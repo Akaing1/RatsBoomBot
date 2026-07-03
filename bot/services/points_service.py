@@ -14,6 +14,7 @@ class PointsService:
         self.bot = bot
         self.db = db
         self.cooldowns: dict[str, float] = {}
+        self.pending_duels: dict[str, dict] = {}
 
     async def setup(self) -> None:
         query = """
@@ -97,6 +98,26 @@ class PointsService:
                 query,
                 (user_id, username, amount),
             )
+
+    async def remove_points(self, user_id: str, amount: int) -> None:
+        query = """
+        UPDATE viewers
+        SET points = MAX(points - ?, 0)
+        WHERE user_id = ?
+        """
+
+        async with self.db.acquire() as connection:
+            await connection.execute(query, (amount, user_id))
+
+    async def set_points(self, user_id: str, amount: int) -> None:
+        query = """
+        UPDATE viewers
+        SET points = ?
+        WHERE user_id = ?
+        """
+
+        async with self.db.acquire() as connection:
+            await connection.execute(query, (amount, user_id))
 
     async def reset_all_points(self) -> None:
         query = """

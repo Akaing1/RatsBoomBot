@@ -1,6 +1,8 @@
 from twitchio import User
 from twitchio.ext import commands
 
+import random
+
 
 class PointsCommands(commands.Component):
     def __init__(self, bot):
@@ -73,3 +75,65 @@ class PointsCommands(commands.Component):
         await ctx.send(
             f"Added {amount} pieces of stale bread to {target.name}'s stash."
         )
+
+    @bread.command(name="gamble")
+    async def bread_gamble(self, ctx: commands.Context, amount: str):
+        if not self.bot.services:
+            return
+
+        user_id = ctx.chatter.id
+        username = ctx.chatter.name
+
+        current_bread = await self.bot.services.points.get_points(user_id)
+
+        if current_bread <= 0:
+            await ctx.reply("You don't have any stale bread to gamble.")
+            return
+
+        all_in = amount.lower() == "all"
+
+        if all_in:
+            gamble_amount = current_bread
+        else:
+            try:
+                gamble_amount = int(amount)
+            except ValueError:
+                await ctx.reply("Use it like this: !bread gamble 50 or !bread gamble all")
+                return
+
+        if gamble_amount <= 0:
+            await ctx.reply("You need to gamble at least 1 piece of stale bread.")
+            return
+
+        if gamble_amount > current_bread:
+            await ctx.reply(f"You only have {current_bread} pieces of stale bread.")
+            return
+
+        won = random.random() < 0.45
+
+        if won and all_in:
+            await self.bot.services.points.add_points(user_id, username, gamble_amount)
+            await ctx.reply(
+                f"{username} raided the pantry and found a hidden stash of stale bread! "
+                f"You now have {current_bread * 2} bread."
+            )
+        elif won:
+            await self.bot.services.points.add_points(user_id, username, gamble_amount)
+            await ctx.reply(
+                f"{username} found {gamble_amount} stale bread on the ground "
+                f"and now has {current_bread + gamble_amount} bread."
+            )
+        elif all_in:
+            await self.bot.services.points.remove_points(user_id, gamble_amount)
+            await ctx.reply(
+                f"{username} got into a fight with the other rats and got mugged. "
+                f"You lost all your stale bread."
+            )
+        else:
+            await self.bot.services.points.remove_points(user_id, gamble_amount)
+            await ctx.reply(
+                f"{username} got caught by a rat trap and lost {gamble_amount} stale bread "
+                f"and now has {current_bread - gamble_amount} bread."
+            )
+
+
