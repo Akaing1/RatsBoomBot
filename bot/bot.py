@@ -86,6 +86,16 @@ class TwitchBot(commands.AutoBot):
             eventsub.ChatMessageSubscription(
                 broadcaster_user_id=payload.user_id,
                 user_id=self.bot_id,
+            ),
+            eventsub.ChannelFollowSubscription(
+                broadcaster_user_id=payload.user_id,
+                moderator_user_id=payload.user_id,
+            ),
+            eventsub.ChannelSubscribeSubscription(
+                broadcaster_user_id=payload.user_id,
+            ),
+            eventsub.ChannelSubscribeMessageSubscription(
+                broadcaster_user_id=payload.user_id,
             )
         ]
 
