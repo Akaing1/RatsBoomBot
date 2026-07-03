@@ -24,7 +24,6 @@ class AnnouncementTimers(commands.Component):
         self.messages = [
             "Join the Discord: discord.gg/...",
             "Follow me on YouTube: youtube.com/...",
-            "No mic today — feel free to lurk! Thanks for stopping by 💚",
         ]
 
         self.message_cycle = itertools.cycle(self.messages)
