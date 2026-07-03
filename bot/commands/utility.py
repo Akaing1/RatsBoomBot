@@ -20,6 +20,13 @@ class UtilityCommands(commands.Component):
             return
         await ctx.reply(f"Hmmmm... I choose: {random.choice(choices)}!")
 
+    @commands.command(name="kaboom")
+    async def kaboom(self, ctx: commands.Context, user: twitchio.User = None):
+        if user is None:
+            await ctx.reply(f"{ctx.chatter.name} has blown up!")
+            return
+        await ctx.send(f"{ctx.chatter.name} has blown {user} up! KABOOM!")
+
     @commands.command(name="help")
     async def help(self, ctx: commands.Context):
         if not self.bot.services:
@@ -28,10 +35,3 @@ class UtilityCommands(commands.Component):
         await ctx.reply(
             self.bot.services.help.format_help_message()
         )
-
-    @commands.command(name="kaboom")
-    async def kaboom(self, ctx: commands.Context, user: twitchio.User = None):
-        if user is None:
-            await ctx.reply(f"{ctx.chatter.name} has blown up!")
-            return
-        await ctx.send(f"{ctx.chatter.name} has blown {user} up! KABOOM!")
