@@ -3,13 +3,24 @@ class HelpService:
         self.bot = bot
 
     def get_commands(self) -> list[str]:
-        names = set()
+        command_names = set()
 
         for command in self.bot.commands.values():
-            name = getattr(command, "qualified_name", command.name)
-            names.add(name)
+            self._collect_command(command, command_names)
 
-        return sorted(names)
+        return sorted(command_names)
+
+    def _collect_command(self, command, command_names: set[str]) -> None:
+        name = getattr(command, "qualified_name", command.name)
+        command_names.add(name)
+
+        subcommands = getattr(command, "commands", None)
+
+        if not subcommands:
+            return
+
+        for subcommand in subcommands.values():
+            self._collect_command(subcommand, command_names)
 
     def format_help_message(self) -> str:
         commands = self.get_commands()
