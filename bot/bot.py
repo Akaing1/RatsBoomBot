@@ -60,12 +60,10 @@ class TwitchBot(commands.AutoBot):
 
         if not payload.user_id:
             return
-
         if payload.user_id == self.bot_id:
             return
 
         subs = [eventsub.ChatMessageSubscription(broadcaster_user_id=payload.user_id, user_id=self.bot_id, )]
-
         await self.multi_subscribe(subs)
 
     async def event_command_error(self, payload):

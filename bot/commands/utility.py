@@ -11,22 +11,14 @@ class UtilityCommands(commands.Component):
 
     @commands.command()
     async def hi(self, ctx: commands.Context, ):
-        await ctx.reply(f"Hi {ctx.chatter.name}!")
-
-    @commands.command()
-    async def say(self, ctx: commands.Context, *, message: str, ):
-        await ctx.send(message)
-
-    @commands.command()
-    async def add(self, ctx: commands.Context, left: int, right: int, ):
-        await ctx.reply(f"{left} + {right} = {left + right}")
+        await ctx.reply(f"Hallo {ctx.chatter.name}!")
 
     @commands.command()
     async def choice(self, ctx: commands.Context, *choices: str):
         if not choices:
             await ctx.reply("Give me some choices! Example: !choice pizza sushi tacos")
             return
-        await ctx.reply(f"I choose: {random.choice(choices)}")
+        await ctx.reply(f"Hmmmm... I choose: {random.choice(choices)}!")
 
     @commands.command(aliases=["thanks", "thank"])
     async def give(self, ctx: commands.Context, user: twitchio.User, amount: int, *, message: str | None = None, ):

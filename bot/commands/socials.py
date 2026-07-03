@@ -7,9 +7,9 @@ class SocialCommands(commands.Component):
         self.bot = bot
 
     @commands.group(invoke_fallback=True)
-    async def socials(self, ctx: commands.Context, ):
+    async def socials(self, ctx: commands.Context):
         await ctx.send("discord.gg/... | youtube.com/...")
 
     @socials.command(name="discord")
-    async def socials_discord(self, ctx: commands.Context, ):
+    async def socials_discord(self, ctx: commands.Context):
         await ctx.send("discord.gg/...")
