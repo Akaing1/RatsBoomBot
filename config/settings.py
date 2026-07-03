@@ -21,5 +21,8 @@ class Settings:
         if user.strip()
     }
 
+    DISCORD = os.getenv("DISCORD")
+    YOUTUBE = os.getenv("YOUTUBE")
+
 
 settings = Settings()
