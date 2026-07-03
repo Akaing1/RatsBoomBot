@@ -1,0 +1,3 @@
+twitchio~=3.2.2
+asqlite~=2.0.0
+
