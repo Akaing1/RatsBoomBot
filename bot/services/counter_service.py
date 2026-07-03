@@ -30,7 +30,10 @@ class CounterService:
 
         return row["value"]
 
-    async def set_counter(self, name: str, value: int) -> None:
+    async def increment_counter(self, name: str, amount: int = 1) -> int:
+        current_value = await self.get_counter(name)
+        new_value = current_value + amount
+
         query = """
         INSERT INTO counters (name, value)
         VALUES (?, ?)
@@ -39,29 +42,8 @@ class CounterService:
         """
 
         async with self.db.acquire() as connection:
-            await connection.execute(query, (name.lower(), max(value, 0)))
-
-    async def increment_counter(self, name: str, amount: int = 1) -> int:
-        current_value = await self.get_counter(name)
-        new_value = current_value + amount
-
-        await self.set_counter(name, new_value)
+            await connection.execute(query, (name.lower(), new_value))
 
         LOGGER.info("Counter %s increased to %s", name, new_value)
 
         return new_value
-
-    async def decrement_counter(self, name: str, amount: int = 1) -> int:
-        current_value = await self.get_counter(name)
-        new_value = max(current_value - amount, 0)
-
-        await self.set_counter(name, new_value)
-
-        LOGGER.info("Counter %s decreased to %s", name, new_value)
-
-        return new_value
-
-    async def reset_counter(self, name: str) -> None:
-        await self.set_counter(name, 0)
-
-        LOGGER.warning("Counter %s was reset.", name)

@@ -1,6 +1,5 @@
 import logging
 
-import twitchio
 from twitchio import eventsub
 from twitchio.ext import commands
 
@@ -42,7 +41,7 @@ class TwitchBot(commands.AutoBot):
         await self.add_component(PointsCommands(self))
         await self.add_component(ModerationCommands(self))
         await self.add_component(ChatEvents(self))
-        await self.add_component(CounterCommands(self))
+        # await self.add_component(CounterCommands(self))
 
         await self.services.start()
 
