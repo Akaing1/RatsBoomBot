@@ -12,6 +12,8 @@ from bot.commands.socials import SocialCommands
 from bot.commands.points import PointsCommands
 from bot.commands.moderation import ModerationCommands
 
+from bot.timers.announcements import AnnouncementTimers
+
 from bot.events.chat import ChatEvents
 
 LOGGER = logging.getLogger("Bot")
@@ -21,6 +23,7 @@ class TwitchBot(commands.AutoBot):
 
     def __init__(self, *, token_database, subs, ):
         self.token_database = token_database
+        self.announcement_timers = AnnouncementTimers(self)
 
         super().__init__(
             client_id=settings.CLIENT_ID,
@@ -39,6 +42,7 @@ class TwitchBot(commands.AutoBot):
         await self.add_component(PointsCommands(self))
         await self.add_component(ModerationCommands(self))
         await self.add_component(ChatEvents(self))
+        await self.add_component(self.announcement_timers)
 
         print("\nLoaded Commands:")
         for cmd in self.commands.values():
