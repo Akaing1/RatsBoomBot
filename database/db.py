@@ -32,12 +32,7 @@ async def setup_database(db: asqlite.Pool, ) -> tuple[list[tuple[str, str]], lis
     return tokens, subs
 
 
-async def save_token(
-        db: asqlite.Pool,
-        user_id: str,
-        token: str,
-        refresh: str,
-):
+async def save_token(db: asqlite.Pool, user_id: str, token: str, refresh: str, ):
     query = """
     INSERT INTO tokens (user_id, token, refresh)
     VALUES (?, ?, ?)

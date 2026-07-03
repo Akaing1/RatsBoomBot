@@ -10,7 +10,7 @@ class UtilityCommands(commands.Component):
         self.bot = bot
 
     @commands.command()
-    async def hi(self, ctx: commands.Context, ):
+    async def hi(self, ctx: commands.Context):
         await ctx.reply(f"Hallo {ctx.chatter.name}!")
 
     @commands.command()
