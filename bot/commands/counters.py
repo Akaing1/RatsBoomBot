@@ -1,0 +1,2 @@
+class CounterCommands:
+    pass

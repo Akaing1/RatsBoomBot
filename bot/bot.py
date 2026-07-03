@@ -8,6 +8,8 @@ from bot.commands.moderation import ModerationCommands
 from bot.commands.points import PointsCommands
 from bot.commands.socials import SocialCommands
 from bot.commands.utility import UtilityCommands
+from bot.commands.counters import CounterCommands
+
 from bot.events.chat import ChatEvents
 from bot.services.service_container import ServiceContainer
 from config.settings import settings
@@ -40,6 +42,7 @@ class TwitchBot(commands.AutoBot):
         await self.add_component(PointsCommands(self))
         await self.add_component(ModerationCommands(self))
         await self.add_component(ChatEvents(self))
+        await self.add_component(CounterCommands(self))
 
         await self.services.start()
 

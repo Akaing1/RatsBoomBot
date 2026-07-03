@@ -28,3 +28,7 @@ class UtilityCommands(commands.Component):
         await ctx.reply(
             self.bot.services.help.format_help_message()
         )
+
+    @commands.command(name="explode")
+    async def explode(self, ctx: commands.Context):
+        await ctx.reply("BOOM!")
