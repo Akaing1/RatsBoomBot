@@ -30,10 +30,34 @@ class UtilityCommands(commands.Component):
     @commands.command()
     async def stinky(self, ctx: commands.Context, user: twitchio.User = None):
 
-        if user is None:
-            await ctx.reply(f"{ctx.chatter.name} is stinky!")
+        stinky_percentage = random.randint(0, 100)
+
+        if stinky_percentage < 20:
+            if user is None:
+                await ctx.reply(f"{ctx.chatter.name} is pretty clean today! Only {stinky_percentage}% stinky.")
+                return
+            await ctx.reply(f"{ctx.chatter.name} thinks {user} is pretty clean today! Only {stinky_percentage}% stinky.")
             return
-        await ctx.send(f"{ctx.chatter.name} thinks {user} is stinky! Eww!")
+
+        elif stinky_percentage < 50:
+            if user is None:
+                await ctx.reply(f"{ctx.chatter.name} is kinda clean today... Only {stinky_percentage}% stinky.")
+                return
+            await ctx.reply(f"{ctx.chatter.name} thinks {user} is kinda clean today... Only {stinky_percentage}% stinky.")
+            return
+
+        elif stinky_percentage > 80:
+            if user is None:
+                await ctx.reply(f"{ctx.chatter.name} is {stinky_percentage}% stinky today! You need a shower!")
+                return
+            await ctx.send(f"{ctx.chatter.name} thinks {user} is {stinky_percentage}% stinky today! They need a shower!")
+
+        else:
+            if user is None:
+                await ctx.reply(f"{ctx.chatter.name} is kinda stinky today... Only {stinky_percentage}% stinky.")
+                return
+            await ctx.reply(f"{ctx.chatter.name} thinks {user} is kinda stinky today... Only {stinky_percentage}% stinky.")
+            return
 
     @commands.command()
     async def lurk(self, ctx: commands.Context):
