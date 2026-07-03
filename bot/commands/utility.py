@@ -22,17 +22,9 @@ class UtilityCommands(commands.Component):
 
     @commands.command(name="help")
     async def help(self, ctx: commands.Context):
-        commands_list = []
-
-        for command in self.bot.commands.values():
-            if command.name != command.qualified_name.split()[-1]:
-                continue
-
-            commands_list.append(command.qualified_name)
-
-        commands_list = sorted(set(commands_list))
+        if not self.bot.services:
+            return
 
         await ctx.reply(
-            "Available commands: " +
-            ", ".join(f"!{cmd}" for cmd in commands_list)
+            self.bot.services.help.format_help_message()
         )
