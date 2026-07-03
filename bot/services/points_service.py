@@ -98,6 +98,17 @@ class PointsService:
                 (user_id, username, amount),
             )
 
+    async def reset_all_points(self) -> None:
+        query = """
+        UPDATE viewers
+        SET points = 0
+        """
+
+        async with self.db.acquire() as connection:
+            await connection.execute(query)
+
+        LOGGER.warning("All stale bread points were reset.")
+
     async def get_leaderboard(self, limit: int = 5):
         query = """
         SELECT username, points

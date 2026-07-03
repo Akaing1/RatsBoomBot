@@ -1,3 +1,4 @@
+import twitchio
 from twitchio.ext import commands
 
 
@@ -33,3 +34,40 @@ class PointsCommands(commands.Component):
         )
 
         await ctx.reply(f"Top stale bread hoarders: {leaderboard}")
+
+    @bread.command(name="reset")
+    async def bread_reset(self, ctx: commands.Context):
+        if not self.bot.services:
+            return
+
+        if ctx.chatter.id != ctx.broadcaster.id:
+            await ctx.reply("Only the broadcaster can reset the stale bread stash.")
+            return
+
+        await self.bot.services.points.reset_all_points()
+
+        await ctx.send("All stale bread has been thrown away. The leaderboard has been reset.")
+
+    @bread.command(name="add")
+    async def bread_add(self, ctx: commands.Context, user: twitchio.user, amount: int):
+        if not self.bot.services:
+            return
+
+        is_broadcaster = ctx.chatter.id == ctx.broadcaster.id
+        is_moderator = ctx.chatter.moderator
+
+        if not is_moderator or not is_broadcaster:
+            await ctx.reply("Only moderators can add stale bread to viewers.")
+            return
+
+        if amount <= 0:
+            await ctx.reply("Bread amount must be greater than 0.")
+            return
+
+        await self.bot.services.points.add_points(
+            user_id=user.id,
+            username=user.name,
+            amount=amount,
+        )
+
+        await ctx.send(f"{amount} pieces of stale bread have been added to {user.name}'s stash.")

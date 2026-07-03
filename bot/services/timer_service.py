@@ -7,9 +7,9 @@ LOGGER = logging.getLogger("Bot")
 
 
 class TimerService:
-    INTERVAL_SECONDS = 30
-    REQUIRED_MESSAGES = 2
-    CHECK_EVERY_SECONDS = 3
+    INTERVAL_SECONDS = 30 * 60
+    REQUIRED_MESSAGES = 20
+    CHECK_EVERY_SECONDS = 5
 
     def __init__(self, bot):
         self.bot = bot
