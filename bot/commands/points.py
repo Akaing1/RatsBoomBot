@@ -1,4 +1,4 @@
-import twitchio
+from twitchio import User
 from twitchio.ext import commands
 
 
@@ -49,14 +49,14 @@ class PointsCommands(commands.Component):
         await ctx.send("All stale bread has been thrown away. The leaderboard has been reset.")
 
     @bread.command(name="add")
-    async def bread_add(self, ctx: commands.Context, user: twitchio.user, amount: int):
+    async def bread_add(self, ctx: commands.Context, target: User,amount: int, ):
         if not self.bot.services:
             return
 
         is_broadcaster = ctx.chatter.id == ctx.broadcaster.id
-        is_moderator = ctx.chatter.moderator
+        is_moderator = getattr(ctx.chatter, "moderator", False)
 
-        if not is_moderator or not is_broadcaster:
+        if not (is_broadcaster or is_moderator):
             await ctx.reply("Only moderators can add stale bread to viewers.")
             return
 
@@ -65,9 +65,11 @@ class PointsCommands(commands.Component):
             return
 
         await self.bot.services.points.add_points(
-            user_id=user.id,
-            username=user.name,
+            user_id=target.id,
+            username=target.name,
             amount=amount,
         )
 
-        await ctx.send(f"{amount} pieces of stale bread have been added to {user.name}'s stash.")
+        await ctx.send(
+            f"Added {amount} pieces of stale bread to {target.name}'s stash."
+        )

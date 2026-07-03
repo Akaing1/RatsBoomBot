@@ -21,7 +21,8 @@ class TimerService:
 
         self.messages = [
             "Lost something? Maybe you left it in the basement: https://discord.gg/RnwtqhpPa4",
-            "Missed something? Go check out Rat's youtube! https://www.youtube.com/@Ninjakaing There's a video there now!"
+            "Missed something? Go check out Rat's youtube! https://www.youtube.com/@Ninjakaing",
+            "Ready to gamble? using !help to get a list of commands you can use!"
         ]
 
         self.message_cycle = itertools.cycle(self.messages)

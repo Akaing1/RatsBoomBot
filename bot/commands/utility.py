@@ -20,8 +20,19 @@ class UtilityCommands(commands.Component):
             return
         await ctx.reply(f"Hmmmm... I choose: {random.choice(choices)}!")
 
-    @commands.command(aliases=["thanks", "thank"])
-    async def give(self, ctx: commands.Context, user: twitchio.User, amount: int, *, message: str | None = None, ):
-        msg = (f"with message: {message}" if message else "")
+    @commands.command(name="help")
+    async def help(self, ctx: commands.Context):
+        commands_list = []
 
-        await ctx.send(f"{ctx.chatter.mention} "f"gave {amount} thanks "f"to {user.mention} {msg}")
+        for command in self.bot.commands.values():
+            if command.name != command.qualified_name.split()[-1]:
+                continue
+
+            commands_list.append(command.qualified_name)
+
+        commands_list = sorted(set(commands_list))
+
+        await ctx.reply(
+            "Available commands: " +
+            ", ".join(f"!{cmd}" for cmd in commands_list)
+        )
