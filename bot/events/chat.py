@@ -13,5 +13,3 @@ class ChatEvents(commands.Component):
             f"{payload.chatter.name}: "
             f"{payload.text}"
         )
-
-        await self.bot.process_commands(payload)
