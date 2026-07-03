@@ -35,6 +35,10 @@ class UtilityCommands(commands.Component):
             return
         await ctx.send(f"{ctx.chatter.name} thinks {user} is stinky! Eww!")
 
+    @commands.command()
+    async def lurk(self, ctx: commands.Context):
+        await ctx.reply(f"{ctx.chatter.name} has been spotted by a human and scattered! See you soon!")
+
     @commands.command(name="help")
     async def help(self, ctx: commands.Context):
         if not self.bot.services:
