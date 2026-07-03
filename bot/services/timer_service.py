@@ -20,9 +20,8 @@ class TimerService:
         self.channels: dict[str, str] = {}
 
         self.messages = [
-            "Join the Discord: discord.gg/...",
-            "Follow me on YouTube: youtube.com/...",
-            "No mic today — feel free to lurk! Thanks for stopping by 💚",
+            "Lost something? Maybe you left it in the basement: https://discord.gg/RnwtqhpPa4",
+            "Missed something? Go check out Rat's youtube! https://www.youtube.com/@Ninjakaing There's a video there now!"
         ]
 
         self.message_cycle = itertools.cycle(self.messages)
