@@ -6,7 +6,7 @@ class ChatEvents(commands.Component):
         self.bot = bot
 
     @commands.Component.listener()
-    async def event_message(self, payload) -> None:
+    async def event_message(self, payload):
         print(
             f"[{payload.broadcaster.name}] "
             f"{payload.chatter.name}: "
@@ -15,3 +15,4 @@ class ChatEvents(commands.Component):
 
         if self.bot.services:
             self.bot.services.timers.track_message(payload)
+            await self.bot.services.points.track_message(payload)

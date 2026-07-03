@@ -31,8 +31,9 @@ class TwitchBot(commands.AutoBot):
             force_subscribe=True,
         )
 
-    async def setup_hook(self) -> None:
-        self.services = ServiceContainer(self)
+    async def setup_hook(self):
+        self.services = ServiceContainer(self, self.token_database)
+        await self.services.setup()
 
         await self.add_component(UtilityCommands(self))
         await self.add_component(SocialCommands(self))
@@ -42,9 +43,9 @@ class TwitchBot(commands.AutoBot):
 
         await self.services.start()
 
-        LOGGER.info("Loaded commands:")
-        for command in self.commands.values():
-            LOGGER.info(" - %s", command.name)
+        LOGGER.info("Loaded Commands:")
+        for cmd in self.commands.values():
+            LOGGER.info(" - %s", cmd.name)
 
     async def close(self) -> None:
         if self.services:
@@ -52,12 +53,8 @@ class TwitchBot(commands.AutoBot):
 
         await super().close()
 
-    async def event_ready(self) -> None:
+    async def event_ready(self):
         LOGGER.info("Logged in as %s", self.bot_id)
-
-    async def event_command_error(self, payload) -> None:
-        LOGGER.error("Command error: %r", payload)
-        LOGGER.error("Exception: %r", getattr(payload, "exception", None))
 
     async def add_token(self, token: str, refresh: str):
         resp = await super().add_token(token, refresh)
@@ -69,20 +66,18 @@ class TwitchBot(commands.AutoBot):
             refresh,
         )
 
-        LOGGER.info("Saved token for user %s", resp.user_id)
-
         return resp
 
-    async def event_oauth_authorized(
-        self,
-        payload: twitchio.authentication.UserTokenPayload,
-    ) -> None:
+    async def event_oauth_authorized(self, payload):
         await self.add_token(
             payload.access_token,
             payload.refresh_token,
         )
 
         if not payload.user_id:
+            return
+
+        if payload.user_id == self.bot_id:
             return
 
         subs = [
@@ -92,11 +87,8 @@ class TwitchBot(commands.AutoBot):
             )
         ]
 
-        resp = await self.multi_subscribe(subs)
+        await self.multi_subscribe(subs)
 
-        if resp.errors:
-            LOGGER.warning(
-                "Failed to subscribe to %r for user %s",
-                resp.errors,
-                payload.user_id,
-            )
+    async def event_command_error(self, payload):
+        LOGGER.error("Command error: %r", payload)
+        LOGGER.error("Exception: %r", getattr(payload, "exception", None))
