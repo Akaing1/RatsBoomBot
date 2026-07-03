@@ -3,12 +3,10 @@ import itertools
 import logging
 import time
 
-from twitchio.ext import commands
-
 LOGGER = logging.getLogger("Bot")
 
 
-class AnnouncementTimers(commands.Component):
+class TimerService:
     INTERVAL_SECONDS = 30
     REQUIRED_MESSAGES = 2
     CHECK_EVERY_SECONDS = 3
@@ -19,29 +17,36 @@ class AnnouncementTimers(commands.Component):
 
         self.message_count = 0
         self.last_announcement = time.time()
-        self.channels = {}
+        self.channels: dict[str, str] = {}
 
         self.messages = [
             "Join the Discord: discord.gg/...",
             "Follow me on YouTube: youtube.com/...",
+            "No mic today — feel free to lurk! Thanks for stopping by 💚",
         ]
 
         self.message_cycle = itertools.cycle(self.messages)
 
-    async def component_load(self) -> None:
-        LOGGER.info("Announcement timer component loaded.")
+    async def start(self) -> None:
+        if self._task is not None:
+            return
+
+        LOGGER.info("Timer service started.")
         self._task = asyncio.create_task(self.announcement_loop())
 
-    async def component_teardown(self) -> None:
-        if self._task:
-            self._task.cancel()
+    async def stop(self) -> None:
+        if self._task is None:
+            return
+
+        self._task.cancel()
+        self._task = None
 
     def track_message(self, payload) -> None:
         self.message_count += 1
-        self.channels[payload.broadcaster.id] = payload.broadcaster
+        self.channels[payload.broadcaster.id] = payload.broadcaster.name
 
         LOGGER.info(
-            "Tracked chat message. Count: %s/%s",
+            "Tracked message. Count: %s/%s",
             self.message_count,
             self.REQUIRED_MESSAGES,
         )
@@ -49,7 +54,7 @@ class AnnouncementTimers(commands.Component):
     async def announcement_loop(self) -> None:
         await self.bot.wait_until_ready()
 
-        LOGGER.info("Announcement timer loop started.")
+        LOGGER.info("Announcement loop started.")
 
         while True:
             await asyncio.sleep(self.CHECK_EVERY_SECONDS)
@@ -71,7 +76,7 @@ class AnnouncementTimers(commands.Component):
                 continue
 
             if not self.channels:
-                LOGGER.warning("No channels available for announcement.")
+                LOGGER.warning("No channels available for timer announcement.")
                 continue
 
             await self.send_next_announcement()
@@ -82,17 +87,24 @@ class AnnouncementTimers(commands.Component):
     async def send_next_announcement(self) -> None:
         message = next(self.message_cycle)
 
-        for broadcaster_id in self.channels.keys():
+        for broadcaster_id, broadcaster_name in self.channels.items():
             try:
-                channel = self.bot.create_partialuser(id=broadcaster_id)
+                channel = self.bot.create_partialuser(broadcaster_id)
 
-                await channel.send_message(sender=self.bot.user, message=message, )
+                await channel.send_message(
+                    sender=self.bot.user,
+                    message=message,
+                )
 
-                LOGGER.info("Announcement sent to %s: %s", broadcaster_id, message)
+                LOGGER.info(
+                    "Announcement sent to %s: %s",
+                    broadcaster_name,
+                    message,
+                )
 
             except Exception as error:
                 LOGGER.error(
                     "Failed to send announcement to %s: %r",
-                    broadcaster_id,
+                    broadcaster_name,
                     error,
                 )
