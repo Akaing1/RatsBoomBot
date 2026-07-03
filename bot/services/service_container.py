@@ -1,3 +1,4 @@
+from bot.services.counter_service import CounterService
 from bot.services.help_service import HelpService
 from bot.services.points_service import PointsService
 from bot.services.timer_service import TimerService
@@ -11,9 +12,11 @@ class ServiceContainer:
         self.help = HelpService(bot)
         self.timers = TimerService(bot)
         self.points = PointsService(bot, db)
+        self.counters = CounterService(bot, db)
 
     async def setup(self) -> None:
         await self.points.setup()
+        await self.counters.setup()
 
     async def start(self) -> None:
         await self.timers.start()
