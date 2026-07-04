@@ -100,6 +100,9 @@ class TwitchBot(commands.AutoBot):
             eventsub.ChannelBanSubscription(
                 broadcaster_user_id=payload.user_id,
                 moderator_user_id=payload.user_id
+            ),
+            eventsub.AdBreakBeginSubscription(
+                broadcaster_user_id=payload.user_id
             )
         ]
 

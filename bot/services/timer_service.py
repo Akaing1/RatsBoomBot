@@ -11,13 +11,13 @@ class TimerService:
     REQUIRED_MESSAGES = 20
     CHECK_EVERY_SECONDS = 5
 
-    def __init__(self, bot):
+    def __init__(self, bot, channels):
         self.bot = bot
         self._task: asyncio.Task | None = None
 
         self.message_count = 0
         self.last_announcement = time.time()
-        self.channels: dict[str, str] = {}
+        self.channels = channels
 
         self.messages = [
             "Lost something? Maybe you left it in the basement: https://discord.gg/RnwtqhpPa4",
@@ -43,7 +43,7 @@ class TimerService:
 
     def track_message(self, payload) -> None:
         self.message_count += 1
-        self.channels[payload.broadcaster.id] = payload.broadcaster.name
+        self.channels.track_channel(payload)
 
         LOGGER.info(
             "Tracked message. Count: %s/%s",
@@ -79,15 +79,21 @@ class TimerService:
                 LOGGER.warning("No channels available for timer announcement.")
                 continue
 
-            await self.send_next_announcement()
+            active_channels = self.channels.get_active_channels()
+
+            if not active_channels:
+                LOGGER.warning("No channels available for timer announcement.")
+                continue
+
+            await self.send_next_announcement(active_channels)
 
             self.message_count = 0
             self.last_announcement = time.time()
 
-    async def send_next_announcement(self) -> None:
+    async def send_next_announcement(self, active_channels: dict[str, str]) -> None:
         message = next(self.message_cycle)
 
-        for broadcaster_id, broadcaster_name in self.channels.items():
+        for broadcaster_id, broadcaster_name in active_channels.items():
             try:
                 channel = self.bot.create_partialuser(broadcaster_id)
 
