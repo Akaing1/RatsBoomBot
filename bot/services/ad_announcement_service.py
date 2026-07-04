@@ -60,9 +60,8 @@ class AdAnnouncementService:
                         await broadcaster.send_message(
                             sender=self.bot.user,
                             message=(
-                                "Heads up! Ads are coming soon. "
-                                "Grab water, stretch, or blame the rats 🐀"
-                            ),
+                                f"Hide! The humans are coming! Ads starting in ~{seconds_until_ad} seconds!"
+                            )
                         )
 
                         self.warned_ads.add(ad_key)
@@ -72,5 +71,5 @@ class AdAnnouncementService:
                     LOGGER.error(
                         "Failed checking ad schedule for %s: %r",
                         broadcaster_name,
-                        error,
+                        error
                     )
