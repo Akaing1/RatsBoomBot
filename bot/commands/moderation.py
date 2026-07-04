@@ -18,7 +18,7 @@ class ModerationCommands(commands.Component):
         broadcaster = ctx.broadcaster
         channel = self.bot.create_partialuser(broadcaster.id)
 
-        if caller.id == target.id or target is None:
+        if target is None or caller.id == target.id:
             await ctx.reply("You bomb yourself...")
             await channel.timeout_user(
                 moderator=broadcaster.id,
@@ -28,14 +28,14 @@ class ModerationCommands(commands.Component):
             )
             return
 
-        isModerator = getattr(target, "moderator", False)
+        isModerator = getattr(target, "moderator", True)
         if target.id == broadcaster.id or isModerator:
             await ctx.reply("You cannot bomb this target, try someone else.")
             return
 
         bomb = random.randint(1, 100)
 
-        if bomb == 100:
+        if bomb > 75:
             await ctx.send(f"{target.name} has been blown up and timed out for {DURATION} seconds.")
             await channel.timeout_user(
                 moderator=broadcaster.id,
