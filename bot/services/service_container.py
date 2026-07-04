@@ -1,3 +1,4 @@
+from bot.services.ad_announcement_service import AdAnnouncementService
 from bot.services.counter_service import CounterService
 from bot.services.help_service import HelpService
 from bot.services.points_service import PointsService
@@ -13,6 +14,7 @@ class ServiceContainer:
         self.timers = TimerService(bot)
         self.points = PointsService(bot, db)
         self.counters = CounterService(bot, db)
+        self.ads = AdAnnouncementService(bot)
 
     async def setup(self) -> None:
         await self.points.setup()
@@ -20,6 +22,9 @@ class ServiceContainer:
 
     async def start(self) -> None:
         await self.timers.start()
+        await self.ads.start()
+
+        await self.bot.announce_start_up()
 
     async def stop(self) -> None:
         await self.timers.stop()
