@@ -108,6 +108,11 @@ class TwitchBot(commands.AutoBot):
 
         await self.multi_subscribe(subs)
 
+        self.services.broadcasters.add_broadcaster(
+            payload.user_id,
+            payload.user_login
+        )
+
     async def event_command_error(self, payload):
         LOGGER.error("Command error: %r", payload)
         LOGGER.error("Exception: %r", getattr(payload, "exception", None))

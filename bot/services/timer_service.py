@@ -7,17 +7,17 @@ LOGGER = logging.getLogger("Bot")
 
 
 class TimerService:
-    INTERVAL_SECONDS = 30 * 60
-    REQUIRED_MESSAGES = 20
-    CHECK_EVERY_SECONDS = 5
+    INTERVAL_SECONDS = 30
+    REQUIRED_MESSAGES = 2
+    CHECK_EVERY_SECONDS = 2
 
-    def __init__(self, bot, channels):
+    def __init__(self, bot, broadcasters):
         self.bot = bot
         self._task: asyncio.Task | None = None
 
         self.message_count = 0
         self.last_announcement = time.time()
-        self.channels = channels
+        self.broadcasters = broadcasters
 
         self.messages = [
             "Lost something? Maybe you left it in the basement: https://discord.gg/RnwtqhpPa4",
@@ -43,7 +43,7 @@ class TimerService:
 
     def track_message(self, payload) -> None:
         self.message_count += 1
-        self.channels.track_channel(payload)
+        # self.channels.track_channel(payload)
 
         LOGGER.info(
             "Tracked message. Count: %s/%s",
@@ -61,25 +61,17 @@ class TimerService:
 
             elapsed = time.time() - self.last_announcement
 
-            # LOGGER.info(
-            #     "Timer check: elapsed=%ss, messages=%s/%s, channels=%s",
-            #     int(elapsed),
-            #     self.message_count,
-            #     self.REQUIRED_MESSAGES,
-            #     len(self.channels),
-            # )
-
             if elapsed < self.INTERVAL_SECONDS:
                 continue
 
             if self.message_count < self.REQUIRED_MESSAGES:
                 continue
 
-            if not self.channels:
+            if not self.broadcasters.get_live_broadcasters:
                 LOGGER.warning("No channels available for timer announcement.")
                 continue
 
-            active_channels = self.channels.get_active_channels()
+            active_channels = await self.broadcasters.get_live_broadcasters()
 
             if not active_channels:
                 LOGGER.warning("No channels available for timer announcement.")
