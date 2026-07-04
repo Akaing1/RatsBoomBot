@@ -14,7 +14,7 @@ class StartUpService:
 
                 await broadcaster.send_message(
                     sender=self.bot.user,
-                    message="🐀 RatsBoomBot is now online!"
+                    message="RatsBoomBot is now online!"
                 )
 
                 LOGGER.info("Startup announcement sent to %s", broadcaster_name)
@@ -23,5 +23,5 @@ class StartUpService:
                 LOGGER.error(
                     "Failed sending startup announcement to %s: %r",
                     broadcaster_name,
-                    error,
+                    error
                 )
