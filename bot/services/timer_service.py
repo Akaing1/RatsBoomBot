@@ -79,7 +79,13 @@ class TimerService:
                 LOGGER.warning("No channels available for timer announcement.")
                 continue
 
-            await self.send_next_announcement()
+            active_channels = self.channels.get_active_channels()
+
+            if not active_channels:
+                LOGGER.warning("No channels available for timer announcement.")
+                continue
+
+            await self.send_next_announcement(active_channels)
 
             self.message_count = 0
             self.last_announcement = time.time()

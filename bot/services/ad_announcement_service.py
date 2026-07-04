@@ -9,10 +9,11 @@ class AdAnnouncementService:
     CHECK_EVERY_SECONDS = 30
     WARNING_SECONDS = 60
 
-    def __init__(self, bot):
+    def __init__(self, bot, channels):
         self.bot = bot
         self._task: asyncio.Task | None = None
         self.warned_ads: set[str] = set()
+        self.channels = channels
 
     async def start(self) -> None:
         if self._task is not None:
@@ -37,9 +38,9 @@ class AdAnnouncementService:
             if not self.bot.services:
                 continue
 
-            channels = self.bot.services.timers.channels
+            channelsList = self.channels.get_active_channels()
 
-            for broadcaster_id, broadcaster_name in channels.items():
+            for broadcaster_id, broadcaster_name in channelsList.items():
                 try:
                     broadcaster = self.bot.create_partialuser(broadcaster_id)
                     schedule = await broadcaster.fetch_ad_schedule()

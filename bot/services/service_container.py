@@ -18,8 +18,8 @@ class ServiceContainer:
         self.timers = TimerService(bot, self.channels)
         self.points = PointsService(bot, db)
         self.counters = CounterService(bot, db)
-        self.ads = AdAnnouncementService(bot)
-        self.start = StartUpService(bot)
+        self.ads = AdAnnouncementService(bot, self.channels)
+        self.startup = StartUpService(bot)
 
     async def setup(self) -> None:
         await self.points.setup()
@@ -29,7 +29,7 @@ class ServiceContainer:
         await self.timers.start()
         await self.ads.start()
 
-        # await self.start.start()
+        # await self.startup.start()
 
     async def stop(self) -> None:
         await self.timers.stop()
