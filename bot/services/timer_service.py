@@ -61,13 +61,13 @@ class TimerService:
 
             elapsed = time.time() - self.last_announcement
 
-            LOGGER.info(
-                "Timer check: elapsed=%ss, messages=%s/%s, channels=%s",
-                int(elapsed),
-                self.message_count,
-                self.REQUIRED_MESSAGES,
-                len(self.channels),
-            )
+            # LOGGER.info(
+            #     "Timer check: elapsed=%ss, messages=%s/%s, channels=%s",
+            #     int(elapsed),
+            #     self.message_count,
+            #     self.REQUIRED_MESSAGES,
+            #     len(self.channels),
+            # )
 
             if elapsed < self.INTERVAL_SECONDS:
                 continue

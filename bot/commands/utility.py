@@ -10,8 +10,11 @@ class UtilityCommands(commands.Component):
         self.bot = bot
 
     @commands.command()
-    async def hi(self, ctx: commands.Context):
-        await ctx.reply(f"Hallo {ctx.chatter.name}!")
+    async def hi(self, ctx: commands.Context, user: twitchio.User = None):
+        if user is None:
+            await ctx.reply(f"Hallo {ctx.chatter.name}!")
+            return
+        await ctx.reply(f"{ctx.chatter.name} says hallo {user}!")
 
     @commands.command()
     async def choice(self, ctx: commands.Context, *choices: str):
@@ -89,10 +92,48 @@ class UtilityCommands(commands.Component):
 
         else:
             if user is None:
-                await ctx.reply(f"{ctx.chatter.name} is kinda lucky today... Only {lucky_percentage}% stinky.")
+                await ctx.reply(f"{ctx.chatter.name} is kinda lucky today... Only {lucky_percentage}% lucky.")
                 return
             await ctx.reply(
-                f"{ctx.chatter.name} thinks {user} is kinda lucky today... Only {lucky_percentage}% stinky.")
+                f"{ctx.chatter.name} thinks {user} is kinda lucky today... Only {lucky_percentage}% lucky.")
+            return
+
+    @commands.command()
+    async def smart(self, ctx: commands.Context, user: twitchio.User = None):
+
+        smart_percentage = random.randint(0, 100)
+
+        if smart_percentage < 20:
+            if user is None:
+                await ctx.reply(f"{ctx.chatter.name} might have pebbles in their head today! "
+                                f"You are {smart_percentage}% smart today!")
+                return
+            await ctx.reply(
+                f"{ctx.chatter.name} thinks {user} might have pebbles in their head today!"
+                f" They are {smart_percentage}% smart today!")
+            return
+
+        elif smart_percentage < 50:
+            if user is None:
+                await ctx.reply(f"{ctx.chatter.name} is kinda dumbo today... Only {smart_percentage}% smart...")
+                return
+            await ctx.reply(
+                f"{ctx.chatter.name} thinks {user} is kinda dumbo today... Only {smart_percentage}% smart...")
+            return
+
+        elif smart_percentage > 80:
+            if user is None:
+                await ctx.reply(f"{ctx.chatter.name} is a genius! You are {smart_percentage}% smart today!")
+                return
+            await ctx.send(
+                f"{ctx.chatter.name} thinks {user} is a genius!They are {smart_percentage}% smart today!")
+
+        else:
+            if user is None:
+                await ctx.reply(f"{ctx.chatter.name} is kinda smart today... Only {smart_percentage}% smart.")
+                return
+            await ctx.reply(
+                f"{ctx.chatter.name} thinks {user} is kinda smart today... Only {smart_percentage}% smart.")
             return
 
     @commands.command()
