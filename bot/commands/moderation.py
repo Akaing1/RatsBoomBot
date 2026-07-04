@@ -16,12 +16,7 @@ class ModerationCommands(commands.Component):
         DURATION = 10  # seconds
         caller = ctx.chatter
         broadcaster = ctx.broadcaster
-        isModerator = getattr(target, "moderator", False)
-        channel = self.bot.create_partialuser(id=broadcaster.id)
-
-        if target.id == broadcaster.id or isModerator:
-            await ctx.reply("You cannot bomb this target, try someone else.")
-            return
+        channel = self.bot.create_partialuser(broadcaster.id)
 
         if caller.id == target.id or target is None:
             await ctx.reply("You bomb yourself...")
@@ -31,6 +26,11 @@ class ModerationCommands(commands.Component):
                 duration=DURATION,
                 reason="Blown up."
             )
+            return
+
+        isModerator = getattr(target, "moderator", False)
+        if target.id == broadcaster.id or isModerator:
+            await ctx.reply("You cannot bomb this target, try someone else.")
             return
 
         bomb = random.randint(1, 100)
