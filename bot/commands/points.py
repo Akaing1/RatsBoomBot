@@ -9,15 +9,19 @@ class PointsCommands(commands.Component):
         self.bot = bot
 
     @commands.group(name="bread", invoke_fallback=True)
-    async def bread(self, ctx: commands.Context):
+    async def bread(self, ctx: commands.Context, target: User = None):
         if not self.bot.services:
             return
 
-        points = await self.bot.services.points.get_points(ctx.chatter.id)
+        if target is None:
+            points = await self.bot.services.points.get_points(ctx.chatter.id)
 
-        await ctx.reply(
-            f"{ctx.chatter.name}, you have {points} pieces of stale bread!"
-        )
+            await ctx.reply(f"{ctx.chatter.name}, you have {points} pieces of stale bread!")
+            return
+
+        points = await self.bot.services.points.get_points(target.id)
+
+        await ctx.reply(f"{target.name} has {points} pieces of stale bread!")
 
     @bread.command(name="leaderboard")
     async def bread_leaderboard(self, ctx: commands.Context):
