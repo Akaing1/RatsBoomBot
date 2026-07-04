@@ -1,10 +1,15 @@
+from typing import Tuple, List, Any
+
 import asqlite
 from twitchio import eventsub
+from twitchio.eventsub import ChatMessageSubscription
 
 from config.settings import settings
 
 
-async def setup_database(db: asqlite.Pool, ) -> tuple[list[tuple[str, str]], list[eventsub.SubscriptionPayload]]:
+async def setup_database(db: asqlite.Pool, ) -> tuple[list[tuple[Any, Any]],
+                                                      list[ChatMessageSubscription],
+                                                      list[str]]:
     query = """
     CREATE TABLE IF NOT EXISTS tokens(
         user_id TEXT PRIMARY KEY,
@@ -20,6 +25,7 @@ async def setup_database(db: asqlite.Pool, ) -> tuple[list[tuple[str, str]], lis
 
         tokens = []
         subs = []
+        broadcasters = []
 
         for row in rows:
             tokens.append((row["token"], row["refresh"]))
@@ -27,9 +33,16 @@ async def setup_database(db: asqlite.Pool, ) -> tuple[list[tuple[str, str]], lis
             if row["user_id"] == settings.BOT_ID:
                 continue
 
-            subs.append(eventsub.ChatMessageSubscription(broadcaster_user_id=row["user_id"], user_id=settings.BOT_ID, ))
+            broadcasters.append(row["user_id"])
 
-    return tokens, subs
+            subs.append(
+                eventsub.ChatMessageSubscription(
+                    broadcaster_user_id=row["user_id"],
+                    user_id=settings.BOT_ID,
+                )
+            )
+
+        return tokens, subs, broadcasters
 
 
 async def save_token(db: asqlite.Pool, user_id: str, token: str, refresh: str, ):

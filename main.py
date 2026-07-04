@@ -13,9 +13,9 @@ LOGGER = logging.getLogger("Bot")
 
 async def runner():
     async with asqlite.create_pool(settings.DATABASE_PATH) as db:
-        tokens, subs = await setup_database(db)
+        tokens, subs, broadcaster_ids = await setup_database(db)
 
-        async with TwitchBot(token_database=db, subs=subs, ) as bot:
+        async with TwitchBot(token_database=db, subs=subs) as bot:
             for token_pair in tokens:
                 await bot.add_token(*token_pair)
 

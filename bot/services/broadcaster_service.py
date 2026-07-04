@@ -1,28 +1,46 @@
+from dataclasses import dataclass
+import logging
+
+LOGGER = logging.getLogger("Bot")
+
+
+@dataclass
+class Broadcaster:
+    id: str
+    name: str | None = None
+    is_live: bool = False
+
+
 class BroadcasterService:
-    def __init__(self, bot, db):
+    def __init__(self, bot, broadcaster_ids: list[str]):
         self.bot = bot
-        self.db = db
-        self.broadcasters: dict[str, str] = {}
+        self.broadcasters: dict[str, Broadcaster] = {}
+
+        for broadcaster_id in broadcaster_ids:
+            self.add_broadcaster(broadcaster_id)
 
     async def setup(self) -> None:
-        # TODO: load authorized users from your token table
-        # self.broadcasters[user_id] = username
-        pass
+        LOGGER.info("Loaded %s broadcasters.", len(self.broadcasters))
 
-    def add_broadcaster(self, broadcaster_id: str, broadcaster_name: str | None = None) -> None:
-        self.broadcasters[broadcaster_id] = broadcaster_name or broadcaster_id
+    def add_broadcaster(self, broadcaster_id: str, broadcaster_name: str | None = None, ) -> None:
+        self.broadcasters[broadcaster_id] = Broadcaster(
+            id=broadcaster_id,
+            name=broadcaster_name,
+        )
 
-    def get_broadcasters(self) -> dict[str, str]:
+    def get_broadcasters(self) -> dict[str, Broadcaster]:
         return self.broadcasters.copy()
 
     async def get_live_broadcasters(self) -> dict[str, str]:
-        live = {}
+        live_broadcasters: dict[str, str] = {}
 
-        for broadcaster_id, broadcaster_name in self.broadcasters.items():
-            broadcaster = self.bot.create_partialuser(broadcaster_id)
-            stream = await broadcaster.fetch_stream()
+        for broadcaster_id, broadcaster in self.broadcasters.items():
+            user = self.bot.create_partialuser(broadcaster_id)
+            stream = await user.fetch_stream()
 
-            if stream is not None:
-                live[broadcaster_id] = broadcaster_name
+            broadcaster.is_live = stream is not None
 
-        return live
+            if broadcaster.is_live:
+                live_broadcasters[broadcaster_id] = broadcaster.name or broadcaster_id
+
+        return live_broadcasters

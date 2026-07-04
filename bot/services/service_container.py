@@ -7,11 +7,11 @@ from bot.services.timer_service import TimerService
 
 
 class ServiceContainer:
-    def __init__(self, bot, db):
+    def __init__(self, bot, db, broadcaster_ids):
         self.bot = bot
         self.db = db
 
-        self.broadcasters = BroadcasterService(bot, db)
+        self.broadcasters = BroadcasterService(bot, broadcaster_ids)
 
         self.help = HelpService(bot)
         self.timers = TimerService(bot, self.broadcasters)

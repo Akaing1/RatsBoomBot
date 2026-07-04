@@ -41,9 +41,8 @@ class TimerService:
         self._task.cancel()
         self._task = None
 
-    def track_message(self, payload) -> None:
+    def track_message(self) -> None:
         self.message_count += 1
-        # self.channels.track_channel(payload)
 
         LOGGER.info(
             "Tracked message. Count: %s/%s",
@@ -65,10 +64,6 @@ class TimerService:
                 continue
 
             if self.message_count < self.REQUIRED_MESSAGES:
-                continue
-
-            if not self.broadcasters.get_live_broadcasters:
-                LOGGER.warning("No channels available for timer announcement.")
                 continue
 
             active_channels = await self.broadcasters.get_live_broadcasters()
