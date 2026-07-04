@@ -10,8 +10,11 @@ class UtilityCommands(commands.Component):
         self.bot = bot
 
     @commands.command()
-    async def hi(self, ctx: commands.Context):
-        await ctx.reply(f"Hallo {ctx.chatter.name}!")
+    async def hi(self, ctx: commands.Context, user: twitchio.User = None):
+        if user is None:
+            await ctx.reply(f"Hallo {ctx.chatter.name}!")
+            return
+        await ctx.reply(f"{ctx.chatter.name} says hallo {user}!")
 
     @commands.command()
     async def choice(self, ctx: commands.Context, *choices: str):
