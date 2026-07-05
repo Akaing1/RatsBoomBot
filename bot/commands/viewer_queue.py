@@ -11,11 +11,23 @@ class ViewerQueueCommands(commands.Component):
 
     @commands.command(name="open")
     async def open_queue(self, ctx: commands.Context):
+        is_moderator = getattr(ctx.author, "moderator", False)
+        is_broadcaster = ctx.author.name.lower() == ctx.channel.name.lower()
+        if not is_moderator and not is_broadcaster:
+            await ctx.send("Only the broadcaster or mods can open the queue.")
+            return
+
         message = self.bot.services.viewer_queue.open_queue()
         await ctx.send(message)
 
     @commands.command(name="close")
     async def close_queue(self, ctx: commands.Context):
+        is_moderator = getattr(ctx.author, "moderator", False)
+        is_broadcaster = ctx.author.name.lower() == ctx.channel.name.lower()
+        if not is_moderator and not is_broadcaster:
+            await ctx.send("Only the broadcaster or mods can close the queue.")
+            return
+
         message = self.bot.services.viewer_queue.close_queue()
         await ctx.send(message)
 
