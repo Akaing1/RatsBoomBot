@@ -1,133 +1,151 @@
 import logging
 
+from twitchio import eventsub
 from twitchio.ext import commands
+
+from bot.commands.moderation import ModerationCommands
+from bot.commands.points import PointsCommands
+from bot.commands.socials import SocialCommands
+from bot.commands.utility import UtilityCommands
+from bot.commands.counters import CounterCommands
+from bot.commands.viewer_queue import ViewerQueueCommands
+
+from bot.events.chat import ChatEvents
+from bot.services.service_container import ServiceContainer
+from config.settings import settings
+from database.db import save_token
 
 LOGGER = logging.getLogger("Bot")
 
 
-def get_nested_attr(obj, *names):
-    current = obj
+def create_channel_point_redemption_subscription(broadcaster_user_id: str):
+    subscription_class = getattr(
+        eventsub,
+        "ChannelPointsCustomRewardRedemptionAddSubscription",
+        None
+    )
 
-    for name in names:
-        if current is None:
-            return None
+    if subscription_class is None:
+        LOGGER.warning(
+            "TwitchIO does not have "
+            "ChannelPointsCustomRewardRedemptionAddSubscription. "
+            "Channel point redeems will not be subscribed."
+        )
+        return None
 
-        current = getattr(current, name, None)
+    return subscription_class(
+        broadcaster_user_id=broadcaster_user_id
+    )
 
-    return current
 
+class TwitchBot(commands.AutoBot):
+    def __init__(self, *, token_database, subs, broadcaster_ids):
+        self.token_database = token_database
+        self.broadcaster_ids = broadcaster_ids
+        self.services: ServiceContainer | None = None
 
-class ChatEvents(commands.Component):
-    def __init__(self, bot):
-        self.bot = bot
-
-    @commands.Component.listener()
-    async def event_message(self, payload):
-        print(
-            f"[{payload.broadcaster.name}] "
-            f"{payload.chatter.name}: "
-            f"{payload.text}"
+        super().__init__(
+            client_id=settings.CLIENT_ID,
+            client_secret=settings.CLIENT_SECRET,
+            bot_id=settings.BOT_ID,
+            owner_id=settings.OWNER_ID,
+            prefix=settings.PREFIX,
+            subscriptions=subs,
+            force_subscribe=True
         )
 
-        if self.bot.services:
-            self.bot.services.timers.track_message(payload)
-            await self.bot.services.points.track_message(payload)
+    async def setup_hook(self):
+        self.services = ServiceContainer(
+            self,
+            self.token_database,
+            self.broadcaster_ids,
+        )
 
-    @commands.Component.listener()
-    async def event_follow(self, payload):
-        broadcaster = self.bot.create_partialuser(id=payload.broadcaster.id)
+        await self.services.setup()
 
-        await broadcaster.send_message(
-            sender=self.bot.user,
-            message=(
-                f"{payload.user.name} has snuck their way into the basement! "
-                f"Thanks for following!"
+        await self.add_component(UtilityCommands(self))
+        await self.add_component(SocialCommands(self))
+        await self.add_component(PointsCommands(self))
+        await self.add_component(ModerationCommands(self))
+        await self.add_component(ChatEvents(self))
+        await self.add_component(CounterCommands(self))
+        await self.add_component(ViewerQueueCommands(self))
+
+        await self.services.start()
+
+        LOGGER.info("Loaded Commands:")
+        for cmd in self.commands.values():
+            LOGGER.info(" - %s", cmd.name)
+
+    async def close(self) -> None:
+        if self.services:
+            await self.services.stop()
+
+        await super().close()
+
+    async def event_ready(self):
+        LOGGER.info("Logged in as %s", self.bot_id)
+
+    async def add_token(self, token: str, refresh: str):
+        resp = await super().add_token(token, refresh)
+
+        await save_token(
+            self.token_database,
+            resp.user_id,
+            token,
+            refresh
+        )
+
+        return resp
+
+    async def event_oauth_authorized(self, payload):
+        await self.add_token(
+            payload.access_token,
+            payload.refresh_token,
+        )
+
+        if not payload.user_id:
+            return
+
+        if payload.user_id == self.bot_id:
+            return
+
+        subs = [
+            eventsub.ChatMessageSubscription(
+                broadcaster_user_id=payload.user_id,
+                user_id=self.bot_id,
+            ),
+            eventsub.ChannelFollowSubscription(
+                broadcaster_user_id=payload.user_id,
+                moderator_user_id=payload.user_id,
+            ),
+            eventsub.ChannelSubscribeSubscription(
+                broadcaster_user_id=payload.user_id,
+            ),
+            eventsub.ChannelSubscribeMessageSubscription(
+                broadcaster_user_id=payload.user_id,
+            ),
+            eventsub.ChannelBanSubscription(
+                broadcaster_user_id=payload.user_id,
+                moderator_user_id=payload.user_id,
+            ),
+            eventsub.AdBreakBeginSubscription(
+                broadcaster_user_id=payload.user_id,
             )
+        ]
+
+        channel_point_sub = create_channel_point_redemption_subscription(
+            payload.user_id
         )
 
-    @commands.Component.listener()
-    async def event_subscription(self, payload):
-        broadcaster = self.bot.create_partialuser(id=payload.broadcaster.id)
+        if channel_point_sub is not None:
+            subs.append(channel_point_sub)
 
-        await broadcaster.send_message(
-            sender=self.bot.user,
-            message=f"{payload.user.name} has subscribed! Rats stronk together!"
-        )
+        await self.multi_subscribe(subs)
 
-    @commands.Component.listener()
-    async def event_subscription_message(self, payload):
-        broadcaster = self.bot.create_partialuser(id=payload.broadcaster.id)
+        if self.services:
+            self.services.broadcasters.add_broadcaster(payload.user_id)
 
-        await broadcaster.send_message(
-            sender=self.bot.user,
-            message=(
-                f"{payload.user.name} resubscribed for "
-                f"{payload.cumulative_months} months! "
-                f"Thank you for your continued support!"
-            )
-        )
-
-    @commands.Component.listener()
-    async def event_channel_points_custom_reward_redemption_add(self, payload):
-        await self.handle_channel_point_redemption(payload)
-
-    @commands.Component.listener()
-    async def event_channel_points_redemption_add(self, payload):
-        await self.handle_channel_point_redemption(payload)
-
-    @commands.Component.listener()
-    async def event_custom_reward_redemption_add(self, payload):
-        await self.handle_channel_point_redemption(payload)
-
-    async def handle_channel_point_redemption(self, payload):
-        if not self.bot.services:
-            return
-
-        broadcaster_id = get_nested_attr(payload, "broadcaster", "id")
-        user_id = get_nested_attr(payload, "user", "id")
-        username = get_nested_attr(payload, "user", "name")
-        reward_title = get_nested_attr(payload, "reward", "title")
-        redemption_id = getattr(payload, "id", None)
-
-        if broadcaster_id is None:
-            broadcaster_id = getattr(payload, "broadcaster_id", None)
-
-        if user_id is None:
-            user_id = getattr(payload, "user_id", None)
-
-        if username is None:
-            username = getattr(payload, "user_name", None)
-
-        if reward_title is None:
-            reward_title = getattr(payload, "reward_title", None)
-
-        if redemption_id is None:
-            redemption_id = getattr(payload, "redemption_id", None)
-
-        if not broadcaster_id or not user_id or not username or not reward_title:
-            LOGGER.warning(
-                "Could not process channel point redemption payload: %r",
-                payload
-            )
-            return
-
-        result = await self.bot.services.redeems.handle_redemption(
-            broadcaster_id=broadcaster_id,
-            user_id=user_id,
-            username=username,
-            reward_title=reward_title,
-            redemption_id=redemption_id
-        )
-
-        if not result.handled:
-            return
-
-        if result.message is None:
-            return
-
-        broadcaster = self.bot.create_partialuser(id=broadcaster_id)
-
-        await broadcaster.send_message(
-            sender=self.bot.user,
-            message=result.message
-        )
+    async def event_command_error(self, payload):
+        LOGGER.error("Command error: %r", payload)
+        LOGGER.error("Exception: %r", getattr(payload, "exception", None))
