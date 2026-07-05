@@ -18,6 +18,26 @@ from database.db import save_token
 LOGGER = logging.getLogger("Bot")
 
 
+def create_channel_point_redemption_subscription(broadcaster_user_id: str):
+    subscription_class = getattr(
+        eventsub,
+        "ChannelPointsCustomRewardRedemptionAddSubscription",
+        None
+    )
+
+    if subscription_class is None:
+        LOGGER.warning(
+            "TwitchIO does not have "
+            "ChannelPointsCustomRewardRedemptionAddSubscription. "
+            "Channel point redeems will not be subscribed."
+        )
+        return None
+
+    return subscription_class(
+        broadcaster_user_id=broadcaster_user_id
+    )
+
+
 class TwitchBot(commands.AutoBot):
     def __init__(self, *, token_database, subs, broadcaster_ids):
         self.token_database = token_database
@@ -31,14 +51,14 @@ class TwitchBot(commands.AutoBot):
             owner_id=settings.OWNER_ID,
             prefix=settings.PREFIX,
             subscriptions=subs,
-            force_subscribe=True,
+            force_subscribe=True
         )
 
     async def setup_hook(self):
         self.services = ServiceContainer(
             self,
             self.token_database,
-            self.broadcaster_ids
+            self.broadcaster_ids,
         )
 
         await self.services.setup()
@@ -73,7 +93,7 @@ class TwitchBot(commands.AutoBot):
             self.token_database,
             resp.user_id,
             token,
-            refresh,
+            refresh
         )
 
         return resp
@@ -93,26 +113,33 @@ class TwitchBot(commands.AutoBot):
         subs = [
             eventsub.ChatMessageSubscription(
                 broadcaster_user_id=payload.user_id,
-                user_id=self.bot_id
+                user_id=self.bot_id,
             ),
             eventsub.ChannelFollowSubscription(
                 broadcaster_user_id=payload.user_id,
-                moderator_user_id=payload.user_id
+                moderator_user_id=payload.user_id,
             ),
             eventsub.ChannelSubscribeSubscription(
-                broadcaster_user_id=payload.user_id
+                broadcaster_user_id=payload.user_id,
             ),
             eventsub.ChannelSubscribeMessageSubscription(
-                broadcaster_user_id=payload.user_id
+                broadcaster_user_id=payload.user_id,
             ),
             eventsub.ChannelBanSubscription(
                 broadcaster_user_id=payload.user_id,
-                moderator_user_id=payload.user_id
+                moderator_user_id=payload.user_id,
             ),
             eventsub.AdBreakBeginSubscription(
-                broadcaster_user_id=payload.user_id
+                broadcaster_user_id=payload.user_id,
             )
         ]
+
+        channel_point_sub = create_channel_point_redemption_subscription(
+            payload.user_id
+        )
+
+        if channel_point_sub is not None:
+            subs.append(channel_point_sub)
 
         await self.multi_subscribe(subs)
 
