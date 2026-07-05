@@ -44,3 +44,17 @@ class BroadcasterService:
                 live_broadcasters[broadcaster_id] = broadcaster.name or broadcaster_id
 
         return live_broadcasters
+
+    async def get_offline_broadcasters(self) -> dict[str, str]:
+        offline_broadcasters: dict[str, str] = {}
+
+        for broadcaster_id, broadcaster in self.broadcasters.items():
+            user = self.bot.create_partialuser(broadcaster_id)
+            stream = await user.fetch_stream()
+
+            broadcaster.is_live = stream is not None
+
+            if not broadcaster.is_live:
+                offline_broadcasters[broadcaster_id] = broadcaster.name or broadcaster_id
+
+        return offline_broadcasters
