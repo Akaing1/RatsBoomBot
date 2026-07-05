@@ -18,8 +18,9 @@ LOGGER = logging.getLogger("Bot")
 
 
 class TwitchBot(commands.AutoBot):
-    def __init__(self, *, token_database, subs):
+    def __init__(self, *, token_database, subs, broadcaster_ids):
         self.token_database = token_database
+        self.broadcaster_ids = broadcaster_ids
         self.services: ServiceContainer | None = None
 
         super().__init__(
@@ -33,7 +34,12 @@ class TwitchBot(commands.AutoBot):
         )
 
     async def setup_hook(self):
-        self.services = ServiceContainer(self, self.token_database)
+        self.services = ServiceContainer(
+            self,
+            self.token_database,
+            self.broadcaster_ids
+        )
+
         await self.services.setup()
 
         await self.add_component(UtilityCommands(self))
@@ -107,6 +113,9 @@ class TwitchBot(commands.AutoBot):
         ]
 
         await self.multi_subscribe(subs)
+
+        if self.services:
+            self.services.broadcasters.add_broadcaster(payload.user_id)
 
     async def event_command_error(self, payload):
         LOGGER.error("Command error: %r", payload)
