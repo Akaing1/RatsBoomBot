@@ -69,9 +69,10 @@ class TimerService:
 
             live_broadcasters = await self.broadcasters.get_live_broadcasters()
 
-            if not live_broadcasters or time.time() - self.last_check < 600:
-                LOGGER.warning("No live broadcasters available for timer announcement.")
-                self.last_check = time.time()
+            if not live_broadcasters:
+                if time.time() - self.last_check >= 600:
+                    LOGGER.warning("No live broadcasters available for timer announcement.")
+                    self.last_check = time.time()
                 continue
 
             now = time.time()
