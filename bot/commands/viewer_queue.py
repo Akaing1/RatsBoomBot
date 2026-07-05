@@ -9,6 +9,16 @@ class ViewerQueueCommands(commands.Component):
     def __init__(self, bot):
         self.bot = bot
 
+    @commands.command(name="open")
+    async def open_queue(self, ctx: commands.Context):
+        message = self.bot.services.viewer_queue.open_queue()
+        await ctx.send(message)
+
+    @commands.command(name="close")
+    async def close_queue(self, ctx: commands.Context):
+        message = self.bot.services.viewer_queue.close_queue()
+        await ctx.send(message)
+
     @commands.command(name="join")
     async def join_queue(self, ctx: commands.Context):
         username = ctx.author.name
