@@ -1,76 +1,106 @@
 from collections import deque
+from dataclasses import dataclass, field
+
+
+@dataclass
+class ViewerQueueState:
+    queue: deque[str] = field(default_factory=deque)
+    users: set[str] = field(default_factory=set)
+    is_open: bool = False
 
 
 class ViewerQueueService:
     def __init__(self, bot):
         self.bot = bot
+        self.queues: dict[str, ViewerQueueState] = {}
 
-        self.queue = deque()
-        self.users = set()
+    def _get_queue_state(self, broadcaster_id: str) -> ViewerQueueState:
+        if broadcaster_id not in self.queues:
+            self.queues[broadcaster_id] = ViewerQueueState()
 
-        self.is_open = False
+        return self.queues[broadcaster_id]
 
-    def open_queue(self) -> str:
-        if self.is_open:
+    def open_queue(self, broadcaster_id: str) -> str:
+        state = self._get_queue_state(broadcaster_id)
+
+        if state.is_open:
             return "The viewer queue is already open."
-        self.is_open = True
-        return "queue is now open! Viewers can join the queue using !join."
 
-    def close_queue(self) -> str:
-        if not self.is_open:
+        state.is_open = True
+        return "Queue is now open! Viewers can join the queue using !join."
+
+    def close_queue(self, broadcaster_id: str) -> str:
+        state = self._get_queue_state(broadcaster_id)
+
+        if not state.is_open:
             return "The viewer queue is already closed."
-        self.is_open = False
+
+        state.is_open = False
         return "The viewer queue is now closed."
 
-    def is_queue_open(self) -> bool:
-        return self.is_open
+    def is_queue_open(self, broadcaster_id: str) -> bool:
+        state = self._get_queue_state(broadcaster_id)
+        return state.is_open
 
-    def join(self, username: str) -> tuple[bool, str]:
-        if not self.is_open:
+    def join(self, broadcaster_id: str, username: str) -> tuple[bool, str]:
+        state = self._get_queue_state(broadcaster_id)
+
+        if not state.is_open:
             return False, "The viewer queue is currently closed."
 
         username = username.lower()
 
-        if username in self.users:
+        if username in state.users:
             return False, f"@{username}, you are already in the queue."
 
-        self.queue.append(username)
-        self.users.add(username)
+        state.queue.append(username)
+        state.users.add(username)
 
-        position = len(self.queue)
+        position = len(state.queue)
         return True, f"@{username}, you joined the queue! Position: {position}"
 
-    def leave(self, username: str) -> tuple[bool, str]:
-        if not self.is_open:
+    def leave(self, broadcaster_id: str, username: str) -> tuple[bool, str]:
+        state = self._get_queue_state(broadcaster_id)
+
+        if not state.is_open:
             return False, "The viewer queue is currently closed."
 
         username = username.lower()
 
-        if username not in self.users:
+        if username not in state.users:
             return False, f"@{username}, you are not in the queue."
 
-        self.queue.remove(username)
-        self.users.remove(username)
+        state.queue.remove(username)
+        state.users.remove(username)
 
         return True, f"@{username}, you left the queue."
 
-    def next_viewer(self) -> str | None:
-        if not self.is_open:
-            return "The viewer queue is currently closed."
+    def next_viewer(self, broadcaster_id: str) -> tuple[bool, str]:
+        state = self._get_queue_state(broadcaster_id)
 
-        if not self.queue:
-            return None
+        if not state.is_open:
+            return False, "The viewer queue is currently closed."
 
-        username = self.queue.popleft()
-        self.users.remove(username)
-        return username
+        if not state.queue:
+            return False, "The queue is empty."
 
-    def clear(self):
-        self.queue.clear()
-        self.users.clear()
+        username = state.queue.popleft()
+        state.users.remove(username)
 
-    def list_queue(self) -> list[str]:
-        return list(self.queue)
+        return True, f"Next up: @{username}!"
 
-    def size(self) -> int:
-        return len(self.queue)
+    def clear(self, broadcaster_id: str) -> str:
+        state = self._get_queue_state(broadcaster_id)
+
+        state.queue.clear()
+        state.users.clear()
+
+        return "Viewer queue cleared."
+
+    def list_queue(self, broadcaster_id: str) -> list[str]:
+        state = self._get_queue_state(broadcaster_id)
+        return list(state.queue)
+
+    def size(self, broadcaster_id: str) -> int:
+        state = self._get_queue_state(broadcaster_id)
+        return len(state.queue)
