@@ -4,6 +4,7 @@ from bot.services.counter_service import CounterService
 from bot.services.help_service import HelpService
 from bot.services.points_service import PointsService
 from bot.services.timer_service import TimerService
+from bot.services.viewer_queue_service import ViewerQueueService
 
 
 class ServiceContainer:
@@ -18,6 +19,7 @@ class ServiceContainer:
         self.points = PointsService(bot, db)
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
+        self.viewer_queue = ViewerQueueService(bot)
 
     async def setup(self) -> None:
         await self.broadcasters.setup()
