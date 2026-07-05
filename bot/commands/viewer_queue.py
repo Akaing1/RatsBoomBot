@@ -1,4 +1,8 @@
+import logging
+
+
 from twitchio.ext import commands
+LOGGER = logging.getLogger("Bot")
 
 
 class ViewerQueueCommands(commands.Component):
@@ -35,8 +39,9 @@ class ViewerQueueCommands(commands.Component):
 
     @commands.command(name="next")
     async def next_viewer(self, ctx: commands.Context):
-        isNotModerator = getattr(ctx.author, "moderator", False)
-        if isNotModerator and ctx.author.name.lower() != ctx.channel.name.lower():
+        is_moderator = getattr(ctx.author, "moderator", False)
+        is_broadcaster = ctx.author.name.lower() == ctx.channel.name.lower()
+        if not is_moderator and not is_broadcaster:
             await ctx.send("Only the broadcaster or mods can use !next.")
             return
 
@@ -50,8 +55,9 @@ class ViewerQueueCommands(commands.Component):
 
     @commands.command(name="clear")
     async def clear_queue(self, ctx: commands.Context):
-        isNotModerator = getattr(ctx.author, "moderator", False)
-        if isNotModerator and ctx.author.name.lower() != ctx.channel.name.lower():
+        is_moderator = getattr(ctx.author, "moderator", False)
+        is_broadcaster = ctx.author.name.lower() == ctx.channel.name.lower()
+        if not is_moderator and not is_broadcaster:
             await ctx.send("Only the broadcaster or mods can clear the queue.")
             return
 

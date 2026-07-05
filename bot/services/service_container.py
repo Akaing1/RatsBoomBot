@@ -19,7 +19,7 @@ class ServiceContainer:
         self.points = PointsService(bot, db)
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
-        self.playWithViewers = ViewerQueueService(bot)
+        self.viewer_queue = ViewerQueueService(bot)
 
     async def setup(self) -> None:
         await self.broadcasters.setup()
