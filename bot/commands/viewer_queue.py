@@ -1,8 +1,29 @@
 import logging
 
-
 from twitchio.ext import commands
+
 LOGGER = logging.getLogger("Bot")
+
+
+def get_broadcaster_id(ctx: commands.Context) -> str:
+    return ctx.broadcaster.id
+
+
+def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
+    chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
+
+    if chatter is None:
+        return False
+
+    is_moderator = getattr(chatter, "moderator", False)
+    is_broadcaster = chatter.id == ctx.broadcaster.id
+
+    return is_moderator or is_broadcaster
+
+
+def get_chatter_name(ctx: commands.Context) -> str:
+    chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
+    return chatter.name
 
 
 class ViewerQueueCommands(commands.Component):
@@ -11,48 +32,79 @@ class ViewerQueueCommands(commands.Component):
 
     @commands.command(name="open")
     async def open_queue(self, ctx: commands.Context):
-        is_moderator = getattr(ctx.author, "moderator", False)
-        is_broadcaster = ctx.author.name.lower() == ctx.channel.name.lower()
-        if not is_moderator and not is_broadcaster:
+        if not self.bot.services:
+            return
+
+        if not is_mod_or_broadcaster(ctx):
             await ctx.send("Only the broadcaster or mods can open the queue.")
             return
 
-        message = self.bot.services.viewer_queue.open_queue()
+        broadcaster_id = get_broadcaster_id(ctx)
+        message = self.bot.services.viewer_queue.open_queue(broadcaster_id)
+
         await ctx.send(message)
 
     @commands.command(name="close")
     async def close_queue(self, ctx: commands.Context):
-        is_moderator = getattr(ctx.author, "moderator", False)
-        is_broadcaster = ctx.author.name.lower() == ctx.channel.name.lower()
-        if not is_moderator and not is_broadcaster:
+        if not self.bot.services:
+            return
+
+        if not is_mod_or_broadcaster(ctx):
             await ctx.send("Only the broadcaster or mods can close the queue.")
             return
 
-        message = self.bot.services.viewer_queue.close_queue()
+        broadcaster_id = get_broadcaster_id(ctx)
+        message = self.bot.services.viewer_queue.close_queue(broadcaster_id)
+
         await ctx.send(message)
 
     @commands.command(name="join")
     async def join_queue(self, ctx: commands.Context):
-        username = ctx.author.name
-        success, message = self.bot.services.viewer_queue.join(username)
+        if not self.bot.services:
+            return
+
+        broadcaster_id = get_broadcaster_id(ctx)
+        username = get_chatter_name(ctx)
+
+        success, message = self.bot.services.viewer_queue.join(
+            broadcaster_id,
+            username,
+        )
+
         await ctx.send(message)
 
     @commands.command(name="leave")
     async def leave_queue(self, ctx: commands.Context):
-        username = ctx.author.name
-        success, message = self.bot.services.viewer_queue.leave(username)
+        if not self.bot.services:
+            return
+
+        broadcaster_id = get_broadcaster_id(ctx)
+        username = get_chatter_name(ctx)
+
+        success, message = self.bot.services.viewer_queue.leave(
+            broadcaster_id,
+            username,
+        )
+
         await ctx.send(message)
 
     @commands.command(name="queue")
     async def show_queue(self, ctx: commands.Context):
-        queue = self.bot.services.viewer_queue.list_queue()
+        if not self.bot.services:
+            return
+
+        broadcaster_id = get_broadcaster_id(ctx)
+        queue = self.bot.services.viewer_queue.list_queue(broadcaster_id)
 
         if not queue:
             await ctx.send("The viewer queue is currently empty.")
             return
 
         preview = queue[:5]
-        queue_text = ", ".join(f"{i + 1}. {name}" for i, name in enumerate(preview))
+        queue_text = ", ".join(
+            f"{index + 1}. {name}"
+            for index, name in enumerate(preview)
+        )
 
         if len(queue) > 5:
             queue_text += f" ... and {len(queue) - 5} more"
@@ -61,27 +113,31 @@ class ViewerQueueCommands(commands.Component):
 
     @commands.command(name="next")
     async def next_viewer(self, ctx: commands.Context):
-        is_moderator = getattr(ctx.author, "moderator", False)
-        is_broadcaster = ctx.author.name.lower() == ctx.channel.name.lower()
-        if not is_moderator and not is_broadcaster:
+        if not self.bot.services:
+            return
+
+        if not is_mod_or_broadcaster(ctx):
             await ctx.send("Only the broadcaster or mods can use !next.")
             return
 
-        username = self.bot.services.viewer_queue.next_viewer()
+        broadcaster_id = get_broadcaster_id(ctx)
 
-        if username is None:
-            await ctx.send("The queue is empty.")
-            return
+        success, message = self.bot.services.viewer_queue.next_viewer(
+            broadcaster_id
+        )
 
-        await ctx.send(f"Next up: @{username}!")
+        await ctx.send(message)
 
     @commands.command(name="clear")
     async def clear_queue(self, ctx: commands.Context):
-        is_moderator = getattr(ctx.author, "moderator", False)
-        is_broadcaster = ctx.author.name.lower() == ctx.channel.name.lower()
-        if not is_moderator and not is_broadcaster:
+        if not self.bot.services:
+            return
+
+        if not is_mod_or_broadcaster(ctx):
             await ctx.send("Only the broadcaster or mods can clear the queue.")
             return
 
-        self.bot.services.viewer_queue.clear()
-        await ctx.send("Viewer queue cleared.")
+        broadcaster_id = get_broadcaster_id(ctx)
+        message = self.bot.services.viewer_queue.clear(broadcaster_id)
+
+        await ctx.send(message)
