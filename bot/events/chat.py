@@ -37,7 +37,7 @@ class ChatEvents(commands.Component):
 
     @commands.Component.listener()
     async def event_follow(self, payload):
-        broadcaster = self.bot.create_partialuser(id=payload.broadcaster.id)
+        broadcaster = self.bot.create_partialuser(payload.broadcaster.id)
 
         await broadcaster.send_message(
             sender=self.bot.user,
@@ -49,7 +49,7 @@ class ChatEvents(commands.Component):
 
     @commands.Component.listener()
     async def event_subscription(self, payload):
-        broadcaster = self.bot.create_partialuser(id=payload.broadcaster.id)
+        broadcaster = self.bot.create_partialuser(payload.broadcaster.id)
 
         await broadcaster.send_message(
             sender=self.bot.user,
@@ -58,7 +58,7 @@ class ChatEvents(commands.Component):
 
     @commands.Component.listener()
     async def event_subscription_message(self, payload):
-        broadcaster = self.bot.create_partialuser(id=payload.broadcaster.id)
+        broadcaster = self.bot.create_partialuser(payload.broadcaster.id)
 
         await broadcaster.send_message(
             sender=self.bot.user,
@@ -127,7 +127,7 @@ class ChatEvents(commands.Component):
         if result.message is None:
             return
 
-        broadcaster = self.bot.create_partialuser(id=broadcaster_id)
+        broadcaster = self.bot.create_partialuser(broadcaster_id)
 
         await broadcaster.send_message(
             sender=self.bot.user,
