@@ -28,7 +28,7 @@ async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool
     if not username:
         return False
 
-    channel = bot.create_partialuser(id=broadcaster_id)
+    channel = bot.create_partialuser(broadcaster_id)
 
     await channel.send_message(
         sender=bot.user,
@@ -73,4 +73,3 @@ class ShoutoutCommands(commands.Component):
 
         if not success:
             await ctx.reply("I could not shoutout that user.")
-            
