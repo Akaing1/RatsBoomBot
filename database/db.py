@@ -9,9 +9,16 @@ from config.settings import settings
 def create_channel_point_redemption_subscription(broadcaster_user_id: str):
     subscription_class = getattr(
         eventsub,
-        "ChannelPointsCustomRewardRedemptionAddSubscription",
+        "ChannelPointsRedeemAddSubscription",
         None
     )
+
+    if subscription_class is None:
+        subscription_class = getattr(
+            eventsub,
+            "ChannelPointsCustomRewardRedemptionAddSubscription",
+            None
+        )
 
     if subscription_class is None:
         return None
