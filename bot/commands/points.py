@@ -13,13 +13,21 @@ class PointsCommands(commands.Component):
         if not self.bot.services:
             return
 
+        broadcaster_id = ctx.broadcaster.id
+
         if target is None:
-            points = await self.bot.services.points.get_points(ctx.chatter.id)
+            points = await self.bot.services.points.get_points(
+                broadcaster_id,
+                ctx.chatter.id
+            )
 
             await ctx.reply(f"{ctx.chatter.name}, you have {points} pieces of stale bread!")
             return
 
-        points = await self.bot.services.points.get_points(target.id)
+        points = await self.bot.services.points.get_points(
+            broadcaster_id,
+            target.id,
+        )
 
         await ctx.reply(f"{target.name} has {points} pieces of stale bread!")
 
@@ -28,10 +36,16 @@ class PointsCommands(commands.Component):
         if not self.bot.services:
             return
 
-        rows = await self.bot.services.points.get_leaderboard(limit=5)
+        broadcaster_id = ctx.broadcaster.id
+        rows = await self.bot.services.points.get_leaderboard(
+            broadcaster_id,
+            limit=5
+        )
 
         if not rows:
-            await ctx.reply("No stale bread has been collected yet. What an upstanding citizen!")
+            await ctx.reply(
+                "No stale bread has been collected yet. What an upstanding citizen!"
+            )
             return
 
         leaderboard = " | ".join(
@@ -50,9 +64,13 @@ class PointsCommands(commands.Component):
             await ctx.reply("Only the broadcaster can reset the stale bread stash.")
             return
 
-        await self.bot.services.points.reset_all_points()
+        broadcaster_id = ctx.broadcaster.id
+        await self.bot.services.points.reset_all_points(broadcaster_id)
 
-        await ctx.send("All stale bread has been thrown away. The leaderboard has been reset.")
+        await ctx.send(
+            "This channel's stale bread has been thrown away. "
+            "The leaderboard has been reset."
+        )
 
     @bread.command(name="add")
     async def bread_add(self, ctx: commands.Context, target: User, amount: int):
@@ -70,25 +88,30 @@ class PointsCommands(commands.Component):
             await ctx.reply("Bread amount must be greater than 0.")
             return
 
+        broadcaster_id = ctx.broadcaster.id
+
         await self.bot.services.points.add_points(
+            broadcaster_id=broadcaster_id,
             user_id=target.id,
             username=target.name,
-            amount=amount,
+            amount=amount
         )
 
-        await ctx.send(
-            f"Added {amount} pieces of stale bread to {target.name}'s stash."
-        )
+        await ctx.send(f"Added {amount} pieces of stale bread to {target.name}'s stash.")
 
     @bread.command(name="gamble")
     async def bread_gamble(self, ctx: commands.Context, amount: str):
         if not self.bot.services:
             return
 
+        broadcaster_id = ctx.broadcaster.id
         user_id = ctx.chatter.id
         username = ctx.chatter.name
 
-        current_bread = await self.bot.services.points.get_points(user_id)
+        current_bread = await self.bot.services.points.get_points(
+            broadcaster_id,
+            user_id
+        )
 
         if current_bread <= 0:
             await ctx.reply("You don't have any stale bread to gamble.")
@@ -115,26 +138,38 @@ class PointsCommands(commands.Component):
 
         won = random.random() < 0.45
 
-        if won and all_in:
-            await self.bot.services.points.add_points(user_id, username, gamble_amount)
-            await ctx.reply(
-                f"{username} raided the pantry and found a hidden stash of stale bread! "
-                f"You now have {current_bread * 2} bread."
+        if won:
+            await self.bot.services.points.add_points(
+                broadcaster_id=broadcaster_id,
+                user_id=user_id,
+                username=username,
+                amount=gamble_amount
             )
-        elif won:
-            await self.bot.services.points.add_points(user_id, username, gamble_amount)
-            await ctx.reply(
-                f"{username} found {gamble_amount} stale bread on the ground "
-                f"and now has {current_bread + gamble_amount} bread."
-            )
-        elif all_in:
-            await self.bot.services.points.remove_points(user_id, gamble_amount)
+
+            if all_in:
+                await ctx.reply(
+                    f"{username} raided the pantry and found a hidden stash of stale bread! "
+                    f"You now have {current_bread * 2} bread."
+                )
+            else:
+                await ctx.reply(
+                    f"{username} found {gamble_amount} stale bread on the ground "
+                    f"and now has {current_bread + gamble_amount} bread."
+                )
+            return
+
+        await self.bot.services.points.remove_points(
+            broadcaster_id=broadcaster_id,
+            user_id=user_id,
+            amount=gamble_amount
+        )
+
+        if all_in:
             await ctx.reply(
                 f"{username} got into a fight with the other rats and got mugged. "
                 f"You lost all your stale bread."
             )
         else:
-            await self.bot.services.points.remove_points(user_id, gamble_amount)
             await ctx.reply(
                 f"{username} got caught by a rat trap and lost {gamble_amount} stale bread "
                 f"and now has {current_bread - gamble_amount} bread."
@@ -149,52 +184,63 @@ class PointsCommands(commands.Component):
             await ctx.reply("Use it like this: !bread duel @user 100")
             return
 
-        all_in = amount.lower() == "all"
-        if all_in:
-            challenger_bread = await self.bot.services.points.get_points(ctx.chatter.id)
-            amount = challenger_bread
-        else:
-            try:
-                amount = int(amount)
-            except ValueError:
-                await ctx.reply("Duel amount must be a number or 'all'.")
-                return
-
+        broadcaster_id = ctx.broadcaster.id
         challenger_id = ctx.chatter.id
         challenger_name = ctx.chatter.name
         opponent_id = opponent.id
         opponent_name = opponent.name
 
+        all_in = amount.lower() == "all"
+
+        if all_in:
+            duel_amount = await self.bot.services.points.get_points(
+                broadcaster_id,
+                challenger_id
+            )
+        else:
+            try:
+                duel_amount = int(amount)
+            except ValueError:
+                await ctx.reply("Duel amount must be a number or 'all'.")
+                return
+
         if challenger_id == opponent_id:
             await ctx.reply("You can't duel yourself. The rats are confused.")
             return
 
-        if amount <= 0:
+        if duel_amount <= 0:
             await ctx.reply("Duel amount must be greater than 0.")
             return
 
-        challenger_bread = await self.bot.services.points.get_points(challenger_id)
-        opponent_bread = await self.bot.services.points.get_points(opponent_id)
+        challenger_bread = await self.bot.services.points.get_points(
+            broadcaster_id,
+            challenger_id
+        )
+        opponent_bread = await self.bot.services.points.get_points(
+            broadcaster_id,
+            opponent_id
+        )
 
-        if challenger_bread < amount:
+        if challenger_bread < duel_amount:
             await ctx.reply(f"You only have {challenger_bread} stale bread.")
             return
 
-        if opponent_bread < amount:
+        if opponent_bread < duel_amount:
             await ctx.reply(f"{opponent_name} only has {opponent_bread} stale bread.")
             return
 
         self.bot.services.points.create_duel(
+            broadcaster_id=broadcaster_id,
             challenger_id=challenger_id,
             challenger_name=challenger_name,
             opponent_id=opponent_id,
             opponent_name=opponent_name,
-            amount=amount,
+            amount=duel_amount
         )
 
         await ctx.send(
             f"@{opponent_name}, @{challenger_name} challenged you to a stale bread duel "
-            f"for {amount} bread! Type !bread duel accept or !bread duel decline. "
+            f"for {duel_amount} bread! Type !bread duel accept or !bread duel decline. "
             f"This duel expires in 60 seconds."
         )
 
@@ -203,18 +249,32 @@ class PointsCommands(commands.Component):
         if not self.bot.services:
             return
 
+        broadcaster_id = ctx.broadcaster.id
         opponent_id = ctx.chatter.id
-        duel = self.bot.services.points.get_duel_for_user(opponent_id)
+
+        duel = self.bot.services.points.get_duel_for_user(
+            broadcaster_id,
+            opponent_id
+        )
 
         if not duel:
             await ctx.reply("You don't have any pending bread duels, or your duel has expired.")
             return
 
-        challenger_bread = await self.bot.services.points.get_points(duel.challenger_id)
-        opponent_bread = await self.bot.services.points.get_points(duel.opponent_id)
+        challenger_bread = await self.bot.services.points.get_points(
+            broadcaster_id,
+            duel.challenger_id
+        )
+        opponent_bread = await self.bot.services.points.get_points(
+            broadcaster_id,
+            duel.opponent_id
+        )
 
         if challenger_bread < duel.amount or opponent_bread < duel.amount:
-            self.bot.services.points.remove_duel_for_user(opponent_id)
+            self.bot.services.points.remove_duel_for_user(
+                broadcaster_id,
+                opponent_id,
+            )
             await ctx.reply("This duel was cancelled because someone no longer has enough stale bread.")
             return
 
@@ -231,10 +291,22 @@ class PointsCommands(commands.Component):
             loser_id = duel.challenger_id
             loser_name = duel.challenger_name
 
-        await self.bot.services.points.remove_points(loser_id, duel.amount)
-        await self.bot.services.points.add_points(winner_id, winner_name, duel.amount)
+        await self.bot.services.points.remove_points(
+            broadcaster_id=broadcaster_id,
+            user_id=loser_id,
+            amount=duel.amount
+        )
+        await self.bot.services.points.add_points(
+            broadcaster_id=broadcaster_id,
+            user_id=winner_id,
+            username=winner_name,
+            amount=duel.amount
+        )
 
-        self.bot.services.points.remove_duel_for_user(opponent_id)
+        self.bot.services.points.remove_duel_for_user(
+            broadcaster_id,
+            opponent_id
+        )
 
         await ctx.send(
             f"@{winner_name} beat @{loser_name} up "
@@ -246,15 +318,21 @@ class PointsCommands(commands.Component):
         if not self.bot.services:
             return
 
+        broadcaster_id = ctx.broadcaster.id
         opponent_id = ctx.chatter.id
-        duel = self.bot.services.points.get_duel_for_user(opponent_id)
+
+        duel = self.bot.services.points.get_duel_for_user(
+            broadcaster_id,
+            opponent_id
+        )
 
         if not duel:
             await ctx.reply("You don't have any pending bread duels, or your duel has expired.")
             return
 
-        self.bot.services.points.remove_duel_for_user(opponent_id)
-
-        await ctx.send(
-            f"{ctx.chatter.name} has a family and decided to decline."
+        self.bot.services.points.remove_duel_for_user(
+            broadcaster_id,
+            opponent_id
         )
+
+        await ctx.send(f"{ctx.chatter.name} has a family and decided to decline.")
