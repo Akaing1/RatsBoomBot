@@ -22,14 +22,20 @@ LOGGER = logging.getLogger("Bot")
 def create_channel_point_redemption_subscription(broadcaster_user_id: str):
     subscription_class = getattr(
         eventsub,
-        "ChannelPointsCustomRewardRedemptionAddSubscription",
+        "ChannelPointsRedeemAddSubscription",
         None
     )
 
     if subscription_class is None:
+        subscription_class = getattr(
+            eventsub,
+            "ChannelPointsCustomRewardRedemptionAddSubscription",
+            None
+        )
+
+    if subscription_class is None:
         LOGGER.warning(
-            "TwitchIO does not have "
-            "ChannelPointsCustomRewardRedemptionAddSubscription. "
+            "TwitchIO does not have a channel point redemption subscription class. "
             "Channel point redeems will not be subscribed."
         )
         return None

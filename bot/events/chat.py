@@ -135,6 +135,10 @@ class ChatEvents(commands.Component):
         )
 
     @commands.Component.listener()
+    async def event_custom_redemption_add(self, payload):
+        await self.handle_channel_point_redemption(payload)
+
+    @commands.Component.listener()
     async def event_raid(self, payload):
         await self.handle_raid(payload)
 

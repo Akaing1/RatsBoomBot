@@ -28,7 +28,7 @@ class ModerationCommands(commands.Component):
             )
             return
 
-        isModerator = getattr(target, "moderator", True)
+        isModerator = getattr(target, "moderator", False)
         if target.id == broadcaster.id or isModerator:
             await ctx.reply("You cannot bomb this target, try someone else.")
             return
