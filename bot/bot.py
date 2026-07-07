@@ -139,6 +139,9 @@ class TwitchBot(commands.AutoBot):
             ),
             eventsub.AdBreakBeginSubscription(
                 broadcaster_user_id=payload.user_id,
+            ),
+            eventsub.ChannelRaidSubscription(
+                broadcaster_user_id=payload.user_id
             )
         ]
 
