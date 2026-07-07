@@ -118,15 +118,8 @@ class RedeemService:
 
         return RedeemResult(handled=False)
 
-    async def claim_daily(
-            self,
-            *,
-            broadcaster_id: str,
-            user_id: str,
-            username: str,
-            stream_id: str,
-            redemption_id: str | None = None
-    ) -> RedeemResult:
+    async def claim_daily(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str,
+                          redemption_id: str | None = None) -> RedeemResult:
         try:
             await self._insert_claim(
                 broadcaster_id=broadcaster_id,
@@ -145,6 +138,7 @@ class RedeemService:
             )
 
         await self.points.add_points(
+            broadcaster_id=broadcaster_id,
             user_id=user_id,
             username=username,
             amount=settings.DAILY_REDEEM_BREAD
@@ -159,7 +153,7 @@ class RedeemService:
         )
 
     async def claim_first(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str,
-                          redemption_id: str | None = None) -> RedeemResult:
+                          redemption_id: str | None = None, ) -> RedeemResult:
         try:
             await self._insert_claim(
                 broadcaster_id=broadcaster_id,
@@ -181,15 +175,16 @@ class RedeemService:
                     message=(
                         f"@{username}, this stream's first redeem was already "
                         f"claimed by @{winner}."
-                    )
+                    ),
                 )
 
             return RedeemResult(
                 handled=True,
-                message=f"@{username}, this stream's first redeem was already claimed.",
+                message=f"@{username}, this stream's first redeem was already claimed."
             )
 
         await self.points.add_points(
+            broadcaster_id=broadcaster_id,
             user_id=user_id,
             username=username,
             amount=settings.FIRST_REDEEM_BREAD
