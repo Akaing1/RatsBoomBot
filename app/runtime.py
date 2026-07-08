@@ -6,7 +6,7 @@ import uvicorn
 
 from bot.bot import TwitchBot
 from config.settings import settings
-from database.db import setup_database
+from storage.database import setup_database
 from web.app import app as web_app
 
 LOGGER = logging.getLogger("Bot")

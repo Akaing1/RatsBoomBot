@@ -14,7 +14,7 @@ from bot.commands.settings import SettingsCommands
 from bot.events.chat import ChatEvents
 from bot.services.service_container import ServiceContainer
 from config.settings import settings
-from database.db import save_token, create_broadcaster_subscriptions
+from storage.database import save_token, create_broadcaster_subscriptions
 
 LOGGER = logging.getLogger("Bot")
 
