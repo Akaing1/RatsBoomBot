@@ -4,11 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config.settings import settings
 from database.db import save_token
-from web.oauth import (
-    build_bot_oauth_url,
-    build_channel_oauth_url,
-    exchange_code_for_token,
-)
+from web.oauth import build_bot_oauth_url, build_channel_oauth_url, exchange_code_for_token, fetch_twitch_user
 
 app = FastAPI(title="RatsBoomBot Web")
 
@@ -67,12 +63,12 @@ async def oauth_channel_callback(code: str | None = None, error: str | None = No
     except Exception as exc:
         return f"<h1>Token exchange failed</h1><p>{exc!r}</p>"
 
+    twitch_user = await fetch_twitch_user(token_response.access_token)
+
     async with asqlite.create_pool(settings.DATABASE_PATH) as db:
-        # Temporary placeholder until we add Twitch user validation.
-        # This will be improved next.
         await save_token(
             db=db,
-            user_id="channel_pending_user_lookup",
+            user_id=twitch_user.user_id,
             token=token_response.access_token,
             refresh=token_response.refresh_token
         )
@@ -100,12 +96,12 @@ async def oauth_bot_callback(code: str | None = None, error: str | None = None):
     except Exception as exc:
         return f"<h1>Token exchange failed</h1><p>{exc!r}</p>"
 
+    twitch_user = await fetch_twitch_user(token_response.access_token)
+
     async with asqlite.create_pool(settings.DATABASE_PATH) as db:
-        # Temporary placeholder until we add Twitch user validation.
-        # This will be improved next.
         await save_token(
             db=db,
-            user_id="bot_pending_user_lookup",
+            user_id=twitch_user.user_id,
             token=token_response.access_token,
             refresh=token_response.refresh_token
         )

@@ -18,6 +18,13 @@ class TwitchTokenResponse:
     token_type: str
 
 
+@dataclass
+class TwitchUser:
+    user_id: str
+    login: str
+    display_name: str
+
+
 def build_bot_oauth_url(force_verify: bool = True) -> str:
     return _build_oauth_url(
         redirect_uri=settings.BOT_REDIRECT_URI,
@@ -69,4 +76,24 @@ async def exchange_code_for_token(*, code: str, redirect_uri: str) -> TwitchToke
         expires_in=payload["expires_in"],
         scope=payload.get("scope", []),
         token_type=payload["token_type"]
+    )
+
+
+async def fetch_twitch_user(access_token: str) -> TwitchUser:
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Client-Id": settings.CLIENT_ID
+    }
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.get("https://api.twitch.tv/helix/users", headers=headers)
+
+    response.raise_for_status()
+    payload = response.json()
+    user = payload["data"][0]
+
+    return TwitchUser(
+        user_id=user["id"],
+        login=user["login"],
+        display_name=user["display_name"]
     )
