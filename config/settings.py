@@ -21,9 +21,6 @@ class Settings:
         if user.strip()
     }
 
-    DISCORD = os.getenv("DISCORD")
-    YOUTUBE = os.getenv("YOUTUBE")
-
     DAILY_REDEEM_TITLE = os.getenv(
         "DAILY_REDEEM_TITLE",
         "Steal some cheese"

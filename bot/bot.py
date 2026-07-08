@@ -9,6 +9,7 @@ from bot.commands.utility import UtilityCommands
 from bot.commands.counters import CounterCommands
 from bot.commands.viewer_queue import ViewerQueueCommands
 from bot.commands.shoutout import ShoutoutCommands
+from bot.commands.settings import SettingsCommands
 
 from bot.events.chat import ChatEvents
 from bot.services.service_container import ServiceContainer
@@ -51,6 +52,7 @@ class TwitchBot(commands.AutoBot):
         await self.add_component(CounterCommands(self))
         await self.add_component(ViewerQueueCommands(self))
         await self.add_component(ShoutoutCommands(self))
+        await self.add_component(SettingsCommands(self))
 
         await self.services.start()
 
