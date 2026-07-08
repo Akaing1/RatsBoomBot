@@ -4,3 +4,8 @@ asqlite~=2.0.0
 python-dotenv
 pystray
 pillow
+
+fastapi
+uvicorn
+jinja2
+httpx

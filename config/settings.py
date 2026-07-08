@@ -15,6 +15,20 @@ class Settings:
     PREFIX = os.getenv("PREFIX", "!")
     DATABASE_PATH = os.getenv("DATABASE_PATH", "tokens.db")
 
+    BASE_URL = os.getenv("BASE_URL", "http://localhost:4343")
+    BOT_REDIRECT_URI = os.getenv("BOT_REDIRECT_URI", f"{BASE_URL}/oauth/bot")
+    CHANNEL_REDIRECT_URI = os.getenv("CHANNEL_REDIRECT_URI", f"{BASE_URL}/oauth/channel")
+
+    BOT_SCOPES = os.getenv(
+        "BOT_SCOPES",
+        "user:read:chat user:write:chat user:bot"
+    )
+    CHANNEL_SCOPES = os.getenv(
+        "CHANNEL_SCOPES",
+        "channel:bot moderator:manage:banned_users moderator:read:followers "
+        "channel:read:redemptions channel:read:subscriptions channel:read:ads"
+    )
+
     IGNORED_USERS = {
         user.strip().lower()
         for user in os.getenv("IGNORED_USERS", "").split(",")
