@@ -28,7 +28,7 @@ class ModerationCommands(commands.Component):
             )
             return
 
-        isModerator = getattr(target, "moderator", True)
+        isModerator = getattr(target, "moderator", False)
         if target.id == broadcaster.id or isModerator:
             await ctx.reply("You cannot bomb this target, try someone else.")
             return
@@ -36,13 +36,13 @@ class ModerationCommands(commands.Component):
         bomb = random.randint(1, 100)
 
         if bomb > 75:
-            await ctx.send(f"{target.name} has been blown up and timed out for {DURATION} seconds.")
             await channel.timeout_user(
                 moderator=broadcaster.id,
                 user=target.id,
                 duration=DURATION,
                 reason="Blown up."
             )
+            await ctx.send(f"{target.name} has been blown up and timed out for {DURATION} seconds.")
             return
 
         await channel.timeout_user(
@@ -51,5 +51,4 @@ class ModerationCommands(commands.Component):
             duration=DURATION,
             reason="Blown up."
         )
-
         await ctx.send(f"{ctx.chatter.name} missed and blew themselves up~ they have been timed out for {DURATION} seconds.")

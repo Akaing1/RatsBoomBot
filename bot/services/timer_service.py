@@ -11,18 +11,19 @@ class TimerService:
     REQUIRED_MESSAGES = 20
     CHECK_EVERY_SECONDS = 5
 
-    def __init__(self, bot, channels):
+    def __init__(self, bot, broadcasters):
         self.bot = bot
+        self.broadcasters = broadcasters
         self._task: asyncio.Task | None = None
 
-        self.message_count = 0
-        self.last_announcement = time.time()
-        self.channels = channels
+        self.message_counts: dict[str, int] = {}
+        self.last_announcements: dict[str, float] = {}
+        self.last_check = 0
 
         self.messages = [
             "Lost something? Maybe you left it in the basement: https://discord.gg/RnwtqhpPa4",
             "Missed something? Go check out Rat's youtube! https://www.youtube.com/@Ninjakaing",
-            "Ready to gamble? using !help to get a list of commands you can use!"
+            "Ready to gamble? using !help to get a list of commands you can use!",
         ]
 
         self.message_cycle = itertools.cycle(self.messages)
@@ -42,12 +43,19 @@ class TimerService:
         self._task = None
 
     def track_message(self, payload) -> None:
-        self.message_count += 1
-        self.channels.track_channel(payload)
+        broadcaster_id = payload.broadcaster.id
+        broadcaster_name = payload.broadcaster.name
+
+        self.message_counts[broadcaster_id] = (
+            self.message_counts.get(broadcaster_id, 0) + 1
+        )
+
+        self.last_announcements.setdefault(broadcaster_id, time.time())
 
         LOGGER.info(
-            "Tracked message. Count: %s/%s",
-            self.message_count,
+            "[%s] Tracked message. Count: %s/%s",
+            broadcaster_name,
+            self.message_counts[broadcaster_id],
             self.REQUIRED_MESSAGES,
         )
 
@@ -59,58 +67,62 @@ class TimerService:
         while True:
             await asyncio.sleep(self.CHECK_EVERY_SECONDS)
 
-            elapsed = time.time() - self.last_announcement
+            live_broadcasters = await self.broadcasters.get_live_broadcasters()
 
-            # LOGGER.info(
-            #     "Timer check: elapsed=%ss, messages=%s/%s, channels=%s",
-            #     int(elapsed),
-            #     self.message_count,
-            #     self.REQUIRED_MESSAGES,
-            #     len(self.channels),
-            # )
-
-            if elapsed < self.INTERVAL_SECONDS:
+            if not live_broadcasters:
+                if time.time() - self.last_check >= 600:
+                    LOGGER.warning("No live broadcasters available for timer announcement.")
+                    self.last_check = time.time()
                 continue
 
-            if self.message_count < self.REQUIRED_MESSAGES:
-                continue
+            now = time.time()
 
-            if not self.channels:
-                LOGGER.warning("No channels available for timer announcement.")
-                continue
+            for broadcaster_id, broadcaster_name in live_broadcasters.items():
+                last_announcement = self.last_announcements.get(
+                    broadcaster_id,
+                    now
+                )
+                message_count = self.message_counts.get(broadcaster_id, 0)
+                elapsed = now - last_announcement
 
-            active_channels = self.channels.get_active_channels()
+                if elapsed < self.INTERVAL_SECONDS:
+                    continue
 
-            if not active_channels:
-                LOGGER.warning("No channels available for timer announcement.")
-                continue
+                if message_count < self.REQUIRED_MESSAGES:
+                    continue
 
-            await self.send_next_announcement(active_channels)
+                await self.send_next_announcement(
+                    broadcaster_id,
+                    broadcaster_name
+                )
 
-            self.message_count = 0
-            self.last_announcement = time.time()
+                self.message_counts[broadcaster_id] = 0
+                self.last_announcements[broadcaster_id] = now
 
-    async def send_next_announcement(self, active_channels: dict[str, str]) -> None:
+    async def send_next_announcement(
+        self,
+        broadcaster_id: str,
+        broadcaster_name: str,
+    ) -> None:
         message = next(self.message_cycle)
 
-        for broadcaster_id, broadcaster_name in active_channels.items():
-            try:
-                channel = self.bot.create_partialuser(broadcaster_id)
+        try:
+            channel = self.bot.create_partialuser(broadcaster_id)
 
-                await channel.send_message(
-                    sender=self.bot.user,
-                    message=message,
-                )
+            await channel.send_message(
+                sender=self.bot.user,
+                message=message
+            )
 
-                LOGGER.info(
-                    "Announcement sent to %s: %s",
-                    broadcaster_name,
-                    message,
-                )
+            LOGGER.info(
+                "Announcement sent to %s: %s",
+                broadcaster_name,
+                message
+            )
 
-            except Exception as error:
-                LOGGER.error(
-                    "Failed to send announcement to %s: %r",
-                    broadcaster_name,
-                    error,
-                )
+        except Exception as error:
+            LOGGER.error(
+                "Failed to send announcement to %s: %r",
+                broadcaster_name,
+                error
+            )
