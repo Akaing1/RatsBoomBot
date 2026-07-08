@@ -1,7 +1,14 @@
+import asqlite
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from web.oauth import build_bot_oauth_url, build_channel_oauth_url
+from config.settings import settings
+from database.db import save_token
+from web.oauth import (
+    build_bot_oauth_url,
+    build_channel_oauth_url,
+    exchange_code_for_token,
+)
 
 app = FastAPI(title="RatsBoomBot Web")
 
@@ -49,10 +56,31 @@ async def oauth_channel_callback(code: str | None = None, error: str | None = No
     if error:
         return f"<h1>Twitch auth failed</h1><p>{error}</p>"
 
-    return f"""
-    <h1>Channel OAuth callback received</h1>
-    <p>Code received: {"yes" if code else "no"}</p>
-    <p>Token exchange comes next.</p>
+    if not code:
+        return "<h1>Twitch auth failed</h1><p>No code was provided.</p>"
+
+    try:
+        token_response = await exchange_code_for_token(
+            code=code,
+            redirect_uri=settings.CHANNEL_REDIRECT_URI
+        )
+    except Exception as exc:
+        return f"<h1>Token exchange failed</h1><p>{exc!r}</p>"
+
+    async with asqlite.create_pool(settings.DATABASE_PATH) as db:
+        # Temporary placeholder until we add Twitch user validation.
+        # This will be improved next.
+        await save_token(
+            db=db,
+            user_id="channel_pending_user_lookup",
+            token=token_response.access_token,
+            refresh=token_response.refresh_token
+        )
+
+    return """
+    <h1>Channel connected</h1>
+    <p>RatsBoomBot received and saved the channel token.</p>
+    <p>You can close this window.</p>
     """
 
 
@@ -61,8 +89,29 @@ async def oauth_bot_callback(code: str | None = None, error: str | None = None):
     if error:
         return f"<h1>Twitch bot auth failed</h1><p>{error}</p>"
 
-    return f"""
-    <h1>Bot OAuth callback received</h1>
-    <p>Code received: {"yes" if code else "no"}</p>
-    <p>Token exchange comes next.</p>
+    if not code:
+        return "<h1>Twitch bot auth failed</h1><p>No code was provided.</p>"
+
+    try:
+        token_response = await exchange_code_for_token(
+            code=code,
+            redirect_uri=settings.BOT_REDIRECT_URI
+        )
+    except Exception as exc:
+        return f"<h1>Token exchange failed</h1><p>{exc!r}</p>"
+
+    async with asqlite.create_pool(settings.DATABASE_PATH) as db:
+        # Temporary placeholder until we add Twitch user validation.
+        # This will be improved next.
+        await save_token(
+            db=db,
+            user_id="bot_pending_user_lookup",
+            token=token_response.access_token,
+            refresh=token_response.refresh_token
+        )
+
+    return """
+    <h1>Bot account connected</h1>
+    <p>RatsBoomBot received and saved the bot token.</p>
+    <p>You can close this window.</p>
     """
