@@ -23,7 +23,7 @@ def start_bot(icon=None, item=None):
         return
 
     BOT_PROCESS = subprocess.Popen(
-        [sys.executable, "main.py"],
+        [sys.executable, "app_runner.py"],
         cwd=PROJECT_DIR,
         creationflags=subprocess.CREATE_NEW_CONSOLE,
     )
