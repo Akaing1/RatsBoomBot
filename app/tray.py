@@ -3,17 +3,15 @@ import sys
 from pathlib import Path
 
 import pystray
-from PIL import Image, ImageDraw
+from PIL import Image
 
 ICON_PATH = "assets/NinjaDoro.ico"
-
-
-PROJECT_DIR = Path(__file__).parent
+PROJECT_DIR = Path(__file__).resolve().parent.parent
 BOT_PROCESS: subprocess.Popen | None = None
 
 
 def create_icon():
-    return Image.open(ICON_PATH)
+    return Image.open(PROJECT_DIR / ICON_PATH)
 
 
 def start_bot(icon=None, item=None):
@@ -23,9 +21,9 @@ def start_bot(icon=None, item=None):
         return
 
     BOT_PROCESS = subprocess.Popen(
-        [sys.executable, "app_runner.py"],
+        [sys.executable, "main.py", "--runtime"],
         cwd=PROJECT_DIR,
-        creationflags=subprocess.CREATE_NEW_CONSOLE,
+        creationflags=subprocess.CREATE_NEW_CONSOLE
     )
 
 
@@ -42,7 +40,7 @@ def exit_app(icon, item):
     icon.stop()
 
 
-def main():
+def run_tray():
     icon = pystray.Icon(
         "RatsBoomBot",
         create_icon(),
@@ -50,13 +48,9 @@ def main():
         menu=pystray.Menu(
             pystray.MenuItem("Start Bot", start_bot),
             pystray.MenuItem("Stop Bot", stop_bot),
-            pystray.MenuItem("Exit", exit_app),
-        ),
+            pystray.MenuItem("Exit", exit_app)
+        )
     )
 
     start_bot()
     icon.run()
-
-
-if __name__ == "__main__":
-    main()

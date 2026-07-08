@@ -12,30 +12,29 @@ from web.app import app as web_app
 LOGGER = logging.getLogger("Bot")
 
 
-async def run_bot_and_web():
+async def run_runtime():
     async with asqlite.create_pool(settings.DATABASE_PATH) as db:
         tokens, subs, broadcaster_ids = await setup_database(db)
 
-        bot = TwitchBot(
+        async with TwitchBot(
             token_database=db,
             subs=subs,
             broadcaster_ids=broadcaster_ids
-        )
+        ) as bot:
+            for token, refresh in tokens:
+                await bot.add_token(token, refresh)
 
-        for token, refresh in tokens:
-            await bot.add_token(token, refresh)
+            server = uvicorn.Server(
+                uvicorn.Config(
+                    web_app,
+                    host="0.0.0.0",
+                    port=4343,
+                    log_level="info"
+                )
+            )
 
-        config = uvicorn.Config(
-            web_app,
-            host="0.0.0.0",
-            port=4343,
-            log_level="info"
-        )
-        server = uvicorn.Server(config)
-
-        async with bot:
             await asyncio.gather(
-                bot.start(),
+                bot.start(load_tokens=False),
                 server.serve()
             )
 
@@ -46,8 +45,7 @@ def run():
         format="%(asctime)s %(levelname)-8s %(name)s %(message)s"
     )
 
-    asyncio.run(run_bot_and_web())
-
-
-if __name__ == "__main__":
-    run()
+    try:
+        asyncio.run(run_runtime())
+    except KeyboardInterrupt:
+        LOGGER.warning("Shutting down...")
