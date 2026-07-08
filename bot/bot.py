@@ -1,6 +1,5 @@
 import logging
 
-from twitchio import eventsub
 from twitchio.ext import commands
 
 from bot.commands.moderation import ModerationCommands
@@ -14,35 +13,9 @@ from bot.commands.shoutout import ShoutoutCommands
 from bot.events.chat import ChatEvents
 from bot.services.service_container import ServiceContainer
 from config.settings import settings
-from database.db import save_token
+from database.db import save_token, create_broadcaster_subscriptions
 
 LOGGER = logging.getLogger("Bot")
-
-
-def create_channel_point_redemption_subscription(broadcaster_user_id: str):
-    subscription_class = getattr(
-        eventsub,
-        "ChannelPointsRedeemAddSubscription",
-        None
-    )
-
-    if subscription_class is None:
-        subscription_class = getattr(
-            eventsub,
-            "ChannelPointsCustomRewardRedemptionAddSubscription",
-            None
-        )
-
-    if subscription_class is None:
-        LOGGER.warning(
-            "TwitchIO does not have a channel point redemption subscription class. "
-            "Channel point redeems will not be subscribed."
-        )
-        return None
-
-    return subscription_class(
-        broadcaster_user_id=broadcaster_user_id
-    )
 
 
 class TwitchBot(commands.AutoBot):
@@ -65,7 +38,7 @@ class TwitchBot(commands.AutoBot):
         self.services = ServiceContainer(
             self,
             self.token_database,
-            self.broadcaster_ids,
+            self.broadcaster_ids
         )
 
         await self.services.setup()
@@ -109,7 +82,7 @@ class TwitchBot(commands.AutoBot):
     async def event_oauth_authorized(self, payload):
         await self.add_token(
             payload.access_token,
-            payload.refresh_token,
+            payload.refresh_token
         )
 
         if not payload.user_id:
@@ -118,39 +91,7 @@ class TwitchBot(commands.AutoBot):
         if payload.user_id == self.bot_id:
             return
 
-        subs = [
-            eventsub.ChatMessageSubscription(
-                broadcaster_user_id=payload.user_id,
-                user_id=self.bot_id,
-            ),
-            eventsub.ChannelFollowSubscription(
-                broadcaster_user_id=payload.user_id,
-                moderator_user_id=payload.user_id,
-            ),
-            eventsub.ChannelSubscribeSubscription(
-                broadcaster_user_id=payload.user_id,
-            ),
-            eventsub.ChannelSubscribeMessageSubscription(
-                broadcaster_user_id=payload.user_id,
-            ),
-            eventsub.ChannelBanSubscription(
-                broadcaster_user_id=payload.user_id,
-                moderator_user_id=payload.user_id,
-            ),
-            eventsub.AdBreakBeginSubscription(
-                broadcaster_user_id=payload.user_id,
-            ),
-            eventsub.ChannelRaidSubscription(
-                broadcaster_user_id=payload.user_id
-            )
-        ]
-
-        channel_point_sub = create_channel_point_redemption_subscription(
-            payload.user_id
-        )
-
-        if channel_point_sub is not None:
-            subs.append(channel_point_sub)
+        subs = create_broadcaster_subscriptions(payload.user_id)
 
         await self.multi_subscribe(subs)
 
