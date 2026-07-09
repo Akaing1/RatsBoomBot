@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config.settings import settings
-from storage.database import save_token, create_broadcaster_subscriptions
+from storage.database import save_token
 from web.oauth import build_bot_oauth_url, build_channel_oauth_url, exchange_code_for_token, fetch_twitch_user
 from web.state import get_bot, get_db
 

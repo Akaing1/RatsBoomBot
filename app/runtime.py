@@ -35,7 +35,7 @@ async def run_runtime():
                 uvicorn.Config(
                     web_app,
                     host="0.0.0.0",
-                    port=4343,
+                    port=4344,
                     log_level="info"
                 )
             )

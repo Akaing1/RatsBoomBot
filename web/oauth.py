@@ -90,7 +90,7 @@ async def fetch_twitch_user(access_token: str) -> TwitchUser:
 
     response.raise_for_status()
     payload = response.json()
-    user = payload[".data"][0]
+    user = payload["data"][0]
 
     return TwitchUser(
         user_id=user["id"],
