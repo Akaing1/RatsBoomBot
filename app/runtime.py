@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from pathlib import Path
 
 import asqlite
 import uvicorn
@@ -8,12 +9,16 @@ from bot.bot import TwitchBot
 from config.settings import settings
 from storage.database import setup_database
 from web.app import app as web_app
+from web.state import set_runtime
 
 LOGGER = logging.getLogger("Bot")
 
 
 async def run_runtime():
-    async with asqlite.create_pool(settings.DATABASE_PATH) as db:
+    database_path = Path(settings.DATABASE_PATH)
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+
+    async with asqlite.create_pool(str(database_path)) as db:
         tokens, subs, broadcaster_ids = await setup_database(db)
 
         async with TwitchBot(
@@ -23,6 +28,8 @@ async def run_runtime():
         ) as bot:
             for token, refresh in tokens:
                 await bot.add_token(token, refresh)
+
+            set_runtime(twitch_bot=bot, token_database=db)
 
             server = uvicorn.Server(
                 uvicorn.Config(
