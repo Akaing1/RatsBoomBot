@@ -5,6 +5,8 @@ from pathlib import Path
 import asqlite
 import uvicorn
 
+from rich.logging import RichHandler
+
 from bot.bot import TwitchBot
 from config.settings import settings
 from storage.database import setup_database
@@ -49,7 +51,14 @@ async def run_runtime():
 def run():
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s %(levelname)-8s %(name)s %(message)s"
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[
+            RichHandler(
+                rich_tracebacks=True,
+                markup=True
+            )
+        ]
     )
 
     try:
