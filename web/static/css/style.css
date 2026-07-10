@@ -489,3 +489,144 @@ button.button:disabled {
         grid-template-columns: 1fr;
     }
 }
+
+.channel-heading {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.channel-heading-image,
+.channel-heading-placeholder {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+}
+
+.channel-heading-image {
+    object-fit: cover;
+}
+
+.channel-heading-placeholder {
+    display: grid;
+    place-items: center;
+    background: var(--surface-raised);
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.channel-heading h2 {
+    margin: 0;
+}
+
+.channel-status-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.channel-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+}
+
+.social-link-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.social-link-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+}
+
+.social-link-row:first-child {
+    border-top: 0;
+}
+
+.social-link-row p {
+    max-width: 420px;
+    margin: 6px 0 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.panel-note {
+    margin: 20px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.queue-list li {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 13px 0;
+    border-top: 1px solid var(--border);
+}
+
+.queue-position {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--surface-raised);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.compact-empty-state {
+    padding: 38px 15px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+}
+
+.compact-empty-state h4 {
+    margin: 0;
+}
+
+.compact-empty-state p {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+@media (max-width: 900px) {
+    .channel-heading {
+        align-items: flex-start;
+    }
+
+    .channel-status-grid,
+    .channel-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .social-link-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .social-link-row p {
+        white-space: normal;
+    }
+}

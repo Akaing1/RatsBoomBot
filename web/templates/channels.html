@@ -84,18 +84,20 @@
                     </div>
 
                     <div class="channel-card-actions">
-                        <a
-                            class="button secondary"
-                            href="https://twitch.tv/{{ broadcaster.login }}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            Open Twitch
-                        </a>
+                        {% if broadcaster.login %}
+                            <a
+                                class="button secondary"
+                                href="https://twitch.tv/{{ broadcaster.login }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                Open Twitch
+                            </a>
+                        {% endif %}
 
-                        <button class="button secondary" type="button" disabled>
+                        <a class="button primary" href="/channels/{{ broadcaster.id }}">
                             Manage
-                        </button>
+                        </a>
                     </div>
                 </article>
             {% endfor %}

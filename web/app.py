@@ -252,3 +252,60 @@ async def channels_page(request: Request):
             "broadcaster_count": len(broadcasters)
         }
     )
+
+
+@app.get("/channels/{broadcaster_id}", response_class=HTMLResponse)
+async def channel_details_page(request: Request, broadcaster_id: str):
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={
+                "active_page": "channels",
+                "title": "Runtime unavailable",
+                "message": "The RatsBoomBot runtime is not available."
+            },
+            status_code=503
+        )
+
+    broadcaster_service = runtime_bot.services.broadcasters
+    broadcaster_records = broadcaster_service.get_broadcasters()
+    broadcaster = broadcaster_records.get(broadcaster_id)
+
+    if broadcaster is None:
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={
+                "active_page": "channels",
+                "title": "Channel not found",
+                "message": "That Twitch channel is not connected to RatsBoomBot."
+            },
+            status_code=404
+        )
+
+    await broadcaster_service.refresh_live_statuses()
+
+    channel_settings = await runtime_bot.services.broadcaster_settings.get_settings(
+        broadcaster_id
+    )
+
+    viewer_queue = runtime_bot.services.viewer_queue
+    queue_open = viewer_queue.is_queue_open(broadcaster_id)
+    queue_users = viewer_queue.list_queue(broadcaster_id)
+    queue_size = viewer_queue.size(broadcaster_id)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="channel_details.html",
+        context={
+            "active_page": "channels",
+            "broadcaster": broadcaster,
+            "channel_settings": channel_settings,
+            "queue_open": queue_open,
+            "queue_users": queue_users,
+            "queue_size": queue_size
+        }
+    )
