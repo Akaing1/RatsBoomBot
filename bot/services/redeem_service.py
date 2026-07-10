@@ -1,4 +1,5 @@
 import logging
+import random
 import sqlite3
 from dataclasses import dataclass
 
@@ -16,6 +17,9 @@ class RedeemResult:
 class RedeemService:
     DAILY_REDEEM_TYPE = "daily"
     FIRST_REDEEM_TYPE = "first"
+
+    DAILY_DOUBLE_CHANCE = 0.05
+    CLAIM_MILESTONES = {10, 25, 50, 100, 250, 500, 1000}
 
     def __init__(self, bot, db, points_service):
         self.bot = bot
@@ -78,8 +82,7 @@ class RedeemService:
                 """
             )
 
-    async def handle_redemption(self, *, broadcaster_id: str, user_id: str, username: str, reward_title: str,
-                                redemption_id: str | None = None) -> RedeemResult:
+    async def handle_redemption(self, *, broadcaster_id: str, user_id: str, username: str, reward_title: str, redemption_id: str | None = None) -> RedeemResult:
         normalized_reward = reward_title.strip().lower()
 
         daily_title = settings.DAILY_REDEEM_TITLE.strip().lower()
@@ -93,9 +96,7 @@ class RedeemService:
         if stream_id is None:
             return RedeemResult(
                 handled=True,
-                message=(
-                    f"@{username}, this redeem only works while the stream is live."
-                )
+                message=f"@{username}, this redeem only works while the stream is live."
             )
 
         if normalized_reward == daily_title:
@@ -118,8 +119,7 @@ class RedeemService:
 
         return RedeemResult(handled=False)
 
-    async def claim_daily(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str,
-                          redemption_id: str | None = None) -> RedeemResult:
+    async def claim_daily(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str, redemption_id: str | None = None) -> RedeemResult:
         try:
             await self._insert_claim(
                 broadcaster_id=broadcaster_id,
@@ -132,28 +132,47 @@ class RedeemService:
         except sqlite3.IntegrityError:
             return RedeemResult(
                 handled=True,
-                message=(
-                    f"@{username}, you already claimed your stream daily stale bread."
-                )
+                message=f"@{username}, you already claimed your stream daily stale bread."
             )
+
+        claim_count = await self.get_claim_count(
+            broadcaster_id=broadcaster_id,
+            user_id=user_id,
+            redeem_type=self.DAILY_REDEEM_TYPE
+        )
+
+        is_double = self.is_daily_double()
+        bread_amount = settings.DAILY_REDEEM_BREAD * 2 if is_double else settings.DAILY_REDEEM_BREAD
 
         await self.points.add_points(
             broadcaster_id=broadcaster_id,
             user_id=user_id,
             username=username,
-            amount=settings.DAILY_REDEEM_BREAD
+            amount=bread_amount
         )
 
-        return RedeemResult(
-            handled=True,
-            message=(
-                f"@{username} claimed their stream daily stale bread "
-                f"and received {settings.DAILY_REDEEM_BREAD} bread!"
+        if is_double:
+            message = (
+                f"Lucky day! @{username} found an extra stale loaf and received "
+                f"{bread_amount} bread! They have collected their daily stale bread "
+                f"{claim_count} times!"
             )
-        )
+        else:
+            message = (
+                f"@{username} claimed their stream daily stale bread and received "
+                f"{bread_amount} bread! They have collected their daily stale bread "
+                f"{claim_count} times!"
+            )
 
-    async def claim_first(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str,
-                          redemption_id: str | None = None, ) -> RedeemResult:
+        if self.is_milestone(claim_count):
+            message += (
+                f" Milestone! @{username} has collected their daily stale bread "
+                f"{claim_count} times!"
+            )
+
+        return RedeemResult(handled=True, message=message)
+
+    async def claim_first(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str, redemption_id: str | None = None) -> RedeemResult:
         try:
             await self._insert_claim(
                 broadcaster_id=broadcaster_id,
@@ -175,7 +194,7 @@ class RedeemService:
                     message=(
                         f"@{username}, this stream's first redeem was already "
                         f"claimed by @{winner}."
-                    ),
+                    )
                 )
 
             return RedeemResult(
@@ -190,15 +209,51 @@ class RedeemService:
             amount=settings.FIRST_REDEEM_BREAD
         )
 
-        return RedeemResult(
-            handled=True,
-            message=(
-                f"@{username} was first in the basement this stream "
-                f"and received {settings.FIRST_REDEEM_BREAD} bread!"
-            )
+        claim_count = await self.get_claim_count(
+            broadcaster_id=broadcaster_id,
+            user_id=user_id,
+            redeem_type=self.FIRST_REDEEM_TYPE
         )
 
-    async def get_first_winner(self, *, broadcaster_id: str, stream_id: str, ) -> str | None:
+        message = (
+            f"@{username} was first in the basement this stream and received "
+            f"{settings.FIRST_REDEEM_BREAD} bread! They have stolen the first bread "
+            f"{claim_count} times!"
+        )
+
+        if self.is_milestone(claim_count):
+            message += (
+                f" Milestone! @{username} has stolen the first bread "
+                f"{claim_count} times!"
+            )
+
+        return RedeemResult(handled=True, message=message)
+
+    async def get_claim_count(self, *, broadcaster_id: str, user_id: str, redeem_type: str) -> int:
+        query = """
+        SELECT COUNT(*) AS claim_count
+        FROM redeem_claims
+        WHERE broadcaster_id = ?
+          AND user_id = ?
+          AND redeem_type = ?
+        """
+
+        async with self.db.acquire() as connection:
+            row = await connection.fetchone(
+                query,
+                (
+                    broadcaster_id,
+                    user_id,
+                    redeem_type
+                )
+            )
+
+        if not row:
+            return 0
+
+        return int(row["claim_count"])
+
+    async def get_first_winner(self, *, broadcaster_id: str, stream_id: str) -> str | None:
         query = """
         SELECT username
         FROM redeem_claims
@@ -254,8 +309,13 @@ class RedeemService:
             )
             return None
 
-    async def _insert_claim(self, *, broadcaster_id: str, user_id: str, username: str, redeem_type: str, stream_id: str,
-                            redemption_id: str | None = None) -> None:
+    def is_daily_double(self) -> bool:
+        return random.random() < self.DAILY_DOUBLE_CHANCE
+
+    def is_milestone(self, claim_count: int) -> bool:
+        return claim_count in self.CLAIM_MILESTONES
+
+    async def _insert_claim(self, *, broadcaster_id: str, user_id: str, username: str, redeem_type: str, stream_id: str, redemption_id: str | None = None) -> None:
         query = """
         INSERT INTO redeem_claims (
             broadcaster_id,
