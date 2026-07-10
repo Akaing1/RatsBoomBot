@@ -93,12 +93,9 @@ class TwitchBot(commands.AutoBot):
 
         if self.services:
             self.services.broadcasters.add_broadcaster(user_id)
+            await self.services.broadcasters.refresh_broadcaster(user_id)
 
         LOGGER.info("Broadcaster %s onboarded successfully.", user_id)
-
-    async def onboard_bot_account(self, token: str, refresh: str) -> None:
-        await self.add_token(token, refresh)
-        LOGGER.info("Bot account token onboarded successfully.")
 
     async def event_oauth_authorized(self, payload):
         if not payload.user_id:

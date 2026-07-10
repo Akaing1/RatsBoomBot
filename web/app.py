@@ -1,40 +1,59 @@
-from fastapi import FastAPI
+from pathlib import Path
+
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from config.settings import settings
 from storage.database import save_token
 from web.oauth import build_bot_oauth_url, build_channel_oauth_url, exchange_code_for_token, fetch_twitch_user
 from web.state import get_bot, get_db
 
-app = FastAPI(title="RatsBoomBot Web")
+WEB_DIRECTORY = Path(__file__).resolve().parent
+TEMPLATES_DIRECTORY = WEB_DIRECTORY / "templates"
+STATIC_DIRECTORY = WEB_DIRECTORY / "static"
+
+app = FastAPI(title="RatsBoomBot Dashboard")
+
+app.mount(
+    "/static",
+    StaticFiles(directory=str(STATIC_DIRECTORY)),
+    name="static"
+)
+
+templates = Jinja2Templates(directory=str(TEMPLATES_DIRECTORY))
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index():
-    return """
-    <!doctype html>
-    <html>
-        <head>
-            <title>RatsBoomBot</title>
-        </head>
-        <body>
-            <h1>RatsBoomBot</h1>
-            <p>Connect your Twitch channel to RatsBoomBot.</p>
+async def dashboard(request: Request):
+    runtime_bot = get_bot()
+    runtime_db = get_db()
 
-            <p>
-                <a href="/connect/channel">
-                    <button>Connect Channel</button>
-                </a>
-            </p>
+    bot_running = runtime_bot is not None
+    database_connected = runtime_db is not None
+    bot_account_id = None
+    broadcasters = []
 
-            <p>
-                <a href="/connect/bot">
-                    <button>Connect Bot Account</button>
-                </a>
-            </p>
-        </body>
-    </html>
-    """
+    if runtime_bot is not None:
+        bot_account_id = runtime_bot.bot_id
+
+        if runtime_bot.services:
+            broadcaster_records = runtime_bot.services.broadcasters.get_broadcasters()
+            broadcasters = list(broadcaster_records.values())
+
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={
+            "active_page": "dashboard",
+            "bot_running": bot_running,
+            "database_connected": database_connected,
+            "bot_account_id": bot_account_id,
+            "broadcasters": broadcasters,
+            "broadcaster_count": len(broadcasters)
+        }
+    )
 
 
 @app.get("/connect/channel")
@@ -48,80 +67,188 @@ async def connect_bot():
 
 
 @app.get("/oauth/channel", response_class=HTMLResponse)
-async def oauth_channel_callback(code: str | None = None, error: str | None = None):
+async def oauth_channel_callback(request: Request, code: str | None = None, error: str | None = None):
     if error:
-        return f"<h1>Twitch auth failed</h1><p>{error}</p>"
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={
+                "title": "Channel authorization failed",
+                "message": error
+            },
+            status_code=400
+        )
 
     if not code:
-        return "<h1>Twitch auth failed</h1><p>No code was provided.</p>"
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={
+                "title": "Channel authorization failed",
+                "message": "No authorization code was provided."
+            },
+            status_code=400
+        )
 
     try:
-        token_response = await exchange_code_for_token(code=code, redirect_uri=settings.CHANNEL_REDIRECT_URI)
+        token_response = await exchange_code_for_token(
+            code=code,
+            redirect_uri=settings.CHANNEL_REDIRECT_URI
+        )
         twitch_user = await fetch_twitch_user(token_response.access_token)
+
+        runtime_bot = get_bot()
+        runtime_db = get_db()
+
+        if runtime_bot is not None:
+            await runtime_bot.onboard_broadcaster(
+                user_id=twitch_user.user_id,
+                token=token_response.access_token,
+                refresh=token_response.refresh_token
+            )
+        elif runtime_db is not None:
+            await save_token(
+                db=runtime_db,
+                user_id=twitch_user.user_id,
+                token=token_response.access_token,
+                refresh=token_response.refresh_token
+            )
+        else:
+            return templates.TemplateResponse(
+                request=request,
+                name="error.html",
+                context={
+                    "title": "Runtime unavailable",
+                    "message": "The RatsBoomBot runtime is not available."
+                },
+                status_code=503
+            )
+
     except Exception as exc:
-        return f"<h1>Token exchange failed</h1><p>{exc!r}</p>"
-
-    runtime_bot = get_bot()
-    runtime_db = get_db()
-
-    if runtime_bot is not None:
-        await runtime_bot.onboard_broadcaster(
-            user_id=twitch_user.user_id,
-            token=token_response.access_token,
-            refresh=token_response.refresh_token
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={
+                "title": "Channel connection failed",
+                "message": repr(exc)
+            },
+            status_code=500
         )
-    elif runtime_db is not None:
-        await save_token(
-            db=runtime_db,
-            user_id=twitch_user.user_id,
-            token=token_response.access_token,
-            refresh=token_response.refresh_token
-        )
-    else:
-        return "<h1>Runtime unavailable</h1><p>The bot runtime is not available.</p>"
 
-    return f"""
-    <h1>Channel connected</h1>
-    <p>RatsBoomBot received and saved the channel token for {twitch_user.display_name}.</p>
-    <p>The bot should now be active in this channel.</p>
-    <p>You can close this window.</p>
-    """
+    return templates.TemplateResponse(
+        request=request,
+        name="auth_success.html",
+        context={
+            "title": "Channel connected",
+            "message": f"RatsBoomBot is now connected to {twitch_user.display_name}."
+        }
+    )
 
 
 @app.get("/oauth/bot", response_class=HTMLResponse)
-async def oauth_bot_callback(code: str | None = None, error: str | None = None):
+async def oauth_bot_callback(request: Request, code: str | None = None, error: str | None = None):
     if error:
-        return f"<h1>Twitch bot auth failed</h1><p>{error}</p>"
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={
+                "title": "Bot authorization failed",
+                "message": error
+            },
+            status_code=400
+        )
 
     if not code:
-        return "<h1>Twitch bot auth failed</h1><p>No code was provided.</p>"
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={
+                "title": "Bot authorization failed",
+                "message": "No authorization code was provided."
+            },
+            status_code=400
+        )
 
     try:
-        token_response = await exchange_code_for_token(code=code, redirect_uri=settings.BOT_REDIRECT_URI)
+        token_response = await exchange_code_for_token(
+            code=code,
+            redirect_uri=settings.BOT_REDIRECT_URI
+        )
         twitch_user = await fetch_twitch_user(token_response.access_token)
+
+        runtime_bot = get_bot()
+        runtime_db = get_db()
+
+        if runtime_bot is not None:
+            await runtime_bot.onboard_bot_account(
+                token=token_response.access_token,
+                refresh=token_response.refresh_token
+            )
+        elif runtime_db is not None:
+            await save_token(
+                db=runtime_db,
+                user_id=twitch_user.user_id,
+                token=token_response.access_token,
+                refresh=token_response.refresh_token
+            )
+        else:
+            return templates.TemplateResponse(
+                request=request,
+                name="error.html",
+                context={
+                    "title": "Runtime unavailable",
+                    "message": "The RatsBoomBot runtime is not available."
+                },
+                status_code=503
+            )
+
     except Exception as exc:
-        return f"<h1>Token exchange failed</h1><p>{exc!r}</p>"
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={
+                "title": "Bot connection failed",
+                "message": repr(exc)
+            },
+            status_code=500
+        )
 
+    return templates.TemplateResponse(
+        request=request,
+        name="auth_success.html",
+        context={
+            "title": "Bot account connected",
+            "message": f"The bot account {twitch_user.display_name} was connected successfully."
+        }
+    )
+
+
+@app.get("/channels", response_class=HTMLResponse)
+async def channels_page(request: Request):
     runtime_bot = get_bot()
-    runtime_db = get_db()
+    broadcasters = []
 
-    if runtime_bot is not None:
-        await runtime_bot.onboard_bot_account(
-            token=token_response.access_token,
-            refresh=token_response.refresh_token
-        )
-    elif runtime_db is not None:
-        await save_token(
-            db=runtime_db,
-            user_id=twitch_user.user_id,
-            token=token_response.access_token,
-            refresh=token_response.refresh_token
-        )
-    else:
-        return "<h1>Runtime unavailable</h1><p>The bot runtime is not available.</p>"
+    if runtime_bot is not None and runtime_bot.services:
+        broadcaster_service = runtime_bot.services.broadcasters
 
-    return f"""
-        <h1>Bot account connected</h1>
-        <p>RatsBoomBot received and saved the bot token for {twitch_user.display_name}.</p>
-        <p>You can close this window.</p>
-        """
+        await broadcaster_service.refresh_live_statuses()
+
+        broadcaster_records = broadcaster_service.get_broadcasters()
+        broadcasters = list(broadcaster_records.values())
+
+    broadcasters.sort(
+        key=lambda broadcaster: (
+            not broadcaster.is_live,
+            (broadcaster.name or broadcaster.id).lower()
+        )
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="channels.html",
+        context={
+            "active_page": "channels",
+            "broadcasters": broadcasters,
+            "broadcaster_count": len(broadcasters)
+        }
+    )
