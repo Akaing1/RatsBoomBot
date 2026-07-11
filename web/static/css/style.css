@@ -630,3 +630,54 @@ button.button:disabled {
         white-space: normal;
     }
 }
+
+.login-page {
+    display: grid;
+    min-height: 100vh;
+    place-items: center;
+    padding: 24px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 440px;
+    padding: 34px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface);
+}
+
+.login-brand {
+    margin-bottom: 34px;
+}
+
+.login-card h2 {
+    margin: 0;
+    font-size: 30px;
+}
+
+.login-card .settings-form {
+    margin-top: 24px;
+}
+
+.login-card .button {
+    width: 100%;
+}
+
+.sidebar {
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+}
+
+.navigation {
+    flex: 1;
+}
+
+.sidebar-logout {
+    margin-top: 30px;
+}
+
+.sidebar-logout .button {
+    width: 100%;
+}

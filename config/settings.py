@@ -22,6 +22,9 @@ class Settings:
         f"http://{ADMIN_HOST}:{ADMIN_PORT}"
     )
 
+    ADMIN_SECRET = os.getenv("ADMIN_SECRET")
+    SESSION_SECRET = os.getenv("SESSION_SECRET")
+
     BOT_REDIRECT_URI = os.getenv(
         "BOT_REDIRECT_URI",
         f"{ADMIN_BASE_URL}/oauth/bot"
@@ -69,3 +72,9 @@ class Settings:
 
 
 settings = Settings()
+
+if not settings.ADMIN_SECRET:
+    raise ValueError("ADMIN_SECRET must be configured in .env.")
+
+if not settings.SESSION_SECRET:
+    raise ValueError("SESSION_SECRET must be configured in .env.")

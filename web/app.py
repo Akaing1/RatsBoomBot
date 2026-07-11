@@ -1,12 +1,21 @@
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 from config.settings import settings
 from storage.database import save_token
+from web.admin_auth import (
+    authenticate_admin,
+    get_csrf_token,
+    is_admin_authenticated,
+    logout_admin,
+    require_admin,
+    validate_csrf_token
+)
 from web.oauth import (
     build_bot_oauth_url,
     build_channel_oauth_url,
@@ -23,6 +32,15 @@ app = FastAPI(
     title="RatsBoomBot Admin",
     docs_url=None,
     redoc_url=None
+)
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SESSION_SECRET,
+    session_cookie="ratsboombot_admin",
+    max_age=60 * 60 * 8,
+    same_site="lax",
+    https_only=False
 )
 
 app.mount(
@@ -44,20 +62,82 @@ def render_error(
     status_code: int,
     active_page: str = "dashboard"
 ):
+    context = {
+        "active_page": active_page,
+        "title": title,
+        "message": message
+    }
+
+    if is_admin_authenticated(request):
+        context["csrf_token"] = get_csrf_token(request)
+
     return templates.TemplateResponse(
         request=request,
         name="error.html",
-        context={
-            "active_page": active_page,
-            "title": title,
-            "message": message
-        },
+        context=context,
         status_code=status_code
+    )
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request, error: str | None = None):
+    if is_admin_authenticated(request):
+        return RedirectResponse(
+            url="/",
+            status_code=303
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={
+            "error": error
+        }
+    )
+
+
+@app.post("/login")
+async def login(request: Request, admin_secret: str = Form(...)):
+    if not authenticate_admin(request, admin_secret):
+        return RedirectResponse(
+            url="/login?error=invalid_credentials",
+            status_code=303
+        )
+
+    return RedirectResponse(
+        url="/",
+        status_code=303
+    )
+
+
+@app.post("/logout")
+async def logout(request: Request, csrf_token: str = Form(...)):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(
+            url="/login",
+            status_code=303
+        )
+
+    validate_csrf_token(
+        request,
+        csrf_token
+    )
+
+    logout_admin(request)
+
+    return RedirectResponse(
+        url="/login",
+        status_code=303
     )
 
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
+    admin_redirect = require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
     runtime_bot = get_bot()
     runtime_db = get_db()
 
@@ -71,15 +151,21 @@ async def dashboard(request: Request):
 
         if runtime_bot.services:
             broadcaster_records = (
-                runtime_bot.services.broadcasters.get_broadcasters()
+                runtime_bot.services
+                .broadcasters
+                .get_broadcasters()
             )
-            broadcasters = list(broadcaster_records.values())
+
+            broadcasters = list(
+                broadcaster_records.values()
+            )
 
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
         context={
             "active_page": "dashboard",
+            "csrf_token": get_csrf_token(request),
             "bot_running": bot_running,
             "database_connected": database_connected,
             "bot_account_id": bot_account_id,
@@ -90,14 +176,24 @@ async def dashboard(request: Request):
 
 
 @app.get("/connect/channel")
-async def connect_channel():
+async def connect_channel(request: Request):
+    admin_redirect = require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
     return RedirectResponse(
         build_channel_oauth_url()
     )
 
 
 @app.get("/connect/bot")
-async def connect_bot():
+async def connect_bot(request: Request):
+    admin_redirect = require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
     return RedirectResponse(
         build_bot_oauth_url()
     )
@@ -109,6 +205,11 @@ async def oauth_channel_callback(
     code: str | None = None,
     error: str | None = None
 ):
+    admin_redirect = require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
     if error:
         return render_error(
             request,
@@ -174,6 +275,7 @@ async def oauth_channel_callback(
         name="auth_success.html",
         context={
             "active_page": "dashboard",
+            "csrf_token": get_csrf_token(request),
             "title": "Channel connected",
             "message": (
                 f"RatsBoomBot is now connected to "
@@ -189,6 +291,11 @@ async def oauth_bot_callback(
     code: str | None = None,
     error: str | None = None
 ):
+    admin_redirect = require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
     if error:
         return render_error(
             request,
@@ -253,6 +360,7 @@ async def oauth_bot_callback(
         name="auth_success.html",
         context={
             "active_page": "dashboard",
+            "csrf_token": get_csrf_token(request),
             "title": "Bot account connected",
             "message": (
                 f"The bot account {twitch_user.display_name} "
@@ -264,6 +372,11 @@ async def oauth_bot_callback(
 
 @app.get("/channels", response_class=HTMLResponse)
 async def channels_page(request: Request):
+    admin_redirect = require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
     runtime_bot = get_bot()
     broadcasters = []
 
@@ -294,6 +407,7 @@ async def channels_page(request: Request):
         name="channels.html",
         context={
             "active_page": "channels",
+            "csrf_token": get_csrf_token(request),
             "broadcasters": broadcasters,
             "broadcaster_count": len(broadcasters)
         }
@@ -308,6 +422,11 @@ async def channel_details_page(
     request: Request,
     broadcaster_id: str
 ):
+    admin_redirect = require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
     runtime_bot = get_bot()
 
     if runtime_bot is None or runtime_bot.services is None:
@@ -345,15 +464,13 @@ async def channel_details_page(
 
     await broadcaster_service.refresh_live_statuses()
 
-    channel_settings = (
-        await runtime_bot.services
+    channel_settings = await (
+        runtime_bot.services
         .broadcaster_settings
         .get_settings(broadcaster_id)
     )
 
-    viewer_queue = (
-        runtime_bot.services.viewer_queue
-    )
+    viewer_queue = runtime_bot.services.viewer_queue
 
     queue_open = viewer_queue.is_queue_open(
         broadcaster_id
@@ -372,6 +489,7 @@ async def channel_details_page(
         name="channel_details.html",
         context={
             "active_page": "channels",
+            "csrf_token": get_csrf_token(request),
             "broadcaster": broadcaster,
             "channel_settings": channel_settings,
             "queue_open": queue_open,

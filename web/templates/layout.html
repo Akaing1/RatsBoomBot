@@ -65,6 +65,17 @@
                     Logs
                 </a>
             </nav>
+            <form class="sidebar-logout" method="post" action="/logout">
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token }}"
+                >
+
+                <button class="button secondary" type="submit">
+                    Log Out
+                </button>
+            </form>
         </aside>
 
         <main class="main-content">
