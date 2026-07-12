@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from config.settings import settings
-from storage.database import save_token
+from storage.database import save_token, delete_token
 from web.admin_auth import (
     authenticate_admin,
     get_csrf_token,
@@ -55,12 +55,12 @@ templates = Jinja2Templates(
 
 
 def render_error(
-    request: Request,
-    *,
-    title: str,
-    message: str,
-    status_code: int,
-    active_page: str = "dashboard"
+        request: Request,
+        *,
+        title: str,
+        message: str,
+        status_code: int,
+        active_page: str = "dashboard"
 ):
     context = {
         "active_page": active_page,
@@ -201,9 +201,9 @@ async def connect_bot(request: Request):
 
 @app.get("/oauth/channel", response_class=HTMLResponse)
 async def oauth_channel_callback(
-    request: Request,
-    code: str | None = None,
-    error: str | None = None
+        request: Request,
+        code: str | None = None,
+        error: str | None = None
 ):
     admin_redirect = require_admin(request)
 
@@ -287,9 +287,9 @@ async def oauth_channel_callback(
 
 @app.get("/oauth/bot", response_class=HTMLResponse)
 async def oauth_bot_callback(
-    request: Request,
-    code: str | None = None,
-    error: str | None = None
+        request: Request,
+        code: str | None = None,
+        error: str | None = None
 ):
     admin_redirect = require_admin(request)
 
@@ -414,13 +414,10 @@ async def channels_page(request: Request):
     )
 
 
-@app.get(
-    "/channels/{broadcaster_id}",
-    response_class=HTMLResponse
-)
+@app.get("/channels/{broadcaster_id}", response_class=HTMLResponse)
 async def channel_details_page(
-    request: Request,
-    broadcaster_id: str
+        request: Request,
+        broadcaster_id: str
 ):
     admin_redirect = require_admin(request)
 
@@ -496,4 +493,66 @@ async def channel_details_page(
             "queue_users": queue_users,
             "queue_size": queue_size
         }
+    )
+
+
+@app.post("/channels/{broadcaster_id}/delete")
+async def delete_broadcaster(request: Request, broadcaster_id: str, csrf_token: str = Form(...)):
+    admin_redirect = require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
+    validate_csrf_token(request, csrf_token)
+
+    if broadcaster_id == settings.BOT_ID:
+        return render_error(
+            request,
+            active_page="channels",
+            title="Cannot remove bot account",
+            message="The bot account cannot be removed as a broadcaster.",
+            status_code=400
+        )
+
+    runtime_bot = get_bot()
+    runtime_db = get_db()
+
+    if runtime_bot is None or runtime_bot.services is None or runtime_db is None:
+        return render_error(
+            request,
+            active_page="channels",
+            title="Runtime unavailable",
+            message="The RatsBoomBot runtime is not available.",
+            status_code=503
+        )
+
+    broadcaster = (
+        runtime_bot.services
+        .broadcasters
+        .get_broadcasters()
+        .get(broadcaster_id)
+    )
+
+    if broadcaster is None:
+        return render_error(
+            request,
+            active_page="channels",
+            title="Channel not found",
+            message="That channel is not connected to RatsBoomBot.",
+            status_code=404
+        )
+
+    await delete_token(runtime_db, broadcaster_id)
+
+    runtime_bot.services.broadcasters.remove_broadcaster(
+        broadcaster_id
+    )
+
+    runtime_bot.services.viewer_queue.remove_queue(
+        broadcaster_id
+    )
+
+    return RedirectResponse(
+        url="/channels?removed=1",
+        status_code=303
     )

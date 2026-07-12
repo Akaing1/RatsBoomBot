@@ -79,9 +79,7 @@ def create_broadcaster_subscriptions(broadcaster_user_id: str) -> list[Any]:
     return subs
 
 
-async def setup_database(
-    db: asqlite.Pool,
-) -> tuple[list[tuple[Any, Any]], list[Any], list[str]]:
+async def setup_database(db: asqlite.Pool) -> tuple[list[tuple[Any, Any]], list[Any], list[str]]:
     query = """
     CREATE TABLE IF NOT EXISTS tokens(
         user_id TEXT PRIMARY KEY,
@@ -111,12 +109,7 @@ async def setup_database(
         return tokens, subs, broadcasters
 
 
-async def save_token(
-    db: asqlite.Pool,
-    user_id: str,
-    token: str,
-    refresh: str
-):
+async def save_token(db: asqlite.Pool, user_id: str, token: str, refresh: str):
     query = """
     INSERT INTO tokens (user_id, token, refresh)
     VALUES (?, ?, ?)
@@ -135,3 +128,13 @@ async def save_token(
                 refresh,
             )
         )
+
+
+async def delete_token(db: asqlite.Pool, user_id: str) -> None:
+    query = """
+    DELETE FROM tokens
+    WHERE user_id = ?
+    """
+
+    async with db.acquire() as connection:
+        await connection.execute(query, (user_id,))

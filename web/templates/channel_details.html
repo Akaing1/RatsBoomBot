@@ -194,5 +194,35 @@
 
         </p>
     </section>
+    <section class="panel danger-zone">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow danger-eyebrow">Remove Channel</p>
+            <h3>Removing this channel disconnects RatsBoomBot.</h3>
+        </div>
+    </div>
+
+    <p class="page-description">
+        The OAuth token will be deleted and the bot will immediately disconnect from this channel.
+    The streamer can reconnect later using the dashboard. Historical data such as points,
+    redeems, and statistics will remain intact.
+    </p>
+
+    <form
+        method="post"
+        action="/channels/{{ broadcaster.id }}/delete"
+        onsubmit="return confirm('Remove {{ broadcaster.name or broadcaster.id }} from RatsBoomBot?');"
+    >
+        <input
+            type="hidden"
+            name="csrf_token"
+            value="{{ csrf_token }}"
+        >
+
+        <button class="button danger" type="submit">
+            Remove Channel
+        </button>
+    </form>
+</section>
 </div>
 {% endblock %}

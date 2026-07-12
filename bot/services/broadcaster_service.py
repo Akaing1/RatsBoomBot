@@ -43,6 +43,19 @@ class BroadcasterService:
             display_name=broadcaster_name
         )
 
+    def remove_broadcaster(self, broadcaster_id: str) -> bool:
+        broadcaster = self.broadcasters.pop(broadcaster_id, None)
+
+        if broadcaster is None:
+            return False
+
+        LOGGER.info(
+            "Removed broadcaster %s (%s).",
+            broadcaster_id,
+            broadcaster.name or "Unknown"
+        )
+        return True
+
     async def refresh_all_broadcasters(self) -> None:
         broadcaster_ids = list(self.broadcasters.keys())
 

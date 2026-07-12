@@ -454,3 +454,28 @@ body.login-page {
     .social-link-row { align-items: flex-start; flex-direction: column; }
     .social-link-row p { white-space: normal; }
 }
+
+.danger-zone .danger-eyebrow {
+    color: var(--danger);
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    margin-bottom: 0.75rem;
+}
+
+.danger-zone h3 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.4;
+}
+
+.danger-zone .page-description {
+    margin-top: 0;
+    margin-bottom: 2rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.6;
+    max-width: 600px;
+}
