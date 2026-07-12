@@ -479,3 +479,121 @@ body.login-page {
     line-height: 1.6;
     max-width: 600px;
 }
+
+.logs-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.log-session-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.log-session-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+}
+
+.log-session-row:first-child {
+    border-top: 0;
+}
+
+.log-session-icon {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    flex: 0 0 46px;
+    place-items: center;
+    border-radius: 12px;
+    background: var(--surface-raised);
+    font-weight: 800;
+}
+
+.log-session-details {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.log-session-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.log-session-details span,
+.log-session-meta span {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.log-session-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.log-active-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 9px;
+    border: 1px solid rgba(53, 196, 106, 0.4);
+    border-radius: 999px;
+    background: rgba(53, 196, 106, 0.1);
+    color: var(--success);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.log-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.log-title-row h2 {
+    margin: 0;
+}
+
+.log-viewer-panel {
+    overflow: hidden;
+}
+
+.log-viewer {
+    max-height: 65vh;
+    margin: 0;
+    overflow: auto;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #0b0d11;
+    color: #d8dee9;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 13px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+    .logs-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .log-session-row {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .log-session-meta {
+        width: 100%;
+        justify-content: space-between;
+        padding-left: 62px;
+    }
+}

@@ -45,23 +45,10 @@
                     Channels
                 </a>
 
-                <a class="nav-link disabled" href="#">
-                    Socials
-                </a>
-
-                <a class="nav-link disabled" href="#">
-                    Timers
-                </a>
-
-                <a class="nav-link disabled" href="#">
-                    Redeems
-                </a>
-
-                <a class="nav-link disabled" href="#">
-                    Viewer Queue
-                </a>
-
-                <a class="nav-link disabled" href="#">
+                <a
+                    class="nav-link {% if active_page == 'logs' %}active{% endif %}"
+                    href="/logs"
+                >
                     Logs
                 </a>
             </nav>
