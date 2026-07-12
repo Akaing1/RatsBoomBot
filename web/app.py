@@ -384,6 +384,7 @@ async def oauth_bot_callback(
 
         if runtime_bot is not None:
             await runtime_bot.onboard_bot_account(
+                user_id=twitch_user.user_id,
                 token=token_response.access_token,
                 refresh=token_response.refresh_token
             )
