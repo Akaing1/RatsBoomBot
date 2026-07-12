@@ -4,11 +4,12 @@ from pathlib import Path
 
 import asqlite
 import uvicorn
+from rich.logging import RichHandler
 
 from bot.bot import TwitchBot
 from config.settings import settings
 from storage.database import setup_database
-from web.app import app as web_app
+from web.app import app as admin_app
 from web.state import set_runtime
 
 LOGGER = logging.getLogger("Bot")
@@ -29,27 +30,42 @@ async def run_runtime():
             for token, refresh in tokens:
                 await bot.add_token(token, refresh)
 
-            set_runtime(twitch_bot=bot, token_database=db)
+            set_runtime(
+                twitch_bot=bot,
+                token_database=db
+            )
 
-            server = uvicorn.Server(
+            admin_server = uvicorn.Server(
                 uvicorn.Config(
-                    web_app,
-                    host="0.0.0.0",
-                    port=4344,
+                    admin_app,
+                    host=settings.ADMIN_HOST,
+                    port=settings.ADMIN_PORT,
                     log_level="info"
                 )
             )
 
+            LOGGER.info(
+                "Admin dashboard available at %s",
+                settings.ADMIN_BASE_URL
+            )
+
             await asyncio.gather(
                 bot.start(load_tokens=False),
-                server.serve()
+                admin_server.serve()
             )
 
 
 def run():
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s %(levelname)-8s %(name)s %(message)s"
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[
+            RichHandler(
+                rich_tracebacks=True,
+                markup=True
+            )
+        ]
     )
 
     try:

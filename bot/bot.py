@@ -81,6 +81,22 @@ class TwitchBot(commands.AutoBot):
 
         return resp
 
+    async def onboard_bot_account(self, token: str, user_id: str, refresh: str) -> None:
+        if str(user_id) != str(self.bot_id):
+            LOGGER.warning(
+                "Authorized account %s does not match configured bot account %s.",
+                user_id,
+                self.bot_id
+            )
+            return
+
+        await self.add_token(token, refresh)
+
+        LOGGER.info(
+            "Bot account %s onboarded successfully.",
+            user_id
+        )
+
     async def onboard_broadcaster(self, user_id: str, token: str, refresh: str) -> None:
         if user_id == self.bot_id:
             LOGGER.info("Skipping broadcaster onboarding for bot account %s.", user_id)
@@ -93,12 +109,9 @@ class TwitchBot(commands.AutoBot):
 
         if self.services:
             self.services.broadcasters.add_broadcaster(user_id)
+            await self.services.broadcasters.refresh_broadcaster(user_id)
 
         LOGGER.info("Broadcaster %s onboarded successfully.", user_id)
-
-    async def onboard_bot_account(self, token: str, refresh: str) -> None:
-        await self.add_token(token, refresh)
-        LOGGER.info("Bot account token onboarded successfully.")
 
     async def event_oauth_authorized(self, payload):
         if not payload.user_id:
@@ -106,6 +119,7 @@ class TwitchBot(commands.AutoBot):
 
         if payload.user_id == self.bot_id:
             await self.onboard_bot_account(
+                user_id=payload.user_id,
                 token=payload.access_token,
                 refresh=payload.refresh_token
             )

@@ -1,0 +1,228 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ broadcaster.name or "Channel" }} | RatsBoomBot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div class="channel-heading">
+        {% if broadcaster.profile_image_url %}
+            <img
+                class="channel-heading-image"
+                src="{{ broadcaster.profile_image_url }}"
+                alt="{{ broadcaster.name or broadcaster.id }}"
+            >
+        {% else %}
+            <div class="channel-heading-placeholder">
+                {{ (broadcaster.name or broadcaster.id)[0] | upper }}
+            </div>
+        {% endif %}
+
+        <div>
+            <p class="eyebrow">Channel management</p>
+            <h2>{{ broadcaster.name or "Unknown channel" }}</h2>
+
+            <p class="page-description">
+                {% if broadcaster.login %}
+                    @{{ broadcaster.login }} ·
+                {% endif %}
+
+                Twitch ID: {{ broadcaster.id }}
+            </p>
+        </div>
+    </div>
+
+    <div class="header-actions">
+        <a class="button secondary" href="/channels">Back to Channels</a>
+
+        {% if broadcaster.login %}
+            <a
+                class="button primary"
+                href="https://twitch.tv/{{ broadcaster.login }}"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                Open Twitch
+            </a>
+        {% endif %}
+    </div>
+</header>
+
+<section class="status-grid channel-status-grid">
+    <article class="status-card">
+        <p class="card-label">Stream status</p>
+
+        <div class="status-row">
+            <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
+
+            <strong>
+                {% if broadcaster.is_live %}Live{% else %}Offline{% endif %}
+            </strong>
+        </div>
+
+        <p class="card-detail">
+            Current Twitch broadcast status.
+        </p>
+    </article>
+
+    <article class="status-card">
+        <p class="card-label">Viewer queue</p>
+
+        <div class="status-row">
+            <span class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"></span>
+
+            <strong>
+                {% if queue_open %}Open{% else %}Closed{% endif %}
+            </strong>
+        </div>
+
+        <p class="card-detail">
+            {{ queue_size }} viewer{% if queue_size != 1 %}s{% endif %} currently waiting.
+        </p>
+    </article>
+
+    <article class="status-card">
+        <p class="card-label">Social links</p>
+
+        <div class="metric">
+            {{ (1 if channel_settings.discord_url else 0) + (1 if channel_settings.youtube_url else 0) }}
+        </div>
+
+        <p class="card-detail">
+            Configured Discord and YouTube links.
+        </p>
+    </article>
+</section>
+
+<div class="channel-detail-grid">
+    <section class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Community</p>
+                <h3>Social links</h3>
+            </div>
+        </div>
+
+        <div class="social-link-list">
+            <article class="social-link-row">
+                <div>
+                    <strong>Discord</strong>
+
+                    {% if channel_settings.discord_url %}
+                        <p>{{ channel_settings.discord_url }}</p>
+                    {% else %}
+                        <p>No Discord link configured.</p>
+                    {% endif %}
+                </div>
+
+                {% if channel_settings.discord_url %}
+                    <a
+                        class="button secondary"
+                        href="{{ channel_settings.discord_url }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Open
+                    </a>
+                {% endif %}
+            </article>
+
+            <article class="social-link-row">
+                <div>
+                    <strong>YouTube</strong>
+
+                    {% if channel_settings.youtube_url %}
+                        <p>{{ channel_settings.youtube_url }}</p>
+                    {% else %}
+                        <p>No YouTube link configured.</p>
+                    {% endif %}
+                </div>
+
+                {% if channel_settings.youtube_url %}
+                    <a
+                        class="button secondary"
+                        href="{{ channel_settings.youtube_url }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Open
+                    </a>
+                {% endif %}
+            </article>
+        </div>
+
+        <p class="panel-note">
+            Social links can currently be updated through the Twitch chat settings commands.
+        </p>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Viewer games</p>
+                <h3>Viewer queue</h3>
+            </div>
+
+            <span class="channel-state {% if queue_open %}live{% endif %}">
+                {% if queue_open %}Open{% else %}Closed{% endif %}
+            </span>
+        </div>
+
+        {% if queue_users %}
+            <ol class="queue-list">
+                {% for username in queue_users %}
+                    <li>
+                        <span class="queue-position">{{ loop.index }}</span>
+                        <span>@{{ username }}</span>
+                    </li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <div class="compact-empty-state">
+                <h4>The queue is empty</h4>
+
+                <p>
+                    {% if queue_open %}
+                        Viewers can join with <strong>!join</strong>.
+                    {% else %}
+                        Open the queue in chat before viewers can join.
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+
+        <p class="panel-note">
+
+        </p>
+    </section>
+    <section class="panel danger-zone">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow danger-eyebrow">Remove Channel</p>
+            <h3>Removing this channel disconnects RatsBoomBot.</h3>
+        </div>
+    </div>
+
+    <p class="page-description">
+        The OAuth token will be deleted and the bot will immediately disconnect from this channel.
+    The streamer can reconnect later using the dashboard. Historical data such as points,
+    redeems, and statistics will remain intact.
+    </p>
+
+    <form
+        method="post"
+        action="/channels/{{ broadcaster.id }}/delete"
+        onsubmit="return confirm('Remove {{ broadcaster.name or broadcaster.id }} from RatsBoomBot?');"
+    >
+        <input
+            type="hidden"
+            name="csrf_token"
+            value="{{ csrf_token }}"
+        >
+
+        <button class="button danger" type="submit">
+            Remove Channel
+        </button>
+    </form>
+</section>
+</div>
+{% endblock %}

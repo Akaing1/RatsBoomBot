@@ -1,0 +1,174 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Admin Dashboard | RatsBoomBot
+{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Local administration</p>
+
+        <h2>Admin Dashboard</h2>
+
+        <p class="page-description">
+            Manage the local RatsBoomBot runtime, bot account,
+            and connected Twitch channels.
+        </p>
+    </div>
+
+    <div class="header-actions">
+        <a
+            class="button secondary"
+            href="/connect/bot"
+        >
+            Connect Bot Account
+        </a>
+
+        <a
+            class="button primary"
+            href="/connect/channel"
+        >
+            Connect Channel
+        </a>
+    </div>
+</header>
+
+<section class="status-grid">
+    <article class="status-card">
+        <p class="card-label">Bot runtime</p>
+
+        <div class="status-row">
+            <span
+                class="status-indicator {% if bot_running %}online{% else %}offline{% endif %}"
+            ></span>
+
+            <strong>
+                {% if bot_running %}
+                    Running
+                {% else %}
+                    Offline
+                {% endif %}
+            </strong>
+        </div>
+
+        <p class="card-detail">
+            {% if bot_account_id %}
+                Bot ID: {{ bot_account_id }}
+            {% else %}
+                No live bot instance detected.
+            {% endif %}
+        </p>
+    </article>
+
+    <article class="status-card">
+        <p class="card-label">Database</p>
+
+        <div class="status-row">
+            <span
+                class="status-indicator {% if database_connected %}online{% else %}offline{% endif %}"
+            ></span>
+
+            <strong>
+                {% if database_connected %}
+                    Connected
+                {% else %}
+                    Unavailable
+                {% endif %}
+            </strong>
+        </div>
+
+        <p class="card-detail">
+            Local token storage and channel configuration.
+        </p>
+    </article>
+
+    <article class="status-card">
+        <p class="card-label">Connected channels</p>
+
+        <div class="metric">
+            {{ broadcaster_count }}
+        </div>
+
+        <p class="card-detail">
+            Channels currently registered with the bot.
+        </p>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Security</p>
+            <h3>Local administrator access</h3>
+        </div>
+    </div>
+
+    <p class="page-description">
+        This dashboard is bound to
+        <strong>127.0.0.1</strong> and can only be accessed
+        from the computer running RatsBoomBot.
+    </p>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Twitch</p>
+            <h3>Connected channels</h3>
+        </div>
+
+        <a
+            class="text-link"
+            href="/connect/channel"
+        >
+            Add channel
+        </a>
+    </div>
+
+    {% if broadcasters %}
+        <div class="channel-list">
+            {% for broadcaster in broadcasters %}
+                <article class="channel-row">
+                    <div class="channel-avatar">
+                        {{ (broadcaster.name or broadcaster.id)[0] | upper }}
+                    </div>
+
+                    <div class="channel-details">
+                        <strong>
+                            {{ broadcaster.name or "Channel" }}
+                        </strong>
+
+                        <span>
+                            ID: {{ broadcaster.id }}
+                        </span>
+                    </div>
+
+                    <a
+                        class="button secondary"
+                        href="/channels/{{ broadcaster.id }}"
+                    >
+                        Manage
+                    </a>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h4>No channels connected</h4>
+
+            <p>
+                Authorize a Twitch channel to start using
+                RatsBoomBot.
+            </p>
+
+            <a
+                class="button primary"
+                href="/connect/channel"
+            >
+                Connect first channel
+            </a>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>
+        {% block title %}RatsBoomBot Admin{% endblock %}
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='/css/style.css') }}"
+    >
+</head>
+
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-mark">R</div>
+
+                <div>
+                    <h1>RatsBoomBot</h1>
+                    <p>Local Admin Control</p>
+                </div>
+            </div>
+
+            <nav class="navigation">
+                <a
+                    class="nav-link {% if active_page == 'dashboard' %}active{% endif %}"
+                    href="/"
+                >
+                    Dashboard
+                </a>
+
+                <a
+                    class="nav-link {% if active_page == 'channels' %}active{% endif %}"
+                    href="/channels"
+                >
+                    Channels
+                </a>
+
+                <a
+                    class="nav-link {% if active_page == 'logs' %}active{% endif %}"
+                    href="/logs"
+                >
+                    Logs
+                </a>
+            </nav>
+            <form class="sidebar-logout" method="post" action="/logout">
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token }}"
+                >
+
+                <button class="button secondary" type="submit">
+                    Log Out
+                </button>
+            </form>
+        </aside>
+
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>
