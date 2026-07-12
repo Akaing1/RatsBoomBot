@@ -52,3 +52,4 @@ Thumbs.db
 *.log
 /.data/
 /.dataTest/
+/.pytest_cache/
