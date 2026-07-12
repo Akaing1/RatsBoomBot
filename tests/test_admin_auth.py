@@ -10,17 +10,29 @@ from web.admin_auth import (
     require_admin,
     validate_csrf_token
 )
+from starlette.requests import Request
 
 
-class FakeRequest:
-    def __init__(self) -> None:
-        self.session: dict[str, object] = {}
+def create_request() -> Request:
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/",
+        "headers": [],
+        "query_string": b"",
+        "server": ("testserver", 80),
+        "client": ("127.0.0.1", 12345),
+        "scheme": "http",
+        "session": {}
+    }
+
+    return Request(scope)
 
 
 def test_authenticate_admin_accepts_correct_secret(monkeypatch) -> None:
     monkeypatch.setattr(settings,"ADMIN_SECRET","correct-secret")
 
-    request = FakeRequest()
+    request = create_request()
     authenticated = authenticate_admin(request, "correct-secret")
 
     assert authenticated is True
@@ -31,7 +43,7 @@ def test_authenticate_admin_accepts_correct_secret(monkeypatch) -> None:
 def test_authenticate_admin_rejects_wrong_secret(monkeypatch) -> None:
     monkeypatch.setattr(settings,"ADMIN_SECRET","correct-secret")
 
-    request = FakeRequest()
+    request = create_request()
 
     authenticated = authenticate_admin(request,"wrong-secret")
 
@@ -40,7 +52,7 @@ def test_authenticate_admin_rejects_wrong_secret(monkeypatch) -> None:
 
 
 def test_csrf_token_is_stable_for_session() -> None:
-    request = FakeRequest()
+    request = create_request()
 
     first_token = get_csrf_token(request)
     second_token = get_csrf_token(request)
@@ -48,7 +60,7 @@ def test_csrf_token_is_stable_for_session() -> None:
 
 
 def test_validate_csrf_token_rejects_missing_token() -> None:
-    request = FakeRequest()
+    request = create_request()
 
     with pytest.raises( HTTPException) as exception:
         validate_csrf_token(request,"anything")
@@ -57,7 +69,7 @@ def test_validate_csrf_token_rejects_missing_token() -> None:
 
 
 def test_validate_csrf_token_rejects_wrong_token() -> None:
-    request = FakeRequest()
+    request = create_request()
     request.session["csrf_token"] = "expected"
 
     with pytest.raises(HTTPException) as exception:
@@ -67,7 +79,7 @@ def test_validate_csrf_token_rejects_wrong_token() -> None:
 
 
 def test_logout_clears_session_and_requires_login() -> None:
-    request = FakeRequest()
+    request = create_request()
 
     request.session["admin_authenticated"] = True
     request.session["csrf_token"] = "token"
