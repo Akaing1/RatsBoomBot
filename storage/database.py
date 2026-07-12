@@ -61,6 +61,12 @@ def create_broadcaster_subscriptions(broadcaster_user_id: str) -> list[Any]:
         ),
         eventsub.AdBreakBeginSubscription(
             broadcaster_user_id=broadcaster_user_id,
+        ),
+        eventsub.StreamOnlineSubscription(
+            broadcaster_user_id=broadcaster_user_id
+        ),
+        eventsub.StreamOfflineSubscription(
+            broadcaster_user_id=broadcaster_user_id
         )
     ]
 

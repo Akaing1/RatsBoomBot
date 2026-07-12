@@ -15,6 +15,8 @@ class Settings:
     PREFIX = os.getenv("PREFIX", "!")
     DATABASE_PATH = os.getenv("DATABASE_PATH", ".data/tokens.db")
 
+    STREAM_LOGS_PATH = os.getenv("STREAM_LOGS_PATH", ".data/logs")
+
     ADMIN_HOST = os.getenv("ADMIN_HOST", "127.0.0.1")
     ADMIN_PORT = int(os.getenv("ADMIN_PORT", "4345"))
     ADMIN_BASE_URL = os.getenv(
