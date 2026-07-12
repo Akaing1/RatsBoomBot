@@ -1,34 +1,63 @@
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, error: str | None = None):
-    if is_admin_authenticated(request):
-        return RedirectResponse(url="/", status_code=303)
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
 
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={
-            "error": error
-        }
-    )
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
 
+    <title>Admin Login | RatsBoomBot</title>
 
-@app.post("/login")
-async def login(request: Request, admin_secret: str = Form(...)):
-    if not authenticate_admin(request, admin_secret):
-        return RedirectResponse(
-            url="/login?error=invalid_credentials",
-            status_code=303
-        )
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='/css/style.css') }}"
+    >
+</head>
 
-    return RedirectResponse(url="/", status_code=303)
+<body class="login-page">
+    <main class="login-card">
+        <div class="brand login-brand">
+            <div class="brand-mark">R</div>
 
+            <div>
+                <h1>RatsBoomBot</h1>
+                <p>Local Admin Control</p>
+            </div>
+        </div>
 
-@app.post("/logout")
-async def logout(request: Request, csrf_token: str = Form(...)):
-    if not is_admin_authenticated(request):
-        return RedirectResponse(url="/login", status_code=303)
+        <p class="eyebrow">Protected access</p>
+        <h2>Admin Login</h2>
 
-    validate_csrf_token(request, csrf_token)
-    logout_admin(request)
+        <p class="page-description">
+            Enter the local administrator secret to continue.
+        </p>
 
-    return RedirectResponse(url="/login", status_code=303)
+        {% if error %}
+            <div class="alert error-alert">
+                The administrator secret was incorrect.
+            </div>
+        {% endif %}
+
+        <form class="settings-form" method="post" action="/login">
+            <div class="form-group">
+                <label for="admin-secret">Admin secret</label>
+
+                <input
+                    id="admin-secret"
+                    name="admin_secret"
+                    type="password"
+                    autocomplete="current-password"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <button class="button primary" type="submit">
+                Sign In
+            </button>
+        </form>
+    </main>
+</body>
+</html>
