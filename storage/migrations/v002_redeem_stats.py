@@ -1,7 +1,7 @@
-import asqlite
+from typing import Any
 
 
-async def migrate(connection: asqlite.Connection) -> None:
+async def migrate(connection: Any) -> None:
     table = await connection.fetchone(
         """
         SELECT name
@@ -27,14 +27,8 @@ async def migrate(connection: asqlite.Connection) -> None:
             """
         )
 
-    columns = await connection.fetchall(
-        "PRAGMA table_info(redeem_claims)"
-    )
-
-    column_names = {
-        column["name"]
-        for column in columns
-    }
+    columns = await connection.fetchall("PRAGMA table_info(redeem_claims)")
+    column_names = {column["name"] for column in columns}
 
     if "stream_id" not in column_names:
         await connection.execute(
@@ -44,13 +38,8 @@ async def migrate(connection: asqlite.Connection) -> None:
             """
         )
 
-    await connection.execute(
-        "DROP INDEX IF EXISTS idx_redeem_claims_daily"
-    )
-
-    await connection.execute(
-        "DROP INDEX IF EXISTS idx_redeem_claims_first"
-    )
+    await connection.execute("DROP INDEX IF EXISTS idx_redeem_claims_daily")
+    await connection.execute("DROP INDEX IF EXISTS idx_redeem_claims_first")
 
     await connection.execute(
         """

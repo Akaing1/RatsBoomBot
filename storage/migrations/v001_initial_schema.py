@@ -1,7 +1,7 @@
-import asqlite
+from typing import Any
 
 
-async def migrate(connection: asqlite.Connection) -> None:
+async def migrate(connection: Any) -> None:
     await connection.execute(
         """
         CREATE TABLE IF NOT EXISTS tokens (
