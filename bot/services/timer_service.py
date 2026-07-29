@@ -1,5 +1,4 @@
 import asyncio
-import itertools
 import logging
 import time
 
@@ -39,18 +38,23 @@ class TimerService:
         self._task = None
 
     def track_message(self, payload) -> None:
-        broadcaster_id = payload.broadcaster.id
+        broadcaster_id = str(payload.broadcaster.id)
         broadcaster_name = payload.broadcaster.name
 
-        self.message_counts[broadcaster_id] = (self.message_counts.get(broadcaster_id, 0) + 1)
+        self.message_counts[broadcaster_id] = (
+                self.message_counts.get(broadcaster_id, 0) + 1
+        )
 
-        self.last_announcements.setdefault(broadcaster_id, time.time())
+        self.last_announcements.setdefault(
+            broadcaster_id,
+            time.time(),
+        )
 
         LOGGER.info(
             "[%s] Tracked message. Count: %s/%s",
             broadcaster_name,
             self.message_counts[broadcaster_id],
-            self.REQUIRED_MESSAGES
+            self.REQUIRED_MESSAGES,
         )
 
     async def announcement_loop(self) -> None:

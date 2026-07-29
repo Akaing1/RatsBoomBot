@@ -2,7 +2,9 @@ import logging
 
 from twitchio.ext import commands
 
+from bot.profiles import get_active_profile, render_profile_message
 from bot.shared.commands.shoutout import send_shoutout_message
+
 
 LOGGER = logging.getLogger("Bot")
 
@@ -21,7 +23,10 @@ class RaidEvents(commands.Component):
         viewer_count = getattr(payload, "viewer_count", 0)
 
         if raider is None or broadcaster is None:
-            LOGGER.warning("Could not process raid payload: %r", payload)
+            LOGGER.warning(
+                "Could not process raid payload: %r",
+                payload,
+            )
             return
 
         raider_name = getattr(raider, "name", None)
@@ -29,7 +34,7 @@ class RaidEvents(commands.Component):
         if not raider_name:
             LOGGER.warning(
                 "Could not find raider name from payload: %r",
-                payload
+                payload,
             )
             return
 
@@ -45,21 +50,29 @@ class RaidEvents(commands.Component):
             self.bot.services.stream_logs.write(
                 broadcaster_id,
                 "RAID",
-                f"{raider_name} raided with {viewer_count} {viewer_word}."
+                f"{raider_name} raided with {viewer_count} {viewer_word}.",
             )
 
-        channel = self.bot.create_partialuser(broadcaster_id)
+        profile = get_active_profile(broadcaster_id)
 
-        await channel.send_message(
-            sender=self.bot.user,
-            message=(
-                f"@{raider_name} has raided the basement with "
-                f"{viewer_count} {viewer_word}! Rats stronk together!"
+        if profile is not None:
+            message = render_profile_message(
+                profile.raid_messages.incoming,
+                raider_name=raider_name,
+                viewer_count=viewer_count,
+                viewer_word=viewer_word,
             )
-        )
+
+            if message:
+                channel = self.bot.create_partialuser(broadcaster_id)
+
+                await channel.send_message(
+                    sender=self.bot.user,
+                    message=message,
+                )
 
         await send_shoutout_message(
             bot=self.bot,
             broadcaster_id=broadcaster_id,
-            username=raider_name
+            username=raider_name,
         )
