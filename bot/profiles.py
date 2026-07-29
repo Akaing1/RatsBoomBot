@@ -5,7 +5,6 @@ from twitchio.ext import commands
 
 @dataclass(frozen=True)
 class ChannelProfile:
-    broadcaster_id: str
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
 
@@ -14,18 +13,18 @@ CHANNEL_PROFILES: dict[str, ChannelProfile] = {}
 
 
 def register_profile(profile: ChannelProfile) -> None:
-    broadcaster_id = str(profile.broadcaster_id)
+    channel_name = profile.channel_name.lower()
 
-    if broadcaster_id in CHANNEL_PROFILES:
+    if channel_name in CHANNEL_PROFILES:
         raise ValueError(
-            f"A channel profile is already registered for broadcaster {broadcaster_id}."
+            f"A channel profile is already registered for {channel_name}."
         )
 
-    CHANNEL_PROFILES[broadcaster_id] = profile
+    CHANNEL_PROFILES[channel_name] = profile
 
 
-def get_profile(broadcaster_id: str) -> ChannelProfile | None:
-    return CHANNEL_PROFILES.get(str(broadcaster_id))
+def get_profile(channel_name: str) -> ChannelProfile | None:
+    return CHANNEL_PROFILES.get(channel_name.lower())
 
 
 def clear_profiles() -> None:
