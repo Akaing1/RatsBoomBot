@@ -3,7 +3,9 @@ import logging
 from twitchio.ext import commands
 
 from bot.channels import register_channel_profiles
-from bot.profiles import CHANNEL_PROFILES
+
+from bot.profiles import CHANNEL_PROFILES, activate_profile
+
 from bot.shared.commands.counters import CounterCommands
 from bot.shared.commands.moderation import ModerationCommands
 from bot.shared.commands.points import PointsCommands
@@ -95,6 +97,8 @@ async def load_channel_components(bot) -> None:
             channel_name,
             broadcaster_id
         )
+
+        activate_profile(broadcaster_id, profile)
 
         for component_class in profile.components:
             await bot.add_component(

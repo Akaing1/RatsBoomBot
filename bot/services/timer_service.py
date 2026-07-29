@@ -3,6 +3,8 @@ import itertools
 import logging
 import time
 
+from bot.profiles import get_active_profile
+
 LOGGER = logging.getLogger("Bot")
 
 
@@ -95,7 +97,20 @@ class TimerService:
 
     async def send_next_announcement(self, broadcaster_id: str, broadcaster_name: str, ) -> None:
         settings = await self.broadcaster_settings.get_settings(broadcaster_id)
-        messages = self.get_messages(settings)
+
+        profile = get_active_profile(broadcaster_id)
+
+        if profile is None:
+            LOGGER.info(
+                "No active channel profile available for %s.",
+                broadcaster_name
+            )
+            return
+
+        messages = self.get_messages(
+            profile.timer_messages,
+            settings
+        )
 
         if not messages:
             LOGGER.info("No timer messages available for %s.", broadcaster_name)
@@ -127,15 +142,32 @@ class TimerService:
             )
 
     @staticmethod
-    def get_messages(settings) -> list[str]:
-        messages = []
+    def get_messages(templates: tuple[str, ...], settings) -> list[str]:
+        messages: list[str] = []
 
-        if settings.discord_url:
-            messages.append(f"Lost something? Maybe you left it in the basement: {settings.discord_url}")
+        values = {
+            "discord_url": settings.discord_url or "",
+            "youtube_url": settings.youtube_url or "",
+        }
 
-        if settings.youtube_url:
-            messages.append(f"Missed something? Go check out Rat's youtube! {settings.youtube_url}")
+        for template in templates:
+            if "{discord_url}" in template and not settings.discord_url:
+                continue
 
-        messages.append("Ready to gamble? Use !help to get a list of commands you can use!")
+            if "{youtube_url}" in template and not settings.youtube_url:
+                continue
+
+            try:
+                message = template.format_map(values).strip()
+            except KeyError as error:
+                LOGGER.warning(
+                    "Unknown timer message placeholder %s in message: %s",
+                    error,
+                    template
+                )
+                continue
+
+            if message:
+                messages.append(message)
 
         return messages

@@ -11,6 +11,7 @@ class ChannelComponent(commands.Component):
         self.profile = profile
         self.broadcaster_id = str(broadcaster_id)
 
+    @staticmethod
     def get_context_broadcaster_id(self, ctx: Any) -> str | None:
         broadcaster = getattr(ctx, "broadcaster", None)
         broadcaster_id = getattr(broadcaster, "id", None)
