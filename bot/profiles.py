@@ -34,7 +34,7 @@ class RedeemMessages:
         "{claim_count} times!"
     )
     daily_milestone: str = (
-        " Milestone! @{username} has collected their daily reward "
+        "Milestone! @{username} has collected their daily reward "
         "{claim_count} times!"
     )
     first_already_claimed_by: str = (
@@ -48,7 +48,7 @@ class RedeemMessages:
         "{claim_count} times!"
     )
     first_milestone: str = (
-        " Milestone! @{username} has claimed first "
+        "Milestone! @{username} has claimed first "
         "{claim_count} times!"
     )
 
@@ -74,6 +74,54 @@ class RedeemConfig:
 
 
 @dataclass(frozen=True)
+class PointsMessages:
+    balance_self: str = "{username}, you have {points} points!"
+    balance_other: str = "{username} has {points} points!"
+    leaderboard_empty: str = "No points have been collected yet."
+    leaderboard_entry: str = "{position}. {username}: {points} points"
+    leaderboard_title: str = "Top point holders: {leaderboard}"
+    reset_denied: str = "Only the broadcaster can reset the points."
+    reset_success: str = "This channel's points have been reset."
+    add_denied: str = "Only moderators can add points to viewers."
+    add_invalid: str = "The points amount must be greater than 0."
+    add_success: str = "Added {amount} points to {username}."
+    gamble_no_points: str = "You do not have any points to gamble."
+    gamble_usage: str = "Use it like this: !{command} gamble 50 or !{command} gamble all"
+    gamble_invalid: str = "You need to gamble at least 1 point."
+    gamble_insufficient: str = "You only have {points} points."
+    gamble_win: str = "{username} won {amount} points and now has {new_balance} points!"
+    gamble_all_win: str = "{username} doubled their points and now has {new_balance} points!"
+    gamble_loss: str = "{username} lost {amount} points and now has {new_balance} points."
+    gamble_all_loss: str = "{username} lost all their points."
+    duel_usage: str = "Use it like this: !{command} duel @user 100"
+    duel_amount_invalid: str = "The duel amount must be a number or 'all'."
+    duel_self: str = "You cannot duel yourself."
+    duel_invalid: str = "The duel amount must be greater than 0."
+    duel_challenger_insufficient: str = "You only have {points} points."
+    duel_opponent_insufficient: str = "{username} only has {points} points."
+    duel_challenge: str = (
+        "@{opponent}, @{challenger} challenged you for {amount} points! "
+        "Type !{command} duel accept or !{command} duel decline. "
+        "This duel expires in {expiration} seconds."
+    )
+    duel_missing: str = "You do not have a pending duel, or it expired."
+    duel_cancelled: str = "The duel was cancelled because someone no longer has enough points."
+    duel_result: str = "@{winner} beat @{loser} and won {amount} points."
+    duel_declined: str = "{username} declined the duel."
+
+
+@dataclass(frozen=True)
+class PointsConfig:
+    enabled: bool = False
+    command_name: str = "points"
+    points_per_message: int = 10
+    message_cooldown_seconds: int = 60
+    gamble_win_chance: float = 0.45
+    duel_expiration_seconds: int = 60
+    messages: PointsMessages = PointsMessages()
+
+
+@dataclass(frozen=True)
 class ChannelProfile:
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
@@ -81,6 +129,7 @@ class ChannelProfile:
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
     redeems: RedeemConfig = RedeemConfig()
+    points: PointsConfig = PointsConfig()
 
 
 CHANNEL_PROFILES: dict[str, ChannelProfile] = {}

@@ -3,230 +3,385 @@ import random
 from twitchio import User
 from twitchio.ext import commands
 
+from bot.profiles import PointsConfig, get_active_profile, render_profile_message
 
-class PointsCommands(commands.Component):
+
+class PointsCommandHandler:
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.group(name="bread", invoke_fallback=True)
-    async def bread(self, ctx: commands.Context, target: User = None):
+    def get_config(self, broadcaster_id: str) -> PointsConfig | None:
+        profile = get_active_profile(str(broadcaster_id))
+
+        if profile is None:
+            return None
+
+        if not profile.points.enabled:
+            return None
+
+        return profile.points
+
+    async def send_message(self, ctx: commands.Context, template: str | None, **values) -> None:
+        message = render_profile_message(template, **values)
+
+        if message:
+            await ctx.reply(message)
+
+    async def show_balance(self, ctx: commands.Context, target: User | None, command_name: str) -> None:
         if not self.bot.services:
             return
 
-        broadcaster_id = ctx.broadcaster.id
+        broadcaster_id = str(ctx.broadcaster.id)
+        config = self.get_config(broadcaster_id)
+
+        if config is None:
+            return
 
         if target is None:
             points = await self.bot.services.points.get_points(
                 broadcaster_id,
-                ctx.chatter.id
+                str(ctx.chatter.id),
             )
 
-            await ctx.reply(f"{ctx.chatter.name}, you have {points} pieces of stale bread!")
+            await self.send_message(
+                ctx,
+                config.messages.balance_self,
+                username=ctx.chatter.name,
+                points=points,
+                command=command_name,
+            )
             return
 
         points = await self.bot.services.points.get_points(
             broadcaster_id,
-            target.id,
+            str(target.id),
         )
 
-        await ctx.reply(f"{target.name} has {points} pieces of stale bread!")
+        await self.send_message(
+            ctx,
+            config.messages.balance_other,
+            username=target.name,
+            points=points,
+            command=command_name,
+        )
 
-    @bread.command(name="leaderboard")
-    async def bread_leaderboard(self, ctx: commands.Context):
+    async def show_leaderboard(self, ctx: commands.Context, command_name: str) -> None:
         if not self.bot.services:
             return
 
-        broadcaster_id = ctx.broadcaster.id
+        broadcaster_id = str(ctx.broadcaster.id)
+        config = self.get_config(broadcaster_id)
+
+        if config is None:
+            return
+
         rows = await self.bot.services.points.get_leaderboard(
             broadcaster_id,
-            limit=5
+            limit=5,
         )
 
         if not rows:
-            await ctx.reply(
-                "No stale bread has been collected yet. What an upstanding citizen!"
+            await self.send_message(
+                ctx,
+                config.messages.leaderboard_empty,
+                command=command_name,
             )
             return
 
-        leaderboard = " | ".join(
-            f"{index + 1}. {row['username']}: {row['points']} bread"
-            for index, row in enumerate(rows)
+        entries: list[str] = []
+
+        for index, row in enumerate(rows):
+            entry = render_profile_message(
+                config.messages.leaderboard_entry,
+                position=index + 1,
+                username=row["username"],
+                points=row["points"],
+                command=command_name,
+            )
+
+            if entry:
+                entries.append(entry)
+
+        leaderboard = " | ".join(entries)
+
+        await self.send_message(
+            ctx,
+            config.messages.leaderboard_title,
+            leaderboard=leaderboard,
+            command=command_name,
         )
 
-        await ctx.reply(f"Top stale bread hoarders: {leaderboard}")
-
-    @bread.command(name="reset")
-    async def bread_reset(self, ctx: commands.Context):
+    async def reset_points(self, ctx: commands.Context, command_name: str) -> None:
         if not self.bot.services:
             return
 
-        if ctx.chatter.id != ctx.broadcaster.id:
-            await ctx.reply("Only the broadcaster can reset the stale bread stash.")
+        broadcaster_id = str(ctx.broadcaster.id)
+        config = self.get_config(broadcaster_id)
+
+        if config is None:
             return
 
-        broadcaster_id = ctx.broadcaster.id
+        if str(ctx.chatter.id) != broadcaster_id:
+            await self.send_message(
+                ctx,
+                config.messages.reset_denied,
+                command=command_name,
+            )
+            return
+
         await self.bot.services.points.reset_all_points(broadcaster_id)
 
-        await ctx.send(
-            "This channel's stale bread has been thrown away. "
-            "The leaderboard has been reset."
+        await self.send_message(
+            ctx,
+            config.messages.reset_success,
+            command=command_name,
         )
 
-    @bread.command(name="add")
-    async def bread_add(self, ctx: commands.Context, target: User, amount: int):
+    async def add_points(self, ctx: commands.Context, target: User, amount: int, command_name: str) -> None:
         if not self.bot.services:
             return
 
-        is_broadcaster = ctx.chatter.id == ctx.broadcaster.id
+        broadcaster_id = str(ctx.broadcaster.id)
+        config = self.get_config(broadcaster_id)
+
+        if config is None:
+            return
+
+        is_broadcaster = str(ctx.chatter.id) == broadcaster_id
         is_moderator = getattr(ctx.chatter, "moderator", False)
 
         if not (is_broadcaster or is_moderator):
-            await ctx.reply("Only moderators can add stale bread to viewers.")
+            await self.send_message(
+                ctx,
+                config.messages.add_denied,
+                command=command_name,
+            )
             return
 
         if amount <= 0:
-            await ctx.reply("Bread amount must be greater than 0.")
+            await self.send_message(
+                ctx,
+                config.messages.add_invalid,
+                command=command_name,
+            )
             return
-
-        broadcaster_id = ctx.broadcaster.id
 
         await self.bot.services.points.add_points(
             broadcaster_id=broadcaster_id,
-            user_id=target.id,
+            user_id=str(target.id),
             username=target.name,
-            amount=amount
+            amount=amount,
         )
 
-        await ctx.send(f"Added {amount} pieces of stale bread to {target.name}'s stash.")
+        await self.send_message(
+            ctx,
+            config.messages.add_success,
+            username=target.name,
+            amount=amount,
+            command=command_name,
+        )
 
-    @bread.command(name="gamble")
-    async def bread_gamble(self, ctx: commands.Context, amount: str):
+    async def gamble(self, ctx: commands.Context, amount: str, command_name: str) -> None:
         if not self.bot.services:
             return
 
-        broadcaster_id = ctx.broadcaster.id
-        user_id = ctx.chatter.id
+        broadcaster_id = str(ctx.broadcaster.id)
+        user_id = str(ctx.chatter.id)
         username = ctx.chatter.name
+        config = self.get_config(broadcaster_id)
 
-        current_bread = await self.bot.services.points.get_points(
+        if config is None:
+            return
+
+        current_points = await self.bot.services.points.get_points(
             broadcaster_id,
-            user_id
+            user_id,
         )
 
-        if current_bread <= 0:
-            await ctx.reply("You don't have any stale bread to gamble.")
+        if current_points <= 0:
+            await self.send_message(
+                ctx,
+                config.messages.gamble_no_points,
+                username=username,
+                points=current_points,
+                command=command_name,
+            )
             return
 
         all_in = amount.lower() == "all"
 
         if all_in:
-            gamble_amount = current_bread
+            gamble_amount = current_points
         else:
             try:
                 gamble_amount = int(amount)
             except ValueError:
-                await ctx.reply("Use it like this: !bread gamble 50 or !bread gamble all")
+                await self.send_message(
+                    ctx,
+                    config.messages.gamble_usage,
+                    username=username,
+                    points=current_points,
+                    command=command_name,
+                )
                 return
 
         if gamble_amount <= 0:
-            await ctx.reply("You need to gamble at least 1 piece of stale bread.")
+            await self.send_message(
+                ctx,
+                config.messages.gamble_invalid,
+                username=username,
+                points=current_points,
+                command=command_name,
+            )
             return
 
-        if gamble_amount > current_bread:
-            await ctx.reply(f"You only have {current_bread} pieces of stale bread.")
+        if gamble_amount > current_points:
+            await self.send_message(
+                ctx,
+                config.messages.gamble_insufficient,
+                username=username,
+                points=current_points,
+                amount=gamble_amount,
+                command=command_name,
+            )
             return
 
-        won = random.random() < 0.45
+        won = random.random() < config.gamble_win_chance
 
         if won:
             await self.bot.services.points.add_points(
                 broadcaster_id=broadcaster_id,
                 user_id=user_id,
                 username=username,
-                amount=gamble_amount
+                amount=gamble_amount,
             )
 
-            if all_in:
-                await ctx.reply(
-                    f"{username} raided the pantry and found a hidden stash of stale bread! "
-                    f"You now have {current_bread * 2} bread."
-                )
-            else:
-                await ctx.reply(
-                    f"{username} found {gamble_amount} stale bread on the ground "
-                    f"and now has {current_bread + gamble_amount} bread."
-                )
+            new_balance = current_points + gamble_amount
+            template = config.messages.gamble_all_win if all_in else config.messages.gamble_win
+
+            await self.send_message(
+                ctx,
+                template,
+                username=username,
+                points=current_points,
+                amount=gamble_amount,
+                new_balance=new_balance,
+                command=command_name,
+            )
             return
 
         await self.bot.services.points.remove_points(
             broadcaster_id=broadcaster_id,
             user_id=user_id,
-            amount=gamble_amount
+            amount=gamble_amount,
         )
 
-        if all_in:
-            await ctx.reply(
-                f"{username} got into a fight with the other rats and got mugged. "
-                f"You lost all your stale bread."
-            )
-        else:
-            await ctx.reply(
-                f"{username} got caught by a rat trap and lost {gamble_amount} stale bread "
-                f"and now has {current_bread - gamble_amount} bread."
-            )
+        new_balance = current_points - gamble_amount
+        template = config.messages.gamble_all_loss if all_in else config.messages.gamble_loss
 
-    @bread.group(name="duel", invoke_fallback=True)
-    async def bread_duel(self, ctx: commands.Context, opponent: User = None, amount: str = None):
+        await self.send_message(
+            ctx,
+            template,
+            username=username,
+            points=current_points,
+            amount=gamble_amount,
+            new_balance=new_balance,
+            command=command_name,
+        )
+
+    async def create_duel(self, ctx: commands.Context, opponent: User | None, amount: str | None, command_name: str) -> None:
         if not self.bot.services:
             return
 
-        if opponent is None or amount is None:
-            await ctx.reply("Use it like this: !bread duel @user 100")
+        broadcaster_id = str(ctx.broadcaster.id)
+        config = self.get_config(broadcaster_id)
+
+        if config is None:
             return
 
-        broadcaster_id = ctx.broadcaster.id
-        challenger_id = ctx.chatter.id
-        challenger_name = ctx.chatter.name
-        opponent_id = opponent.id
-        opponent_name = opponent.name
+        if opponent is None or amount is None:
+            await self.send_message(
+                ctx,
+                config.messages.duel_usage,
+                command=command_name,
+            )
+            return
 
+        challenger_id = str(ctx.chatter.id)
+        challenger_name = ctx.chatter.name
+        opponent_id = str(opponent.id)
+        opponent_name = opponent.name
         all_in = amount.lower() == "all"
 
         if all_in:
             duel_amount = await self.bot.services.points.get_points(
                 broadcaster_id,
-                challenger_id
+                challenger_id,
             )
         else:
             try:
                 duel_amount = int(amount)
             except ValueError:
-                await ctx.reply("Duel amount must be a number or 'all'.")
+                await self.send_message(
+                    ctx,
+                    config.messages.duel_amount_invalid,
+                    challenger=challenger_name,
+                    opponent=opponent_name,
+                    command=command_name,
+                )
                 return
 
         if challenger_id == opponent_id:
-            await ctx.reply("You can't duel yourself. The rats are confused.")
+            await self.send_message(
+                ctx,
+                config.messages.duel_self,
+                challenger=challenger_name,
+                opponent=opponent_name,
+                command=command_name,
+            )
             return
 
         if duel_amount <= 0:
-            await ctx.reply("Duel amount must be greater than 0.")
+            await self.send_message(
+                ctx,
+                config.messages.duel_invalid,
+                challenger=challenger_name,
+                opponent=opponent_name,
+                amount=duel_amount,
+                command=command_name,
+            )
             return
 
-        challenger_bread = await self.bot.services.points.get_points(
+        challenger_points = await self.bot.services.points.get_points(
             broadcaster_id,
-            challenger_id
-        )
-        opponent_bread = await self.bot.services.points.get_points(
-            broadcaster_id,
-            opponent_id
+            challenger_id,
         )
 
-        if challenger_bread < duel_amount:
-            await ctx.reply(f"You only have {challenger_bread} stale bread.")
+        opponent_points = await self.bot.services.points.get_points(
+            broadcaster_id,
+            opponent_id,
+        )
+
+        if challenger_points < duel_amount:
+            await self.send_message(
+                ctx,
+                config.messages.duel_challenger_insufficient,
+                username=challenger_name,
+                points=challenger_points,
+                amount=duel_amount,
+                command=command_name,
+            )
             return
 
-        if opponent_bread < duel_amount:
-            await ctx.reply(f"{opponent_name} only has {opponent_bread} stale bread.")
+        if opponent_points < duel_amount:
+            await self.send_message(
+                ctx,
+                config.messages.duel_opponent_insufficient,
+                username=opponent_name,
+                points=opponent_points,
+                amount=duel_amount,
+                command=command_name,
+            )
             return
 
         self.bot.services.points.create_duel(
@@ -235,47 +390,68 @@ class PointsCommands(commands.Component):
             challenger_name=challenger_name,
             opponent_id=opponent_id,
             opponent_name=opponent_name,
-            amount=duel_amount
+            amount=duel_amount,
+            expiration_seconds=config.duel_expiration_seconds,
         )
 
-        await ctx.send(
-            f"@{opponent_name}, @{challenger_name} challenged you to a stale bread duel "
-            f"for {duel_amount} bread! Type !bread duel accept or !bread duel decline. "
-            f"This duel expires in 60 seconds."
+        await self.send_message(
+            ctx,
+            config.messages.duel_challenge,
+            challenger=challenger_name,
+            opponent=opponent_name,
+            amount=duel_amount,
+            expiration=config.duel_expiration_seconds,
+            command=command_name,
         )
 
-    @bread_duel.command(name="accept")
-    async def bread_duel_accept(self, ctx: commands.Context):
+    async def accept_duel(self, ctx: commands.Context, command_name: str) -> None:
         if not self.bot.services:
             return
 
-        broadcaster_id = ctx.broadcaster.id
-        opponent_id = ctx.chatter.id
+        broadcaster_id = str(ctx.broadcaster.id)
+        opponent_id = str(ctx.chatter.id)
+        config = self.get_config(broadcaster_id)
+
+        if config is None:
+            return
 
         duel = self.bot.services.points.get_duel_for_user(
             broadcaster_id,
-            opponent_id
+            opponent_id,
         )
 
         if not duel:
-            await ctx.reply("You don't have any pending bread duels, or your duel has expired.")
+            await self.send_message(
+                ctx,
+                config.messages.duel_missing,
+                command=command_name,
+            )
             return
 
-        challenger_bread = await self.bot.services.points.get_points(
+        challenger_points = await self.bot.services.points.get_points(
             broadcaster_id,
-            duel.challenger_id
-        )
-        opponent_bread = await self.bot.services.points.get_points(
-            broadcaster_id,
-            duel.opponent_id
+            duel.challenger_id,
         )
 
-        if challenger_bread < duel.amount or opponent_bread < duel.amount:
+        opponent_points = await self.bot.services.points.get_points(
+            broadcaster_id,
+            duel.opponent_id,
+        )
+
+        if challenger_points < duel.amount or opponent_points < duel.amount:
             self.bot.services.points.remove_duel_for_user(
                 broadcaster_id,
                 opponent_id,
             )
-            await ctx.reply("This duel was cancelled because someone no longer has enough stale bread.")
+
+            await self.send_message(
+                ctx,
+                config.messages.duel_cancelled,
+                challenger=duel.challenger_name,
+                opponent=duel.opponent_name,
+                amount=duel.amount,
+                command=command_name,
+            )
             return
 
         challenger_wins = random.choice([True, False])
@@ -294,45 +470,103 @@ class PointsCommands(commands.Component):
         await self.bot.services.points.remove_points(
             broadcaster_id=broadcaster_id,
             user_id=loser_id,
-            amount=duel.amount
+            amount=duel.amount,
         )
+
         await self.bot.services.points.add_points(
             broadcaster_id=broadcaster_id,
             user_id=winner_id,
             username=winner_name,
-            amount=duel.amount
+            amount=duel.amount,
         )
 
         self.bot.services.points.remove_duel_for_user(
             broadcaster_id,
-            opponent_id
+            opponent_id,
         )
 
-        await ctx.send(
-            f"@{winner_name} beat @{loser_name} up "
-            f"and stole {duel.amount} bread."
+        await self.send_message(
+            ctx,
+            config.messages.duel_result,
+            winner=winner_name,
+            loser=loser_name,
+            amount=duel.amount,
+            command=command_name,
         )
 
-    @bread_duel.command(name="decline")
-    async def bread_duel_decline(self, ctx: commands.Context):
+    async def decline_duel(self, ctx: commands.Context, command_name: str) -> None:
         if not self.bot.services:
             return
 
-        broadcaster_id = ctx.broadcaster.id
-        opponent_id = ctx.chatter.id
+        broadcaster_id = str(ctx.broadcaster.id)
+        opponent_id = str(ctx.chatter.id)
+        config = self.get_config(broadcaster_id)
+
+        if config is None:
+            return
 
         duel = self.bot.services.points.get_duel_for_user(
             broadcaster_id,
-            opponent_id
+            opponent_id,
         )
 
         if not duel:
-            await ctx.reply("You don't have any pending bread duels, or your duel has expired.")
+            await self.send_message(
+                ctx,
+                config.messages.duel_missing,
+                command=command_name,
+            )
             return
 
         self.bot.services.points.remove_duel_for_user(
             broadcaster_id,
-            opponent_id
+            opponent_id,
         )
 
-        await ctx.send(f"{ctx.chatter.name} has a family and decided to decline.")
+        await self.send_message(
+            ctx,
+            config.messages.duel_declined,
+            username=ctx.chatter.name,
+            challenger=duel.challenger_name,
+            opponent=duel.opponent_name,
+            amount=duel.amount,
+            command=command_name,
+        )
+
+
+class PointsCommands(commands.Component):
+    def __init__(self, bot):
+        self.bot = bot
+        self.handler = PointsCommandHandler(bot)
+
+    @commands.group(name="points", invoke_fallback=True)
+    async def points(self, ctx: commands.Context, target: User = None):
+        await self.handler.show_balance(ctx, target, "points")
+
+    @points.command(name="leaderboard")
+    async def points_leaderboard(self, ctx: commands.Context):
+        await self.handler.show_leaderboard(ctx, "points")
+
+    @points.command(name="reset")
+    async def points_reset(self, ctx: commands.Context):
+        await self.handler.reset_points(ctx, "points")
+
+    @points.command(name="add")
+    async def points_add(self, ctx: commands.Context, target: User, amount: int):
+        await self.handler.add_points(ctx, target, amount, "points")
+
+    @points.command(name="gamble")
+    async def points_gamble(self, ctx: commands.Context, amount: str):
+        await self.handler.gamble(ctx, amount, "points")
+
+    @points.group(name="duel", invoke_fallback=True)
+    async def points_duel(self, ctx: commands.Context, opponent: User = None, amount: str = None):
+        await self.handler.create_duel(ctx, opponent, amount, "points")
+
+    @points_duel.command(name="accept")
+    async def points_duel_accept(self, ctx: commands.Context):
+        await self.handler.accept_duel(ctx, "points")
+
+    @points_duel.command(name="decline")
+    async def points_duel_decline(self, ctx: commands.Context):
+        await self.handler.decline_duel(ctx, "points")

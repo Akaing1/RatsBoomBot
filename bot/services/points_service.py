@@ -3,6 +3,7 @@ import time
 from dataclasses import dataclass
 
 from config.settings import settings
+from bot.profiles import get_active_profile
 
 LOGGER = logging.getLogger("Bot")
 
@@ -15,16 +16,12 @@ class PendingDuel:
     opponent_id: str
     opponent_name: str
     amount: int
+    expiration_seconds: int
     created_at: float
 
 
 class PointsService:
-    BREAD_PER_MESSAGE = 10
-    MESSAGE_COOLDOWN_SECONDS = 60
-    DUEL_EXPIRATION_SECONDS = 60
 
-    # Old shared balances are preserved here during migration.
-    # New per-channel balances start under the actual broadcaster_id.
     LEGACY_BROADCASTER_ID = "shared"
 
     def __init__(self, bot, db):
@@ -129,19 +126,24 @@ class PointsService:
             )
 
     async def track_message(self, payload) -> None:
-        broadcaster_id = payload.broadcaster.id
-        user_id = payload.chatter.id
+        broadcaster_id = str(payload.broadcaster.id)
+        user_id = str(payload.chatter.id)
         username = payload.chatter.name
         username_key = username.lower()
+        profile = get_active_profile(broadcaster_id)
+
+        if profile is None or not profile.points.enabled:
+            return
 
         if username_key in settings.IGNORED_USERS:
             return
 
+        points_config = profile.points
         now = time.time()
         cooldown_key = self._user_key(broadcaster_id, user_id)
         last_message = self.cooldowns.get(cooldown_key, 0)
 
-        if now - last_message < self.MESSAGE_COOLDOWN_SECONDS:
+        if now - last_message < points_config.message_cooldown_seconds:
             return
 
         self.cooldowns[cooldown_key] = now
@@ -162,15 +164,15 @@ class PointsService:
                     broadcaster_id,
                     user_id,
                     username,
-                    self.BREAD_PER_MESSAGE
-                )
+                    points_config.points_per_message,
+                ),
             )
 
         LOGGER.info(
-            "[%s] Added %s stale bread to %s",
+            "[%s] Added %s points to %s.",
             broadcaster_id,
-            self.BREAD_PER_MESSAGE,
-            username
+            points_config.points_per_message,
+            username,
         )
 
     async def get_points(self, broadcaster_id: str, user_id: str) -> int:
@@ -255,7 +257,7 @@ class PointsService:
         async with self.db.acquire() as connection:
             await connection.execute(query, (broadcaster_id,))
 
-        LOGGER.warning("[%s] All stale bread points were reset.", broadcaster_id)
+        LOGGER.warning("[%s] All channel points were reset.", broadcaster_id)
 
     async def get_leaderboard(self, broadcaster_id: str, limit: int = 5):
         query = """
@@ -276,21 +278,29 @@ class PointsService:
             )
 
     def create_duel(self, broadcaster_id: str, challenger_id: str, challenger_name: str, opponent_id: str,
-                    opponent_name: str, amount: int) -> None:
-        duel_key = self._user_key(broadcaster_id, opponent_id)
+                    opponent_name: str, amount: int, expiration_seconds: int) -> None:
+        duel_key = self._user_key(
+            str(broadcaster_id),
+            str(opponent_id),
+        )
 
         self.pending_duels[duel_key] = PendingDuel(
-            broadcaster_id=broadcaster_id,
-            challenger_id=challenger_id,
+            broadcaster_id=str(broadcaster_id),
+            challenger_id=str(challenger_id),
             challenger_name=challenger_name,
-            opponent_id=opponent_id,
+            opponent_id=str(opponent_id),
             opponent_name=opponent_name,
             amount=amount,
-            created_at=time.time()
+            expiration_seconds=expiration_seconds,
+            created_at=time.time(),
         )
 
     def get_duel_for_user(self, broadcaster_id: str, user_id: str) -> PendingDuel | None:
-        duel_key = self._user_key(broadcaster_id, user_id)
+        duel_key = self._user_key(
+            str(broadcaster_id),
+            str(user_id),
+        )
+
         duel = self.pending_duels.get(duel_key)
 
         if not duel:
@@ -298,16 +308,20 @@ class PointsService:
 
         now = time.time()
 
-        if now - duel.created_at > self.DUEL_EXPIRATION_SECONDS:
+        if now - duel.created_at > duel.expiration_seconds:
             self.pending_duels.pop(duel_key, None)
             return None
 
         return duel
 
     def remove_duel_for_user(self, broadcaster_id: str, user_id: str) -> None:
-        duel_key = self._user_key(broadcaster_id, user_id)
+        duel_key = self._user_key(
+            str(broadcaster_id),
+            str(user_id),
+        )
+
         self.pending_duels.pop(duel_key, None)
 
     @staticmethod
     def _user_key(broadcaster_id: str, user_id: str) -> str:
-        return f"{broadcaster_id}:{user_id}"
+        return f"{str(broadcaster_id)}:{str(user_id)}"
