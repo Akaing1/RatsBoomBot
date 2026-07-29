@@ -23,9 +23,9 @@ class PointsService:
     MESSAGE_COOLDOWN_SECONDS = 60
     DUEL_EXPIRATION_SECONDS = 60
 
-    # Old global balances are preserved here during migration.
+    # Old shared balances are preserved here during migration.
     # New per-channel balances start under the actual broadcaster_id.
-    LEGACY_BROADCASTER_ID = "global"
+    LEGACY_BROADCASTER_ID = "shared"
 
     def __init__(self, bot, db):
         self.bot = bot
@@ -87,7 +87,7 @@ class PointsService:
                 return
 
             LOGGER.warning(
-                "Migrating viewers table from global points to per-broadcaster points. "
+                "Migrating viewers table from shared points to per-broadcaster points. "
                 "Existing balances will be stored under broadcaster_id=%s.",
                 self.LEGACY_BROADCASTER_ID
             )
