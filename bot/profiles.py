@@ -3,8 +3,7 @@ from dataclasses import dataclass
 
 from twitchio.ext import commands
 
-
-LOGGER = logging.getLogger("Bot")
+LOGGER = logging.getLogger("RatBoomBot")
 
 
 @dataclass(frozen=True)
@@ -68,7 +67,7 @@ class RedeemConfig:
         100,
         250,
         500,
-        1000,
+        1000
     )
     messages: RedeemMessages = RedeemMessages()
 
@@ -137,39 +136,82 @@ ACTIVE_CHANNEL_PROFILES: dict[str, ChannelProfile] = {}
 
 
 def register_profile(profile: ChannelProfile) -> None:
+
     channel_name = profile.channel_name.lower()
 
     if channel_name in CHANNEL_PROFILES:
+        LOGGER.error(
+            "[Profiles] Duplicate profile registration attempted for %s.",
+            channel_name
+        )
         raise ValueError(
             f"A channel profile is already registered for {channel_name}."
         )
 
     CHANNEL_PROFILES[channel_name] = profile
 
+    LOGGER.debug(
+        "[Profiles] Registered channel profile %s.",
+        channel_name
+    )
+
 
 def activate_profile(broadcaster_id: str, profile: ChannelProfile) -> None:
-    ACTIVE_CHANNEL_PROFILES[str(broadcaster_id)] = profile
+
+    broadcaster_id = str(broadcaster_id)
+
+    ACTIVE_CHANNEL_PROFILES[broadcaster_id] = profile
+
+    LOGGER.info(
+        "[Profiles] Activated profile %s for broadcaster %s.",
+        profile.channel_name,
+        broadcaster_id
+    )
 
 
 def get_active_profile(broadcaster_id: str) -> ChannelProfile | None:
-    return ACTIVE_CHANNEL_PROFILES.get(str(broadcaster_id))
+
+    broadcaster_id = str(broadcaster_id)
+    profile = ACTIVE_CHANNEL_PROFILES.get(broadcaster_id)
+
+    if profile is None:
+        LOGGER.debug(
+            "[Profiles] No active profile found for broadcaster %s.",
+            broadcaster_id
+        )
+
+    return profile
 
 
 def render_profile_message(template: str | None, **values) -> str | None:
+
     if not template:
+        LOGGER.debug(
+            "[Profiles] Skipping message rendering because no template was configured."
+        )
         return None
 
     try:
         return template.format_map(values).strip()
     except KeyError as error:
         LOGGER.warning(
-            "Unknown channel-profile placeholder %s in message: %s",
+            "[Profiles] Unknown placeholder %s in profile message template: %s",
             error,
-            template,
+            template
         )
         return None
 
 
 def clear_profiles() -> None:
+
+    registered_count = len(CHANNEL_PROFILES)
+    active_count = len(ACTIVE_CHANNEL_PROFILES)
+
     CHANNEL_PROFILES.clear()
     ACTIVE_CHANNEL_PROFILES.clear()
+
+    LOGGER.info(
+        "[Profiles] Cleared %d registered profiles and %d active profiles.",
+        registered_count,
+        active_count
+    )
