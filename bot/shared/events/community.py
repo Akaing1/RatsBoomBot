@@ -1,6 +1,9 @@
 from twitchio.ext import commands
+import logging
 
 from bot.profiles import get_active_profile, render_profile_message
+
+LOGGER = logging.getLogger("Bot")
 
 
 class CommunityEvents(commands.Component):
@@ -25,6 +28,11 @@ class CommunityEvents(commands.Component):
 
     @commands.Component.listener()
     async def event_follow(self, payload):
+        LOGGER.info(
+            "Follow event received: broadcaster=%s follower=%s",
+            payload.broadcaster.id,
+            payload.user.name
+        )
         broadcaster_id = str(payload.broadcaster.id)
         username = payload.user.name
 
