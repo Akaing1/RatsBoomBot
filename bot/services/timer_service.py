@@ -4,10 +4,11 @@ import time
 
 from bot.profiles import get_active_profile
 
-LOGGER = logging.getLogger("Bot")
+LOGGER = logging.getLogger("RatBoomBot")
 
 
 class TimerService:
+
     INTERVAL_SECONDS = 30 * 60
     REQUIRED_MESSAGES = 20
     CHECK_EVERY_SECONDS = 5
@@ -24,92 +25,174 @@ class TimerService:
         self.last_check = 0
 
     async def start(self) -> None:
+
         if self._task is not None:
+            LOGGER.debug("[Timers] Timer service is already running.")
             return
 
-        LOGGER.info("Timer service started.")
-        self._task = asyncio.create_task(self.announcement_loop())
+        LOGGER.info("[Timers] Starting timer service.")
+
+        self._task = asyncio.create_task(
+            self.announcement_loop(),
+            name="timer-announcement-loop"
+        )
+
+        LOGGER.info("[Timers] Timer service started.")
 
     async def stop(self) -> None:
+
         if self._task is None:
+            LOGGER.debug("[Timers] Timer service is not running.")
             return
 
-        self._task.cancel()
+        LOGGER.info("[Timers] Stopping timer service.")
+
+        task = self._task
         self._task = None
+        task.cancel()
+
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            LOGGER.exception(
+                "[Timers] Timer announcement task failed during shutdown."
+            )
+
+        LOGGER.info("[Timers] Timer service stopped.")
 
     def track_message(self, payload) -> None:
+
         broadcaster_id = str(payload.broadcaster.id)
         broadcaster_name = payload.broadcaster.name
 
         self.message_counts[broadcaster_id] = (
-                self.message_counts.get(broadcaster_id, 0) + 1
+            self.message_counts.get(broadcaster_id, 0) + 1
         )
 
         self.last_announcements.setdefault(
             broadcaster_id,
-            time.time(),
+            time.time()
         )
 
-        LOGGER.info(
-            "[%s] Tracked message. Count: %s/%s",
+        LOGGER.debug(
+            "[Timers] Tracked message for %s (%s). Count: %d/%d.",
             broadcaster_name,
+            broadcaster_id,
             self.message_counts[broadcaster_id],
-            self.REQUIRED_MESSAGES,
+            self.REQUIRED_MESSAGES
         )
 
     async def announcement_loop(self) -> None:
-        await self.bot.wait_until_ready()
 
-        LOGGER.info("Announcement loop started.")
+        try:
+            await self.bot.wait_until_ready()
 
-        while True:
-            await asyncio.sleep(self.CHECK_EVERY_SECONDS)
+            LOGGER.info("[Timers] Announcement loop started.")
 
-            live_broadcasters = await self.broadcasters.get_live_broadcasters()
+            while True:
+                await asyncio.sleep(self.CHECK_EVERY_SECONDS)
 
-            if not live_broadcasters:
-                if time.time() - self.last_check >= 600:
-                    LOGGER.warning("No live broadcasters available for timer announcement.")
-                    self.last_check = time.time()
-                continue
+                try:
+                    await self.check_announcements()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    LOGGER.exception(
+                        "[Timers] Announcement check failed."
+                    )
+        except asyncio.CancelledError:
+            LOGGER.debug("[Timers] Announcement loop cancelled.")
+            raise
+        except Exception:
+            LOGGER.exception(
+                "[Timers] Announcement loop terminated unexpectedly."
+            )
+            raise
 
+    async def check_announcements(self) -> None:
+
+        live_broadcasters = await self.broadcasters.get_live_broadcasters()
+
+        if not live_broadcasters:
             now = time.time()
 
-            for broadcaster_id, broadcaster_name in live_broadcasters.items():
-                broadcaster_settings = await self.broadcaster_settings.get_settings(broadcaster_id)
-
-                if not broadcaster_settings.timers_enabled:
-                    continue
-
-                last_announcement = self.last_announcements.get(broadcaster_id, now)
-                message_count = self.message_counts.get(broadcaster_id, 0)
-                elapsed = now - last_announcement
-
-                if elapsed < self.INTERVAL_SECONDS:
-                    continue
-
-                if message_count < self.REQUIRED_MESSAGES:
-                    continue
-
-                await self.send_next_announcement(
-                    broadcaster_id,
-                    broadcaster_name
+            if now - self.last_check >= 600:
+                LOGGER.info(
+                    "[Timers] No live broadcasters are available for announcements."
                 )
+                self.last_check = now
 
-                self.message_counts[broadcaster_id] = 0
-                self.last_announcements[broadcaster_id] = now
+            return
 
-    async def send_next_announcement(self, broadcaster_id: str, broadcaster_name: str, ) -> None:
-        settings = await self.broadcaster_settings.get_settings(broadcaster_id)
+        now = time.time()
+
+        for broadcaster_id, broadcaster_name in live_broadcasters.items():
+            settings = await self.broadcaster_settings.get_settings(
+                broadcaster_id
+            )
+
+            if not settings.timers_enabled:
+                LOGGER.debug(
+                    "[Timers] Announcements are disabled for %s (%s).",
+                    broadcaster_name,
+                    broadcaster_id
+                )
+                continue
+
+            last_announcement = self.last_announcements.get(
+                broadcaster_id,
+                now
+            )
+
+            message_count = self.message_counts.get(
+                broadcaster_id,
+                0
+            )
+
+            elapsed = now - last_announcement
+
+            if elapsed < self.INTERVAL_SECONDS:
+                continue
+
+            if message_count < self.REQUIRED_MESSAGES:
+                LOGGER.debug(
+                    "[Timers] %s has %d/%d required messages for an announcement.",
+                    broadcaster_name,
+                    message_count,
+                    self.REQUIRED_MESSAGES
+                )
+                continue
+
+            sent = await self.send_next_announcement(
+                broadcaster_id,
+                broadcaster_name
+            )
+
+            if not sent:
+                continue
+
+            self.message_counts[broadcaster_id] = 0
+            self.last_announcements[broadcaster_id] = now
+
+    async def send_next_announcement(self, broadcaster_id: str, broadcaster_name: str) -> bool:
+
+        broadcaster_id = str(broadcaster_id)
+
+        settings = await self.broadcaster_settings.get_settings(
+            broadcaster_id
+        )
 
         profile = get_active_profile(broadcaster_id)
 
         if profile is None:
-            LOGGER.info(
-                "No active channel profile available for %s.",
-                broadcaster_name
+            LOGGER.warning(
+                "[Timers] No active channel profile is available for %s (%s).",
+                broadcaster_name,
+                broadcaster_id
             )
-            return
+            return False
 
         messages = self.get_messages(
             profile.timer_messages,
@@ -117,12 +200,15 @@ class TimerService:
         )
 
         if not messages:
-            LOGGER.info("No timer messages available for %s.", broadcaster_name)
-            return
+            LOGGER.debug(
+                "[Timers] No timer messages are available for %s (%s).",
+                broadcaster_name,
+                broadcaster_id
+            )
+            return False
 
         index = self.message_indexes.get(broadcaster_id, 0)
         message = messages[index % len(messages)]
-        self.message_indexes[broadcaster_id] = index + 1
 
         try:
             channel = self.bot.create_partialuser(broadcaster_id)
@@ -131,27 +217,33 @@ class TimerService:
                 sender=self.bot.user,
                 message=message
             )
-
-            LOGGER.info(
-                "Announcement sent to %s: %s",
+        except Exception:
+            LOGGER.exception(
+                "[Timers] Failed to send announcement to %s (%s).",
                 broadcaster_name,
-                message
+                broadcaster_id
             )
+            return False
 
-        except Exception as error:
-            LOGGER.error(
-                "Failed to send announcement to %s: %r",
-                broadcaster_name,
-                error
-            )
+        self.message_indexes[broadcaster_id] = index + 1
+
+        LOGGER.info(
+            "[Timers] Sent announcement to %s (%s): %s",
+            broadcaster_name,
+            broadcaster_id,
+            message
+        )
+
+        return True
 
     @staticmethod
     def get_messages(templates: tuple[str, ...], settings) -> list[str]:
+
         messages: list[str] = []
 
         values = {
             "discord_url": settings.discord_url or "",
-            "youtube_url": settings.youtube_url or "",
+            "youtube_url": settings.youtube_url or ""
         }
 
         for template in templates:
@@ -165,7 +257,7 @@ class TimerService:
                 message = template.format_map(values).strip()
             except KeyError as error:
                 LOGGER.warning(
-                    "Unknown timer message placeholder %s in message: %s",
+                    "[Timers] Unknown placeholder %s in timer message: %s",
                     error,
                     template
                 )

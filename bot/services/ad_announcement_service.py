@@ -2,10 +2,11 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-LOGGER = logging.getLogger("Bot")
+LOGGER = logging.getLogger("RatBoomBot")
 
 
 class AdAnnouncementService:
+
     CHECK_EVERY_SECONDS = 30
     WARNING_SECONDS = 60
 
@@ -16,59 +17,155 @@ class AdAnnouncementService:
         self.broadcasters = broadcasters
 
     async def start(self) -> None:
+
         if self._task is not None:
+            LOGGER.debug("[Ads] Ad announcement service is already running.")
             return
 
-        LOGGER.info("Ad announcement service started.")
-        self._task = asyncio.create_task(self.ad_loop())
+        LOGGER.info("[Ads] Starting ad announcement service.")
+
+        self._task = asyncio.create_task(
+            self.ad_loop(),
+            name="ad-announcement-loop"
+        )
+
+        LOGGER.info("[Ads] Ad announcement service started.")
 
     async def stop(self) -> None:
+
         if self._task is None:
+            LOGGER.debug("[Ads] Ad announcement service is not running.")
             return
 
-        self._task.cancel()
+        LOGGER.info("[Ads] Stopping ad announcement service.")
+
+        task = self._task
         self._task = None
+        task.cancel()
+
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            LOGGER.exception(
+                "[Ads] Ad announcement task failed during shutdown."
+            )
+
+        self.warned_ads.clear()
+
+        LOGGER.info("[Ads] Ad announcement service stopped.")
 
     async def ad_loop(self) -> None:
-        await self.bot.wait_until_ready()
 
-        while True:
-            await asyncio.sleep(self.CHECK_EVERY_SECONDS)
+        try:
+            await self.bot.wait_until_ready()
 
-            if not self.bot.services:
+            LOGGER.info("[Ads] Ad announcement loop started.")
+
+            while True:
+                await asyncio.sleep(self.CHECK_EVERY_SECONDS)
+
+                try:
+                    await self.check_ad_schedules()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    LOGGER.exception("[Ads] Ad schedule check failed.")
+        except asyncio.CancelledError:
+            LOGGER.debug("[Ads] Ad announcement loop cancelled.")
+            raise
+        except Exception:
+            LOGGER.exception(
+                "[Ads] Ad announcement loop terminated unexpectedly."
+            )
+            raise
+
+    async def check_ad_schedules(self) -> None:
+
+        if not self.bot.services:
+            LOGGER.debug(
+                "[Ads] Skipping ad schedule check because services are unavailable."
+            )
+            return
+
+        active_channels = await self.broadcasters.get_live_broadcasters()
+
+        if not active_channels:
+            LOGGER.debug(
+                "[Ads] No live broadcasters are available for ad schedule checks."
+            )
+            return
+
+        now = datetime.now(timezone.utc)
+        active_ad_keys: set[str] = set()
+
+        for broadcaster_id, broadcaster_name in active_channels.items():
+            try:
+                broadcaster = self.bot.create_partialuser(broadcaster_id)
+                schedule = await broadcaster.fetch_ad_schedule()
+            except Exception:
+                LOGGER.exception(
+                    "[Ads] Failed to fetch ad schedule for %s (%s).",
+                    broadcaster_name,
+                    broadcaster_id
+                )
                 continue
 
-            active_channels = await self.broadcasters.get_live_broadcasters()
+            next_ad_at = schedule.next_ad_at
 
-            for broadcaster_id, broadcaster_name in active_channels.items():
-                try:
-                    broadcaster = self.bot.create_partialuser(broadcaster_id)
-                    schedule = await broadcaster.fetch_ad_schedule()
+            if next_ad_at is None:
+                LOGGER.debug(
+                    "[Ads] No upcoming ad is scheduled for %s (%s).",
+                    broadcaster_name,
+                    broadcaster_id
+                )
+                continue
 
-                    next_ad_at = schedule.next_ad_at
-                    if next_ad_at is None:
-                        continue
+            seconds_until_ad = int(
+                (next_ad_at - now).total_seconds()
+            )
 
-                    now = datetime.now(timezone.utc)
-                    seconds_until_ad = int((next_ad_at - now).total_seconds())
+            ad_key = f"{broadcaster_id}:{next_ad_at.isoformat()}"
+            active_ad_keys.add(ad_key)
 
-                    ad_key = f"{broadcaster_id}:{next_ad_at.isoformat()}"
+            if seconds_until_ad <= 0:
+                continue
 
-                    if 0 < seconds_until_ad <= self.WARNING_SECONDS:
-                        if ad_key in self.warned_ads:
-                            continue
+            if seconds_until_ad > self.WARNING_SECONDS:
+                LOGGER.debug(
+                    "[Ads] Next ad for %s begins in %d seconds.",
+                    broadcaster_name,
+                    seconds_until_ad
+                )
+                continue
 
-                        await broadcaster.send_message(
-                            sender=self.bot.user,
-                            message=f"Hide! The humans are coming! Ads starting in ~{seconds_until_ad} seconds!"
-                        )
+            if ad_key in self.warned_ads:
+                continue
 
-                        self.warned_ads.add(ad_key)
-                        LOGGER.info("Ad warning sent to %s", broadcaster_name)
-
-                except Exception as error:
-                    LOGGER.error(
-                        "Failed checking ad schedule for %s: %r",
-                        broadcaster_name,
-                        error
+            try:
+                await broadcaster.send_message(
+                    sender=self.bot.user,
+                    message=(
+                        "Hide! The humans are coming! "
+                        f"Ads starting in ~{seconds_until_ad} seconds!"
                     )
+                )
+            except Exception:
+                LOGGER.exception(
+                    "[Ads] Failed to send ad warning to %s (%s).",
+                    broadcaster_name,
+                    broadcaster_id
+                )
+                continue
+
+            self.warned_ads.add(ad_key)
+
+            LOGGER.info(
+                "[Ads] Sent ad warning to %s (%s) for an ad starting in %d seconds.",
+                broadcaster_name,
+                broadcaster_id,
+                seconds_until_ad
+            )
+
+        self.warned_ads.intersection_update(active_ad_keys)
