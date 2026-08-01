@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ title }} | RatsBoomBot{% endblock %}
+
+{% block content %}
+<section class="message-card error-card">
+    <div class="message-icon">!</div>
+    <p class="eyebrow">Something went wrong</p>
+    <h2>{{ title }}</h2>
+    <p>{{ message }}</p>
+    <a class="button secondary" href="/">Return to dashboard</a>
+</section>
+{% endblock %}

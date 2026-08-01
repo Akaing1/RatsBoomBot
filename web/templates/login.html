@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>Admin Login | RatsBoomBot</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='/css/style.css') }}"
+    >
+</head>
+
+<body class="login-page">
+    <main class="login-card">
+        <div class="brand login-brand">
+            <div class="brand-mark">R</div>
+
+            <div>
+                <h1>RatsBoomBot</h1>
+                <p>Local Admin Control</p>
+            </div>
+        </div>
+
+        <p class="eyebrow">Protected access</p>
+        <h2>Admin Login</h2>
+
+        <p class="page-description">
+            Enter the local administrator secret to continue.
+        </p>
+
+        {% if error %}
+            <div class="alert error-alert">
+                The administrator secret was incorrect.
+            </div>
+        {% endif %}
+
+        <form class="settings-form" method="post" action="/login">
+            <div class="form-group">
+                <label for="admin-secret">Admin secret</label>
+
+                <input
+                    id="admin-secret"
+                    name="admin_secret"
+                    type="password"
+                    autocomplete="current-password"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <button class="button primary" type="submit">
+                Sign In
+            </button>
+        </form>
+    </main>
+</body>
+</html>

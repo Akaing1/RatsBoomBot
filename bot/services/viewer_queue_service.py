@@ -104,3 +104,6 @@ class ViewerQueueService:
     def size(self, broadcaster_id: str) -> int:
         state = self._get_queue_state(broadcaster_id)
         return len(state.queue)
+
+    def remove_queue(self, broadcaster_id: str) -> None:
+        self.queues.pop(broadcaster_id, None)

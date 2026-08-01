@@ -25,86 +25,160 @@ class ChatEvents(commands.Component):
 
     @commands.Component.listener()
     async def event_message(self, payload):
-        print(
-            f"[{payload.broadcaster.name}] "
-            f"{payload.chatter.name}: "
-            f"{payload.text}"
+        broadcaster_id = str(payload.broadcaster.id)
+
+        LOGGER.info(
+            "[%s] %s: %s",
+            payload.broadcaster.name,
+            payload.chatter.name,
+            payload.text
         )
 
         if self.bot.services:
+            self.bot.services.stream_logs.write(
+                broadcaster_id,
+                "CHAT",
+                f"{payload.chatter.name}: {payload.text}"
+            )
+
             self.bot.services.timers.track_message(payload)
             await self.bot.services.points.track_message(payload)
 
     @commands.Component.listener()
     async def event_follow(self, payload):
-        broadcaster = self.bot.create_partialuser(payload.broadcaster.id)
+        broadcaster_id = str(payload.broadcaster.id)
+        username = payload.user.name
+
+        if self.bot.services:
+            self.bot.services.stream_logs.write(
+                broadcaster_id,
+                "FOLLOW",
+                f"{username} followed the channel."
+            )
+
+        broadcaster = self.bot.create_partialuser(broadcaster_id)
 
         await broadcaster.send_message(
             sender=self.bot.user,
             message=(
-                f"{payload.user.name} has snuck their way into the basement! "
+                f"{username} has snuck their way into the basement! "
                 f"Thanks for following!"
             )
         )
 
     @commands.Component.listener()
     async def event_subscription(self, payload):
-        broadcaster = self.bot.create_partialuser(payload.broadcaster.id)
+        broadcaster_id = str(payload.broadcaster.id)
+        username = payload.user.name
+
+        if self.bot.services:
+            self.bot.services.stream_logs.write(
+                broadcaster_id,
+                "SUBSCRIPTION",
+                f"{username} subscribed."
+            )
+
+        broadcaster = self.bot.create_partialuser(broadcaster_id)
 
         await broadcaster.send_message(
             sender=self.bot.user,
-            message=f"{payload.user.name} has subscribed! Rats stronk together!"
+            message=f"{username} has subscribed! Rats stronk together!"
         )
 
     @commands.Component.listener()
     async def event_subscription_message(self, payload):
-        broadcaster = self.bot.create_partialuser(payload.broadcaster.id)
+        broadcaster_id = str(payload.broadcaster.id)
+        username = payload.user.name
+
+        if self.bot.services:
+            self.bot.services.stream_logs.write(
+                broadcaster_id,
+                "RESUB",
+                (
+                    f"{username} resubscribed for "
+                    f"{payload.cumulative_months} months."
+                )
+            )
+
+        broadcaster = self.bot.create_partialuser(broadcaster_id)
 
         await broadcaster.send_message(
             sender=self.bot.user,
             message=(
-                f"{payload.user.name} resubscribed for "
+                f"{username} resubscribed for "
                 f"{payload.cumulative_months} months! "
                 f"Thank you for your continued support!"
-            ),
+            )
         )
 
     @commands.Component.listener()
-    async def event_channel_points_custom_reward_redemption_add(self, payload):
-        await self.handle_channel_point_redemption(payload)
-
-    @commands.Component.listener()
-    async def event_channel_points_redemption_add(self, payload):
-        await self.handle_channel_point_redemption(payload)
-
-    @commands.Component.listener()
-    async def event_custom_reward_redemption_add(self, payload):
+    async def event_custom_redemption_add(self, payload):
         await self.handle_channel_point_redemption(payload)
 
     async def handle_channel_point_redemption(self, payload):
         if not self.bot.services:
             return
 
-        broadcaster_id = get_nested_attr(payload, "broadcaster", "id")
-        user_id = get_nested_attr(payload, "user", "id")
-        username = get_nested_attr(payload, "user", "name")
-        reward_title = get_nested_attr(payload, "reward", "title")
-        redemption_id = getattr(payload, "id", None)
+        broadcaster_id = get_nested_attr(
+            payload,
+            "broadcaster",
+            "id"
+        )
+        user_id = get_nested_attr(
+            payload,
+            "user",
+            "id"
+        )
+        username = get_nested_attr(
+            payload,
+            "user",
+            "name"
+        )
+        reward_title = get_nested_attr(
+            payload,
+            "reward",
+            "title"
+        )
+        redemption_id = getattr(
+            payload,
+            "id",
+            None
+        )
 
         if broadcaster_id is None:
-            broadcaster_id = getattr(payload, "broadcaster_id", None)
+            broadcaster_id = getattr(
+                payload,
+                "broadcaster_id",
+                None
+            )
 
         if user_id is None:
-            user_id = getattr(payload, "user_id", None)
+            user_id = getattr(
+                payload,
+                "user_id",
+                None
+            )
 
         if username is None:
-            username = getattr(payload, "user_name", None)
+            username = getattr(
+                payload,
+                "user_name",
+                None
+            )
 
         if reward_title is None:
-            reward_title = getattr(payload, "reward_title", None)
+            reward_title = getattr(
+                payload,
+                "reward_title",
+                None
+            )
 
         if redemption_id is None:
-            redemption_id = getattr(payload, "redemption_id", None)
+            redemption_id = getattr(
+                payload,
+                "redemption_id",
+                None
+            )
 
         if not broadcaster_id or not user_id or not username or not reward_title:
             LOGGER.warning(
@@ -113,18 +187,23 @@ class ChatEvents(commands.Component):
             )
             return
 
+        broadcaster_id = str(broadcaster_id)
+
+        self.bot.services.stream_logs.write(
+            broadcaster_id,
+            "REDEEM",
+            f"{username} redeemed: {reward_title}"
+        )
+
         result = await self.bot.services.redeems.handle_redemption(
             broadcaster_id=broadcaster_id,
-            user_id=user_id,
+            user_id=str(user_id),
             username=username,
             reward_title=reward_title,
             redemption_id=redemption_id
         )
 
-        if not result.handled:
-            return
-
-        if result.message is None:
+        if not result.handled or result.message is None:
             return
 
         broadcaster = self.bot.create_partialuser(broadcaster_id)
@@ -135,26 +214,44 @@ class ChatEvents(commands.Component):
         )
 
     @commands.Component.listener()
-    async def event_custom_redemption_add(self, payload):
-        await self.handle_channel_point_redemption(payload)
-
-    @commands.Component.listener()
     async def event_raid(self, payload):
         await self.handle_raid(payload)
 
     async def handle_raid(self, payload):
-        raider = getattr(payload, "from_broadcaster", None)
-        broadcaster = getattr(payload, "to_broadcaster", None)
-        viewer_count = getattr(payload, "viewer_count", 0)
+        raider = getattr(
+            payload,
+            "from_broadcaster",
+            None
+        )
+        broadcaster = getattr(
+            payload,
+            "to_broadcaster",
+            None
+        )
+        viewer_count = getattr(
+            payload,
+            "viewer_count",
+            0
+        )
 
         if raider is None or broadcaster is None:
-            LOGGER.warning("Could not process raid payload: %r", payload)
+            LOGGER.warning(
+                "Could not process raid payload: %r",
+                payload
+            )
             return
 
-        raider_name = getattr(raider, "name", None)
+        raider_name = getattr(
+            raider,
+            "name",
+            None
+        )
 
         if not raider_name:
-            LOGGER.warning("Could not find raider name from payload: %r", payload)
+            LOGGER.warning(
+                "Could not find raider name from payload: %r",
+                payload
+            )
             return
 
         try:
@@ -162,9 +259,26 @@ class ChatEvents(commands.Component):
         except (TypeError, ValueError):
             viewer_count = 0
 
-        viewer_word = "viewer" if viewer_count == 1 else "viewers"
+        broadcaster_id = str(broadcaster.id)
+        viewer_word = (
+            "viewer"
+            if viewer_count == 1
+            else "viewers"
+        )
 
-        channel = self.bot.create_partialuser(broadcaster.id)
+        if self.bot.services:
+            self.bot.services.stream_logs.write(
+                broadcaster_id,
+                "RAID",
+                (
+                    f"{raider_name} raided with "
+                    f"{viewer_count} {viewer_word}."
+                )
+            )
+
+        channel = self.bot.create_partialuser(
+            broadcaster_id
+        )
 
         await channel.send_message(
             sender=self.bot.user,
@@ -176,6 +290,97 @@ class ChatEvents(commands.Component):
 
         await send_shoutout_message(
             bot=self.bot,
-            broadcaster_id=broadcaster.id,
+            broadcaster_id=broadcaster_id,
             username=raider_name
+        )
+
+    @commands.Component.listener()
+    async def event_stream_online(self, payload):
+        if not self.bot.services:
+            return
+
+        broadcaster = getattr(
+            payload,
+            "broadcaster",
+            None
+        )
+
+        broadcaster_id = getattr(
+            broadcaster,
+            "id",
+            None
+        )
+
+        if broadcaster_id is None:
+            broadcaster_id = getattr(
+                payload,
+                "broadcaster_id",
+                None
+            )
+
+        stream_id = getattr(
+            payload,
+            "id",
+            None
+        )
+
+        if stream_id is None:
+            stream_id = getattr(
+                payload,
+                "stream_id",
+                None
+            )
+
+        if broadcaster_id is None or stream_id is None:
+            LOGGER.warning(
+                "Could not start stream logger from payload: %r",
+                payload
+            )
+            return
+
+        channel_name = getattr(
+            broadcaster,
+            "name",
+            None
+        )
+
+        await self.bot.services.stream_logs.start_session(
+            broadcaster_id=str(broadcaster_id),
+            stream_id=str(stream_id),
+            channel_name=channel_name
+        )
+
+    @commands.Component.listener()
+    async def event_stream_offline(self, payload):
+        if not self.bot.services:
+            return
+
+        broadcaster = getattr(
+            payload,
+            "broadcaster",
+            None
+        )
+
+        broadcaster_id = getattr(
+            broadcaster,
+            "id",
+            None
+        )
+
+        if broadcaster_id is None:
+            broadcaster_id = getattr(
+                payload,
+                "broadcaster_id",
+                None
+            )
+
+        if broadcaster_id is None:
+            LOGGER.warning(
+                "Could not stop stream logger from payload: %r",
+                payload
+            )
+            return
+
+        await self.bot.services.stream_logs.end_session(
+            str(broadcaster_id)
         )
