@@ -46,6 +46,7 @@ class Settings:
         "CHANNEL_SCOPES",
         "channel:bot moderator:manage:banned_users moderator:read:followers "
         "channel:read:redemptions channel:read:subscriptions channel:read:ads"
+        "channel:manage:moderators"
     )
 
     IGNORED_USERS = {
