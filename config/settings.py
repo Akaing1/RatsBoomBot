@@ -44,8 +44,19 @@ class Settings:
 
     CHANNEL_SCOPES = os.getenv(
         "CHANNEL_SCOPES",
-        "channel:bot moderator:manage:banned_users moderator:read:followers "
-        "channel:read:redemptions channel:read:subscriptions channel:read:ads"
+        "channel:bot "
+        "moderator:manage:banned_users "
+        "moderator:read:followers "
+        "moderator:read:blocked_terms "
+        "moderator:read:chat_settings "
+        "moderator:read:unban_requests "
+        "moderator:read:chat_messages "
+        "moderator:read:warnings "
+        "moderator:read:moderators "
+        "moderator:read:vips "
+        "channel:read:redemptions "
+        "channel:read:subscriptions "
+        "channel:read:ads "
         "channel:manage:moderators"
     )
 
