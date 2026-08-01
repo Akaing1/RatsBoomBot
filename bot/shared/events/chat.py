@@ -57,52 +57,20 @@ class ChatEvents(commands.Component):
                 moderation_result
             )
 
-            if banned:
-                self.bot.services.stream_logs.write(
-                    broadcaster_id,
-                    "MODERATION",
-                    (
-                        f"Banned known bot {chatter_name} ({chatter_id}) | "
-                        f"Source: {moderation_result.source} | "
-                        f"Reason: {moderation_result.reason}"
-                    )
-                )
-            else:
-                self.bot.services.stream_logs.write(
-                    broadcaster_id,
-                    "MODERATION",
-                    (
-                        f"Failed to ban known bot {chatter_name} ({chatter_id}) | "
-                        f"Source: {moderation_result.source} | "
-                        f"Reason: {moderation_result.reason}"
-                    )
-                )
-
-            return
-
-        if moderation_result is not None and moderation_result.should_flag:
-            try:
-                await self.bot.services.moderation.flag_user(
-                    payload,
-                    moderation_result
-                )
-            except Exception:
-                LOGGER.exception(
-                    "[Moderation] Failed to flag user %s (%s) in %s.",
-                    chatter_name,
-                    chatter_id,
-                    broadcaster_name
-                )
+            result_text = "Banned" if banned else "Failed to ban"
 
             self.bot.services.stream_logs.write(
                 broadcaster_id,
                 "MODERATION",
                 (
-                    f"Flagged user {chatter_name} ({chatter_id}) | "
+                    f"{result_text} {chatter_name} ({chatter_id}) | "
+                    f"Campaign: {moderation_result.campaign_id} | "
                     f"Source: {moderation_result.source} | "
                     f"Reason: {moderation_result.reason}"
                 )
             )
+
+            return
 
         self.bot.services.timers.track_message(payload)
 
