@@ -7,6 +7,7 @@ from bot.services.broadcaster_service import BroadcasterService
 from bot.services.broadcaster_settings_service import BroadcasterSettingsService
 from bot.services.counter_service import CounterService
 from bot.services.help_service import HelpService
+from bot.services.moderation_service import ModerationService
 from bot.services.points_service import PointsService
 from bot.services.redeem_service import RedeemService
 from bot.services.stream_log_service import StreamLogService
@@ -44,6 +45,7 @@ class ServiceContainer:
         self.ads = AdAnnouncementService(bot, self.broadcasters)
         self.viewer_queue = ViewerQueueService(bot)
         self.redeems = RedeemService(bot, db, self.points)
+        self.moderation = ModerationService(bot, db)
 
         LOGGER.info("[Services] Service container created.")
 
@@ -57,6 +59,7 @@ class ServiceContainer:
             ("PointsService", self.points),
             ("CounterService", self.counters),
             ("RedeemService", self.redeems),
+            ("ModerationService", self.moderation),
             ("StreamLogService", self.stream_logs)
         )
 
