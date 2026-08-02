@@ -66,6 +66,11 @@ class Settings:
         if user.strip()
     }
 
+    BOT_DETECTION_MODE = os.getenv(
+        "BOT_DETECTION_MODE",
+        "learning"
+    ).strip().lower()
+
     DAILY_REDEEM_TITLE = os.getenv(
         "DAILY_REDEEM_TITLE",
         "Steal some cheese"
@@ -87,8 +92,19 @@ class Settings:
 
 settings = Settings()
 
+VALID_BOT_DETECTION_MODES = {
+    "learning",
+    "shadow",
+    "active"
+}
+
 if not settings.ADMIN_SECRET:
     raise ValueError("ADMIN_SECRET must be configured in .env.")
 
 if not settings.SESSION_SECRET:
     raise ValueError("SESSION_SECRET must be configured in .env.")
+
+if settings.BOT_DETECTION_MODE not in VALID_BOT_DETECTION_MODES:
+    raise ValueError(
+        "BOT_DETECTION_MODE must be learning, shadow, or active."
+    )
