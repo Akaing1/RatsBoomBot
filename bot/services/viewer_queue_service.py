@@ -7,6 +7,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 @dataclass
 class ViewerQueueState:
+
     queue: deque[str] = field(default_factory=deque)
     users: set[str] = field(default_factory=set)
     is_open: bool = False
@@ -155,36 +156,115 @@ class ViewerQueueService:
 
         return True, f"@{username}, you left the queue."
 
-    def next_viewer(self, broadcaster_id: str) -> tuple[bool, str]:
+    def next_viewers(self, broadcaster_id: str, count: int = 1) -> tuple[bool, list[str], str]:
 
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
         if not state.is_open:
             LOGGER.debug(
-                "[Viewer Queue] Next viewer requested for closed queue in broadcaster %s.",
+                "[Viewer Queue] Next viewers requested for closed queue in broadcaster %s.",
                 broadcaster_id
             )
-            return False, "The viewer queue is currently closed."
+            return False, [], "The viewer queue is currently closed."
+
+        if count < 1:
+            LOGGER.debug(
+                "[Viewer Queue] Invalid next-viewer count %d requested in broadcaster %s.",
+                count,
+                broadcaster_id
+            )
+            return False, [], "The number of viewers must be at least 1."
 
         if not state.queue:
             LOGGER.debug(
-                "[Viewer Queue] Next viewer requested for empty queue in broadcaster %s.",
+                "[Viewer Queue] Next viewers requested for empty queue in broadcaster %s.",
                 broadcaster_id
             )
-            return False, "The queue is empty."
+            return False, [], "The queue is empty."
 
-        username = state.queue.popleft()
-        state.users.remove(username)
+        selected_count = min(
+            count,
+            len(state.queue)
+        )
+
+        selected_viewers: list[str] = []
+
+        for _ in range(selected_count):
+            username = state.queue.popleft()
+            state.users.remove(username)
+            selected_viewers.append(username)
 
         LOGGER.info(
-            "[Viewer Queue] Selected user %s next for broadcaster %s. %d viewers remain.",
-            username,
+            "[Viewer Queue] Selected %d viewer(s) for broadcaster %s: %s. %d viewers remain.",
+            selected_count,
+            broadcaster_id,
+            ", ".join(selected_viewers),
+            len(state.queue)
+        )
+
+        viewers_text = ", ".join(
+            f"@{username}"
+            for username in selected_viewers
+        )
+
+        if selected_count == 1:
+            message = f"Next up: {viewers_text}!"
+        else:
+            message = f"Next group: {viewers_text}!"
+
+        return True, selected_viewers, message
+
+    def remove_position(self, broadcaster_id: str, position: int) -> tuple[bool, str | None, str]:
+
+        broadcaster_id = str(broadcaster_id)
+        state = self._get_queue_state(broadcaster_id)
+
+        if position < 1:
+            LOGGER.debug(
+                "[Viewer Queue] Invalid removal position %d requested in broadcaster %s.",
+                position,
+                broadcaster_id
+            )
+            return False, None, "The queue position must be at least 1."
+
+        queue_size = len(state.queue)
+
+        if queue_size == 0:
+            LOGGER.debug(
+                "[Viewer Queue] Position removal requested for empty queue in broadcaster %s.",
+                broadcaster_id
+            )
+            return False, None, "The queue is empty."
+
+        if position > queue_size:
+            LOGGER.debug(
+                "[Viewer Queue] Position %d requested for broadcaster %s queue with %d viewers.",
+                position,
+                broadcaster_id,
+                queue_size
+            )
+            return False, None, f"The queue only has {queue_size} viewer(s)."
+
+        queue_list = list(state.queue)
+        removed_username = queue_list.pop(position - 1)
+
+        state.queue = deque(queue_list)
+        state.users.remove(removed_username)
+
+        LOGGER.info(
+            "[Viewer Queue] Removed user %s from position %d in broadcaster %s. %d viewers remain.",
+            removed_username,
+            position,
             broadcaster_id,
             len(state.queue)
         )
 
-        return True, f"Next up: @{username}!"
+        return (
+            True,
+            removed_username,
+            f"Removed @{removed_username} from position {position}."
+        )
 
     def clear(self, broadcaster_id: str) -> str:
 
