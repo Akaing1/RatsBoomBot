@@ -4,6 +4,8 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from twitchio import HTTPException
+
 LOGGER = logging.getLogger("RatBoomBot")
 
 
@@ -181,13 +183,16 @@ class ShoutoutService:
             )
             return
 
-        success = await self.send_native_shoutout(
+        result = await self.send_native_shoutout(
             broadcaster_id=broadcaster_id,
             target_id=queued_shoutout.user_id,
             username=queued_shoutout.username
         )
 
-        if not success:
+        if result == "global_cooldown":
+            return
+
+        if result == "failed":
             return
 
         queue.popleft()
@@ -195,6 +200,15 @@ class ShoutoutService:
         self.queued_user_ids[broadcaster_id].discard(
             queued_shoutout.user_id
         )
+
+        if result == "target_cooldown":
+            LOGGER.info(
+                "[Shoutouts] Removed %s (%s) from broadcaster %s queue because Twitch reported an active target cooldown.",
+                queued_shoutout.username,
+                queued_shoutout.user_id,
+                broadcaster_id
+            )
+            return
 
         now = datetime.now(UTC)
 
@@ -208,7 +222,7 @@ class ShoutoutService:
             broadcaster_id
         )
 
-    async def send_native_shoutout(self, broadcaster_id: str, target_id: str, username: str) -> bool:
+    async def send_native_shoutout(self, broadcaster_id: str, target_id: str, username: str) -> str:
 
         broadcaster_id = str(broadcaster_id)
         target_id = str(target_id)
@@ -221,6 +235,41 @@ class ShoutoutService:
                 to_broadcaster=target_id,
                 moderator=broadcaster_id
             )
+        except HTTPException as error:
+            message = str(
+                error.extra.get("message", "")
+            ).lower()
+
+            if error.status == 429 and "specified streamer" in message:
+                self.target_last_shoutout_at[broadcaster_id][target_id] = datetime.now(UTC)
+
+                LOGGER.info(
+                    "[Shoutouts] Twitch reported that %s (%s) is already under the target cooldown in broadcaster %s.",
+                    username,
+                    target_id,
+                    broadcaster_id
+                )
+
+                return "target_cooldown"
+
+            if error.status == 429:
+                self.last_shoutout_at[broadcaster_id] = datetime.now(UTC)
+
+                LOGGER.info(
+                    "[Shoutouts] Twitch reported that broadcaster %s is under the global shoutout cooldown.",
+                    broadcaster_id
+                )
+
+                return "global_cooldown"
+
+            LOGGER.exception(
+                "[Shoutouts] Failed to send native Twitch shoutout for %s (%s) in broadcaster %s.",
+                username,
+                target_id,
+                broadcaster_id
+            )
+
+            return "failed"
         except Exception:
             LOGGER.exception(
                 "[Shoutouts] Failed to send native Twitch shoutout for %s (%s) in broadcaster %s.",
@@ -228,7 +277,8 @@ class ShoutoutService:
                 target_id,
                 broadcaster_id
             )
-            return False
+
+            return "failed"
 
         LOGGER.info(
             "[Shoutouts] Sent native Twitch shoutout for %s (%s) in broadcaster %s.",
@@ -237,7 +287,7 @@ class ShoutoutService:
             broadcaster_id
         )
 
-        return True
+        return "success"
 
     def is_global_cooldown_active(self, broadcaster_id: str) -> bool:
 
