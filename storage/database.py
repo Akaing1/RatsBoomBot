@@ -96,6 +96,10 @@ def create_broadcaster_subscriptions(broadcaster_user_id: str) -> list[Any]:
         ),
         eventsub.StreamOfflineSubscription(
             broadcaster_user_id=broadcaster_user_id
+        ),
+        eventsub.ChannelModerateV2Subscription(
+            broadcaster_user_id=broadcaster_user_id,
+            moderator_user_id=broadcaster_user_id
         )
     ]
 

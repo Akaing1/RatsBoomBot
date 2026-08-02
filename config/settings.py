@@ -44,8 +44,19 @@ class Settings:
 
     CHANNEL_SCOPES = os.getenv(
         "CHANNEL_SCOPES",
-        "channel:bot moderator:manage:banned_users moderator:read:followers "
-        "channel:read:redemptions channel:read:subscriptions channel:read:ads"
+        "channel:bot "
+        "moderator:manage:banned_users "
+        "moderator:read:followers "
+        "moderator:read:blocked_terms "
+        "moderator:read:chat_settings "
+        "moderator:read:unban_requests "
+        "moderator:read:chat_messages "
+        "moderator:read:warnings "
+        "moderator:read:moderators "
+        "moderator:read:vips "
+        "channel:read:redemptions "
+        "channel:read:subscriptions "
+        "channel:read:ads "
         "channel:manage:moderators"
     )
 
@@ -54,6 +65,11 @@ class Settings:
         for user in os.getenv("IGNORED_USERS", "").split(",")
         if user.strip()
     }
+
+    BOT_DETECTION_MODE = os.getenv(
+        "BOT_DETECTION_MODE",
+        "learning"
+    ).strip().lower()
 
     DAILY_REDEEM_TITLE = os.getenv(
         "DAILY_REDEEM_TITLE",
@@ -76,8 +92,19 @@ class Settings:
 
 settings = Settings()
 
+VALID_BOT_DETECTION_MODES = {
+    "learning",
+    "shadow",
+    "active"
+}
+
 if not settings.ADMIN_SECRET:
     raise ValueError("ADMIN_SECRET must be configured in .env.")
 
 if not settings.SESSION_SECRET:
     raise ValueError("SESSION_SECRET must be configured in .env.")
+
+if settings.BOT_DETECTION_MODE not in VALID_BOT_DETECTION_MODES:
+    raise ValueError(
+        "BOT_DETECTION_MODE must be learning, shadow, or active."
+    )
