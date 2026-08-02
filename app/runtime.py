@@ -24,7 +24,7 @@ async def run_runtime() -> None:
     database_path.parent.mkdir(parents=True, exist_ok=True)
 
     LOGGER.info(SEPARATOR)
-    LOGGER.info("[Startup] RatBoomBot v4.0 starting.")
+    LOGGER.info("[Startup] RatBoomBot v4.1.1 starting.")
     LOGGER.info("[Startup] Python %s", sys.version.split()[0])
     LOGGER.info("[Startup] Database path: %s", database_path)
     LOGGER.info("[Startup] Admin dashboard: %s", settings.ADMIN_BASE_URL)

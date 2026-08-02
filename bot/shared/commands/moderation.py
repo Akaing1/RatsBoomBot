@@ -11,7 +11,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 class ModerationCommands(commands.Component):
 
     KAMIKAZE_DURATION_SECONDS = 10
-    KAMIKAZE_SUCCESS_THRESHOLD = 0
+    KAMIKAZE_SUCCESS_THRESHOLD = 90
     REMOD_DELAY_SECONDS = 12
 
     def __init__(self, bot):
