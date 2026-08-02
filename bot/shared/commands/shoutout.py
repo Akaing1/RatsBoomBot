@@ -40,7 +40,9 @@ async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool
         )
         return False
 
-    channel = bot.create_partialuser(broadcaster_id)
+    channel = bot.create_partialuser(
+        broadcaster_id
+    )
 
     try:
         await channel.send_message(
@@ -52,14 +54,14 @@ async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool
         )
     except Exception:
         LOGGER.exception(
-            "[Shoutouts] Failed to send shoutout for %s in broadcaster %s.",
+            "[Shoutouts] Failed to send shoutout message for %s in broadcaster %s.",
             username,
             broadcaster_id
         )
         return False
 
     LOGGER.info(
-        "[Shoutouts] Sent shoutout for %s in broadcaster %s.",
+        "[Shoutouts] Sent shoutout message for %s in broadcaster %s.",
         username,
         broadcaster_id
     )
@@ -72,8 +74,9 @@ class ShoutoutCommands(commands.Component):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="so")
+    @commands.command(name="so", aliases=["shoutout"])
     async def shoutout(self, ctx: commands.Context, username: str | None = None):
+
         broadcaster_id = str(ctx.broadcaster.id)
         caller_name = ctx.chatter.name
 
@@ -97,48 +100,81 @@ class ShoutoutCommands(commands.Component):
             return
 
         if not username:
-            LOGGER.debug(
-                "[Commands] !so was invoked without a username in broadcaster %s.",
-                broadcaster_id
-            )
-
             await ctx.reply(
                 "Use it like this: !so username"
             )
             return
 
-        cleaned_username = clean_username(username)
+        cleaned_username = clean_username(
+            username
+        )
 
         if not cleaned_username:
-            LOGGER.debug(
-                "[Commands] !so received an invalid username in broadcaster %s.",
-                broadcaster_id
-            )
-
             await ctx.reply(
                 "Use it like this: !so username"
             )
             return
 
         if cleaned_username.lower() == ctx.broadcaster.name.lower():
-            LOGGER.info(
-                "[Commands] User %s attempted to shout out broadcaster %s.",
-                caller_name,
-                ctx.broadcaster.name
-            )
-
             await ctx.reply(
                 "You cannot shoutout the broadcaster."
             )
             return
 
-        success = await send_shoutout_message(
-            bot=self.bot,
+        try:
+            target = await self.bot.fetch_user(
+                login=cleaned_username
+            )
+        except Exception:
+            LOGGER.exception(
+                "[Shoutouts] Failed to resolve Twitch user %s.",
+                cleaned_username
+            )
+
+            await ctx.reply(
+                "I could not look up that Twitch user."
+            )
+            return
+
+        if target is None:
+            await ctx.reply(
+                f"I could not find a Twitch user named {cleaned_username}."
+            )
+            return
+
+        queued, response, position = self.bot.services.shoutouts.enqueue(
             broadcaster_id=broadcaster_id,
-            username=cleaned_username
+            user_id=str(target.id),
+            username=target.name,
+            requested_by=caller_name
         )
 
-        if not success:
+        if not queued:
             await ctx.reply(
-                "I could not shoutout that user."
+                response
             )
+            return
+
+        message_success = await send_shoutout_message(
+            bot=self.bot,
+            broadcaster_id=broadcaster_id,
+            username=target.name
+        )
+
+        if not message_success:
+            LOGGER.warning(
+                "[Shoutouts] Native shoutout for %s was queued, but the chat message failed.",
+                target.name
+            )
+
+            await ctx.reply(
+                response
+            )
+            return
+
+        LOGGER.info(
+            "[Shoutouts] %s was added to broadcaster %s shoutout queue at position %d.",
+            target.name,
+            broadcaster_id,
+            position
+        )

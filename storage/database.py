@@ -100,6 +100,10 @@ def create_broadcaster_subscriptions(broadcaster_user_id: str) -> list[Any]:
         eventsub.ChannelModerateV2Subscription(
             broadcaster_user_id=broadcaster_user_id,
             moderator_user_id=broadcaster_user_id
+        ),
+        eventsub.ShoutoutCreateSubscription(
+            broadcaster_user_id=broadcaster_user_id,
+            moderator_user_id=broadcaster_user_id
         )
     ]
 
