@@ -13,6 +13,7 @@ from bot.services.redeem_service import RedeemService
 from bot.services.stream_log_service import StreamLogService
 from bot.services.timer_service import TimerService
 from bot.services.viewer_queue_service import ViewerQueueService
+from bot.services.shoutout_service import ShoutoutService
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -46,6 +47,7 @@ class ServiceContainer:
         self.viewer_queue = ViewerQueueService(bot)
         self.redeems = RedeemService(bot, db, self.points)
         self.moderation = ModerationService(bot, db)
+        self.shoutouts = ShoutoutService(bot)
 
         LOGGER.info("[Services] Service container created.")
 
@@ -82,7 +84,8 @@ class ServiceContainer:
 
         services = (
             ("TimerService", self.timers),
-            ("AdAnnouncementService", self.ads)
+            ("AdAnnouncementService", self.ads),
+            ("ShoutoutService", self.shoutouts)
         )
 
         for name, service in services:
@@ -105,6 +108,7 @@ class ServiceContainer:
         services = (
             ("TimerService", self.timers),
             ("AdAnnouncementService", self.ads),
+            ("ShoutoutService", self.shoutouts),
             ("StreamLogService", self.stream_logs)
         )
 

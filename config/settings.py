@@ -58,6 +58,7 @@ class Settings:
         "channel:read:subscriptions "
         "channel:read:ads "
         "channel:manage:moderators"
+        "moderator:manage:shoutouts"
     )
 
     IGNORED_USERS = {
