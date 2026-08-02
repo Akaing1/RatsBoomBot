@@ -40,7 +40,6 @@ class ViewerQueueCommands(commands.Component):
 
     def services_available(self, command_name: str) -> bool:
 
-
         if self.bot.services:
             return True
 
@@ -76,6 +75,7 @@ class ViewerQueueCommands(commands.Component):
 
     @commands.command(name="open")
     async def open_queue(self, ctx: commands.Context):
+
         self.log_command(ctx, "open")
 
         if not self.services_available("open"):
@@ -87,16 +87,15 @@ class ViewerQueueCommands(commands.Component):
             )
             return
 
-        broadcaster_id = get_broadcaster_id(ctx)
-
         message = self.bot.services.viewer_queue.open_queue(
-            broadcaster_id
+            get_broadcaster_id(ctx)
         )
 
         await ctx.send(message)
 
     @commands.command(name="close")
     async def close_queue(self, ctx: commands.Context):
+
         self.log_command(ctx, "close")
 
         if not self.services_available("close"):
@@ -108,59 +107,52 @@ class ViewerQueueCommands(commands.Component):
             )
             return
 
-        broadcaster_id = get_broadcaster_id(ctx)
-
         message = self.bot.services.viewer_queue.close_queue(
-            broadcaster_id
+            get_broadcaster_id(ctx)
         )
 
         await ctx.send(message)
 
     @commands.command(name="join")
     async def join_queue(self, ctx: commands.Context):
+
         self.log_command(ctx, "join")
 
         if not self.services_available("join"):
             return
 
-        broadcaster_id = get_broadcaster_id(ctx)
-        username = get_chatter_name(ctx)
-
         _, message = self.bot.services.viewer_queue.join(
-            broadcaster_id,
-            username
+            get_broadcaster_id(ctx),
+            get_chatter_name(ctx)
         )
 
         await ctx.send(message)
 
     @commands.command(name="leave")
     async def leave_queue(self, ctx: commands.Context):
+
         self.log_command(ctx, "leave")
 
         if not self.services_available("leave"):
             return
 
-        broadcaster_id = get_broadcaster_id(ctx)
-        username = get_chatter_name(ctx)
-
         _, message = self.bot.services.viewer_queue.leave(
-            broadcaster_id,
-            username
+            get_broadcaster_id(ctx),
+            get_chatter_name(ctx)
         )
 
         await ctx.send(message)
 
     @commands.command(name="queue")
     async def show_queue(self, ctx: commands.Context):
+
         self.log_command(ctx, "queue")
 
         if not self.services_available("queue"):
             return
 
-        broadcaster_id = get_broadcaster_id(ctx)
-
         queue = self.bot.services.viewer_queue.list_queue(
-            broadcaster_id
+            get_broadcaster_id(ctx)
         )
 
         if not queue:
@@ -184,7 +176,8 @@ class ViewerQueueCommands(commands.Component):
         )
 
     @commands.command(name="next")
-    async def next_viewer(self, ctx: commands.Context):
+    async def next_viewers(self, ctx: commands.Context, count: int = 1):
+
         self.log_command(ctx, "next")
 
         if not self.services_available("next"):
@@ -196,16 +189,43 @@ class ViewerQueueCommands(commands.Component):
             )
             return
 
-        broadcaster_id = get_broadcaster_id(ctx)
+        _, _, message = self.bot.services.viewer_queue.next_viewers(
+            get_broadcaster_id(ctx),
+            count
+        )
 
-        _, message = self.bot.services.viewer_queue.next_viewer(
-            broadcaster_id
+        await ctx.send(message)
+
+    @commands.command(name="remove")
+    async def remove_viewer(self, ctx: commands.Context, position: int | None = None):
+
+        self.log_command(ctx, "remove")
+
+        if not self.services_available("remove"):
+            return
+
+        if not self.has_permission(ctx, "remove"):
+            await ctx.send(
+                "Only the broadcaster or mods can use !remove."
+            )
+            return
+
+        if position is None:
+            await ctx.send(
+                "Use it like this: !remove 3"
+            )
+            return
+
+        _, _, message = self.bot.services.viewer_queue.remove_position(
+            get_broadcaster_id(ctx),
+            position
         )
 
         await ctx.send(message)
 
     @commands.command(name="clear")
     async def clear_queue(self, ctx: commands.Context):
+
         self.log_command(ctx, "clear")
 
         if not self.services_available("clear"):
@@ -217,10 +237,8 @@ class ViewerQueueCommands(commands.Component):
             )
             return
 
-        broadcaster_id = get_broadcaster_id(ctx)
-
         message = self.bot.services.viewer_queue.clear(
-            broadcaster_id
+            get_broadcaster_id(ctx)
         )
 
         await ctx.send(message)
