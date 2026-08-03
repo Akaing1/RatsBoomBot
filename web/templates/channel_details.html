@@ -167,32 +167,38 @@
             </span>
         </div>
 
-        {% if queue_message %}
+       {% if queue_message %}
             <div
                 class="queue-feedback {% if queue_result == 'removed' %}success{% else %}error{% endif %}"
+                role="status"
             >
-                {{ queue_message }}
+                <span class="queue-feedback-icon">
+                    {% if queue_result == "removed" %}✓{% else %}!{% endif %}
+                </span>
+
+                <span>{{ queue_message }}</span>
             </div>
         {% endif %}
 
         {% if queue_users %}
-            <ol class="queue-list">
+            <div class="queue-list">
                 {% for username in queue_users %}
-                    <li class="queue-list-item">
+                    <div class="queue-list-item">
                         <div class="queue-user">
                             <span class="queue-position">
                                 {{ loop.index }}
                             </span>
 
-                            <span>
-                                @{{ username }}
-                            </span>
+                            <div class="queue-user-details">
+                                <strong>@{{ username }}</strong>
+                                <span>Position {{ loop.index }}</span>
+                            </div>
                         </div>
 
                         <form
                             method="post"
                             action="/channels/{{ broadcaster.id }}/viewer-queue/remove"
-                            onsubmit="return confirm('Remove @{{ username }} from position {{ loop.index }}?');"
+                            onsubmit="return confirm('Remove @{{ username }} from the viewer queue?');"
                         >
                             <input
                                 type="hidden"
@@ -207,16 +213,29 @@
                             >
 
                             <button
-                                class="button danger compact"
+                                class="queue-remove-button"
                                 type="submit"
+                                aria-label="Remove @{{ username }} from the queue"
                             >
                                 Remove
                             </button>
                         </form>
-                    </li>
+                    </div>
                 {% endfor %}
-            </ol>
+            </div>
         {% else %}
+            <div class="compact-empty-state">
+                <h4>The queue is empty</h4>
+
+                <p>
+                    {% if queue_open %}
+                        Viewers can join with <strong>!join</strong>.
+                    {% else %}
+                        Open the queue before viewers can join.
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
             <div class="compact-empty-state">
                 <h4>The queue is empty</h4>
 
@@ -229,10 +248,6 @@
                 </p>
             </div>
         {% endif %}
-
-        <p class="panel-note">
-            Removing a viewer updates the active in-memory queue immediately.
-        </p>
     </section>
     <section class="panel danger-zone">
     <div class="panel-header">
