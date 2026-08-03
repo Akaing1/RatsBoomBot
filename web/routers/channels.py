@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from urllib.parse import urlencode
+
 from config.settings import settings
 from storage.database import delete_token
 from web.admin_auth import (
@@ -62,6 +64,8 @@ async def channels_page(request: Request):
 
 @router.get("/{broadcaster_id}", response_class=HTMLResponse)
 async def channel_details_page(request: Request,broadcaster_id: str):
+    queue_result = request.query_params.get("queue_result")
+    queue_message = request.query_params.get("queue_message")
     admin_redirect = require_admin(request)
 
     if admin_redirect:
@@ -112,7 +116,9 @@ async def channel_details_page(request: Request,broadcaster_id: str):
             channel_settings=channel_settings,
             queue_open=queue_open,
             queue_users=queue_users,
-            queue_size=queue_size
+            queue_size=queue_size,
+            queue_result=queue_result,
+            queue_message=queue_message
         )
     )
 
@@ -187,5 +193,76 @@ async def delete_broadcaster(request: Request, broadcaster_id: str, csrf_token: 
 
     return RedirectResponse(
         url="/channels?removed=1",
+        status_code=303
+    )
+
+
+@router.post("/{broadcaster_id}/viewer-queue/remove")
+async def remove_viewer_from_queue(
+    request: Request,
+    broadcaster_id: str,
+    position: int = Form(...),
+    csrf_token: str = Form(...)
+):
+    admin_redirect = require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
+    validate_csrf_token(
+        request,
+        csrf_token
+    )
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return render_error(
+            request,
+            active_page="channels",
+            title="Runtime unavailable",
+            message="The RatsBoomBot runtime is not available.",
+            status_code=503
+        )
+
+    broadcaster = (
+        runtime_bot.services
+        .broadcasters
+        .get_broadcasters()
+        .get(str(broadcaster_id))
+    )
+
+    if broadcaster is None:
+        return render_error(
+            request,
+            active_page="channels",
+            title="Channel not found",
+            message=(
+                "That Twitch channel is not connected "
+                "to RatsBoomBot."
+            ),
+            status_code=404
+        )
+
+    removed, _, message = (
+        runtime_bot.services
+        .viewer_queue
+        .remove_position(
+            broadcaster_id,
+            position
+        )
+    )
+
+    result = "removed" if removed else "remove_failed"
+
+    query = urlencode(
+        {
+            "queue_result": result,
+            "queue_message": message
+        }
+    )
+
+    return RedirectResponse(
+        url=f"/channels/{broadcaster_id}?{query}",
         status_code=303
     )
