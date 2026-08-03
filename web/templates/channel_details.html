@@ -23,9 +23,8 @@
 
             <p class="page-description">
                 {% if broadcaster.login %}
-                    @{{ broadcaster.login }} ·
+                    @{{ broadcaster.login }} &middot;
                 {% endif %}
-
                 Twitch ID: {{ broadcaster.id }}
             </p>
         </div>
@@ -53,15 +52,10 @@
 
         <div class="status-row">
             <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
-
-            <strong>
-                {% if broadcaster.is_live %}Live{% else %}Offline{% endif %}
-            </strong>
+            <strong>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
         </div>
 
-        <p class="card-detail">
-            Current Twitch broadcast status.
-        </p>
+        <p class="card-detail">Current Twitch broadcast status.</p>
     </article>
 
     <article class="status-card">
@@ -69,10 +63,7 @@
 
         <div class="status-row">
             <span class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"></span>
-
-            <strong>
-                {% if queue_open %}Open{% else %}Closed{% endif %}
-            </strong>
+            <strong>{% if queue_open %}Open{% else %}Closed{% endif %}</strong>
         </div>
 
         <p class="card-detail">
@@ -87,9 +78,7 @@
             {{ (1 if channel_settings.discord_url else 0) + (1 if channel_settings.youtube_url else 0) }}
         </div>
 
-        <p class="card-detail">
-            Configured Discord and YouTube links.
-        </p>
+        <p class="card-detail">Configured Discord and YouTube links.</p>
     </article>
 </section>
 
@@ -173,7 +162,7 @@
                 role="status"
             >
                 <span class="queue-feedback-icon">
-                    {% if queue_result == "removed" %}✓{% else %}!{% endif %}
+                    {% if queue_result == "removed" %}&#10003;{% else %}!{% endif %}
                 </span>
 
                 <span>{{ queue_message }}</span>
@@ -181,48 +170,33 @@
         {% endif %}
 
         {% if queue_users %}
-            <div class="queue-list">
+            <ul class="queue-list">
                 {% for username in queue_users %}
-                    <div class="queue-list-item">
-                        <div class="queue-user">
-                            <span class="queue-position">
-                                {{ loop.index }}
-                            </span>
+                    <li class="queue-list-item">
+                        <span class="queue-position">{{ loop.index }}</span>
 
-                            <div class="queue-user-details">
-                                <strong>@{{ username }}</strong>
-                                <span>Position {{ loop.index }}</span>
-                            </div>
-                        </div>
+                        <strong class="queue-username">@{{ username }}</strong>
 
                         <form
                             method="post"
                             action="/channels/{{ broadcaster.id }}/viewer-queue/remove"
                             onsubmit="return confirm('Remove @{{ username }} from the viewer queue?');"
                         >
-                            <input
-                                type="hidden"
-                                name="csrf_token"
-                                value="{{ csrf_token }}"
-                            >
-
-                            <input
-                                type="hidden"
-                                name="position"
-                                value="{{ loop.index }}"
-                            >
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="position" value="{{ loop.index }}">
 
                             <button
                                 class="queue-remove-button"
                                 type="submit"
                                 aria-label="Remove @{{ username }} from the queue"
+                                title="Remove @{{ username }}"
                             >
-                                Remove
+                                &times;
                             </button>
                         </form>
-                    </div>
+                    </li>
                 {% endfor %}
-            </div>
+            </ul>
         {% else %}
             <div class="compact-empty-state">
                 <h4>The queue is empty</h4>
@@ -237,35 +211,32 @@
             </div>
         {% endif %}
     </section>
+
     <section class="panel danger-zone">
-    <div class="panel-header">
-        <div>
-            <p class="eyebrow danger-eyebrow">Remove Channel</p>
-            <h3>Removing this channel disconnects RatsBoomBot.</h3>
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow danger-eyebrow">Remove Channel</p>
+                <h3>Removing this channel disconnects RatsBoomBot.</h3>
+            </div>
         </div>
-    </div>
 
-    <p class="page-description">
-        The OAuth token will be deleted and the bot will immediately disconnect from this channel.
-    The streamer can reconnect later using the dashboard. Historical data such as points,
-    redeems, and statistics will remain intact.
-    </p>
+        <p class="page-description">
+            The OAuth token will be deleted and the bot will immediately disconnect from this channel.
+            The streamer can reconnect later using the dashboard. Historical data such as points,
+            redeems, and statistics will remain intact.
+        </p>
 
-    <form
-        method="post"
-        action="/channels/{{ broadcaster.id }}/delete"
-        onsubmit="return confirm('Remove {{ broadcaster.name or broadcaster.id }} from RatsBoomBot?');"
-    >
-        <input
-            type="hidden"
-            name="csrf_token"
-            value="{{ csrf_token }}"
+        <form
+            method="post"
+            action="/channels/{{ broadcaster.id }}/delete"
+            onsubmit="return confirm('Remove {{ broadcaster.name or broadcaster.id }} from RatsBoomBot?');"
         >
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <button class="button danger" type="submit">
-            Remove Channel
-        </button>
-    </form>
-</section>
+            <button class="button danger" type="submit">
+                Remove Channel
+            </button>
+        </form>
+    </section>
 </div>
 {% endblock %}
