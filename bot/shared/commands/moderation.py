@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+import time
 
 from twitchio import User
 from twitchio.ext import commands
@@ -13,17 +14,20 @@ class ModerationCommands(commands.Component):
     KAMIKAZE_DURATION_SECONDS = 10
     KAMIKAZE_SUCCESS_THRESHOLD = 90
     REMOD_DELAY_SECONDS = 12
-    COOLDOWN_SECONDS = 60*10
+    KAMIKAZE_COOLDOWN_SECONDS = 60 * 10
 
     def __init__(self, bot):
         self.bot = bot
         self._remod_tasks: set[asyncio.Task] = set()
+        self._kamikaze_cooldowns: dict[tuple[str, str], float] = {}
 
     @staticmethod
     def is_broadcaster(user_id: str, broadcaster_id: str) -> bool:
+
         return str(user_id) == str(broadcaster_id)
 
     def is_bot(self, user_id: str) -> bool:
+
         bot_id = getattr(self.bot, "bot_id", None)
 
         if bot_id is None:
@@ -36,12 +40,70 @@ class ModerationCommands(commands.Component):
         return str(user_id) == str(bot_id)
 
     def is_protected_target(self, user_id: str, broadcaster_id: str) -> bool:
+
         return (
             self.is_broadcaster(user_id, broadcaster_id)
             or self.is_bot(user_id)
         )
 
+    def get_kamikaze_cooldown_remaining(self, broadcaster_id: str, user_id: str) -> int:
+
+        key = (
+            str(broadcaster_id),
+            str(user_id)
+        )
+
+        cooldown_ends_at = self._kamikaze_cooldowns.get(
+            key
+        )
+
+        if cooldown_ends_at is None:
+            return 0
+
+        remaining = cooldown_ends_at - time.monotonic()
+
+        if remaining <= 0:
+            self._kamikaze_cooldowns.pop(
+                key,
+                None
+            )
+            return 0
+
+        return max(
+            1,
+            int(remaining) + 1
+        )
+
+    def start_kamikaze_cooldown(self, broadcaster_id: str, user_id: str) -> None:
+
+        key = (
+            str(broadcaster_id),
+            str(user_id)
+        )
+
+        self._kamikaze_cooldowns[key] = (
+            time.monotonic()
+            + self.KAMIKAZE_COOLDOWN_SECONDS
+        )
+
+    @staticmethod
+    def format_cooldown(seconds: int) -> str:
+
+        minutes, remaining_seconds = divmod(
+            seconds,
+            60
+        )
+
+        if minutes and remaining_seconds:
+            return f"{minutes}m {remaining_seconds}s"
+
+        if minutes:
+            return f"{minutes}m"
+
+        return f"{remaining_seconds}s"
+
     async def is_moderator(self, channel, target_id: str, target_name: str, broadcaster_id: str) -> bool:
+
         try:
             moderators = channel.fetch_moderators(
                 user_ids=[target_id],
@@ -66,6 +128,7 @@ class ModerationCommands(commands.Component):
         return False
 
     async def timeout_user(self, channel, broadcaster_id: str, user_id: str, username: str) -> bool:
+
         try:
             await channel.timeout_user(
                 moderator=broadcaster_id,
@@ -84,8 +147,11 @@ class ModerationCommands(commands.Component):
         return True
 
     async def restore_moderator(self, channel, broadcaster_id: str, target_id: str, target_name: str) -> None:
+
         try:
-            await asyncio.sleep(self.REMOD_DELAY_SECONDS)
+            await asyncio.sleep(
+                self.REMOD_DELAY_SECONDS
+            )
 
             await channel.add_moderator(
                 user=target_id
@@ -112,6 +178,7 @@ class ModerationCommands(commands.Component):
         )
 
     def schedule_moderator_restoration(self, channel, broadcaster_id: str, target_id: str, target_name: str) -> None:
+
         task = asyncio.create_task(
             self.restore_moderator(
                 channel,
@@ -123,7 +190,9 @@ class ModerationCommands(commands.Component):
         )
 
         self._remod_tasks.add(task)
-        task.add_done_callback(self._remod_tasks.discard)
+        task.add_done_callback(
+            self._remod_tasks.discard
+        )
 
         LOGGER.info(
             "[Moderation] Scheduled moderator restoration for %s in broadcaster %s.",
@@ -132,6 +201,7 @@ class ModerationCommands(commands.Component):
         )
 
     async def timeout_with_moderator_restore(self, channel, broadcaster_id: str, user_id: str, username: str) -> bool:
+
         was_moderator = await self.is_moderator(
             channel,
             user_id,
@@ -161,6 +231,7 @@ class ModerationCommands(commands.Component):
 
     @commands.command(name="kamikaze")
     async def kamikaze(self, ctx: commands.Context, target: User = None):
+
         if not self.bot.services:
             LOGGER.warning(
                 "[Commands] !kamikaze could not run because services are unavailable."
@@ -171,7 +242,9 @@ class ModerationCommands(commands.Component):
         broadcaster = ctx.broadcaster
         broadcaster_id = str(broadcaster.id)
         caller_id = str(caller.id)
-        channel = self.bot.create_partialuser(broadcaster_id)
+        channel = self.bot.create_partialuser(
+            broadcaster_id
+        )
 
         LOGGER.debug(
             "[Commands] User %s invoked !kamikaze against %s in broadcaster %s.",
@@ -180,8 +253,33 @@ class ModerationCommands(commands.Component):
             broadcaster_id
         )
 
+        cooldown_remaining = self.get_kamikaze_cooldown_remaining(
+            broadcaster_id,
+            caller_id
+        )
+
+        if cooldown_remaining > 0:
+            cooldown_text = self.format_cooldown(
+                cooldown_remaining
+            )
+
+            LOGGER.debug(
+                "[Commands] User %s attempted !kamikaze during cooldown in broadcaster %s with %s remaining.",
+                caller.name,
+                broadcaster_id,
+                cooldown_text
+            )
+
+            await ctx.reply(
+                f"!kamikaze is on cooldown for you. Try again in {cooldown_text}."
+            )
+            return
+
         if target is None or caller_id == str(target.id):
-            if self.is_protected_target(caller_id, broadcaster_id):
+            if self.is_protected_target(
+                caller_id,
+                broadcaster_id
+            ):
                 LOGGER.info(
                     "[Moderation] Protected user %s attempted to target themselves with !kamikaze in broadcaster %s.",
                     caller.name,
@@ -193,7 +291,14 @@ class ModerationCommands(commands.Component):
                 )
                 return
 
-            await ctx.reply("You bomb yourself...")
+            self.start_kamikaze_cooldown(
+                broadcaster_id,
+                caller_id
+            )
+
+            await ctx.reply(
+                "You bomb yourself..."
+            )
 
             timed_out = await self.timeout_with_moderator_restore(
                 channel,
@@ -215,7 +320,10 @@ class ModerationCommands(commands.Component):
 
         target_id = str(target.id)
 
-        if self.is_protected_target(target_id, broadcaster_id):
+        if self.is_protected_target(
+            target_id,
+            broadcaster_id
+        ):
             LOGGER.info(
                 "[Moderation] User %s attempted to target protected user %s with !kamikaze in broadcaster %s.",
                 caller.name,
@@ -228,7 +336,15 @@ class ModerationCommands(commands.Component):
             )
             return
 
-        bomb_roll = random.randint(1, 100)
+        self.start_kamikaze_cooldown(
+            broadcaster_id,
+            caller_id
+        )
+
+        bomb_roll = random.randint(
+            1,
+            100
+        )
 
         LOGGER.debug(
             "[Commands] !kamikaze rolled %d for user %s against %s.",
@@ -262,7 +378,10 @@ class ModerationCommands(commands.Component):
             )
             return
 
-        if self.is_protected_target(caller_id, broadcaster_id):
+        if self.is_protected_target(
+            caller_id,
+            broadcaster_id
+        ):
             LOGGER.info(
                 "[Moderation] Protected user %s missed !kamikaze but was not timed out in broadcaster %s.",
                 caller.name,
