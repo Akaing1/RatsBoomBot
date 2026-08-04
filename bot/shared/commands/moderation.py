@@ -13,12 +13,14 @@ class ModerationCommands(commands.Component):
     KAMIKAZE_DURATION_SECONDS = 10
     KAMIKAZE_SUCCESS_THRESHOLD = 90
     REMOD_DELAY_SECONDS = 12
+    COOLDOWN_SECONDS = 60*10
 
     def __init__(self, bot):
         self.bot = bot
         self._remod_tasks: set[asyncio.Task] = set()
 
-    def is_broadcaster(self, user_id: str, broadcaster_id: str) -> bool:
+    @staticmethod
+    def is_broadcaster(user_id: str, broadcaster_id: str) -> bool:
         return str(user_id) == str(broadcaster_id)
 
     def is_bot(self, user_id: str) -> bool:
