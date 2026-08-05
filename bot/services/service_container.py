@@ -37,16 +37,7 @@ class ServiceContainer:
         )
 
         self.help = HelpService(bot)
-        self.timers = TimerService(
-            bot,
-            self.broadcasters,
-            self.broadcaster_settings
-        )
-        self.broadcasters = BroadcasterService(
-            bot,
-            broadcaster_ids
-        )
-
+        self.timers = TimerService(bot, self.broadcasters, self.broadcaster_settings)
         self.broadcaster_settings = BroadcasterSettingsService(db)
         self.features = FeatureToggleService(db)
         self.points = PointsService(bot, db)
