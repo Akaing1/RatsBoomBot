@@ -2,7 +2,7 @@ from typing import Any
 
 from twitchio.ext import commands
 
-from bot.profiles import ChannelProfile
+from bot.profiles import ChannelProfile, FeatureName
 
 
 class ChannelComponent(commands.Component):
@@ -43,4 +43,10 @@ class ChannelComponent(commands.Component):
         return context_broadcaster_id == self.broadcaster_id
 
     async def require_profile_channel(self, ctx: commands.Context) -> bool:
-        return self.is_profile_channel(ctx)
+        if not self.is_profile_channel(ctx):
+            return False
+
+        if not self.bot.services:
+            return False
+
+        return self.bot.services.features.is_enabled(self.broadcaster_id, FeatureName.CHANNEL)

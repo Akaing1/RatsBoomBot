@@ -249,7 +249,6 @@ class FeatureToggleService:
         )
 
     def is_enabled(self, broadcaster_id: str, feature: FeatureName) -> bool:
-
         return self.get_feature_state(broadcaster_id, feature).effective_enabled
 
     def get_feature_state(self, broadcaster_id: str, feature: FeatureName) -> FeatureState:
