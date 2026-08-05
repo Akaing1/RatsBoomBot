@@ -18,7 +18,7 @@ DEVELOPER_NINJAKAING_PROFILE = ChannelProfile(
         DeveloperPointsCommands
     ),
     features=FeatureDefaults(
-        profile=True,
+        channel=False,
         timers=True,
         points=True,
         redeems=False,

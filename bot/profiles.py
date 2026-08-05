@@ -1,14 +1,14 @@
 import logging
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 
 from twitchio.ext import commands
 
 LOGGER = logging.getLogger("RatBoomBot")
 
 
-class FeatureName(StrEnum):
-    PROFILE = "profile"
+class FeatureName(Enum):
+    CHANNEL = "channel"
     TIMERS = "timers"
     POINTS = "points"
     REDEEMS = "redeems"
@@ -23,7 +23,7 @@ class FeatureName(StrEnum):
 
 @dataclass(frozen=True)
 class FeatureDefaults:
-    profile: bool = True
+    channel: bool = True
     timers: bool = True
     points: bool = True
     redeems: bool = True

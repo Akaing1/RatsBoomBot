@@ -14,6 +14,7 @@ from bot.services.stream_log_service import StreamLogService
 from bot.services.timer_service import TimerService
 from bot.services.viewer_queue_service import ViewerQueueService
 from bot.services.shoutout_service import ShoutoutService
+from bot.services.feature_toggle_service import FeatureToggleService
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -41,6 +42,13 @@ class ServiceContainer:
             self.broadcasters,
             self.broadcaster_settings
         )
+        self.broadcasters = BroadcasterService(
+            bot,
+            broadcaster_ids
+        )
+
+        self.broadcaster_settings = BroadcasterSettingsService(db)
+        self.features = FeatureToggleService(db)
         self.points = PointsService(bot, db)
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
@@ -58,6 +66,7 @@ class ServiceContainer:
         services = (
             ("BroadcasterService", self.broadcasters),
             ("BroadcasterSettingsService", self.broadcaster_settings),
+            ("FeatureToggleService", self.features),
             ("PointsService", self.points),
             ("CounterService", self.counters),
             ("RedeemService", self.redeems),

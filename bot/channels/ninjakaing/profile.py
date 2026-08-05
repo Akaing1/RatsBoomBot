@@ -20,7 +20,7 @@ NINJAKAING_PROFILE = ChannelProfile(
         NinjakaingPointsCommands
     ),
     features=FeatureDefaults(
-        profile=True,
+        channel=True,
         timers=True,
         points=True,
         redeems=True,
