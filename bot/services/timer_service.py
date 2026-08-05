@@ -2,13 +2,12 @@ import asyncio
 import logging
 import time
 
-from bot.profiles import get_active_profile
+from bot.profiles import FeatureName, get_active_profile
 
 LOGGER = logging.getLogger("RatBoomBot")
 
 
 class TimerService:
-
     INTERVAL_SECONDS = 30 * 60
     REQUIRED_MESSAGES = 20
     CHECK_EVERY_SECONDS = 5
@@ -67,14 +66,15 @@ class TimerService:
         broadcaster_id = str(payload.broadcaster.id)
         broadcaster_name = payload.broadcaster.name
 
-        self.message_counts[broadcaster_id] = (
-            self.message_counts.get(broadcaster_id, 0) + 1
-        )
+        if not self.bot.services:
+            return
 
-        self.last_announcements.setdefault(
-            broadcaster_id,
-            time.time()
-        )
+        if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.TIMERS):
+            return
+
+        self.message_counts[broadcaster_id] = (self.message_counts.get(broadcaster_id, 0) + 1)
+
+        self.last_announcements.setdefault(broadcaster_id, time.time())
 
         LOGGER.debug(
             "[Timers] Tracked message for %s (%s). Count: %d/%d.",
@@ -129,6 +129,14 @@ class TimerService:
         now = time.time()
 
         for broadcaster_id, broadcaster_name in live_broadcasters.items():
+            if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.TIMERS):
+                LOGGER.debug(
+                    "[Timers] Timer feature is disabled for %s (%s).",
+                    broadcaster_name,
+                    broadcaster_id
+                )
+                continue
+
             settings = await self.broadcaster_settings.get_settings(
                 broadcaster_id
             )
@@ -180,9 +188,15 @@ class TimerService:
 
         broadcaster_id = str(broadcaster_id)
 
-        settings = await self.broadcaster_settings.get_settings(
-            broadcaster_id
-        )
+        if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.TIMERS):
+            LOGGER.debug(
+                "[Timers] Skipped announcement because timers are disabled for %s (%s).",
+                broadcaster_name,
+                broadcaster_id
+            )
+            return False
+
+        settings = await self.broadcaster_settings.get_settings(broadcaster_id)
 
         profile = get_active_profile(broadcaster_id)
 

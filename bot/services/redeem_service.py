@@ -3,12 +3,7 @@ import random
 import sqlite3
 from dataclasses import dataclass
 
-from bot.profiles import (
-    FeatureName,
-    RedeemConfig,
-    get_active_profile,
-    render_profile_message
-)
+from bot.profiles import FeatureName, RedeemConfig, get_active_profile, render_profile_message
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -20,7 +15,6 @@ class RedeemResult:
 
 
 class RedeemService:
-
     DAILY_REDEEM_TYPE = "daily"
     FIRST_REDEEM_TYPE = "first"
 
@@ -109,7 +103,8 @@ class RedeemService:
 
         LOGGER.info("[Redeems] Redeem claim storage ready.")
 
-    async def handle_redemption(self, *, broadcaster_id: str, user_id: str, username: str, reward_title: str, redemption_id: str | None = None) -> RedeemResult:
+    async def handle_redemption(self, *, broadcaster_id: str, user_id: str, username: str, reward_title: str,
+                                redemption_id: str | None = None) -> RedeemResult:
 
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
@@ -177,7 +172,8 @@ class RedeemService:
 
         return RedeemResult(handled=False)
 
-    async def claim_daily(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str, config: RedeemConfig, redemption_id: str | None = None) -> RedeemResult:
+    async def claim_daily(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str,
+                          config: RedeemConfig, redemption_id: str | None = None) -> RedeemResult:
 
         try:
             await self._insert_claim(
@@ -264,7 +260,8 @@ class RedeemService:
             message=message
         )
 
-    async def claim_first(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str, config: RedeemConfig, redemption_id: str | None = None) -> RedeemResult:
+    async def claim_first(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str,
+                          config: RedeemConfig, redemption_id: str | None = None) -> RedeemResult:
 
         try:
             await self._insert_claim(
@@ -458,15 +455,18 @@ class RedeemService:
 
         return str(stream_id)
 
-    @staticmethod
-    def get_redeem_config(broadcaster_id: str) -> RedeemConfig | None:
+    def get_redeem_config(self, broadcaster_id: str) -> RedeemConfig | None:
 
-        profile = get_active_profile(str(broadcaster_id))
+        broadcaster_id = str(broadcaster_id)
+        profile = get_active_profile(broadcaster_id)
 
         if profile is None:
             return None
 
-        if not profile.features.is_enabled(FeatureName.REDEEMS):
+        if not self.bot.services:
+            return None
+
+        if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.REDEEMS):
             return None
 
         return profile.redeems
@@ -481,7 +481,8 @@ class RedeemService:
 
         return claim_count in config.claim_milestones
 
-    async def _insert_claim(self, *, broadcaster_id: str, user_id: str, username: str, redeem_type: str, stream_id: str, redemption_id: str | None = None) -> None:
+    async def _insert_claim(self, *, broadcaster_id: str, user_id: str, username: str, redeem_type: str, stream_id: str,
+                            redemption_id: str | None = None) -> None:
 
         query = """
         INSERT INTO redeem_claims (
