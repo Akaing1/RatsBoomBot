@@ -7,7 +7,7 @@ from bot.profiles import (
     PointsMessages,
     RaidMessages,
     RedeemConfig,
-    RedeemMessages,
+    RedeemMessages
 )
 
 
@@ -15,12 +15,12 @@ NINJAKAING_PROFILE = ChannelProfile(
     channel_name="ninjakaing",
     components=(
         NinjakaingCommands,
-        NinjakaingPointsCommands,
+        NinjakaingPointsCommands
     ),
     timer_messages=(
         "Lost something? Maybe you left it in the basement: {discord_url}",
         "Missed something? Go check out Rat's YouTube! {youtube_url}",
-        "Ready to gamble? Use !help to get a list of commands you can use!",
+        "Ready to gamble? Use !help to get a list of commands you can use!"
     ),
     community_messages=CommunityMessages(
         follow=(
@@ -55,7 +55,7 @@ NINJAKAING_PROFILE = ChannelProfile(
             100,
             250,
             500,
-            1000,
+            1000
         ),
         messages=RedeemMessages(
             stream_offline=(

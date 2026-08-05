@@ -34,12 +34,6 @@ class ChatEvents(commands.Component):
             )
             return
 
-        self.bot.services.stream_logs.write(
-            broadcaster_id,
-            "CHAT",
-            f"{chatter_name}: {message}"
-        )
-
         try:
             moderation_result = await self.bot.services.moderation.evaluate_message(
                 payload
