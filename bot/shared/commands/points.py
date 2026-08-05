@@ -4,7 +4,7 @@ import random
 from twitchio import User
 from twitchio.ext import commands
 
-from bot.profiles import PointsConfig, get_active_profile, render_profile_message
+from bot.profiles import PointsConfig, get_active_profile, render_profile_message, FeatureName
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -14,12 +14,16 @@ class PointsCommandHandler:
     def __init__(self, bot):
         self.bot = bot
 
-    def get_config(self, broadcaster_id: str) -> PointsConfig | None:
+    @staticmethod
+    def get_config(broadcaster_id: str) -> PointsConfig | None:
 
-        profile = get_active_profile(str(broadcaster_id))
+        profile = get_active_profile(broadcaster_id)
 
-        if profile is None or not profile.points.enabled:
-            return None
+        if profile is None:
+            return
+
+        if not profile.features.is_enabled(FeatureName.POINTS):
+            return
 
         return profile.points
 
