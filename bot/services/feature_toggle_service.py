@@ -279,14 +279,14 @@ class FeatureToggleService:
         profile_enabled = self.get_profile_enabled(broadcaster_id)
 
         blocked_by_profile = (
-                feature is not FeatureName.PROFILE
+                feature is not FeatureName.CHANNEL
                 and configured_enabled
                 and not profile_enabled
         )
 
         effective_enabled = (
             configured_enabled
-            if feature is FeatureName.PROFILE
+            if feature is FeatureName.CHANNEL
             else configured_enabled and profile_enabled
         )
 
@@ -307,8 +307,8 @@ class FeatureToggleService:
         if profile is None:
             return False
 
-        default_enabled = profile.features.is_enabled(FeatureName.PROFILE)
-        override_enabled = self.overrides.get(broadcaster_id, {}).get(FeatureName.PROFILE)
+        default_enabled = profile.features.is_enabled(FeatureName.CHANNEL)
+        override_enabled = self.overrides.get(broadcaster_id, {}).get(FeatureName.CHANNEL)
 
         if override_enabled is not None:
             return override_enabled
