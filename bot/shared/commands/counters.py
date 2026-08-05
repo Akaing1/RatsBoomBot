@@ -51,7 +51,7 @@ class CounterCommands(commands.Component):
 
         return count
 
-    @commands.command(name="explode")
+    @commands.command(name="explode", aliases=["rat"])
     async def explode(self, ctx: commands.Context):
         exploded_count = await self.increment_counter(
             ctx,
