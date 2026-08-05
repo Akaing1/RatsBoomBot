@@ -48,7 +48,8 @@ class PointsCommandHandler:
 
         return broadcaster_id, config
 
-    def log_command(self, ctx: commands.Context, command_name: str) -> None:
+    @staticmethod
+    def log_command(ctx: commands.Context, command_name: str) -> None:
 
         LOGGER.debug(
             "[Commands] User %s invoked %s in broadcaster %s.",
@@ -57,7 +58,8 @@ class PointsCommandHandler:
             ctx.broadcaster.id
         )
 
-    async def send_message(self, ctx: commands.Context, template: str | None, **values) -> None:
+    @staticmethod
+    async def send_message(ctx: commands.Context, template: str | None, **values) -> None:
 
         message = render_profile_message(template, **values)
 
