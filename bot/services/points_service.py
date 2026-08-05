@@ -2,7 +2,10 @@ import logging
 import time
 from dataclasses import dataclass
 
-from bot.profiles import get_active_profile
+from bot.profiles import (
+    FeatureName,
+    get_active_profile
+)
 from config.settings import settings
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -170,7 +173,10 @@ class PointsService:
         username_key = username.lower()
         profile = get_active_profile(broadcaster_id)
 
-        if profile is None or not profile.points.enabled:
+        if profile is None:
+            return
+
+        if not profile.features.is_enabled(FeatureName.POINTS):
             return
 
         if username_key in settings.IGNORED_USERS:

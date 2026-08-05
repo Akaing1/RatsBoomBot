@@ -1,9 +1,48 @@
 import logging
 from dataclasses import dataclass
+from enum import StrEnum
 
 from twitchio.ext import commands
 
 LOGGER = logging.getLogger("RatBoomBot")
+
+
+class FeatureName(StrEnum):
+    PROFILE = "profile"
+    TIMERS = "timers"
+    POINTS = "points"
+    REDEEMS = "redeems"
+    COMMUNITY_EVENTS = "community_events"
+    RAID_RESPONSES = "raid_responses"
+    KAMIKAZE = "kamikaze"
+    VIEWER_QUEUE = "viewer_queue"
+    SHOUTOUTS = "shoutouts"
+    SOCIALS = "socials"
+    COUNTERS = "counters"
+
+
+@dataclass(frozen=True)
+class FeatureDefaults:
+    profile: bool = True
+    timers: bool = True
+    points: bool = True
+    redeems: bool = True
+    community_events: bool = True
+    raid_responses: bool = True
+    kamikaze: bool = True
+    viewer_queue: bool = True
+    shoutouts: bool = True
+    socials: bool = True
+    counters: bool = True
+
+    def is_enabled(self, feature: FeatureName) -> bool:
+        return bool(getattr(self, feature.value))
+
+    def as_dict(self) -> dict[FeatureName, bool]:
+        return {
+            feature: self.is_enabled(feature)
+            for feature in FeatureName
+        }
 
 
 @dataclass(frozen=True)
@@ -54,7 +93,6 @@ class RedeemMessages:
 
 @dataclass(frozen=True)
 class RedeemConfig:
-    enabled: bool = False
     daily_title: str = ""
     first_title: str = ""
     daily_amount: int = 0
@@ -111,7 +149,6 @@ class PointsMessages:
 
 @dataclass(frozen=True)
 class PointsConfig:
-    enabled: bool = False
     command_name: str = "points"
     points_per_message: int = 10
     message_cooldown_seconds: int = 60
@@ -124,6 +161,7 @@ class PointsConfig:
 class ChannelProfile:
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
+    features: FeatureDefaults = FeatureDefaults()
     timer_messages: tuple[str, ...] = ()
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
@@ -136,7 +174,6 @@ ACTIVE_CHANNEL_PROFILES: dict[str, ChannelProfile] = {}
 
 
 def register_profile(profile: ChannelProfile) -> None:
-
     channel_name = profile.channel_name.lower()
 
     if channel_name in CHANNEL_PROFILES:
@@ -157,7 +194,6 @@ def register_profile(profile: ChannelProfile) -> None:
 
 
 def activate_profile(broadcaster_id: str, profile: ChannelProfile) -> None:
-
     broadcaster_id = str(broadcaster_id)
 
     ACTIVE_CHANNEL_PROFILES[broadcaster_id] = profile
@@ -170,7 +206,6 @@ def activate_profile(broadcaster_id: str, profile: ChannelProfile) -> None:
 
 
 def get_active_profile(broadcaster_id: str) -> ChannelProfile | None:
-
     broadcaster_id = str(broadcaster_id)
     profile = ACTIVE_CHANNEL_PROFILES.get(broadcaster_id)
 
@@ -184,7 +219,6 @@ def get_active_profile(broadcaster_id: str) -> ChannelProfile | None:
 
 
 def render_profile_message(template: str | None, **values) -> str | None:
-
     if not template:
         LOGGER.debug(
             "[Profiles] Skipping message rendering because no template was configured."
@@ -203,7 +237,6 @@ def render_profile_message(template: str | None, **values) -> str | None:
 
 
 def clear_profiles() -> None:
-
     registered_count = len(CHANNEL_PROFILES)
     active_count = len(ACTIVE_CHANNEL_PROFILES)
 

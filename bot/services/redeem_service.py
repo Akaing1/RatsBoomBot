@@ -3,7 +3,12 @@ import random
 import sqlite3
 from dataclasses import dataclass
 
-from bot.profiles import RedeemConfig, get_active_profile, render_profile_message
+from bot.profiles import (
+    FeatureName,
+    RedeemConfig,
+    get_active_profile,
+    render_profile_message
+)
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -458,7 +463,10 @@ class RedeemService:
 
         profile = get_active_profile(str(broadcaster_id))
 
-        if profile is None or not profile.redeems.enabled:
+        if profile is None:
+            return None
+
+        if not profile.features.is_enabled(FeatureName.REDEEMS):
             return None
 
         return profile.redeems
