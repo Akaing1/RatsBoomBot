@@ -6,7 +6,7 @@ from twitchio.ext import commands
 from bot.channels import register_channel_profiles
 from bot.profiles import CHANNEL_PROFILES, activate_profile
 from bot.shared.commands.counters import CounterCommands
-from bot.shared.commands.moderation import ModerationCommands
+from bot.shared.commands.mod_actions import ModActionCommands
 from bot.shared.commands.points import PointsCommands
 from bot.shared.commands.settings import SettingsCommands
 from bot.shared.commands.shoutout import ShoutoutCommands
@@ -25,7 +25,7 @@ GLOBAL_COMPONENTS: tuple[type[commands.Component], ...] = (
     UtilityCommands,
     SocialCommands,
     PointsCommands,
-    ModerationCommands,
+    ModActionCommands,
     CounterCommands,
     ViewerQueueCommands,
     ShoutoutCommands,

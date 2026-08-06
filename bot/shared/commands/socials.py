@@ -1,6 +1,13 @@
 import logging
+from typing import TYPE_CHECKING
 
 from twitchio.ext import commands
+
+from bot.profiles import FeatureName
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+
+if TYPE_CHECKING:
+    from bot.services.broadcaster_settings_service import BroadcasterSettings
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -10,20 +17,32 @@ class SocialCommands(commands.Component):
     def __init__(self, bot):
         self.bot = bot
 
-    async def get_settings(self, ctx: commands.Context):
+    async def get_settings(self, ctx: commands.Context) -> "BroadcasterSettings | None":
+        services = self.bot.services
 
-        if not self.bot.services:
+        if services is None:
             LOGGER.warning(
                 "[Commands] Social command could not run because services are unavailable."
             )
             return None
 
-        broadcaster_id = str(ctx.broadcaster.id)
+        broadcaster_id = get_context_broadcaster_id(ctx)
 
-        try:
-            return await self.bot.services.broadcaster_settings.get_settings(
+        if broadcaster_id is None:
+            LOGGER.warning(
+                "[Commands] Social command could not resolve its broadcaster."
+            )
+            return None
+
+        if not is_feature_enabled(self.bot, ctx, FeatureName.SOCIALS):
+            LOGGER.debug(
+                "[Socials] Social commands are disabled for broadcaster %s.",
                 broadcaster_id
             )
+            return None
+
+        try:
+            return await services.broadcaster_settings.get_settings(broadcaster_id)
         except Exception:
             LOGGER.exception(
                 "[Commands] Failed to load social settings for broadcaster %s.",
@@ -32,11 +51,13 @@ class SocialCommands(commands.Component):
             return None
 
     @commands.group(invoke_fallback=True)
-    async def socials(self, ctx: commands.Context):
+    async def socials(self, ctx: commands.Context) -> None:
+        broadcaster_id = get_context_broadcaster_id(ctx)
+
         LOGGER.debug(
             "[Commands] User %s invoked !socials in broadcaster %s.",
             ctx.chatter.name,
-            ctx.broadcaster.id
+            broadcaster_id or "unknown"
         )
 
         settings = await self.get_settings(ctx)
@@ -47,16 +68,16 @@ class SocialCommands(commands.Component):
         discord = settings.discord_url or "not set"
         youtube = settings.youtube_url or "not set"
 
-        await ctx.reply(
-            f"discord: {discord} | youtube: {youtube}"
-        )
+        await ctx.reply(f"discord: {discord} | youtube: {youtube}")
 
     @socials.command(name="discord")
-    async def socials_discord(self, ctx: commands.Context):
+    async def socials_discord(self, ctx: commands.Context) -> None:
+        broadcaster_id = get_context_broadcaster_id(ctx)
+
         LOGGER.debug(
             "[Commands] User %s invoked !socials discord in broadcaster %s.",
             ctx.chatter.name,
-            ctx.broadcaster.id
+            broadcaster_id or "unknown"
         )
 
         settings = await self.get_settings(ctx)
@@ -67,12 +88,10 @@ class SocialCommands(commands.Component):
         if not settings.discord_url:
             LOGGER.debug(
                 "[Commands] Discord URL is not configured for broadcaster %s.",
-                ctx.broadcaster.id
+                broadcaster_id or "unknown"
             )
 
-            await ctx.reply(
-                "No Discord link has been set for this channel yet."
-            )
+            await ctx.reply("No Discord link has been set for this channel yet.")
             return
 
         await ctx.reply(
@@ -81,11 +100,13 @@ class SocialCommands(commands.Component):
         )
 
     @socials.command(name="youtube")
-    async def socials_youtube(self, ctx: commands.Context):
+    async def socials_youtube(self, ctx: commands.Context) -> None:
+        broadcaster_id = get_context_broadcaster_id(ctx)
+
         LOGGER.debug(
             "[Commands] User %s invoked !socials youtube in broadcaster %s.",
             ctx.chatter.name,
-            ctx.broadcaster.id
+            broadcaster_id or "unknown"
         )
 
         settings = await self.get_settings(ctx)
@@ -96,12 +117,10 @@ class SocialCommands(commands.Component):
         if not settings.youtube_url:
             LOGGER.debug(
                 "[Commands] YouTube URL is not configured for broadcaster %s.",
-                ctx.broadcaster.id
+                broadcaster_id or "unknown"
             )
 
-            await ctx.reply(
-                "No YouTube link has been set for this channel yet."
-            )
+            await ctx.reply("No YouTube link has been set for this channel yet.")
             return
 
         await ctx.reply(

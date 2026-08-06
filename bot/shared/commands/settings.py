@@ -2,6 +2,9 @@ import logging
 
 from twitchio.ext import commands
 
+from bot.profiles import FeatureName
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+
 LOGGER = logging.getLogger("RatBoomBot")
 
 VALID_TIMER_STATUSES = {
@@ -20,15 +23,31 @@ ENABLED_TIMER_STATUSES = {
 }
 
 
-def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
+def get_chatter(ctx: commands.Context):
+    return getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
 
-    chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
+
+def get_chatter_name(ctx: commands.Context) -> str:
+    chatter = get_chatter(ctx)
+
+    if chatter is None:
+        return "unknown"
+
+    return chatter.name
+
+
+def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
+    chatter = get_chatter(ctx)
+    broadcaster_id = get_context_broadcaster_id(ctx)
 
     if chatter is None:
         return False
 
+    if broadcaster_id is None:
+        return False
+
     is_moderator = getattr(chatter, "moderator", False)
-    is_broadcaster = str(chatter.id) == str(ctx.broadcaster.id)
+    is_broadcaster = str(chatter.id) == broadcaster_id
 
     return is_moderator or is_broadcaster
 
@@ -38,49 +57,63 @@ class SettingsCommands(commands.Component):
     def __init__(self, bot):
         self.bot = bot
 
-    def services_available(self, command_name: str) -> bool:
+    def get_context(self, ctx: commands.Context, command_name: str) -> str | None:
+        if self.bot.services is None:
+            LOGGER.warning(
+                "[Commands] !%s could not run because services are unavailable.",
+                command_name
+            )
+            return None
 
-        if self.bot.services:
-            return True
+        broadcaster_id = get_context_broadcaster_id(ctx)
 
-        LOGGER.warning(
-            "[Commands] !%s could not run because services are unavailable.",
-            command_name
-        )
+        if broadcaster_id is None:
+            LOGGER.warning(
+                "[Commands] !%s could not resolve its broadcaster.",
+                command_name
+            )
+            return None
 
-        return False
+        if not is_feature_enabled(self.bot, ctx, FeatureName.CHANNEL):
+            LOGGER.debug(
+                "[Settings] Settings commands are disabled for broadcaster %s because the channel profile is disabled.",
+                broadcaster_id
+            )
+            return None
+
+        return broadcaster_id
 
     def has_permission(self, ctx: commands.Context, command_name: str) -> bool:
-
         if is_mod_or_broadcaster(ctx):
             return True
 
         LOGGER.info(
             "[Commands] User %s was denied permission to run !%s in broadcaster %s.",
-            ctx.chatter.name,
+            get_chatter_name(ctx),
             command_name,
-            ctx.broadcaster.id
+            get_context_broadcaster_id(ctx) or "unknown"
         )
 
         return False
 
     @commands.command(name="setdiscord")
-    async def set_discord(self, ctx: commands.Context, url: str | None = None):
-        broadcaster_id = str(ctx.broadcaster.id)
+    async def set_discord(self, ctx: commands.Context, url: str | None = None) -> None:
+        broadcaster_id = self.get_context(ctx, "setdiscord")
+
+        if broadcaster_id is None:
+            return
+
+        services = self.bot.services
+        username = get_chatter_name(ctx)
 
         LOGGER.debug(
             "[Commands] User %s invoked !setdiscord in broadcaster %s.",
-            ctx.chatter.name,
+            username,
             broadcaster_id
         )
 
-        if not self.services_available("setdiscord"):
-            return
-
         if not self.has_permission(ctx, "setdiscord"):
-            await ctx.reply(
-                "Only the broadcaster or mods can set the Discord link."
-            )
+            await ctx.reply("Only the broadcaster or mods can set the Discord link.")
             return
 
         if not url:
@@ -89,16 +122,11 @@ class SettingsCommands(commands.Component):
                 broadcaster_id
             )
 
-            await ctx.reply(
-                "Use it like this: !setdiscord https://discord.gg/yourlink"
-            )
+            await ctx.reply("Use it like this: !setdiscord https://discord.gg/yourlink")
             return
 
         try:
-            await self.bot.services.broadcaster_settings.set_discord_url(
-                broadcaster_id=broadcaster_id,
-                discord_url=url
-            )
+            await services.broadcaster_settings.set_discord_url(broadcaster_id=broadcaster_id, discord_url=url)
         except Exception:
             LOGGER.exception(
                 "[Commands] Failed to update Discord URL for broadcaster %s.",
@@ -108,31 +136,30 @@ class SettingsCommands(commands.Component):
 
         LOGGER.info(
             "[Commands] User %s updated the Discord URL for broadcaster %s.",
-            ctx.chatter.name,
+            username,
             broadcaster_id
         )
 
-        await ctx.reply(
-            "Discord link updated for this channel."
-        )
+        await ctx.reply("Discord link updated for this channel.")
 
     @commands.command(name="setyoutube")
-    async def set_youtube(self, ctx: commands.Context, url: str | None = None):
-        broadcaster_id = str(ctx.broadcaster.id)
+    async def set_youtube(self, ctx: commands.Context, url: str | None = None) -> None:
+        broadcaster_id = self.get_context(ctx, "setyoutube")
+
+        if broadcaster_id is None:
+            return
+
+        services = self.bot.services
+        username = get_chatter_name(ctx)
 
         LOGGER.debug(
             "[Commands] User %s invoked !setyoutube in broadcaster %s.",
-            ctx.chatter.name,
+            username,
             broadcaster_id
         )
 
-        if not self.services_available("setyoutube"):
-            return
-
         if not self.has_permission(ctx, "setyoutube"):
-            await ctx.reply(
-                "Only the broadcaster or mods can set the YouTube link."
-            )
+            await ctx.reply("Only the broadcaster or mods can set the YouTube link.")
             return
 
         if not url:
@@ -141,16 +168,11 @@ class SettingsCommands(commands.Component):
                 broadcaster_id
             )
 
-            await ctx.reply(
-                "Use it like this: !setyoutube https://youtube.com/@yourchannel"
-            )
+            await ctx.reply("Use it like this: !setyoutube https://youtube.com/@yourchannel")
             return
 
         try:
-            await self.bot.services.broadcaster_settings.set_youtube_url(
-                broadcaster_id=broadcaster_id,
-                youtube_url=url
-            )
+            await services.broadcaster_settings.set_youtube_url(broadcaster_id=broadcaster_id, youtube_url=url)
         except Exception:
             LOGGER.exception(
                 "[Commands] Failed to update YouTube URL for broadcaster %s.",
@@ -160,39 +182,36 @@ class SettingsCommands(commands.Component):
 
         LOGGER.info(
             "[Commands] User %s updated the YouTube URL for broadcaster %s.",
-            ctx.chatter.name,
+            username,
             broadcaster_id
         )
 
-        await ctx.reply(
-            "YouTube link updated for this channel."
-        )
+        await ctx.reply("YouTube link updated for this channel.")
 
     @commands.command(name="timers")
-    async def timers(self, ctx: commands.Context, status: str | None = None):
-        broadcaster_id = str(ctx.broadcaster.id)
+    async def timers(self, ctx: commands.Context, status: str | None = None) -> None:
+        broadcaster_id = self.get_context(ctx, "timers")
+
+        if broadcaster_id is None:
+            return
+
+        services = self.bot.services
+        username = get_chatter_name(ctx)
 
         LOGGER.debug(
             "[Commands] User %s invoked !timers in broadcaster %s with status %s.",
-            ctx.chatter.name,
+            username,
             broadcaster_id,
             status or "current"
         )
 
-        if not self.services_available("timers"):
-            return
-
         if not self.has_permission(ctx, "timers"):
-            await ctx.reply(
-                "Only the broadcaster or mods can change timer settings."
-            )
+            await ctx.reply("Only the broadcaster or mods can change timer settings.")
             return
 
         if status is None:
             try:
-                settings = await self.bot.services.broadcaster_settings.get_settings(
-                    broadcaster_id
-                )
+                settings = await services.broadcaster_settings.get_settings(broadcaster_id)
             except Exception:
                 LOGGER.exception(
                     "[Commands] Failed to load timer settings for broadcaster %s.",
@@ -200,11 +219,12 @@ class SettingsCommands(commands.Component):
                 )
                 return
 
-            state = "enabled" if settings.timers_enabled else "disabled"
+            if settings.timers_enabled:
+                state = "enabled"
+            else:
+                state = "disabled"
 
-            await ctx.reply(
-                f"Timers are currently {state} for this channel."
-            )
+            await ctx.reply(f"Timers are currently {state} for this channel.")
             return
 
         normalized_status = status.lower().strip()
@@ -212,23 +232,18 @@ class SettingsCommands(commands.Component):
         if normalized_status not in VALID_TIMER_STATUSES:
             LOGGER.debug(
                 "[Commands] User %s supplied invalid timer status %s in broadcaster %s.",
-                ctx.chatter.name,
+                username,
                 status,
                 broadcaster_id
             )
 
-            await ctx.reply(
-                "Use it like this: !timers on or !timers off"
-            )
+            await ctx.reply("Use it like this: !timers on or !timers off")
             return
 
         enabled = normalized_status in ENABLED_TIMER_STATUSES
 
         try:
-            await self.bot.services.broadcaster_settings.set_timers_enabled(
-                broadcaster_id=broadcaster_id,
-                enabled=enabled
-            )
+            await services.broadcaster_settings.set_timers_enabled(broadcaster_id=broadcaster_id, enabled=enabled)
         except Exception:
             LOGGER.exception(
                 "[Commands] Failed to update timer settings for broadcaster %s.",
@@ -236,15 +251,16 @@ class SettingsCommands(commands.Component):
             )
             return
 
-        state = "enabled" if enabled else "disabled"
+        if enabled:
+            state = "enabled"
+        else:
+            state = "disabled"
 
         LOGGER.info(
             "[Commands] User %s %s timers for broadcaster %s.",
-            ctx.chatter.name,
+            username,
             state,
             broadcaster_id
         )
 
-        await ctx.reply(
-            f"Timers are now {state} for this channel."
-        )
+        await ctx.reply(f"Timers are now {state} for this channel.")

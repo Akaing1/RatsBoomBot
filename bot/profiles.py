@@ -14,11 +14,33 @@ class FeatureName(Enum):
     REDEEMS = "redeems"
     COMMUNITY_EVENTS = "community_events"
     RAID_RESPONSES = "raid_responses"
-    KAMIKAZE = "kamikaze"
+
+
+class GlobalCommandGroup(Enum):
+    GLOBALS = "globals"
+    POINTS = "points"
     VIEWER_QUEUE = "viewer_queue"
     SHOUTOUTS = "shoutouts"
     SOCIALS = "socials"
-    COUNTERS = "counters"
+    SETTINGS = "settings"
+
+
+class GlobalCommandName(Enum):
+    HI = "hi"
+    CHOICE = "choice"
+    KABOOM = "kaboom"
+    STINKY = "stinky"
+    LUCKY = "lucky"
+    SMART = "smart"
+    LURK = "lurk"
+    HELP = "help"
+
+    EXPLODE = "explode"
+    REKLOP = "reklop"
+    RANDY = "randy"
+    CAR = "car"
+
+    KAMIKAZE = "kamikaze"
 
 
 @dataclass(frozen=True)
@@ -29,17 +51,54 @@ class FeatureDefaults:
     redeems: bool = True
     community_events: bool = True
     raid_responses: bool = True
-    kamikaze: bool = True
-    viewer_queue: bool = True
-    shoutouts: bool = True
-    socials: bool = True
-    counters: bool = True
 
     def is_enabled(self, feature: FeatureName) -> bool:
         return bool(getattr(self, feature.value))
 
     def as_dict(self) -> dict[FeatureName, bool]:
         return {feature: self.is_enabled(feature) for feature in FeatureName}
+
+
+@dataclass(frozen=True)
+class GlobalCommandDefaults:
+    enabled: bool = True
+
+    points: bool = True
+    viewer_queue: bool = True
+    shoutouts: bool = True
+    socials: bool = True
+    settings: bool = True
+
+    hi: bool = True
+    choice: bool = True
+    kaboom: bool = True
+    stinky: bool = True
+    lucky: bool = True
+    smart: bool = True
+    lurk: bool = True
+    help: bool = True
+
+    explode: bool = True
+    reklop: bool = True
+    randy: bool = True
+    car: bool = True
+
+    kamikaze: bool = True
+
+    def is_group_enabled(self, group: GlobalCommandGroup) -> bool:
+        if group is GlobalCommandGroup.GLOBALS:
+            return self.enabled
+
+        return bool(getattr(self, group.value))
+
+    def is_command_enabled(self, command: GlobalCommandName) -> bool:
+        return bool(getattr(self, command.value))
+
+    def groups_as_dict(self) -> dict[GlobalCommandGroup, bool]:
+        return {group: self.is_group_enabled(group) for group in GlobalCommandGroup}
+
+    def commands_as_dict(self) -> dict[GlobalCommandName, bool]:
+        return {command: self.is_command_enabled(command) for command in GlobalCommandName}
 
 
 @dataclass(frozen=True)
@@ -151,6 +210,7 @@ class ChannelProfile:
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
     features: FeatureDefaults = FeatureDefaults()
+    globals: GlobalCommandDefaults = GlobalCommandDefaults()
     timer_messages: tuple[str, ...] = ()
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()

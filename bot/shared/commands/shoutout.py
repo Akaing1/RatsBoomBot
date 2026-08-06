@@ -3,34 +3,35 @@ import re
 
 from twitchio.ext import commands
 
+from bot.profiles import FeatureName
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+
 LOGGER = logging.getLogger("RatBoomBot")
 
 USERNAME_PATTERN = re.compile(r"[^a-zA-Z0-9_]")
 
 
 def clean_username(username: str) -> str:
-
-    return USERNAME_PATTERN.sub(
-        "",
-        username.replace("@", "").strip()
-    )
+    return USERNAME_PATTERN.sub("", username.replace("@", "").strip())
 
 
 def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
-
     chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
+    broadcaster_id = get_context_broadcaster_id(ctx)
 
     if chatter is None:
         return False
 
+    if broadcaster_id is None:
+        return False
+
     is_moderator = getattr(chatter, "moderator", False)
-    is_broadcaster = str(chatter.id) == str(ctx.broadcaster.id)
+    is_broadcaster = str(chatter.id) == broadcaster_id
 
     return is_moderator or is_broadcaster
 
 
 async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool:
-
     broadcaster_id = str(broadcaster_id)
     username = clean_username(username)
 
@@ -40,18 +41,14 @@ async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool
         )
         return False
 
-    channel = bot.create_partialuser(
-        broadcaster_id
+    channel = bot.create_partialuser(broadcaster_id)
+    message = (
+        f"Go check out @{username}! "
+        f"They are a cool rat: https://twitch.tv/{username}"
     )
 
     try:
-        await channel.send_message(
-            sender=bot.user,
-            message=(
-                f"Go check out @{username}! "
-                f"They are a cool rat: https://twitch.tv/{username}"
-            )
-        )
+        await channel.send_message(sender=bot.user, message=message)
     except Exception:
         LOGGER.exception(
             "[Shoutouts] Failed to send shoutout message for %s in broadcaster %s.",
@@ -75,10 +72,25 @@ class ShoutoutCommands(commands.Component):
         self.bot = bot
 
     @commands.command(name="so", aliases=["shoutout"])
-    async def shoutout(self, ctx: commands.Context, username: str | None = None):
+    async def shoutout(self, ctx: commands.Context, username: str | None = None) -> None:
+        services = self.bot.services
 
-        broadcaster_id = str(ctx.broadcaster.id)
-        caller_name = ctx.chatter.name
+        if services is None:
+            LOGGER.warning(
+                "[Commands] !so could not run because services are unavailable."
+            )
+            return
+
+        broadcaster_id = get_context_broadcaster_id(ctx)
+
+        if broadcaster_id is None:
+            LOGGER.warning(
+                "[Commands] !so could not resolve its broadcaster."
+            )
+            return
+
+        caller = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
+        caller_name = getattr(caller, "name", "unknown")
 
         LOGGER.debug(
             "[Commands] User %s invoked !so in broadcaster %s with target %s.",
@@ -87,6 +99,13 @@ class ShoutoutCommands(commands.Component):
             username or "missing"
         )
 
+        if not is_feature_enabled(self.bot, ctx, FeatureName.SHOUTOUTS):
+            LOGGER.debug(
+                "[Shoutouts] Shoutouts are disabled for broadcaster %s.",
+                broadcaster_id
+            )
+            return
+
         if not is_mod_or_broadcaster(ctx):
             LOGGER.info(
                 "[Commands] User %s was denied permission to run !so in broadcaster %s.",
@@ -94,55 +113,42 @@ class ShoutoutCommands(commands.Component):
                 broadcaster_id
             )
 
-            await ctx.reply(
-                "Only the broadcaster or mods can use !so."
-            )
+            await ctx.reply("Only the broadcaster or mods can use !so.")
             return
 
         if not username:
-            await ctx.reply(
-                "Use it like this: !so username"
-            )
+            await ctx.reply("Use it like this: !so username")
             return
 
-        cleaned_username = clean_username(
-            username
-        )
+        cleaned_username = clean_username(username)
 
         if not cleaned_username:
-            await ctx.reply(
-                "Use it like this: !so username"
-            )
+            await ctx.reply("Use it like this: !so username")
             return
 
-        if cleaned_username.lower() == ctx.broadcaster.name.lower():
-            await ctx.reply(
-                "You cannot shoutout the broadcaster."
-            )
+        broadcaster = getattr(ctx, "broadcaster", None)
+        broadcaster_name = getattr(broadcaster, "name", "")
+
+        if cleaned_username.lower() == broadcaster_name.lower():
+            await ctx.reply("You cannot shoutout the broadcaster.")
             return
 
         try:
-            target = await self.bot.fetch_user(
-                login=cleaned_username
-            )
+            target = await self.bot.fetch_user(login=cleaned_username)
         except Exception:
             LOGGER.exception(
                 "[Shoutouts] Failed to resolve Twitch user %s.",
                 cleaned_username
             )
 
-            await ctx.reply(
-                "I could not look up that Twitch user."
-            )
+            await ctx.reply("I could not look up that Twitch user.")
             return
 
         if target is None:
-            await ctx.reply(
-                f"I could not find a Twitch user named {cleaned_username}."
-            )
+            await ctx.reply(f"I could not find a Twitch user named {cleaned_username}.")
             return
 
-        queued, response, position = self.bot.services.shoutouts.enqueue(
+        queued, response, position = services.shoutouts.enqueue(
             broadcaster_id=broadcaster_id,
             user_id=str(target.id),
             username=target.name,
@@ -150,16 +156,10 @@ class ShoutoutCommands(commands.Component):
         )
 
         if not queued:
-            await ctx.reply(
-                response
-            )
+            await ctx.reply(response)
             return
 
-        message_success = await send_shoutout_message(
-            bot=self.bot,
-            broadcaster_id=broadcaster_id,
-            username=target.name
-        )
+        message_success = await send_shoutout_message(self.bot, broadcaster_id, target.name)
 
         if not message_success:
             LOGGER.warning(
@@ -167,9 +167,7 @@ class ShoutoutCommands(commands.Component):
                 target.name
             )
 
-            await ctx.reply(
-                response
-            )
+            await ctx.reply(response)
             return
 
         LOGGER.info(
