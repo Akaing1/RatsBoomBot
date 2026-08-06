@@ -11,9 +11,10 @@ class StreamEvents(commands.Component):
         self.bot = bot
 
     @commands.Component.listener()
-    async def event_stream_online(self, payload):
+    async def event_stream_online(self, payload) -> None:
+        services = self.bot.services
 
-        if not self.bot.services:
+        if services is None:
             LOGGER.warning(
                 "[Events] Stream online event received before services were initialized."
             )
@@ -37,24 +38,23 @@ class StreamEvents(commands.Component):
             )
             return
 
+        broadcaster_id = str(broadcaster_id)
+        stream_id = str(stream_id)
         channel_name = getattr(broadcaster, "name", None)
 
         LOGGER.info(
             "[Events] Stream started for %s (%s).",
-            channel_name,
+            channel_name or "unknown",
             broadcaster_id
         )
 
-        await self.bot.services.stream_logs.start_session(
-            broadcaster_id=str(broadcaster_id),
-            stream_id=str(stream_id),
-            channel_name=channel_name
-        )
+        await services.stream_logs.start_session(broadcaster_id=broadcaster_id, stream_id=stream_id, channel_name=channel_name)
 
     @commands.Component.listener()
-    async def event_stream_offline(self, payload):
+    async def event_stream_offline(self, payload) -> None:
+        services = self.bot.services
 
-        if not self.bot.services:
+        if services is None:
             LOGGER.warning(
                 "[Events] Stream offline event received before services were initialized."
             )
@@ -73,12 +73,13 @@ class StreamEvents(commands.Component):
             )
             return
 
+        broadcaster_id = str(broadcaster_id)
+        channel_name = getattr(broadcaster, "name", None)
+
         LOGGER.info(
             "[Events] Stream ended for %s (%s).",
-            getattr(broadcaster, "name", None),
+            channel_name or "unknown",
             broadcaster_id
         )
 
-        await self.bot.services.stream_logs.end_session(
-            str(broadcaster_id)
-        )
+        await services.stream_logs.end_session(broadcaster_id)

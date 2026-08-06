@@ -2,10 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
 from web.admin_auth import require_admin
-from web.common import (
-    build_admin_context,
-    templates
-)
+from web.common import build_admin_context, templates
 from web.state import get_bot, get_db
 
 router = APIRouter()
@@ -20,26 +17,17 @@ async def dashboard(request: Request):
 
     runtime_bot = get_bot()
     runtime_db = get_db()
-
     bot_running = runtime_bot is not None
     database_connected = runtime_db is not None
-
     bot_account_id = None
     broadcasters = []
 
     if runtime_bot is not None:
         bot_account_id = runtime_bot.bot_id
+        services = runtime_bot.services
 
-        if runtime_bot.services:
-            broadcaster_records = (
-                runtime_bot.services
-                .broadcasters
-                .get_broadcasters()
-            )
-
-            broadcasters = list(
-                broadcaster_records.values()
-            )
+        if services is not None:
+            broadcasters = list(services.broadcasters.get_broadcasters().values())
 
     return templates.TemplateResponse(
         request=request,
