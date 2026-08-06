@@ -31,7 +31,6 @@ TRACKING_PARAMETERS = {
 
 
 class ModerationAction(StrEnum):
-
     ALLOW = "allow"
     FLAG = "flag"
     BAN = "ban"
@@ -39,7 +38,6 @@ class ModerationAction(StrEnum):
 
 @dataclass(frozen=True)
 class ModerationResult:
-
     action: ModerationAction
     reason: str
     source: str = "moderation_service"
@@ -61,7 +59,6 @@ class ModerationResult:
 
 @dataclass
 class RecentMessage:
-
     broadcaster_id: str
     user_id: str
     username: str
@@ -72,7 +69,6 @@ class RecentMessage:
 
 
 class ModerationService:
-
     RECENT_MESSAGE_TTL_SECONDS = 120
     REQUIRED_EXTERNAL_OBSERVATIONS = 2
 
@@ -82,7 +78,6 @@ class ModerationService:
         self.recent_messages: dict[str, RecentMessage] = {}
 
     async def setup(self) -> None:
-
         LOGGER.info("[Moderation] Preparing moderation storage.")
 
         campaigns_query = """
@@ -179,7 +174,6 @@ class ModerationService:
         LOGGER.info("[Moderation] Moderation storage ready.")
 
     async def evaluate_message(self, payload) -> ModerationResult:
-
         broadcaster_id = str(payload.broadcaster.id)
         user_id = str(payload.chatter.id)
         username = payload.chatter.name
@@ -212,9 +206,7 @@ class ModerationService:
                 source="allowlist"
             )
 
-        campaign = await self.get_confirmed_campaign(
-            recent_message.fingerprint
-        )
+        campaign = await self.get_confirmed_campaign(recent_message.fingerprint)
 
         if campaign is None:
             return ModerationResult(
@@ -227,11 +219,7 @@ class ModerationService:
         reason = campaign["reason"] or "Message matched a confirmed spam campaign."
         source = campaign["source"]
 
-        await self.associate_campaign_account(
-            campaign_id=campaign_id,
-            user_id=user_id,
-            username=username
-        )
+        await self.associate_campaign_account(campaign_id=campaign_id, user_id=user_id, username=username)
 
         LOGGER.warning(
             "[Moderation] Message from %s (%s) matched campaign %d in broadcaster %s.",
@@ -250,7 +238,6 @@ class ModerationService:
         )
 
     def cache_message(self, broadcaster_id: str, user_id: str, username: str, message: str) -> RecentMessage:
-
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
         normalized_message = self.normalize_message(message)
@@ -272,7 +259,6 @@ class ModerationService:
         return recent_message
 
     def get_recent_message(self, broadcaster_id: str, user_id: str) -> RecentMessage | None:
-
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
         key = self.get_recent_message_key(broadcaster_id, user_id)
@@ -288,15 +274,10 @@ class ModerationService:
         return recent_message
 
     async def observe_external_ban(self, broadcaster_id: str, user_id: str, username: str, moderator_id: str, moderator_name: str, reason: str | None, source: str) -> bool:
-
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
         moderator_id = str(moderator_id)
-
-        recent_message = self.get_recent_message(
-            broadcaster_id,
-            user_id
-        )
+        recent_message = self.get_recent_message(broadcaster_id, user_id)
 
         if recent_message is None:
             LOGGER.warning(
@@ -329,24 +310,16 @@ class ModerationService:
             message=recent_message.message
         )
 
-        await self.associate_campaign_account(
-            campaign_id=campaign_id,
-            user_id=user_id,
-            username=username
-        )
+        await self.associate_campaign_account(campaign_id=campaign_id, user_id=user_id, username=username)
 
         if not created:
             return False
 
-        await self.update_campaign_confidence(
-            campaign_id,
-            source
-        )
+        await self.update_campaign_confidence(campaign_id, source)
 
         return True
 
     async def upsert_campaign(self, fingerprint: str, normalized_message: str, example_message: str, source: str, reason: str | None) -> int:
-
         query = """
         INSERT INTO moderation_campaigns (
             fingerprint,
@@ -365,18 +338,11 @@ class ModerationService:
         RETURNING id
         """
 
+        values = (fingerprint, normalized_message, example_message, source, reason)
+
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(
-                    query,
-                    (
-                        fingerprint,
-                        normalized_message,
-                        example_message,
-                        source,
-                        reason
-                    )
-                )
+                row = await connection.fetchone(query, values)
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to create or update campaign %s.",
@@ -387,7 +353,6 @@ class ModerationService:
         return int(row["id"])
 
     async def record_campaign_observation(self, campaign_id: int, broadcaster_id: str, user_id: str, username: str, moderator_id: str | None, moderator_name: str | None, observed_action: str, source: str, reason: str | None, message: str) -> bool:
-
         query = """
         INSERT INTO moderation_campaign_observations (
             campaign_id,
@@ -411,23 +376,22 @@ class ModerationService:
         RETURNING id
         """
 
+        values = (
+            campaign_id,
+            str(broadcaster_id),
+            str(user_id),
+            username,
+            str(moderator_id) if moderator_id is not None else None,
+            moderator_name,
+            observed_action,
+            source,
+            reason,
+            message
+        )
+
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(
-                    query,
-                    (
-                        campaign_id,
-                        str(broadcaster_id),
-                        str(user_id),
-                        username,
-                        str(moderator_id) if moderator_id is not None else None,
-                        moderator_name,
-                        observed_action,
-                        source,
-                        reason,
-                        message
-                    )
-                )
+                row = await connection.fetchone(query, values)
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to record campaign %d observation in broadcaster %s.",
@@ -455,15 +419,15 @@ class ModerationService:
         return True
 
     async def update_campaign_confidence(self, campaign_id: int, source: str) -> None:
-
-        observation_count = await self.count_campaign_observations(
-            campaign_id,
-            source
-        )
-
+        observation_count = await self.count_campaign_observations(campaign_id, source)
         confirmed = observation_count >= self.REQUIRED_EXTERNAL_OBSERVATIONS
-        confidence = 100 if confirmed else 75
-        status = "confirmed" if confirmed else "pending"
+
+        if confirmed:
+            confidence = 100
+            status = "confirmed"
+        else:
+            confidence = 75
+            status = "pending"
 
         query = """
         UPDATE moderation_campaigns
@@ -475,14 +439,7 @@ class ModerationService:
 
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        status,
-                        confidence,
-                        campaign_id
-                    )
-                )
+                await connection.execute(query, (status, confidence, campaign_id))
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to update confidence for campaign %d.",
@@ -508,7 +465,6 @@ class ModerationService:
         )
 
     async def count_campaign_observations(self, campaign_id: int, source: str) -> int:
-
         query = """
         SELECT COUNT(DISTINCT broadcaster_id) AS observation_count
         FROM moderation_campaign_observations
@@ -519,13 +475,7 @@ class ModerationService:
 
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(
-                    query,
-                    (
-                        campaign_id,
-                        source
-                    )
-                )
+                row = await connection.fetchone(query, (campaign_id, source))
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to count observations for campaign %d.",
@@ -533,10 +483,12 @@ class ModerationService:
             )
             raise
 
-        return int(row["observation_count"]) if row else 0
+        if not row:
+            return 0
+
+        return int(row["observation_count"])
 
     async def get_confirmed_campaign(self, fingerprint: str):
-
         query = """
         SELECT id, fingerprint, normalized_message, confidence, source, reason
         FROM moderation_campaigns
@@ -546,10 +498,7 @@ class ModerationService:
 
         try:
             async with self.db.acquire() as connection:
-                return await connection.fetchone(
-                    query,
-                    (fingerprint,)
-                )
+                return await connection.fetchone(query, (fingerprint,))
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to check campaign fingerprint %s.",
@@ -558,7 +507,6 @@ class ModerationService:
             raise
 
     async def associate_campaign_account(self, campaign_id: int, user_id: str, username: str) -> None:
-
         query = """
         INSERT INTO moderation_campaign_accounts (
             campaign_id,
@@ -573,14 +521,7 @@ class ModerationService:
 
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        campaign_id,
-                        str(user_id),
-                        username
-                    )
-                )
+                await connection.execute(query, (campaign_id, str(user_id), username))
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to associate user %s with campaign %d.",
@@ -590,7 +531,6 @@ class ModerationService:
             raise
 
     async def confirm_campaign(self, fingerprint: str, reason: str = "Manually confirmed spam campaign.", source: str = "manual") -> bool:
-
         query = """
         UPDATE moderation_campaigns
         SET status = 'confirmed',
@@ -604,14 +544,7 @@ class ModerationService:
 
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(
-                    query,
-                    (
-                        reason,
-                        source,
-                        fingerprint
-                    )
-                )
+                row = await connection.fetchone(query, (reason, source, fingerprint))
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to confirm campaign %s.",
@@ -622,7 +555,6 @@ class ModerationService:
         return row is not None
 
     async def reject_campaign(self, fingerprint: str) -> bool:
-
         query = """
         UPDATE moderation_campaigns
         SET status = 'rejected',
@@ -634,10 +566,7 @@ class ModerationService:
 
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(
-                    query,
-                    (fingerprint,)
-                )
+                row = await connection.fetchone(query, (fingerprint,))
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to reject campaign %s.",
@@ -648,7 +577,6 @@ class ModerationService:
         return row is not None
 
     async def ban_user(self, payload, result: ModerationResult) -> bool:
-
         broadcaster_id = str(payload.broadcaster.id)
         user_id = str(payload.chatter.id)
         username = payload.chatter.name
@@ -663,9 +591,7 @@ class ModerationService:
             )
             return False
 
-        channel = self.bot.create_partialuser(
-            broadcaster_id
-        )
+        channel = self.bot.create_partialuser(broadcaster_id)
 
         try:
             await channel.ban_user(
@@ -720,7 +646,6 @@ class ModerationService:
         return True
 
     async def allow_user(self, user_id: str, username: str | None = None, reason: str | None = None) -> None:
-
         query = """
         INSERT INTO moderation_allowlist (
             user_id,
@@ -735,14 +660,7 @@ class ModerationService:
 
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        str(user_id),
-                        username,
-                        reason
-                    )
-                )
+                await connection.execute(query, (str(user_id), username, reason))
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to allowlist user %s (%s).",
@@ -752,7 +670,6 @@ class ModerationService:
             raise
 
     async def is_allowlisted(self, user_id: str) -> bool:
-
         query = """
         SELECT 1
         FROM moderation_allowlist
@@ -761,10 +678,7 @@ class ModerationService:
 
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(
-                    query,
-                    (str(user_id),)
-                )
+                row = await connection.fetchone(query, (str(user_id),))
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to check allowlist status for user %s.",
@@ -775,7 +689,6 @@ class ModerationService:
         return row is not None
 
     async def record_action(self, broadcaster_id: str, user_id: str, username: str, campaign_id: int | None, fingerprint: str | None, action: ModerationAction, reason: str, source: str, message: str | None = None, successful: bool = True) -> None:
-
         query = """
         INSERT INTO moderation_actions (
             broadcaster_id,
@@ -792,23 +705,22 @@ class ModerationService:
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
+        values = (
+            str(broadcaster_id),
+            str(user_id),
+            username,
+            campaign_id,
+            fingerprint,
+            action.value,
+            reason,
+            source,
+            message,
+            int(successful)
+        )
+
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        str(broadcaster_id),
-                        str(user_id),
-                        username,
-                        campaign_id,
-                        fingerprint,
-                        action.value,
-                        reason,
-                        source,
-                        message,
-                        int(successful)
-                    )
-                )
+                await connection.execute(query, values)
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to record %s action for user %s in broadcaster %s.",
@@ -818,7 +730,6 @@ class ModerationService:
             )
 
     def remove_expired_messages(self) -> None:
-
         now = time.time()
 
         expired_keys = [
@@ -831,7 +742,6 @@ class ModerationService:
             self.recent_messages.pop(key, None)
 
     def is_protected_user(self, broadcaster_id: str, user_id: str) -> bool:
-
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
 
@@ -848,39 +758,17 @@ class ModerationService:
 
     @staticmethod
     def normalize_message(message: str) -> str:
-
-        normalized = unicodedata.normalize(
-            "NFKC",
-            str(message)
-        )
-
-        normalized = ZERO_WIDTH_PATTERN.sub(
-            "",
-            normalized
-        )
-
+        normalized = unicodedata.normalize("NFKC", str(message))
+        normalized = ZERO_WIDTH_PATTERN.sub("", normalized)
         normalized = normalized.lower()
-
-        normalized = URL_PATTERN.sub(
-            lambda match: ModerationService.normalize_url(match.group(0)),
-            normalized
-        )
-
-        normalized = NON_TEXT_PATTERN.sub(
-            " ",
-            normalized
-        )
-
-        normalized = WHITESPACE_PATTERN.sub(
-            " ",
-            normalized
-        )
+        normalized = URL_PATTERN.sub(lambda match: ModerationService.normalize_url(match.group(0)), normalized)
+        normalized = NON_TEXT_PATTERN.sub(" ", normalized)
+        normalized = WHITESPACE_PATTERN.sub(" ", normalized)
 
         return normalized.strip()
 
     @staticmethod
     def normalize_url(url: str) -> str:
-
         clean_url = url.rstrip(".,!?;:)]}'\"")
 
         try:
@@ -906,12 +794,8 @@ class ModerationService:
 
     @staticmethod
     def create_fingerprint(normalized_message: str) -> str:
-
-        return hashlib.sha256(
-            normalized_message.encode("utf-8")
-        ).hexdigest()
+        return hashlib.sha256(normalized_message.encode("utf-8")).hexdigest()
 
     @staticmethod
     def get_recent_message_key(broadcaster_id: str, user_id: str) -> str:
-
         return f"{str(broadcaster_id)}:{str(user_id)}"

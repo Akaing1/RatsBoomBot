@@ -39,10 +39,7 @@ class FeatureDefaults:
         return bool(getattr(self, feature.value))
 
     def as_dict(self) -> dict[FeatureName, bool]:
-        return {
-            feature: self.is_enabled(feature)
-            for feature in FeatureName
-        }
+        return {feature: self.is_enabled(feature) for feature in FeatureName}
 
 
 @dataclass(frozen=True)
@@ -98,15 +95,7 @@ class RedeemConfig:
     daily_amount: int = 0
     first_amount: int = 0
     daily_double_chance: float = 0.05
-    claim_milestones: tuple[int, ...] = (
-        10,
-        25,
-        50,
-        100,
-        250,
-        500,
-        1000
-    )
+    claim_milestones: tuple[int, ...] = (10, 25, 50, 100, 250, 500, 1000)
     messages: RedeemMessages = RedeemMessages()
 
 
@@ -181,9 +170,7 @@ def register_profile(profile: ChannelProfile) -> None:
             "[Profiles] Duplicate profile registration attempted for %s.",
             channel_name
         )
-        raise ValueError(
-            f"A channel profile is already registered for {channel_name}."
-        )
+        raise ValueError(f"A channel profile is already registered for {channel_name}.")
 
     CHANNEL_PROFILES[channel_name] = profile
 
@@ -195,7 +182,6 @@ def register_profile(profile: ChannelProfile) -> None:
 
 def activate_profile(broadcaster_id: str, profile: ChannelProfile) -> None:
     broadcaster_id = str(broadcaster_id)
-
     ACTIVE_CHANNEL_PROFILES[broadcaster_id] = profile
 
     LOGGER.info(

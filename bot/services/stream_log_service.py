@@ -24,17 +24,13 @@ class StreamLogService:
         self.active_sessions: dict[str, StreamLogSession] = {}
 
     async def setup(self) -> None:
-
         LOGGER.info(
             "[Stream Logs] Preparing stream log directory at %s.",
             self.logs_path
         )
 
         try:
-            self.logs_path.mkdir(
-                parents=True,
-                exist_ok=True
-            )
+            self.logs_path.mkdir(parents=True, exist_ok=True)
         except OSError:
             LOGGER.exception(
                 "[Stream Logs] Failed to create stream log directory at %s.",
@@ -50,8 +46,6 @@ class StreamLogService:
         )
 
     async def stop(self) -> None:
-        """Close all active stream logging sessions."""
-
         session_count = len(self.active_sessions)
 
         LOGGER.info(
@@ -71,7 +65,6 @@ class StreamLogService:
         LOGGER.info("[Stream Logs] Stream logging stopped.")
 
     async def start_live_sessions(self) -> None:
-
         broadcasters = self.broadcasters.get_broadcasters()
 
         if not broadcasters:
@@ -128,10 +121,8 @@ class StreamLogService:
         )
 
     async def start_session(self, broadcaster_id: str, stream_id: str, channel_name: str | None = None) -> StreamLogSession:
-
         broadcaster_id = str(broadcaster_id)
         stream_id = str(stream_id)
-
         existing_session = self.active_sessions.get(broadcaster_id)
 
         if existing_session and existing_session.stream_id == stream_id:
@@ -149,10 +140,7 @@ class StreamLogService:
                 "A new stream session replaced the previous active session."
             )
 
-            self.active_sessions.pop(
-                broadcaster_id,
-                None
-            )
+            self.active_sessions.pop(broadcaster_id, None)
 
             LOGGER.warning(
                 "[Stream Logs] Replaced stream session %s with %s for broadcaster %s.",
@@ -161,44 +149,27 @@ class StreamLogService:
                 broadcaster_id
             )
 
-        broadcaster = self.broadcasters.get_broadcasters().get(
-            broadcaster_id
-        )
+        broadcaster = self.broadcasters.get_broadcasters().get(broadcaster_id)
 
         if not channel_name and broadcaster:
             channel_name = broadcaster.name
 
         channel_name = channel_name or broadcaster_id
-
         safe_channel_name = self.sanitize_path_part(channel_name)
         safe_stream_id = self.sanitize_path_part(stream_id)
-
-        timestamp = datetime.now().astimezone().strftime(
-            "%Y-%m-%d_%H%M%S"
-        )
-
+        timestamp = datetime.now().astimezone().strftime("%Y-%m-%d_%H%M%S")
         channel_directory = self.logs_path / safe_channel_name
-
-        existing_session_directory = self.find_stream_directory(
-            channel_directory=channel_directory,
-            stream_id=safe_stream_id
-        )
+        existing_session_directory = self.find_stream_directory(channel_directory, safe_stream_id)
 
         if existing_session_directory:
             session_directory = existing_session_directory
             resumed = True
         else:
-            session_directory = (
-                channel_directory
-                / f"{timestamp}_stream-{safe_stream_id}"
-            )
+            session_directory = channel_directory / f"{timestamp}_stream-{safe_stream_id}"
             resumed = False
 
         try:
-            session_directory.mkdir(
-                parents=True,
-                exist_ok=True
-            )
+            session_directory.mkdir(parents=True, exist_ok=True)
         except OSError:
             LOGGER.exception(
                 "[Stream Logs] Failed to create stream session directory at %s.",
@@ -224,16 +195,12 @@ class StreamLogService:
                 "RatsBoomBot resumed logging this active stream."
             )
         else:
-            self.write(
-                broadcaster_id,
-                "SYSTEM",
-                (
-                    f"Stream session started | "
-                    f"Channel: {channel_name} | "
-                    f"Broadcaster ID: {broadcaster_id} | "
-                    f"Stream ID: {stream_id}"
-                )
+            message = (
+                f"Stream session started | Channel: {channel_name} | "
+                f"Broadcaster ID: {broadcaster_id} | Stream ID: {stream_id}"
             )
+
+            self.write(broadcaster_id, "SYSTEM", message)
 
         LOGGER.info(
             "[Stream Logs] %s stream logging for %s. File: %s",
@@ -245,7 +212,6 @@ class StreamLogService:
         return session
 
     async def end_session(self, broadcaster_id: str) -> None:
-
         broadcaster_id = str(broadcaster_id)
         session = self.active_sessions.get(broadcaster_id)
 
@@ -256,20 +222,13 @@ class StreamLogService:
             )
             return
 
-        self.write(
-            broadcaster_id,
-            "SYSTEM",
-            (
-                f"Stream session ended | "
-                f"Channel: {session.channel_name} | "
-                f"Stream ID: {session.stream_id}"
-            )
+        message = (
+            f"Stream session ended | Channel: {session.channel_name} | "
+            f"Stream ID: {session.stream_id}"
         )
 
-        self.active_sessions.pop(
-            broadcaster_id,
-            None
-        )
+        self.write(broadcaster_id, "SYSTEM", message)
+        self.active_sessions.pop(broadcaster_id, None)
 
         LOGGER.info(
             "[Stream Logs] Stopped stream logging for %s.",
@@ -277,7 +236,6 @@ class StreamLogService:
         )
 
     def write(self, broadcaster_id: str, event_type: str, message: str) -> bool:
-
         broadcaster_id = str(broadcaster_id)
         session = self.active_sessions.get(broadcaster_id)
 
@@ -289,20 +247,13 @@ class StreamLogService:
             )
             return False
 
-        timestamp = datetime.now().astimezone().strftime(
-            "%Y-%m-%d %H:%M:%S %z"
-        )
-
+        timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
         clean_event_type = event_type.strip().upper()
         clean_message = self.clean_message(message)
-
         line = f"{timestamp} {clean_event_type:<12} {clean_message}\n"
 
         try:
-            with session.log_path.open(
-                "a",
-                encoding="utf-8"
-            ) as log_file:
+            with session.log_path.open("a", encoding="utf-8") as log_file:
                 log_file.write(line)
         except OSError:
             LOGGER.exception(
@@ -320,16 +271,13 @@ class StreamLogService:
         return True
 
     def is_active(self, broadcaster_id: str) -> bool:
-
         return str(broadcaster_id) in self.active_sessions
 
     def get_active_session(self, broadcaster_id: str) -> StreamLogSession | None:
-
         return self.active_sessions.get(str(broadcaster_id))
 
     @staticmethod
     def get_stream_id(stream) -> str | None:
-
         stream_id = getattr(stream, "id", None)
 
         if stream_id is None:
@@ -342,24 +290,16 @@ class StreamLogService:
 
     @staticmethod
     def find_stream_directory(channel_directory: Path, stream_id: str) -> Path | None:
-
         if not channel_directory.exists():
             return None
 
         try:
-            matches = list(
-                channel_directory.glob(
-                    f"*_stream-{stream_id}"
-                )
-            )
+            matches = list(channel_directory.glob(f"*_stream-{stream_id}"))
 
             if not matches:
                 return None
 
-            matches.sort(
-                key=lambda path: path.stat().st_mtime,
-                reverse=True
-            )
+            matches.sort(key=lambda path: path.stat().st_mtime, reverse=True)
         except OSError:
             LOGGER.exception(
                 "[Stream Logs] Failed to inspect stream directories in %s.",
@@ -371,20 +311,11 @@ class StreamLogService:
 
     @staticmethod
     def sanitize_path_part(value: str) -> str:
-
-        sanitized = re.sub(
-            r"[^a-zA-Z0-9_-]+",
-            "_",
-            value.strip()
-        )
-
+        sanitized = re.sub(r"[^a-zA-Z0-9_-]+", "_", value.strip())
         sanitized = sanitized.strip("_")
 
         return sanitized.lower() or "unknown"
 
     @staticmethod
     def clean_message(message: str) -> str:
-
-        return " ".join(
-            str(message).splitlines()
-        ).strip()
+        return " ".join(str(message).splitlines()).strip()

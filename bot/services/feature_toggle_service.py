@@ -1,10 +1,7 @@
 import logging
 from dataclasses import dataclass
 
-from bot.profiles import (
-    FeatureName,
-    get_active_profile
-)
+from bot.profiles import FeatureName, get_active_profile
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -26,7 +23,6 @@ class FeatureToggleService:
         self.overrides: dict[str, dict[FeatureName, bool]] = {}
 
     async def setup(self) -> None:
-
         LOGGER.info(
             "[Features] Preparing channel feature toggle storage."
         )
@@ -62,7 +58,6 @@ class FeatureToggleService:
         )
 
     async def load_overrides(self) -> None:
-
         query = """
         SELECT
             broadcaster_id,
@@ -80,22 +75,14 @@ class FeatureToggleService:
             )
             raise
 
-        loaded_overrides: dict[
-            str,
-            dict[FeatureName, bool]
-        ] = {}
-
+        loaded_overrides: dict[str, dict[FeatureName, bool]] = {}
         skipped_count = 0
 
         for row in rows:
-            broadcaster_id = str(
-                row["broadcaster_id"]
-            )
+            broadcaster_id = str(row["broadcaster_id"])
 
             try:
-                feature = FeatureName(
-                    row["feature_name"]
-                )
+                feature = FeatureName(row["feature_name"])
             except ValueError:
                 skipped_count += 1
 
@@ -106,23 +93,19 @@ class FeatureToggleService:
                 )
                 continue
 
-            channel_overrides = loaded_overrides.setdefault(
-                broadcaster_id,
-                {}
-            )
-
-            channel_overrides[feature] = bool(
-                row["enabled"]
-            )
+            channel_overrides = loaded_overrides.setdefault(broadcaster_id, {})
+            channel_overrides[feature] = bool(row["enabled"])
 
         self.overrides = loaded_overrides
 
+        override_count = sum(
+            len(channel_overrides)
+            for channel_overrides in self.overrides.values()
+        )
+
         LOGGER.info(
             "[Features] Loaded %d feature override(s) across %d broadcaster(s).",
-            sum(
-                len(channel_overrides)
-                for channel_overrides in self.overrides.values()
-            ),
+            override_count,
             len(self.overrides)
         )
 
@@ -132,9 +115,7 @@ class FeatureToggleService:
                 skipped_count
             )
 
-    async def set_enabled(self, broadcaster_id: str, feature: FeatureName, enabled: bool,
-                          updated_by: str) -> FeatureState:
-
+    async def set_enabled(self, broadcaster_id: str, feature: FeatureName, enabled: bool, updated_by: str) -> FeatureState:
         broadcaster_id = str(broadcaster_id)
 
         query = """
@@ -146,7 +127,7 @@ class FeatureToggleService:
             updated_at
         )
         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(
+        ON CONFLICT (
             broadcaster_id,
             feature_name
         ) DO UPDATE SET
@@ -159,12 +140,7 @@ class FeatureToggleService:
             async with self.db.acquire() as connection:
                 await connection.execute(
                     query,
-                    (
-                        broadcaster_id,
-                        feature.value,
-                        int(enabled),
-                        updated_by
-                    )
+                    (broadcaster_id, feature.value, int(enabled), updated_by)
                 )
         except Exception:
             LOGGER.exception(
@@ -175,11 +151,7 @@ class FeatureToggleService:
             )
             raise
 
-        channel_overrides = self.overrides.setdefault(
-            broadcaster_id,
-            {}
-        )
-
+        channel_overrides = self.overrides.setdefault(broadcaster_id, {})
         channel_overrides[feature] = enabled
 
         LOGGER.info(
@@ -190,13 +162,9 @@ class FeatureToggleService:
             updated_by
         )
 
-        return self.get_feature_state(
-            broadcaster_id,
-            feature
-        )
+        return self.get_feature_state(broadcaster_id, feature)
 
     async def clear_override(self, broadcaster_id: str, feature: FeatureName, updated_by: str) -> FeatureState:
-
         broadcaster_id = str(broadcaster_id)
 
         query = """
@@ -209,10 +177,7 @@ class FeatureToggleService:
             async with self.db.acquire() as connection:
                 await connection.execute(
                     query,
-                    (
-                        broadcaster_id,
-                        feature.value
-                    )
+                    (broadcaster_id, feature.value)
                 )
         except Exception:
             LOGGER.exception(
@@ -225,16 +190,10 @@ class FeatureToggleService:
         channel_overrides = self.overrides.get(broadcaster_id)
 
         if channel_overrides is not None:
-            channel_overrides.pop(
-                feature,
-                None
-            )
+            channel_overrides.pop(feature, None)
 
             if not channel_overrides:
-                self.overrides.pop(
-                    broadcaster_id,
-                    None
-                )
+                self.overrides.pop(broadcaster_id, None)
 
         LOGGER.info(
             "[Features] Feature %s override was cleared for broadcaster %s by %s.",
@@ -243,17 +202,15 @@ class FeatureToggleService:
             updated_by
         )
 
-        return self.get_feature_state(
-            broadcaster_id,
-            feature
-        )
+        return self.get_feature_state(broadcaster_id, feature)
 
     def is_enabled(self, broadcaster_id: str, feature: FeatureName) -> bool:
-        return self.get_feature_state(broadcaster_id, feature).effective_enabled
+        feature_state = self.get_feature_state(broadcaster_id, feature)
+        return feature_state.effective_enabled
 
     def get_feature_state(self, broadcaster_id: str, feature: FeatureName) -> FeatureState:
-
         broadcaster_id = str(broadcaster_id)
+
         profile = get_active_profile(broadcaster_id)
 
         if profile is None:
@@ -266,28 +223,23 @@ class FeatureToggleService:
                 blocked_by_profile=False
             )
 
+        channel_overrides = self.overrides.get(broadcaster_id, {})
+        override_enabled = channel_overrides.get(feature)
         default_enabled = profile.features.is_enabled(feature)
-        override_enabled = self.overrides.get(broadcaster_id, {}).get(feature)
 
-        configured_enabled = (
-            override_enabled
-            if override_enabled is not None
-            else default_enabled
-        )
+        if override_enabled is not None:
+            configured_enabled = override_enabled
+        else:
+            configured_enabled = default_enabled
 
         profile_enabled = self.get_profile_enabled(broadcaster_id)
 
-        blocked_by_profile = (
-                feature is not FeatureName.CHANNEL
-                and configured_enabled
-                and not profile_enabled
-        )
-
-        effective_enabled = (
-            configured_enabled
-            if feature is FeatureName.CHANNEL
-            else configured_enabled and profile_enabled
-        )
+        if feature is FeatureName.CHANNEL:
+            blocked_by_profile = False
+            effective_enabled = configured_enabled
+        else:
+            blocked_by_profile = configured_enabled and not profile_enabled
+            effective_enabled = configured_enabled and profile_enabled
 
         return FeatureState(
             feature=feature,
@@ -299,15 +251,16 @@ class FeatureToggleService:
         )
 
     def get_profile_enabled(self, broadcaster_id: str) -> bool:
-
         broadcaster_id = str(broadcaster_id)
+
         profile = get_active_profile(broadcaster_id)
 
         if profile is None:
             return False
 
+        channel_overrides = self.overrides.get(broadcaster_id, {})
+        override_enabled = channel_overrides.get(FeatureName.CHANNEL)
         default_enabled = profile.features.is_enabled(FeatureName.CHANNEL)
-        override_enabled = self.overrides.get(broadcaster_id, {}).get(FeatureName.CHANNEL)
 
         if override_enabled is not None:
             return override_enabled
@@ -315,7 +268,6 @@ class FeatureToggleService:
         return default_enabled
 
     def get_channel_features(self, broadcaster_id: str) -> dict[FeatureName, FeatureState]:
-
         broadcaster_id = str(broadcaster_id)
 
         return {

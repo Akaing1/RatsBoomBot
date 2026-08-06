@@ -6,33 +6,27 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 
 class AdAnnouncementService:
-
     CHECK_EVERY_SECONDS = 30
     WARNING_SECONDS = 60
 
     def __init__(self, bot, broadcasters):
         self.bot = bot
+        self.broadcasters = broadcasters
         self._task: asyncio.Task | None = None
         self.warned_ads: set[str] = set()
-        self.broadcasters = broadcasters
 
     async def start(self) -> None:
-
         if self._task is not None:
             LOGGER.debug("[Ads] Ad announcement service is already running.")
             return
 
         LOGGER.info("[Ads] Starting ad announcement service.")
 
-        self._task = asyncio.create_task(
-            self.ad_loop(),
-            name="ad-announcement-loop"
-        )
+        self._task = asyncio.create_task(self.ad_loop(), name="ad-announcement-loop")
 
         LOGGER.info("[Ads] Ad announcement service started.")
 
     async def stop(self) -> None:
-
         if self._task is None:
             LOGGER.debug("[Ads] Ad announcement service is not running.")
             return
@@ -57,7 +51,6 @@ class AdAnnouncementService:
         LOGGER.info("[Ads] Ad announcement service stopped.")
 
     async def ad_loop(self) -> None:
-
         try:
             await self.bot.wait_until_ready()
 
@@ -82,8 +75,9 @@ class AdAnnouncementService:
             raise
 
     async def check_ad_schedules(self) -> None:
+        services = self.bot.services
 
-        if not self.bot.services:
+        if services is None:
             LOGGER.debug(
                 "[Ads] Skipping ad schedule check because services are unavailable."
             )
@@ -122,11 +116,9 @@ class AdAnnouncementService:
                 )
                 continue
 
-            seconds_until_ad = int(
-                (next_ad_at - now).total_seconds()
-            )
-
+            seconds_until_ad = int((next_ad_at - now).total_seconds())
             ad_key = f"{broadcaster_id}:{next_ad_at.isoformat()}"
+
             active_ad_keys.add(ad_key)
 
             if seconds_until_ad <= 0:
@@ -143,14 +135,13 @@ class AdAnnouncementService:
             if ad_key in self.warned_ads:
                 continue
 
+            message = (
+                "Hide! The humans are coming! "
+                f"Ads starting in ~{seconds_until_ad} seconds!"
+            )
+
             try:
-                await broadcaster.send_message(
-                    sender=self.bot.user,
-                    message=(
-                        "Hide! The humans are coming! "
-                        f"Ads starting in ~{seconds_until_ad} seconds!"
-                    )
-                )
+                await broadcaster.send_message(sender=self.bot.user, message=message)
             except Exception:
                 LOGGER.exception(
                     "[Ads] Failed to send ad warning to %s (%s).",

@@ -27,7 +27,6 @@ class BroadcasterService:
             self.add_broadcaster(broadcaster_id)
 
     async def setup(self) -> None:
-
         LOGGER.info(
             "[Broadcasters] Preparing %d broadcasters.",
             len(self.broadcasters)
@@ -41,7 +40,6 @@ class BroadcasterService:
         )
 
     def add_broadcaster(self, broadcaster_id: str, broadcaster_name: str | None = None) -> None:
-
         broadcaster_id = str(broadcaster_id)
         existing = self.broadcasters.get(broadcaster_id)
 
@@ -55,10 +53,7 @@ class BroadcasterService:
             )
             return
 
-        self.broadcasters[broadcaster_id] = Broadcaster(
-            id=broadcaster_id,
-            display_name=broadcaster_name
-        )
+        self.broadcasters[broadcaster_id] = Broadcaster(id=broadcaster_id, display_name=broadcaster_name)
 
         LOGGER.info(
             "[Broadcasters] Added broadcaster %s%s.",
@@ -67,7 +62,6 @@ class BroadcasterService:
         )
 
     def remove_broadcaster(self, broadcaster_id: str) -> bool:
-
         broadcaster_id = str(broadcaster_id)
         broadcaster = self.broadcasters.pop(broadcaster_id, None)
 
@@ -87,8 +81,7 @@ class BroadcasterService:
         return True
 
     async def refresh_all_broadcasters(self) -> None:
-
-        broadcaster_ids = list(self.broadcasters.keys())
+        broadcaster_ids = list(self.broadcasters)
 
         if not broadcaster_ids:
             LOGGER.info("[Broadcasters] No broadcasters are available to refresh.")
@@ -107,7 +100,7 @@ class BroadcasterService:
             )
             return
 
-        resolved_ids = set()
+        resolved_ids: set[str] = set()
 
         for user in users:
             broadcaster_id = str(user.id)
@@ -129,7 +122,6 @@ class BroadcasterService:
         )
 
     async def refresh_broadcaster(self, broadcaster_id: str) -> Broadcaster | None:
-
         broadcaster_id = str(broadcaster_id)
 
         LOGGER.debug(
@@ -158,7 +150,6 @@ class BroadcasterService:
         return self.broadcasters.get(broadcaster_id)
 
     def update_broadcaster_from_user(self, user) -> None:
-
         broadcaster_id = str(user.id)
         broadcaster = self.broadcasters.get(broadcaster_id)
 
@@ -182,7 +173,6 @@ class BroadcasterService:
         )
 
     async def refresh_live_statuses(self) -> None:
-
         if not self.broadcasters:
             LOGGER.debug(
                 "[Broadcasters] No broadcasters are available for live-status refresh."
@@ -226,11 +216,9 @@ class BroadcasterService:
         )
 
     def get_broadcasters(self) -> dict[str, Broadcaster]:
-
         return self.broadcasters.copy()
 
     async def get_live_broadcasters(self) -> dict[str, str]:
-
         await self.refresh_live_statuses()
 
         return {
@@ -240,7 +228,6 @@ class BroadcasterService:
         }
 
     async def get_offline_broadcasters(self) -> dict[str, str]:
-
         await self.refresh_live_statuses()
 
         return {
