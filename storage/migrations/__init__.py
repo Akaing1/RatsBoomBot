@@ -15,7 +15,7 @@ class Migration:
     run: MigrationFunction
 
 
-MIGRATIONS = [
+MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=1, name="initial_schema", run=migrate_initial_schema),
     Migration(version=2, name="redeem_stats", run=migrate_redeem_stats)
-]
+)

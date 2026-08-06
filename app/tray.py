@@ -14,7 +14,6 @@ BOT_PROCESS: subprocess.Popen | None = None
 
 
 def create_icon() -> Image.Image:
-
     icon_path = PROJECT_DIR / ICON_PATH
 
     try:
@@ -28,13 +27,10 @@ def create_icon() -> Image.Image:
 
 
 def start_bot(icon=None, item=None) -> None:
-
     global BOT_PROCESS
 
     if BOT_PROCESS and BOT_PROCESS.poll() is None:
-        LOGGER.warning(
-            "[Tray] Start ignored because RatBoomBot is already running."
-        )
+        LOGGER.warning("[Tray] Start ignored because RatBoomBot is already running.")
         return
 
     command = [sys.executable, "main.py", "--runtime"]
@@ -42,11 +38,7 @@ def start_bot(icon=None, item=None) -> None:
     LOGGER.info("[Tray] Starting RatBoomBot runtime.")
 
     try:
-        BOT_PROCESS = subprocess.Popen(
-            command,
-            cwd=PROJECT_DIR,
-            creationflags=subprocess.CREATE_NEW_CONSOLE
-        )
+        BOT_PROCESS = subprocess.Popen(command, cwd=PROJECT_DIR, creationflags=subprocess.CREATE_NEW_CONSOLE)
     except OSError:
         LOGGER.exception("[Tray] Failed to start RatBoomBot runtime.")
         BOT_PROCESS = None
@@ -59,13 +51,10 @@ def start_bot(icon=None, item=None) -> None:
 
 
 def stop_bot(icon=None, item=None) -> None:
-
     global BOT_PROCESS
 
     if BOT_PROCESS is None:
-        LOGGER.info(
-            "[Tray] Stop ignored because no runtime process is tracked."
-        )
+        LOGGER.info("[Tray] Stop ignored because no runtime process is tracked.")
         return
 
     if BOT_PROCESS.poll() is not None:
@@ -74,6 +63,7 @@ def stop_bot(icon=None, item=None) -> None:
             BOT_PROCESS.pid,
             BOT_PROCESS.returncode
         )
+
         BOT_PROCESS = None
         return
 
@@ -102,7 +92,6 @@ def stop_bot(icon=None, item=None) -> None:
 
 
 def exit_app(icon, item) -> None:
-
     LOGGER.info("[Tray] Exiting RatBoomBot tray application.")
 
     stop_bot()
@@ -110,19 +99,15 @@ def exit_app(icon, item) -> None:
 
 
 def run_tray() -> None:
-
     LOGGER.info("[Tray] Starting RatBoomBot tray application.")
 
-    icon = pystray.Icon(
-        "RatsBoomBot",
-        create_icon(),
-        title="RatsBoomBot",
-        menu=pystray.Menu(
-            pystray.MenuItem("Start Bot", start_bot),
-            pystray.MenuItem("Stop Bot", stop_bot),
-            pystray.MenuItem("Exit", exit_app)
-        )
+    menu = pystray.Menu(
+        pystray.MenuItem("Start Bot", start_bot),
+        pystray.MenuItem("Stop Bot", stop_bot),
+        pystray.MenuItem("Exit", exit_app)
     )
+
+    icon = pystray.Icon("RatsBoomBot", create_icon(), title="RatsBoomBot", menu=menu)
 
     start_bot()
 
