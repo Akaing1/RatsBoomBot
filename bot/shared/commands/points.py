@@ -4,8 +4,8 @@ import random
 from twitchio import User
 from twitchio.ext import commands
 
-from bot.profiles import FeatureName, PointsConfig, get_active_profile, render_profile_message
-from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+from bot.profiles import FeatureName, GlobalCommandGroup, PointsConfig, get_active_profile, render_profile_message
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled, is_global_group_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -45,7 +45,14 @@ class PointsCommandHandler:
 
         if not is_feature_enabled(self.bot, ctx, FeatureName.POINTS):
             LOGGER.debug(
-                "[Points] Points are disabled for broadcaster %s.",
+                "[Points] The points system is disabled for broadcaster %s.",
+                broadcaster_id
+            )
+            return None
+
+        if not is_global_group_enabled(self.bot, ctx, GlobalCommandGroup.POINTS):
+            LOGGER.debug(
+                "[Points] Global points commands are disabled for broadcaster %s.",
                 broadcaster_id
             )
             return None

@@ -3,11 +3,9 @@ from typing import TYPE_CHECKING
 
 from twitchio.ext import commands
 
-from bot.profiles import FeatureName
-from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+from bot.profiles import GlobalCommandGroup
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
 
-if TYPE_CHECKING:
-    from bot.services.broadcaster_settings_service import BroadcasterSettings
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -34,7 +32,7 @@ class SocialCommands(commands.Component):
             )
             return None
 
-        if not is_feature_enabled(self.bot, ctx, FeatureName.SOCIALS):
+        if not is_global_group_enabled(self.bot, ctx, GlobalCommandGroup.SOCIALS):
             LOGGER.debug(
                 "[Socials] Social commands are disabled for broadcaster %s.",
                 broadcaster_id

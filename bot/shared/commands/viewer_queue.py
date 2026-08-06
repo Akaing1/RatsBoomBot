@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING
 
 from twitchio.ext import commands
 
-from bot.profiles import FeatureName
-from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+from bot.profiles import GlobalCommandGroup
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
 
 if TYPE_CHECKING:
     from bot.services.service_container import ServiceContainer
@@ -61,7 +61,7 @@ class ViewerQueueCommands(commands.Component):
             )
             return None
 
-        if not is_feature_enabled(self.bot, ctx, FeatureName.VIEWER_QUEUE):
+        if not is_global_group_enabled(self.bot, ctx, GlobalCommandGroup.VIEWER_QUEUE):
             LOGGER.debug(
                 "[Viewer Queue] Viewer queue is disabled for broadcaster %s.",
                 broadcaster_id
@@ -70,7 +70,8 @@ class ViewerQueueCommands(commands.Component):
 
         return broadcaster_id, services
 
-    def has_permission(self, ctx: commands.Context, command_name: str) -> bool:
+    @staticmethod
+    def has_permission(ctx: commands.Context, command_name: str) -> bool:
         if is_mod_or_broadcaster(ctx):
             return True
 

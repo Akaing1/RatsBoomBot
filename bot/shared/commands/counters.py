@@ -2,8 +2,8 @@ import logging
 
 from twitchio.ext import commands
 
-from bot.profiles import FeatureName
-from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+from bot.profiles import GlobalCommandName
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_command_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -13,7 +13,8 @@ class CounterCommands(commands.Component):
     def __init__(self, bot):
         self.bot = bot
 
-    async def increment_counter(self, ctx: commands.Context, counter_name: str) -> int | None:
+    async def increment_counter(self, ctx: commands.Context, counter_name: str,
+                                command: GlobalCommandName) -> int | None:
         services = self.bot.services
 
         if services is None:
@@ -32,9 +33,10 @@ class CounterCommands(commands.Component):
             )
             return None
 
-        if not is_feature_enabled(self.bot, ctx, FeatureName.COUNTERS):
+        if not is_global_command_enabled(self.bot, ctx, command):
             LOGGER.debug(
-                "[Counters] Counters are disabled for broadcaster %s.",
+                "[Counters] Command !%s is disabled for broadcaster %s.",
+                counter_name,
                 broadcaster_id
             )
             return None
@@ -70,7 +72,7 @@ class CounterCommands(commands.Component):
 
     @commands.command(name="explode", aliases=["rat"])
     async def explode(self, ctx: commands.Context) -> None:
-        exploded_count = await self.increment_counter(ctx, "explode")
+        exploded_count = await self.increment_counter(ctx, "explode", GlobalCommandName.EXPLODE)
 
         if exploded_count is None:
             return
@@ -79,7 +81,7 @@ class CounterCommands(commands.Component):
 
     @commands.command(name="reklop")
     async def reklop(self, ctx: commands.Context) -> None:
-        reklop_count = await self.increment_counter(ctx, "reklop")
+        reklop_count = await self.increment_counter(ctx, "reklop", GlobalCommandName.REKLOP)
 
         if reklop_count is None:
             return
@@ -91,7 +93,7 @@ class CounterCommands(commands.Component):
 
     @commands.command(name="randy")
     async def randy(self, ctx: commands.Context) -> None:
-        randy_count = await self.increment_counter(ctx, "randy")
+        randy_count = await self.increment_counter(ctx, "randy", GlobalCommandName.RANDY)
 
         if randy_count is None:
             return
@@ -103,7 +105,7 @@ class CounterCommands(commands.Component):
 
     @commands.command(name="car")
     async def car(self, ctx: commands.Context) -> None:
-        car_count = await self.increment_counter(ctx, "car")
+        car_count = await self.increment_counter(ctx, "car", GlobalCommandName.CAR)
 
         if car_count is None:
             return

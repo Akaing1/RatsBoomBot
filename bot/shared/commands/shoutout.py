@@ -3,8 +3,8 @@ import re
 
 from twitchio.ext import commands
 
-from bot.profiles import FeatureName
-from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+from bot.profiles import GlobalCommandGroup
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -99,7 +99,7 @@ class ShoutoutCommands(commands.Component):
             username or "missing"
         )
 
-        if not is_feature_enabled(self.bot, ctx, FeatureName.SHOUTOUTS):
+        if not is_global_group_enabled(self.bot, ctx, GlobalCommandGroup.SHOUTOUTS):
             LOGGER.debug(
                 "[Shoutouts] Shoutouts are disabled for broadcaster %s.",
                 broadcaster_id

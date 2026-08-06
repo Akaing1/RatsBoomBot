@@ -6,8 +6,8 @@ import time
 from twitchio import User
 from twitchio.ext import commands
 
-from bot.profiles import FeatureName
-from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+from bot.profiles import GlobalCommandName
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_command_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -182,7 +182,7 @@ class ModActionCommands(commands.Component):
             )
             return
 
-        if not is_feature_enabled(self.bot, ctx, FeatureName.KAMIKAZE):
+        if not is_global_command_enabled(self.bot, ctx, GlobalCommandName.KAMIKAZE):
             LOGGER.debug(
                 "[Mod Actions] Kamikaze is disabled for broadcaster %s.",
                 broadcaster_id
