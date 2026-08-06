@@ -9,10 +9,8 @@ class ChannelService:
         self.active_channels: dict[str, str] = {}
 
     def track_channel(self, payload) -> None:
-
         broadcaster_id = str(payload.broadcaster.id)
         broadcaster_name = payload.broadcaster.name
-
         previous_name = self.active_channels.get(broadcaster_id)
 
         self.active_channels[broadcaster_id] = broadcaster_name
@@ -41,7 +39,6 @@ class ChannelService:
         )
 
     def get_active_channels(self) -> dict[str, str]:
-
         LOGGER.debug(
             "[Channels] Returning %d active channels.",
             len(self.active_channels)

@@ -9,7 +9,6 @@ class HelpService:
         self.bot = bot
 
     def get_commands(self) -> list[str]:
-
         command_names: set[str] = set()
 
         for command in self.bot.commands.values():
@@ -25,7 +24,6 @@ class HelpService:
         return commands
 
     def _collect_command(self, command, command_names: set[str]) -> None:
-
         name = getattr(command, "qualified_name", command.name)
         command_names.add(name)
 
@@ -38,7 +36,6 @@ class HelpService:
             self._collect_command(subcommand, command_names)
 
     def format_help_message(self) -> str:
-
         commands = self.get_commands()
 
         if not commands:

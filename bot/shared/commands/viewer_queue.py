@@ -1,17 +1,18 @@
 import logging
+from typing import TYPE_CHECKING
 
 from twitchio.ext import commands
+
+from bot.profiles import GlobalCommandGroup
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
+
+if TYPE_CHECKING:
+    from bot.services.service_container import ServiceContainer
 
 LOGGER = logging.getLogger("RatBoomBot")
 
 
-def get_broadcaster_id(ctx: commands.Context) -> str:
-
-    return str(ctx.broadcaster.id)
-
-
 def get_chatter_name(ctx: commands.Context) -> str:
-
     chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
 
     if chatter is None:
@@ -21,14 +22,17 @@ def get_chatter_name(ctx: commands.Context) -> str:
 
 
 def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
-
     chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
+    broadcaster_id = get_context_broadcaster_id(ctx)
 
     if chatter is None:
         return False
 
+    if broadcaster_id is None:
+        return False
+
     is_moderator = getattr(chatter, "moderator", False)
-    is_broadcaster = str(chatter.id) == str(ctx.broadcaster.id)
+    is_broadcaster = str(chatter.id) == broadcaster_id
 
     return is_moderator or is_broadcaster
 
@@ -38,20 +42,36 @@ class ViewerQueueCommands(commands.Component):
     def __init__(self, bot):
         self.bot = bot
 
-    def services_available(self, command_name: str) -> bool:
+    def get_context(self, ctx: commands.Context, command_name: str) -> tuple[str, "ServiceContainer"] | None:
+        services = self.bot.services
 
-        if self.bot.services:
-            return True
+        if services is None:
+            LOGGER.warning(
+                "[Commands] !%s could not run because services are unavailable.",
+                command_name
+            )
+            return None
 
-        LOGGER.warning(
-            "[Commands] !%s could not run because services are unavailable.",
-            command_name
-        )
+        broadcaster_id = get_context_broadcaster_id(ctx)
 
-        return False
+        if broadcaster_id is None:
+            LOGGER.warning(
+                "[Commands] !%s could not resolve its broadcaster.",
+                command_name
+            )
+            return None
 
-    def has_permission(self, ctx: commands.Context, command_name: str) -> bool:
+        if not is_global_group_enabled(self.bot, ctx, GlobalCommandGroup.VIEWER_QUEUE):
+            LOGGER.debug(
+                "[Viewer Queue] Viewer queue is disabled for broadcaster %s.",
+                broadcaster_id
+            )
+            return None
 
+        return broadcaster_id, services
+
+    @staticmethod
+    def has_permission(ctx: commands.Context, command_name: str) -> bool:
         if is_mod_or_broadcaster(ctx):
             return True
 
@@ -59,186 +79,167 @@ class ViewerQueueCommands(commands.Component):
             "[Commands] User %s was denied permission to run !%s in broadcaster %s.",
             get_chatter_name(ctx),
             command_name,
-            get_broadcaster_id(ctx)
+            get_context_broadcaster_id(ctx) or "unknown"
         )
 
         return False
 
-    def log_command(self, ctx: commands.Context, command_name: str) -> None:
-
+    @staticmethod
+    def log_command(ctx: commands.Context, command_name: str) -> None:
         LOGGER.debug(
             "[Commands] User %s invoked !%s in broadcaster %s.",
             get_chatter_name(ctx),
             command_name,
-            get_broadcaster_id(ctx)
+            get_context_broadcaster_id(ctx) or "unknown"
         )
 
     @commands.command(name="open")
-    async def open_queue(self, ctx: commands.Context):
-
+    async def open_queue(self, ctx: commands.Context) -> None:
         self.log_command(ctx, "open")
 
-        if not self.services_available("open"):
+        context = self.get_context(ctx, "open")
+
+        if context is None:
             return
+
+        broadcaster_id, services = context
 
         if not self.has_permission(ctx, "open"):
-            await ctx.send(
-                "Only the broadcaster or mods can open the queue."
-            )
+            await ctx.send("Only the broadcaster or mods can open the queue.")
             return
 
-        message = self.bot.services.viewer_queue.open_queue(
-            get_broadcaster_id(ctx)
-        )
+        message = services.viewer_queue.open_queue(broadcaster_id)
 
         await ctx.send(message)
 
     @commands.command(name="close")
-    async def close_queue(self, ctx: commands.Context):
-
+    async def close_queue(self, ctx: commands.Context) -> None:
         self.log_command(ctx, "close")
 
-        if not self.services_available("close"):
+        context = self.get_context(ctx, "close")
+
+        if context is None:
             return
+
+        broadcaster_id, services = context
 
         if not self.has_permission(ctx, "close"):
-            await ctx.send(
-                "Only the broadcaster or mods can close the queue."
-            )
+            await ctx.send("Only the broadcaster or mods can close the queue.")
             return
 
-        message = self.bot.services.viewer_queue.close_queue(
-            get_broadcaster_id(ctx)
-        )
+        message = services.viewer_queue.close_queue(broadcaster_id)
 
         await ctx.send(message)
 
     @commands.command(name="join")
-    async def join_queue(self, ctx: commands.Context):
-
+    async def join_queue(self, ctx: commands.Context) -> None:
         self.log_command(ctx, "join")
 
-        if not self.services_available("join"):
+        context = self.get_context(ctx, "join")
+
+        if context is None:
             return
 
-        _, message = self.bot.services.viewer_queue.join(
-            get_broadcaster_id(ctx),
-            get_chatter_name(ctx)
-        )
+        broadcaster_id, services = context
+        _, message = services.viewer_queue.join(broadcaster_id, get_chatter_name(ctx))
 
         await ctx.send(message)
 
     @commands.command(name="leave")
-    async def leave_queue(self, ctx: commands.Context):
-
+    async def leave_queue(self, ctx: commands.Context) -> None:
         self.log_command(ctx, "leave")
 
-        if not self.services_available("leave"):
+        context = self.get_context(ctx, "leave")
+
+        if context is None:
             return
 
-        _, message = self.bot.services.viewer_queue.leave(
-            get_broadcaster_id(ctx),
-            get_chatter_name(ctx)
-        )
+        broadcaster_id, services = context
+        _, message = services.viewer_queue.leave(broadcaster_id, get_chatter_name(ctx))
 
         await ctx.send(message)
 
     @commands.command(name="queue")
-    async def show_queue(self, ctx: commands.Context):
-
+    async def show_queue(self, ctx: commands.Context) -> None:
         self.log_command(ctx, "queue")
 
-        if not self.services_available("queue"):
+        context = self.get_context(ctx, "queue")
+
+        if context is None:
             return
 
-        queue = self.bot.services.viewer_queue.list_queue(
-            get_broadcaster_id(ctx)
-        )
+        broadcaster_id, services = context
+        queue = services.viewer_queue.list_queue(broadcaster_id)
 
         if not queue:
-            await ctx.send(
-                "The viewer queue is currently empty."
-            )
+            await ctx.send("The viewer queue is currently empty.")
             return
 
         preview = queue[:5]
-
-        queue_text = ", ".join(
-            f"{index + 1}. {name}"
-            for index, name in enumerate(preview)
-        )
+        queue_text = ", ".join(f"{index + 1}. {name}" for index, name in enumerate(preview))
 
         if len(queue) > 5:
             queue_text += f" ... and {len(queue) - 5} more"
 
-        await ctx.send(
-            f"Current queue: {queue_text}"
-        )
+        await ctx.send(f"Current queue: {queue_text}")
 
     @commands.command(name="next")
-    async def next_viewers(self, ctx: commands.Context, count: int = 1):
-
+    async def next_viewers(self, ctx: commands.Context, count: int = 1) -> None:
         self.log_command(ctx, "next")
 
-        if not self.services_available("next"):
+        context = self.get_context(ctx, "next")
+
+        if context is None:
             return
+
+        broadcaster_id, services = context
 
         if not self.has_permission(ctx, "next"):
-            await ctx.send(
-                "Only the broadcaster or mods can use !next."
-            )
+            await ctx.send("Only the broadcaster or mods can use !next.")
             return
 
-        _, _, message = self.bot.services.viewer_queue.next_viewers(
-            get_broadcaster_id(ctx),
-            count
-        )
+        _, _, message = services.viewer_queue.next_viewers(broadcaster_id, count)
 
         await ctx.send(message)
 
     @commands.command(name="remove")
-    async def remove_viewer(self, ctx: commands.Context, position: int | None = None):
-
+    async def remove_viewer(self, ctx: commands.Context, position: int | None = None) -> None:
         self.log_command(ctx, "remove")
 
-        if not self.services_available("remove"):
+        context = self.get_context(ctx, "remove")
+
+        if context is None:
             return
 
+        broadcaster_id, services = context
+
         if not self.has_permission(ctx, "remove"):
-            await ctx.send(
-                "Only the broadcaster or mods can use !remove."
-            )
+            await ctx.send("Only the broadcaster or mods can use !remove.")
             return
 
         if position is None:
-            await ctx.send(
-                "Use it like this: !remove 3"
-            )
+            await ctx.send("Use it like this: !remove 3")
             return
 
-        _, _, message = self.bot.services.viewer_queue.remove_position(
-            get_broadcaster_id(ctx),
-            position
-        )
+        _, _, message = services.viewer_queue.remove_position(broadcaster_id, position)
 
         await ctx.send(message)
 
     @commands.command(name="clear")
-    async def clear_queue(self, ctx: commands.Context):
-
+    async def clear_queue(self, ctx: commands.Context) -> None:
         self.log_command(ctx, "clear")
 
-        if not self.services_available("clear"):
+        context = self.get_context(ctx, "clear")
+
+        if context is None:
             return
+
+        broadcaster_id, services = context
 
         if not self.has_permission(ctx, "clear"):
-            await ctx.send(
-                "Only the broadcaster or mods can clear the queue."
-            )
+            await ctx.send("Only the broadcaster or mods can clear the queue.")
             return
 
-        message = self.bot.services.viewer_queue.clear(
-            get_broadcaster_id(ctx)
-        )
+        message = services.viewer_queue.clear(broadcaster_id)
 
         await ctx.send(message)

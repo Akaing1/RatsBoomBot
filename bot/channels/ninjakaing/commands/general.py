@@ -5,6 +5,7 @@ from bot.profiles import ChannelProfile
 
 
 class NinjakaingCommands(ChannelComponent):
+
     def __init__(self, bot, profile: ChannelProfile, broadcaster_id: str):
         super().__init__(bot, profile, broadcaster_id)
 
@@ -14,3 +15,4 @@ class NinjakaingCommands(ChannelComponent):
             return
 
         await ctx.send("The Ninjakaing channel profile is loaded!")
+        

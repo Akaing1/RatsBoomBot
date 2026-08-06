@@ -1,9 +1,104 @@
 import logging
 from dataclasses import dataclass
+from enum import Enum
 
 from twitchio.ext import commands
 
 LOGGER = logging.getLogger("RatBoomBot")
+
+
+class FeatureName(Enum):
+    CHANNEL = "channel"
+    TIMERS = "timers"
+    POINTS = "points"
+    REDEEMS = "redeems"
+    COMMUNITY_EVENTS = "community_events"
+    RAID_RESPONSES = "raid_responses"
+
+
+class GlobalCommandGroup(Enum):
+    GLOBALS = "globals"
+    POINTS = "points"
+    VIEWER_QUEUE = "viewer_queue"
+    SHOUTOUTS = "shoutouts"
+    SOCIALS = "socials"
+    SETTINGS = "settings"
+
+
+class GlobalCommandName(Enum):
+    HI = "hi"
+    CHOICE = "choice"
+    KABOOM = "kaboom"
+    STINKY = "stinky"
+    LUCKY = "lucky"
+    SMART = "smart"
+    LURK = "lurk"
+    HELP = "help"
+
+    EXPLODE = "explode"
+    REKLOP = "reklop"
+    RANDY = "randy"
+    CAR = "car"
+
+    KAMIKAZE = "kamikaze"
+
+
+@dataclass(frozen=True)
+class FeatureDefaults:
+    channel: bool = True
+    timers: bool = True
+    points: bool = True
+    redeems: bool = True
+    community_events: bool = True
+    raid_responses: bool = True
+
+    def is_enabled(self, feature: FeatureName) -> bool:
+        return bool(getattr(self, feature.value))
+
+    def as_dict(self) -> dict[FeatureName, bool]:
+        return {feature: self.is_enabled(feature) for feature in FeatureName}
+
+
+@dataclass(frozen=True)
+class GlobalCommandDefaults:
+    enabled: bool = True
+
+    points: bool = True
+    viewer_queue: bool = True
+    shoutouts: bool = True
+    socials: bool = True
+    settings: bool = True
+
+    hi: bool = True
+    choice: bool = True
+    kaboom: bool = True
+    stinky: bool = True
+    lucky: bool = True
+    smart: bool = True
+    lurk: bool = True
+    help: bool = True
+
+    explode: bool = True
+    reklop: bool = True
+    randy: bool = True
+    car: bool = True
+
+    kamikaze: bool = True
+
+    def is_group_enabled(self, group: GlobalCommandGroup) -> bool:
+        if group is GlobalCommandGroup.GLOBALS:
+            return self.enabled
+
+        return bool(getattr(self, group.value))
+
+    def is_command_enabled(self, command: GlobalCommandName) -> bool:
+        return bool(getattr(self, command.value))
+
+    def groups_as_dict(self) -> dict[GlobalCommandGroup, bool]:
+        return {group: self.is_group_enabled(group) for group in GlobalCommandGroup}
+
+    def commands_as_dict(self) -> dict[GlobalCommandName, bool]:
+        return {command: self.is_command_enabled(command) for command in GlobalCommandName}
 
 
 @dataclass(frozen=True)
@@ -54,21 +149,12 @@ class RedeemMessages:
 
 @dataclass(frozen=True)
 class RedeemConfig:
-    enabled: bool = False
     daily_title: str = ""
     first_title: str = ""
     daily_amount: int = 0
     first_amount: int = 0
     daily_double_chance: float = 0.05
-    claim_milestones: tuple[int, ...] = (
-        10,
-        25,
-        50,
-        100,
-        250,
-        500,
-        1000
-    )
+    claim_milestones: tuple[int, ...] = (10, 25, 50, 100, 250, 500, 1000)
     messages: RedeemMessages = RedeemMessages()
 
 
@@ -111,7 +197,6 @@ class PointsMessages:
 
 @dataclass(frozen=True)
 class PointsConfig:
-    enabled: bool = False
     command_name: str = "points"
     points_per_message: int = 10
     message_cooldown_seconds: int = 60
@@ -124,6 +209,8 @@ class PointsConfig:
 class ChannelProfile:
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
+    features: FeatureDefaults = FeatureDefaults()
+    globals: GlobalCommandDefaults = GlobalCommandDefaults()
     timer_messages: tuple[str, ...] = ()
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
@@ -136,7 +223,6 @@ ACTIVE_CHANNEL_PROFILES: dict[str, ChannelProfile] = {}
 
 
 def register_profile(profile: ChannelProfile) -> None:
-
     channel_name = profile.channel_name.lower()
 
     if channel_name in CHANNEL_PROFILES:
@@ -144,9 +230,7 @@ def register_profile(profile: ChannelProfile) -> None:
             "[Profiles] Duplicate profile registration attempted for %s.",
             channel_name
         )
-        raise ValueError(
-            f"A channel profile is already registered for {channel_name}."
-        )
+        raise ValueError(f"A channel profile is already registered for {channel_name}.")
 
     CHANNEL_PROFILES[channel_name] = profile
 
@@ -157,9 +241,7 @@ def register_profile(profile: ChannelProfile) -> None:
 
 
 def activate_profile(broadcaster_id: str, profile: ChannelProfile) -> None:
-
     broadcaster_id = str(broadcaster_id)
-
     ACTIVE_CHANNEL_PROFILES[broadcaster_id] = profile
 
     LOGGER.info(
@@ -170,7 +252,6 @@ def activate_profile(broadcaster_id: str, profile: ChannelProfile) -> None:
 
 
 def get_active_profile(broadcaster_id: str) -> ChannelProfile | None:
-
     broadcaster_id = str(broadcaster_id)
     profile = ACTIVE_CHANNEL_PROFILES.get(broadcaster_id)
 
@@ -184,7 +265,6 @@ def get_active_profile(broadcaster_id: str) -> ChannelProfile | None:
 
 
 def render_profile_message(template: str | None, **values) -> str | None:
-
     if not template:
         LOGGER.debug(
             "[Profiles] Skipping message rendering because no template was configured."
@@ -203,7 +283,6 @@ def render_profile_message(template: str | None, **values) -> str | None:
 
 
 def clear_profiles() -> None:
-
     registered_count = len(CHANNEL_PROFILES)
     active_count = len(ACTIVE_CHANNEL_PROFILES)
 

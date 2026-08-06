@@ -1,48 +1,26 @@
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import (
-    FileResponse,
-    HTMLResponse
-)
+from fastapi.responses import FileResponse, HTMLResponse
 
 from web.admin_auth import require_admin
-from web.common import (
-    build_admin_context,
-    render_error,
-    templates
-)
-from web.log_browser import (
-    format_file_size,
-    get_logs_directory,
-    parse_session_directory_name,
-    resolve_log_file
-)
+from web.common import build_admin_context, render_error, templates
+from web.log_browser import format_file_size, get_logs_directory, parse_session_directory_name, resolve_log_file
 from web.state import get_bot
 
-router = APIRouter(
-    prefix="/logs"
-)
+router = APIRouter(prefix="/logs")
 
 
 def get_active_log_paths() -> set[Path]:
     runtime_bot = get_bot()
-    active_log_paths: set[Path] = set()
 
     if runtime_bot is None or runtime_bot.services is None:
-        return active_log_paths
+        return set()
 
-    sessions = (
-        runtime_bot.services
-        .stream_logs
-        .active_sessions
-        .values()
-    )
+    active_log_paths: set[Path] = set()
 
-    for session in sessions:
-        active_log_paths.add(
-            session.log_path.resolve()
-        )
+    for session in runtime_bot.services.stream_logs.active_sessions.values():
+        active_log_paths.add(session.log_path.resolve())
 
     return active_log_paths
 
@@ -66,20 +44,12 @@ async def logs_page(request: Request):
             if not session_directory.is_dir():
                 continue
 
-            log_file = (
-                session_directory
-                / "log.txt"
-            )
+            log_file = session_directory / "log.txt"
 
             if not log_file.is_file():
                 continue
 
-            started_at, stream_id = (
-                parse_session_directory_name(
-                    session_directory.name
-                )
-            )
-
+            started_at, stream_id = parse_session_directory_name(session_directory.name)
             file_stats = log_file.stat()
 
             log_sessions.append({
@@ -87,22 +57,12 @@ async def logs_page(request: Request):
                 "session_name": session_directory.name,
                 "started_at": started_at,
                 "stream_id": stream_id,
-                "file_size": format_file_size(
-                    file_stats.st_size
-                ),
+                "file_size": format_file_size(file_stats.st_size),
                 "modified_timestamp": file_stats.st_mtime,
-                "is_active": (
-                    log_file.resolve()
-                    in active_log_paths
-                )
+                "is_active": log_file.resolve() in active_log_paths
             })
 
-    log_sessions.sort(
-        key=lambda session: (
-            session["modified_timestamp"]
-        ),
-        reverse=True
-    )
+    log_sessions.sort(key=lambda session: session["modified_timestamp"], reverse=True)
 
     return templates.TemplateResponse(
         request=request,
@@ -123,10 +83,7 @@ async def log_details_page(request: Request, channel_name: str, session_name: st
     if admin_redirect:
         return admin_redirect
 
-    log_file = resolve_log_file(
-        channel_name,
-        session_name
-    )
+    log_file = resolve_log_file(channel_name, session_name)
 
     if log_file is None:
         return render_error(
@@ -138,10 +95,7 @@ async def log_details_page(request: Request, channel_name: str, session_name: st
         )
 
     try:
-        log_content = log_file.read_text(
-            encoding="utf-8",
-            errors="replace"
-        )
+        log_content = log_file.read_text(encoding="utf-8", errors="replace")
     except OSError as error:
         return render_error(
             request,
@@ -151,16 +105,8 @@ async def log_details_page(request: Request, channel_name: str, session_name: st
             status_code=500
         )
 
-    started_at, stream_id = (
-        parse_session_directory_name(
-            session_name
-        )
-    )
-
-    is_active = (
-        log_file.resolve()
-        in get_active_log_paths()
-    )
+    started_at, stream_id = parse_session_directory_name(session_name)
+    is_active = log_file.resolve() in get_active_log_paths()
 
     return templates.TemplateResponse(
         request=request,
@@ -172,9 +118,7 @@ async def log_details_page(request: Request, channel_name: str, session_name: st
             session_name=session_name,
             started_at=started_at,
             stream_id=stream_id,
-            file_size=format_file_size(
-                log_file.stat().st_size
-            ),
+            file_size=format_file_size(log_file.stat().st_size),
             is_active=is_active,
             log_content=log_content
         )
@@ -188,10 +132,7 @@ async def download_log(request: Request, channel_name: str, session_name: str):
     if admin_redirect:
         return admin_redirect
 
-    log_file = resolve_log_file(
-        channel_name,
-        session_name
-    )
+    log_file = resolve_log_file(channel_name, session_name)
 
     if log_file is None:
         return render_error(
@@ -202,13 +143,6 @@ async def download_log(request: Request, channel_name: str, session_name: str):
             status_code=404
         )
 
-    download_name = (
-        f"{channel_name}_"
-        f"{session_name}_log.txt"
-    )
+    download_name = f"{channel_name}_{session_name}_log.txt"
 
-    return FileResponse(
-        path=log_file,
-        media_type="text/plain",
-        filename=download_name
-    )
+    return FileResponse(path=log_file, media_type="text/plain", filename=download_name)

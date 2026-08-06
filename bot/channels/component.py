@@ -2,10 +2,11 @@ from typing import Any
 
 from twitchio.ext import commands
 
-from bot.profiles import ChannelProfile
+from bot.profiles import ChannelProfile, FeatureName
 
 
 class ChannelComponent(commands.Component):
+
     def __init__(self, bot, profile: ChannelProfile, broadcaster_id: str):
         self.bot = bot
         self.profile = profile
@@ -27,11 +28,7 @@ class ChannelComponent(commands.Component):
 
         message = getattr(ctx, "message", None)
         message_broadcaster = getattr(message, "broadcaster", None)
-        message_broadcaster_id = getattr(
-            message_broadcaster,
-            "id",
-            None
-        )
+        message_broadcaster_id = getattr(message_broadcaster, "id", None)
 
         if message_broadcaster_id is not None:
             return str(message_broadcaster_id)
@@ -42,5 +39,16 @@ class ChannelComponent(commands.Component):
         context_broadcaster_id = self.get_context_broadcaster_id(ctx)
         return context_broadcaster_id == self.broadcaster_id
 
+    async def require_feature(self, ctx: commands.Context, feature: FeatureName) -> bool:
+        if not self.is_profile_channel(ctx):
+            return False
+
+        services = self.bot.services
+
+        if services is None:
+            return False
+
+        return services.features.is_enabled(self.broadcaster_id, feature)
+
     async def require_profile_channel(self, ctx: commands.Context) -> bool:
-        return self.is_profile_channel(ctx)
+        return await self.require_feature(ctx, FeatureName.CHANNEL)

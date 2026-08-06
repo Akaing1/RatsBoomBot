@@ -2,13 +2,12 @@ import asyncio
 import logging
 import time
 
-from bot.profiles import get_active_profile
+from bot.profiles import FeatureName, get_active_profile
 
 LOGGER = logging.getLogger("RatBoomBot")
 
 
 class TimerService:
-
     INTERVAL_SECONDS = 30 * 60
     REQUIRED_MESSAGES = 20
     CHECK_EVERY_SECONDS = 5
@@ -25,22 +24,17 @@ class TimerService:
         self.last_check = 0
 
     async def start(self) -> None:
-
         if self._task is not None:
             LOGGER.debug("[Timers] Timer service is already running.")
             return
 
         LOGGER.info("[Timers] Starting timer service.")
 
-        self._task = asyncio.create_task(
-            self.announcement_loop(),
-            name="timer-announcement-loop"
-        )
+        self._task = asyncio.create_task(self.announcement_loop(), name="timer-announcement-loop")
 
         LOGGER.info("[Timers] Timer service started.")
 
     async def stop(self) -> None:
-
         if self._task is None:
             LOGGER.debug("[Timers] Timer service is not running.")
             return
@@ -63,18 +57,17 @@ class TimerService:
         LOGGER.info("[Timers] Timer service stopped.")
 
     def track_message(self, payload) -> None:
-
         broadcaster_id = str(payload.broadcaster.id)
         broadcaster_name = payload.broadcaster.name
 
-        self.message_counts[broadcaster_id] = (
-            self.message_counts.get(broadcaster_id, 0) + 1
-        )
+        if not self.bot.services:
+            return
 
-        self.last_announcements.setdefault(
-            broadcaster_id,
-            time.time()
-        )
+        if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.TIMERS):
+            return
+
+        self.message_counts[broadcaster_id] = self.message_counts.get(broadcaster_id, 0) + 1
+        self.last_announcements.setdefault(broadcaster_id, time.time())
 
         LOGGER.debug(
             "[Timers] Tracked message for %s (%s). Count: %d/%d.",
@@ -85,7 +78,6 @@ class TimerService:
         )
 
     async def announcement_loop(self) -> None:
-
         try:
             await self.bot.wait_until_ready()
 
@@ -112,7 +104,6 @@ class TimerService:
             raise
 
     async def check_announcements(self) -> None:
-
         live_broadcasters = await self.broadcasters.get_live_broadcasters()
 
         if not live_broadcasters:
@@ -129,9 +120,15 @@ class TimerService:
         now = time.time()
 
         for broadcaster_id, broadcaster_name in live_broadcasters.items():
-            settings = await self.broadcaster_settings.get_settings(
-                broadcaster_id
-            )
+            if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.TIMERS):
+                LOGGER.debug(
+                    "[Timers] Timer feature is disabled for %s (%s).",
+                    broadcaster_name,
+                    broadcaster_id
+                )
+                continue
+
+            settings = await self.broadcaster_settings.get_settings(broadcaster_id)
 
             if not settings.timers_enabled:
                 LOGGER.debug(
@@ -141,16 +138,8 @@ class TimerService:
                 )
                 continue
 
-            last_announcement = self.last_announcements.get(
-                broadcaster_id,
-                now
-            )
-
-            message_count = self.message_counts.get(
-                broadcaster_id,
-                0
-            )
-
+            last_announcement = self.last_announcements.get(broadcaster_id, now)
+            message_count = self.message_counts.get(broadcaster_id, 0)
             elapsed = now - last_announcement
 
             if elapsed < self.INTERVAL_SECONDS:
@@ -165,10 +154,7 @@ class TimerService:
                 )
                 continue
 
-            sent = await self.send_next_announcement(
-                broadcaster_id,
-                broadcaster_name
-            )
+            sent = await self.send_next_announcement(broadcaster_id, broadcaster_name)
 
             if not sent:
                 continue
@@ -177,13 +163,17 @@ class TimerService:
             self.last_announcements[broadcaster_id] = now
 
     async def send_next_announcement(self, broadcaster_id: str, broadcaster_name: str) -> bool:
-
         broadcaster_id = str(broadcaster_id)
 
-        settings = await self.broadcaster_settings.get_settings(
-            broadcaster_id
-        )
+        if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.TIMERS):
+            LOGGER.debug(
+                "[Timers] Skipped announcement because timers are disabled for %s (%s).",
+                broadcaster_name,
+                broadcaster_id
+            )
+            return False
 
+        settings = await self.broadcaster_settings.get_settings(broadcaster_id)
         profile = get_active_profile(broadcaster_id)
 
         if profile is None:
@@ -194,10 +184,7 @@ class TimerService:
             )
             return False
 
-        messages = self.get_messages(
-            profile.timer_messages,
-            settings
-        )
+        messages = self.get_messages(profile.timer_messages, settings)
 
         if not messages:
             LOGGER.debug(
@@ -212,11 +199,7 @@ class TimerService:
 
         try:
             channel = self.bot.create_partialuser(broadcaster_id)
-
-            await channel.send_message(
-                sender=self.bot.user,
-                message=message
-            )
+            await channel.send_message(sender=self.bot.user, message=message)
         except Exception:
             LOGGER.exception(
                 "[Timers] Failed to send announcement to %s (%s).",
@@ -238,13 +221,8 @@ class TimerService:
 
     @staticmethod
     def get_messages(templates: tuple[str, ...], settings) -> list[str]:
-
         messages: list[str] = []
-
-        values = {
-            "discord_url": settings.discord_url or "",
-            "youtube_url": settings.youtube_url or ""
-        }
+        values = {"discord_url": settings.discord_url or "", "youtube_url": settings.youtube_url or ""}
 
         for template in templates:
             if "{discord_url}" in template and not settings.discord_url:

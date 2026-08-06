@@ -18,7 +18,6 @@ class BroadcasterSettingsService:
         self.db = db
 
     async def setup(self) -> None:
-
         LOGGER.info("[Broadcaster Settings] Preparing broadcaster settings storage.")
 
         query = """
@@ -42,7 +41,6 @@ class BroadcasterSettingsService:
         LOGGER.info("[Broadcaster Settings] Broadcaster settings storage ready.")
 
     async def get_settings(self, broadcaster_id: str) -> BroadcasterSettings:
-
         broadcaster_id = str(broadcaster_id)
 
         query = """
@@ -81,7 +79,6 @@ class BroadcasterSettingsService:
         )
 
     async def set_discord_url(self, broadcaster_id: str, discord_url: str) -> None:
-
         broadcaster_id = str(broadcaster_id)
 
         query = """
@@ -93,13 +90,7 @@ class BroadcasterSettingsService:
 
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        broadcaster_id,
-                        discord_url
-                    )
-                )
+                await connection.execute(query, (broadcaster_id, discord_url))
         except Exception:
             LOGGER.exception(
                 "[Broadcaster Settings] Failed to update Discord URL for broadcaster %s.",
@@ -113,7 +104,6 @@ class BroadcasterSettingsService:
         )
 
     async def set_youtube_url(self, broadcaster_id: str, youtube_url: str) -> None:
-
         broadcaster_id = str(broadcaster_id)
 
         query = """
@@ -125,13 +115,7 @@ class BroadcasterSettingsService:
 
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        broadcaster_id,
-                        youtube_url
-                    )
-                )
+                await connection.execute(query, (broadcaster_id, youtube_url))
         except Exception:
             LOGGER.exception(
                 "[Broadcaster Settings] Failed to update YouTube URL for broadcaster %s.",
@@ -145,7 +129,6 @@ class BroadcasterSettingsService:
         )
 
     async def set_timers_enabled(self, broadcaster_id: str, enabled: bool) -> None:
-
         broadcaster_id = str(broadcaster_id)
 
         query = """
@@ -157,13 +140,7 @@ class BroadcasterSettingsService:
 
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        broadcaster_id,
-                        int(enabled)
-                    )
-                )
+                await connection.execute(query, (broadcaster_id, int(enabled)))
         except Exception:
             LOGGER.exception(
                 "[Broadcaster Settings] Failed to update timer state for broadcaster %s.",

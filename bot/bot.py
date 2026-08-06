@@ -14,10 +14,7 @@ class TwitchBot(commands.AutoBot):
 
     def __init__(self, *, token_database, subs, broadcaster_ids):
         self.token_database = token_database
-        self.broadcaster_ids = [
-            str(broadcaster_id)
-            for broadcaster_id in broadcaster_ids
-        ]
+        self.broadcaster_ids = [str(broadcaster_id) for broadcaster_id in broadcaster_ids]
         self.services: ServiceContainer | None = None
 
         LOGGER.info(
@@ -38,14 +35,9 @@ class TwitchBot(commands.AutoBot):
         )
 
     async def setup_hook(self) -> None:
-
         LOGGER.info("[Startup] Running Twitch bot setup hook.")
 
-        self.services = ServiceContainer(
-            self,
-            self.token_database,
-            self.broadcaster_ids
-        )
+        self.services = ServiceContainer(self, self.token_database, self.broadcaster_ids)
 
         LOGGER.info("[Services] Initializing service container.")
         await self.services.setup()
@@ -59,10 +51,7 @@ class TwitchBot(commands.AutoBot):
         await self.services.start()
         LOGGER.info("[Services] Background services started.")
 
-        command_names = sorted(
-            command.name
-            for command in self.commands.values()
-        )
+        command_names = sorted(command.name for command in self.commands.values())
 
         LOGGER.info(
             "[Commands] Loaded %d commands.",
@@ -78,14 +67,15 @@ class TwitchBot(commands.AutoBot):
         LOGGER.info("[Startup] Twitch bot setup hook completed.")
 
     async def close(self) -> None:
-
         LOGGER.info("[Shutdown] Closing Twitch bot.")
 
-        if self.services is not None:
+        services = self.services
+
+        if services is not None:
             LOGGER.info("[Services] Stopping background services.")
 
             try:
-                await self.services.stop()
+                await services.stop()
             except Exception:
                 LOGGER.exception(
                     "[Services] Failed while stopping background services."
@@ -102,14 +92,12 @@ class TwitchBot(commands.AutoBot):
         LOGGER.info("[Shutdown] Twitch bot closed.")
 
     async def event_ready(self) -> None:
-
         LOGGER.info(
             "[Startup] Twitch bot logged in successfully as user %s.",
             self.bot_id
         )
 
     async def add_token(self, token: str, refresh: str):
-
         LOGGER.debug("[OAuth] Adding OAuth token to Twitch client.")
 
         try:
@@ -125,17 +113,11 @@ class TwitchBot(commands.AutoBot):
             response.user_id
         )
 
-        await save_token(
-            self.token_database,
-            response.user_id,
-            token,
-            refresh
-        )
+        await save_token(self.token_database, response.user_id, token, refresh)
 
         return response
 
     async def onboard_bot_account(self, token: str, user_id: str, refresh: str) -> None:
-
         user_id = str(user_id)
         bot_id = str(self.bot_id)
 
@@ -160,7 +142,6 @@ class TwitchBot(commands.AutoBot):
         )
 
     async def onboard_broadcaster(self, user_id: str, token: str, refresh: str) -> None:
-
         user_id = str(user_id)
 
         LOGGER.info(
@@ -199,7 +180,9 @@ class TwitchBot(commands.AutoBot):
             user_id
         )
 
-        if self.services is None:
+        services = self.services
+
+        if services is None:
             LOGGER.warning(
                 "[Services] Broadcaster %s was authorized before the service container was available.",
                 user_id
@@ -210,10 +193,10 @@ class TwitchBot(commands.AutoBot):
                 user_id
             )
 
-            self.services.broadcasters.add_broadcaster(user_id)
+            services.broadcasters.add_broadcaster(user_id)
 
             try:
-                await self.services.broadcasters.refresh_broadcaster(user_id)
+                await services.broadcasters.refresh_broadcaster(user_id)
             except Exception:
                 LOGGER.exception(
                     "[Broadcasters] Failed to refresh broadcaster %s after onboarding.",
@@ -235,7 +218,6 @@ class TwitchBot(commands.AutoBot):
         )
 
     async def event_oauth_authorized(self, payload) -> None:
-
         if not payload.user_id:
             LOGGER.warning(
                 "[OAuth] Received authorization event without a user ID."
@@ -248,21 +230,12 @@ class TwitchBot(commands.AutoBot):
         )
 
         if str(payload.user_id) == str(self.bot_id):
-            await self.onboard_bot_account(
-                user_id=payload.user_id,
-                token=payload.access_token,
-                refresh=payload.refresh_token
-            )
+            await self.onboard_bot_account(user_id=payload.user_id, token=payload.access_token, refresh=payload.refresh_token)
             return
 
-        await self.onboard_broadcaster(
-            user_id=payload.user_id,
-            token=payload.access_token,
-            refresh=payload.refresh_token
-        )
+        await self.onboard_broadcaster(user_id=payload.user_id, token=payload.access_token, refresh=payload.refresh_token)
 
     async def event_command_error(self, payload) -> None:
-
         exception = getattr(payload, "exception", None)
         context = getattr(payload, "context", None)
         command = getattr(context, "command", None)
@@ -285,9 +258,5 @@ class TwitchBot(commands.AutoBot):
             LOGGER.debug(
                 "[Commands] Command failure payload: %r",
                 payload,
-                exc_info=(
-                    type(exception),
-                    exception,
-                    exception.__traceback__
-                )
+                exc_info=(type(exception), exception, exception.__traceback__)
             )

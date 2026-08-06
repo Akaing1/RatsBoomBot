@@ -471,3 +471,231 @@ body.login-page {
     background: rgba(239, 83, 80, .14);
     color: #fff;
 }
+
+.panel-description {
+    max-width: 720px;
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.toggle-management-panel {
+    grid-column: 1 / -1;
+}
+
+.toggle-feedback {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 24px;
+    padding: 13px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.toggle-feedback.success {
+    border-color: rgba(53, 196, 106, .35);
+    background: rgba(53, 196, 106, .08);
+    color: var(--success);
+}
+
+.toggle-feedback.error {
+    border-color: rgba(239, 83, 80, .35);
+    background: rgba(239, 83, 80, .08);
+    color: var(--danger);
+}
+
+.toggle-feedback-icon {
+    display: grid;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    place-items: center;
+    border-radius: 50%;
+    background: currentColor;
+    color: var(--surface);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.toggle-section {
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+}
+
+.toggle-section:first-of-type {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.toggle-section + .toggle-section {
+    margin-top: 28px;
+}
+
+.toggle-section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 16px;
+}
+
+.toggle-section-heading h4 {
+    margin: 0;
+    font-size: 17px;
+}
+
+.toggle-section-heading p {
+    max-width: 720px;
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.toggle-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-raised);
+    transition: border-color .15s ease, background .15s ease;
+}
+
+.toggle-card.enabled {
+    border-color: rgba(53, 196, 106, .3);
+}
+
+.toggle-card.disabled {
+    background: rgba(32, 36, 44, .62);
+}
+
+.toggle-card-content {
+    min-width: 0;
+}
+
+.toggle-card-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.toggle-card-heading h4 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.toggle-card-heading p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.toggle-status {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    padding: 5px 9px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.toggle-status.enabled {
+    border-color: rgba(53, 196, 106, .4);
+    background: rgba(53, 196, 106, .1);
+    color: var(--success);
+}
+
+.toggle-status.disabled {
+    border-color: rgba(239, 83, 80, .35);
+    background: rgba(239, 83, 80, .08);
+    color: #ff8784;
+}
+
+.toggle-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px 16px;
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.toggle-meta strong {
+    color: var(--text);
+}
+
+.toggle-override-label {
+    color: var(--accent);
+}
+
+.toggle-blocked-message {
+    margin: 13px 0 0;
+    padding: 9px 11px;
+    border-left: 3px solid var(--danger);
+    border-radius: 0 7px 7px 0;
+    background: rgba(239, 83, 80, .07);
+    color: #ffaaa7;
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.toggle-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.toggle-actions .button {
+    min-height: 36px;
+    padding: 0 13px;
+    font-size: 12px;
+}
+
+.toggle-disable-button {
+    border-color: rgba(239, 83, 80, .4);
+    background: rgba(239, 83, 80, .09);
+    color: #ff8784;
+}
+
+.toggle-disable-button:hover {
+    background: rgba(239, 83, 80, .18);
+    color: #fff;
+}
+
+@media (max-width: 900px) {
+    .toggle-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 560px) {
+    .toggle-card-heading {
+        flex-direction: column;
+    }
+
+    .toggle-actions {
+        flex-direction: column;
+    }
+
+    .toggle-actions .button {
+        width: 100%;
+    }
+}

@@ -2,8 +2,9 @@ import logging
 import time
 from dataclasses import dataclass
 
-from bot.profiles import get_active_profile
 from config.settings import settings
+
+from bot.profiles import FeatureName, get_active_profile
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -21,7 +22,6 @@ class PendingDuel:
 
 
 class PointsService:
-
     LEGACY_BROADCASTER_ID = "shared"
 
     def __init__(self, bot, db):
@@ -31,7 +31,6 @@ class PointsService:
         self.pending_duels: dict[str, PendingDuel] = {}
 
     async def setup(self) -> None:
-
         LOGGER.info("[Points] Preparing points storage.")
 
         try:
@@ -57,7 +56,6 @@ class PointsService:
         LOGGER.info("[Points] Points storage ready.")
 
     async def _migrate_viewers_table_if_needed(self) -> None:
-
         async with self.db.acquire() as connection:
             table = await connection.fetchone(
                 """
@@ -74,21 +72,11 @@ class PointsService:
                 )
                 return
 
-            columns = await connection.fetchall(
-                "PRAGMA table_info(viewers)"
-            )
-
-            column_names = {
-                column["name"]
-                for column in columns
-            }
-
+            columns = await connection.fetchall("PRAGMA table_info(viewers)")
+            column_names = {column["name"] for column in columns}
             primary_key_columns = [
                 column["name"]
-                for column in sorted(
-                    columns,
-                    key=lambda column: column["pk"]
-                )
+                for column in sorted(columns, key=lambda column: column["pk"])
                 if column["pk"]
             ]
 
@@ -102,10 +90,7 @@ class PointsService:
 
             already_per_broadcaster = (
                 column_names == expected_columns
-                and primary_key_columns == [
-                    "broadcaster_id",
-                    "user_id"
-                ]
+                and primary_key_columns == ["broadcaster_id", "user_id"]
             )
 
             if already_per_broadcaster:
@@ -119,13 +104,8 @@ class PointsService:
                 self.LEGACY_BROADCASTER_ID
             )
 
-            await connection.execute(
-                "DROP TABLE IF EXISTS viewers_legacy"
-            )
-
-            await connection.execute(
-                "ALTER TABLE viewers RENAME TO viewers_legacy"
-            )
+            await connection.execute("DROP TABLE IF EXISTS viewers_legacy")
+            await connection.execute("ALTER TABLE viewers RENAME TO viewers_legacy")
 
             await connection.execute(
                 """
@@ -163,14 +143,20 @@ class PointsService:
         LOGGER.info("[Points] Legacy viewer balances migrated successfully.")
 
     async def track_message(self, payload) -> None:
-
         broadcaster_id = str(payload.broadcaster.id)
         user_id = str(payload.chatter.id)
         username = payload.chatter.name
         username_key = username.lower()
         profile = get_active_profile(broadcaster_id)
+        services = self.bot.services
 
-        if profile is None or not profile.points.enabled:
+        if profile is None:
+            return
+
+        if services is None:
+            return
+
+        if not services.features.is_enabled(broadcaster_id, FeatureName.POINTS):
             return
 
         if username_key in settings.IGNORED_USERS:
@@ -183,10 +169,7 @@ class PointsService:
 
         points_config = profile.points
         now = time.time()
-        cooldown_key = self._user_key(
-            broadcaster_id,
-            user_id
-        )
+        cooldown_key = self._user_key(broadcaster_id, user_id)
         last_message = self.cooldowns.get(cooldown_key, 0)
 
         if now - last_message < points_config.message_cooldown_seconds:
@@ -209,17 +192,16 @@ class PointsService:
             messages = messages + 1
         """
 
+        values = (
+            broadcaster_id,
+            user_id,
+            username,
+            points_config.points_per_message
+        )
+
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        broadcaster_id,
-                        user_id,
-                        username,
-                        points_config.points_per_message
-                    )
-                )
+                await connection.execute(query, values)
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to award message points to %s for broadcaster %s.",
@@ -236,7 +218,6 @@ class PointsService:
         )
 
     async def get_points(self, broadcaster_id: str, user_id: str) -> int:
-
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
 
@@ -249,13 +230,7 @@ class PointsService:
 
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(
-                    query,
-                    (
-                        broadcaster_id,
-                        user_id
-                    )
-                )
+                row = await connection.fetchone(query, (broadcaster_id, user_id))
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to load points for user %s in broadcaster %s.",
@@ -270,7 +245,6 @@ class PointsService:
         return int(row["points"])
 
     async def add_points(self, broadcaster_id: str, user_id: str, username: str, amount: int) -> None:
-
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
 
@@ -288,17 +262,11 @@ class PointsService:
             points = points + excluded.points
         """
 
+        values = (broadcaster_id, user_id, username, amount)
+
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        broadcaster_id,
-                        user_id,
-                        username,
-                        amount
-                    )
-                )
+                await connection.execute(query, values)
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to add %d points to %s for broadcaster %s.",
@@ -316,7 +284,6 @@ class PointsService:
         )
 
     async def remove_points(self, broadcaster_id: str, user_id: str, amount: int) -> None:
-
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
 
@@ -327,16 +294,11 @@ class PointsService:
           AND user_id = ?
         """
 
+        values = (amount, broadcaster_id, user_id)
+
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        amount,
-                        broadcaster_id,
-                        user_id
-                    )
-                )
+                await connection.execute(query, values)
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to remove %d points from user %s for broadcaster %s.",
@@ -354,7 +316,6 @@ class PointsService:
         )
 
     async def set_points(self, broadcaster_id: str, user_id: str, amount: int) -> None:
-
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
 
@@ -365,16 +326,11 @@ class PointsService:
           AND user_id = ?
         """
 
+        values = (amount, broadcaster_id, user_id)
+
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (
-                        amount,
-                        broadcaster_id,
-                        user_id
-                    )
-                )
+                await connection.execute(query, values)
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to set points for user %s in broadcaster %s.",
@@ -391,7 +347,6 @@ class PointsService:
         )
 
     async def reset_all_points(self, broadcaster_id: str) -> None:
-
         broadcaster_id = str(broadcaster_id)
 
         query = """
@@ -402,10 +357,7 @@ class PointsService:
 
         try:
             async with self.db.acquire() as connection:
-                await connection.execute(
-                    query,
-                    (broadcaster_id,)
-                )
+                await connection.execute(query, (broadcaster_id,))
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to reset points for broadcaster %s.",
@@ -419,7 +371,6 @@ class PointsService:
         )
 
     async def get_leaderboard(self, broadcaster_id: str, limit: int = 5):
-
         broadcaster_id = str(broadcaster_id)
 
         query = """
@@ -432,13 +383,7 @@ class PointsService:
 
         try:
             async with self.db.acquire() as connection:
-                rows = await connection.fetchall(
-                    query,
-                    (
-                        broadcaster_id,
-                        limit
-                    )
-                )
+                rows = await connection.fetchall(query, (broadcaster_id, limit))
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to load leaderboard for broadcaster %s.",
@@ -455,15 +400,10 @@ class PointsService:
         return rows
 
     def create_duel(self, broadcaster_id: str, challenger_id: str, challenger_name: str, opponent_id: str, opponent_name: str, amount: int, expiration_seconds: int) -> None:
-
         broadcaster_id = str(broadcaster_id)
         challenger_id = str(challenger_id)
         opponent_id = str(opponent_id)
-
-        duel_key = self._user_key(
-            broadcaster_id,
-            opponent_id
-        )
+        duel_key = self._user_key(broadcaster_id, opponent_id)
 
         self.pending_duels[duel_key] = PendingDuel(
             broadcaster_id=broadcaster_id,
@@ -485,15 +425,9 @@ class PointsService:
         )
 
     def get_duel_for_user(self, broadcaster_id: str, user_id: str) -> PendingDuel | None:
-
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
-
-        duel_key = self._user_key(
-            broadcaster_id,
-            user_id
-        )
-
+        duel_key = self._user_key(broadcaster_id, user_id)
         duel = self.pending_duels.get(duel_key)
 
         if duel is None:
@@ -513,15 +447,9 @@ class PointsService:
         return duel
 
     def remove_duel_for_user(self, broadcaster_id: str, user_id: str) -> None:
-
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
-
-        duel_key = self._user_key(
-            broadcaster_id,
-            user_id
-        )
-
+        duel_key = self._user_key(broadcaster_id, user_id)
         duel = self.pending_duels.pop(duel_key, None)
 
         if duel is None:
@@ -541,5 +469,5 @@ class PointsService:
 
     @staticmethod
     def _user_key(broadcaster_id: str, user_id: str) -> str:
-
         return f"{str(broadcaster_id)}:{str(user_id)}"
+    

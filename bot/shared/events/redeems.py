@@ -6,8 +6,7 @@ from twitchio.ext import commands
 LOGGER = logging.getLogger("RatBoomBot")
 
 
-def get_nested_attr(obj: Any, *names: str):
-
+def get_nested_attr(obj: Any, *names: str) -> Any | None:
     current = obj
 
     for name in names:
@@ -25,13 +24,13 @@ class RedeemEvents(commands.Component):
         self.bot = bot
 
     @commands.Component.listener()
-    async def event_custom_redemption_add(self, payload):
-
+    async def event_custom_redemption_add(self, payload) -> None:
         await self.handle_channel_point_redemption(payload)
 
     async def handle_channel_point_redemption(self, payload) -> None:
+        services = self.bot.services
 
-        if not self.bot.services:
+        if services is None:
             LOGGER.warning(
                 "[Events] Redemption event received before services were initialized."
             )
@@ -67,25 +66,26 @@ class RedeemEvents(commands.Component):
             return
 
         broadcaster_id = str(broadcaster_id)
+        user_id = str(user_id)
 
         LOGGER.info(
             "[Events] %s redeemed '%s' in %s (%s).",
             username,
             reward_title,
-            broadcaster_name,
+            broadcaster_name or "unknown",
             broadcaster_id
         )
 
-        self.bot.services.stream_logs.write(
+        services.stream_logs.write(
             broadcaster_id,
             "REDEEM",
             f"{username} redeemed: {reward_title}"
         )
 
         try:
-            result = await self.bot.services.redeems.handle_redemption(
+            result = await services.redeems.handle_redemption(
                 broadcaster_id=broadcaster_id,
-                user_id=str(user_id),
+                user_id=user_id,
                 username=username,
                 reward_title=reward_title,
                 redemption_id=redemption_id
@@ -115,10 +115,7 @@ class RedeemEvents(commands.Component):
         broadcaster = self.bot.create_partialuser(broadcaster_id)
 
         try:
-            await broadcaster.send_message(
-                sender=self.bot.user,
-                message=result.message
-            )
+            await broadcaster.send_message(sender=self.bot.user, message=result.message)
         except Exception:
             LOGGER.exception(
                 "[Events] Failed to send redemption response for '%s'.",

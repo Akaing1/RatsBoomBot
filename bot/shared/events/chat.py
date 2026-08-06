@@ -13,13 +13,13 @@ class ChatEvents(commands.Component):
         self.bot = bot
 
     @commands.Component.listener()
-    async def event_message(self, payload):
-
+    async def event_message(self, payload) -> None:
         broadcaster_id = str(payload.broadcaster.id)
         broadcaster_name = payload.broadcaster.name
         chatter_id = str(payload.chatter.id)
         chatter_name = payload.chatter.name
         message = payload.text
+        services = self.bot.services
 
         LOGGER.debug(
             "[Chat] [%s] %s: %s",
@@ -28,16 +28,14 @@ class ChatEvents(commands.Component):
             message
         )
 
-        if not self.bot.services:
+        if services is None:
             LOGGER.warning(
                 "[Chat] Received chat message before services were initialized."
             )
             return
 
         try:
-            moderation_result = await self.bot.services.moderation.evaluate_message(
-                payload
-            )
+            moderation_result = await services.moderation.evaluate_message(payload)
         except Exception:
             LOGGER.exception(
                 "[Moderation] Failed to evaluate message from %s (%s) in %s.",
@@ -49,14 +47,10 @@ class ChatEvents(commands.Component):
 
         if moderation_result is not None and moderation_result.should_ban:
             if settings.BOT_DETECTION_MODE == "active":
-                banned = await self.bot.services.moderation.ban_user(
-                    payload,
-                    moderation_result
-                )
-
+                banned = await services.moderation.ban_user(payload, moderation_result)
                 result_text = "Banned" if banned else "Failed to ban"
 
-                self.bot.services.stream_logs.write(
+                services.stream_logs.write(
                     broadcaster_id,
                     "MODERATION",
                     (
@@ -80,7 +74,7 @@ class ChatEvents(commands.Component):
                     moderation_result.reason
                 )
 
-                await self.bot.services.moderation.record_action(
+                await services.moderation.record_action(
                     broadcaster_id=broadcaster_id,
                     user_id=chatter_id,
                     username=chatter_name,
@@ -93,7 +87,7 @@ class ChatEvents(commands.Component):
                     successful=False
                 )
 
-                self.bot.services.stream_logs.write(
+                services.stream_logs.write(
                     broadcaster_id,
                     "MODERATION",
                     (
@@ -114,7 +108,7 @@ class ChatEvents(commands.Component):
                 broadcaster_id
             )
 
-            self.bot.services.stream_logs.write(
+            services.stream_logs.write(
                 broadcaster_id,
                 "MODERATION",
                 (
@@ -129,10 +123,10 @@ class ChatEvents(commands.Component):
 
             return
 
-        self.bot.services.timers.track_message(payload)
+        services.timers.track_message(payload)
 
         try:
-            await self.bot.services.points.track_message(payload)
+            await services.points.track_message(payload)
         except Exception:
             LOGGER.exception(
                 "[Chat] Failed to process message rewards for %s in %s.",

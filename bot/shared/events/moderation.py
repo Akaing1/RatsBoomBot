@@ -13,9 +13,10 @@ class ModerationEvents(commands.Component):
         self.bot = bot
 
     @commands.Component.listener()
-    async def event_mod_action(self, payload):
+    async def event_mod_action(self, payload) -> None:
+        services = self.bot.services
 
-        if not self.bot.services:
+        if services is None:
             LOGGER.warning(
                 "[Moderation] Received moderation event before services were initialized."
             )
@@ -41,7 +42,16 @@ class ModerationEvents(commands.Component):
             )
             return
 
-        broadcaster_id = str(payload.broadcaster.id)
+        broadcaster = getattr(payload, "broadcaster", None)
+        broadcaster_id = getattr(broadcaster, "id", None)
+
+        if broadcaster_id is None:
+            LOGGER.warning(
+                "[Moderation] SeryBot ban event did not include a broadcaster."
+            )
+            return
+
+        broadcaster_id = str(broadcaster_id)
         user_id = str(banned_user.id)
         username = banned_user.name
         moderator_name = moderator.name
@@ -55,7 +65,7 @@ class ModerationEvents(commands.Component):
         )
 
         try:
-            recorded = await self.bot.services.moderation.observe_external_ban(
+            recorded = await services.moderation.observe_external_ban(
                 broadcaster_id=broadcaster_id,
                 user_id=user_id,
                 username=username,
@@ -75,7 +85,7 @@ class ModerationEvents(commands.Component):
         if not recorded:
             return
 
-        self.bot.services.stream_logs.write(
+        services.stream_logs.write(
             broadcaster_id,
             "MODERATION",
             (

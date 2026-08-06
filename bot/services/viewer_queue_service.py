@@ -7,7 +7,6 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 @dataclass
 class ViewerQueueState:
-
     queue: deque[str] = field(default_factory=deque)
     users: set[str] = field(default_factory=set)
     is_open: bool = False
@@ -20,7 +19,6 @@ class ViewerQueueService:
         self.queues: dict[str, ViewerQueueState] = {}
 
     def _get_queue_state(self, broadcaster_id: str) -> ViewerQueueState:
-
         broadcaster_id = str(broadcaster_id)
         state = self.queues.get(broadcaster_id)
 
@@ -36,7 +34,6 @@ class ViewerQueueService:
         return state
 
     def open_queue(self, broadcaster_id: str) -> str:
-
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -57,7 +54,6 @@ class ViewerQueueService:
         return "Queue is now open! Viewers can join the queue using !join."
 
     def close_queue(self, broadcaster_id: str) -> str:
-
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -79,13 +75,10 @@ class ViewerQueueService:
         return "The viewer queue is now closed."
 
     def is_queue_open(self, broadcaster_id: str) -> bool:
-
         state = self._get_queue_state(str(broadcaster_id))
-
         return state.is_open
 
     def join(self, broadcaster_id: str, username: str) -> tuple[bool, str]:
-
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -122,7 +115,6 @@ class ViewerQueueService:
         return True, f"@{username}, you joined the queue! Position: {position}"
 
     def leave(self, broadcaster_id: str, username: str) -> tuple[bool, str]:
-
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -157,7 +149,6 @@ class ViewerQueueService:
         return True, f"@{username}, you left the queue."
 
     def next_viewers(self, broadcaster_id: str, count: int = 1) -> tuple[bool, list[str], str]:
-
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -183,11 +174,7 @@ class ViewerQueueService:
             )
             return False, [], "The queue is empty."
 
-        selected_count = min(
-            count,
-            len(state.queue)
-        )
-
+        selected_count = min(count, len(state.queue))
         selected_viewers: list[str] = []
 
         for _ in range(selected_count):
@@ -203,10 +190,7 @@ class ViewerQueueService:
             len(state.queue)
         )
 
-        viewers_text = ", ".join(
-            f"@{username}"
-            for username in selected_viewers
-        )
+        viewers_text = ", ".join(f"@{username}" for username in selected_viewers)
 
         if selected_count == 1:
             message = f"Next up: {viewers_text}!"
@@ -216,7 +200,6 @@ class ViewerQueueService:
         return True, selected_viewers, message
 
     def remove_position(self, broadcaster_id: str, position: int) -> tuple[bool, str | None, str]:
-
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -260,14 +243,9 @@ class ViewerQueueService:
             len(state.queue)
         )
 
-        return (
-            True,
-            removed_username,
-            f"Removed @{removed_username} from position {position}."
-        )
+        return True, removed_username, f"Removed @{removed_username} from position {position}."
 
     def clear(self, broadcaster_id: str) -> str:
-
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
         removed_count = len(state.queue)
@@ -284,7 +262,6 @@ class ViewerQueueService:
         return "Viewer queue cleared."
 
     def list_queue(self, broadcaster_id: str) -> list[str]:
-
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -297,13 +274,10 @@ class ViewerQueueService:
         return list(state.queue)
 
     def size(self, broadcaster_id: str) -> int:
-
         state = self._get_queue_state(str(broadcaster_id))
-
         return len(state.queue)
 
     def remove_queue(self, broadcaster_id: str) -> None:
-
         broadcaster_id = str(broadcaster_id)
         state = self.queues.pop(broadcaster_id, None)
 

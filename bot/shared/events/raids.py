@@ -2,7 +2,7 @@ import logging
 
 from twitchio.ext import commands
 
-from bot.profiles import get_active_profile, render_profile_message
+from bot.profiles import FeatureName, get_active_profile, render_profile_message
 from bot.shared.commands.shoutout import send_shoutout_message
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -14,15 +14,14 @@ class RaidEvents(commands.Component):
         self.bot = bot
 
     @commands.Component.listener()
-    async def event_raid(self, payload):
-
+    async def event_raid(self, payload) -> None:
         await self.handle_raid(payload)
 
     async def handle_raid(self, payload) -> None:
-
         raider = getattr(payload, "from_broadcaster", None)
         broadcaster = getattr(payload, "to_broadcaster", None)
         viewer_count = getattr(payload, "viewer_count", 0)
+        services = self.bot.services
 
         if raider is None or broadcaster is None:
             LOGGER.warning(
@@ -32,7 +31,7 @@ class RaidEvents(commands.Component):
             return
 
         raider_name = getattr(raider, "name", None)
-        broadcaster_name = getattr(broadcaster, "name", None)
+        broadcaster_name = getattr(broadcaster, "name", None) or "unknown"
         broadcaster_id = str(broadcaster.id)
 
         if not raider_name:
@@ -63,16 +62,25 @@ class RaidEvents(commands.Component):
             viewer_word
         )
 
-        if self.bot.services:
-            self.bot.services.stream_logs.write(
-                broadcaster_id,
-                "RAID",
-                f"{raider_name} raided with {viewer_count} {viewer_word}."
-            )
-        else:
+        if services is None:
             LOGGER.warning(
                 "[Events] Raid event received before services were initialized."
             )
+            return
+
+        services.stream_logs.write(
+            broadcaster_id,
+            "RAID",
+            f"{raider_name} raided with {viewer_count} {viewer_word}."
+        )
+
+        if not services.features.is_enabled(broadcaster_id, FeatureName.RAID_RESPONSES):
+            LOGGER.debug(
+                "[Events] Raid responses are disabled for %s (%s).",
+                broadcaster_name,
+                broadcaster_id
+            )
+            return
 
         profile = get_active_profile(broadcaster_id)
 
@@ -82,50 +90,44 @@ class RaidEvents(commands.Component):
                 broadcaster_name,
                 broadcaster_id
             )
-        else:
+            return
+
+        try:
+            message = render_profile_message(
+                profile.raid_messages.incoming,
+                raider_name=raider_name,
+                viewer_count=viewer_count,
+                viewer_word=viewer_word
+            )
+        except Exception:
+            LOGGER.exception(
+                "[Events] Failed to render raid message for %s (%s).",
+                broadcaster_name,
+                broadcaster_id
+            )
+            raise
+
+        if message:
+            channel = self.bot.create_partialuser(broadcaster_id)
+
             try:
-                message = render_profile_message(
-                    profile.raid_messages.incoming,
-                    raider_name=raider_name,
-                    viewer_count=viewer_count,
-                    viewer_word=viewer_word
-                )
+                await channel.send_message(sender=self.bot.user, message=message)
             except Exception:
                 LOGGER.exception(
-                    "[Events] Failed to render raid message for %s (%s).",
+                    "[Events] Failed to send raid message in %s (%s).",
                     broadcaster_name,
                     broadcaster_id
                 )
                 raise
-
-            if message:
-                channel = self.bot.create_partialuser(broadcaster_id)
-
-                try:
-                    await channel.send_message(
-                        sender=self.bot.user,
-                        message=message
-                    )
-                except Exception:
-                    LOGGER.exception(
-                        "[Events] Failed to send raid message in %s (%s).",
-                        broadcaster_name,
-                        broadcaster_id
-                    )
-                    raise
-            else:
-                LOGGER.debug(
-                    "[Events] Incoming raid message is disabled for %s (%s).",
-                    broadcaster_name,
-                    broadcaster_id
-                )
+        else:
+            LOGGER.debug(
+                "[Events] Incoming raid message is disabled for %s (%s).",
+                broadcaster_name,
+                broadcaster_id
+            )
 
         try:
-            await send_shoutout_message(
-                bot=self.bot,
-                broadcaster_id=broadcaster_id,
-                username=raider_name
-            )
+            await send_shoutout_message(self.bot, broadcaster_id, raider_name)
         except Exception:
             LOGGER.exception(
                 "[Events] Failed to send shoutout for raider %s in %s (%s).",

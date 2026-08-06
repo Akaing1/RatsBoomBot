@@ -10,7 +10,6 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 
 async def create_migration_table(connection: Any) -> None:
-
     await connection.execute(
         """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -23,7 +22,6 @@ async def create_migration_table(connection: Any) -> None:
 
 
 async def get_applied_versions(connection: Any) -> set[int]:
-
     rows = await connection.fetchall(
         """
         SELECT version
@@ -32,10 +30,7 @@ async def get_applied_versions(connection: Any) -> set[int]:
         """
     )
 
-    return {
-        int(row["version"])
-        for row in rows
-    }
+    return {int(row["version"]) for row in rows}
 
 
 async def record_migration(connection: Any, migration: Migration) -> None:
@@ -44,10 +39,7 @@ async def record_migration(connection: Any, migration: Migration) -> None:
         INSERT INTO schema_migrations (version, name)
         VALUES (?, ?)
         """,
-        (
-            migration.version,
-            migration.name
-        )
+        (migration.version, migration.name)
     )
 
 
@@ -87,21 +79,14 @@ async def run_migration(connection: Any, migration: Migration) -> None:
 async def run_migrations(db: asqlite.Pool) -> None:
     started_at = perf_counter()
 
-    LOGGER.debug(
-        "[Database] Ensuring the migration history table exists."
-    )
+    LOGGER.debug("[Database] Ensuring the migration history table exists.")
 
     async with db.acquire() as connection:
         await create_migration_table(connection)
         await connection.commit()
 
         applied_versions = await get_applied_versions(connection)
-
-        pending_migrations = [
-            migration
-            for migration in MIGRATIONS
-            if migration.version not in applied_versions
-        ]
+        pending_migrations = [migration for migration in MIGRATIONS if migration.version not in applied_versions]
 
         LOGGER.info(
             "[Database] Found %d registered migrations: %d applied, %d pending.",
@@ -111,18 +96,14 @@ async def run_migrations(db: asqlite.Pool) -> None:
         )
 
         for migration in pending_migrations:
-            await run_migration(
-                connection,
-                migration
-            )
+            await run_migration(connection, migration)
 
-    if pending_migrations:
-        LOGGER.info(
-            "[Database] Applied %d pending migrations in %.3f seconds.",
-            len(pending_migrations),
-            perf_counter() - started_at
-        )
-    else:
-        LOGGER.info(
-            "[Database] Database migrations are up to date."
-        )
+    if not pending_migrations:
+        LOGGER.info("[Database] Database migrations are up to date.")
+        return
+
+    LOGGER.info(
+        "[Database] Applied %d pending migrations in %.3f seconds.",
+        len(pending_migrations),
+        perf_counter() - started_at
+    )

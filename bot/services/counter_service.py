@@ -10,7 +10,6 @@ class CounterService:
         self.db = db
 
     async def setup(self) -> None:
-
         LOGGER.info("[Counters] Preparing counter storage.")
 
         query = """
@@ -30,7 +29,6 @@ class CounterService:
         LOGGER.info("[Counters] Counter storage ready.")
 
     async def get_counter(self, name: str) -> int:
-
         counter_name = name.lower()
 
         query = """
@@ -41,10 +39,7 @@ class CounterService:
 
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(
-                    query,
-                    (counter_name,)
-                )
+                row = await connection.fetchone(query, (counter_name,))
         except Exception:
             LOGGER.exception(
                 "[Counters] Failed to load counter %s.",
@@ -62,7 +57,6 @@ class CounterService:
         return int(row["value"])
 
     async def increment_counter(self, name: str, amount: int = 1) -> int:
-
         counter_name = name.lower()
 
         query = """
@@ -75,13 +69,7 @@ class CounterService:
 
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(
-                    query,
-                    (
-                        counter_name,
-                        amount
-                    )
-                )
+                row = await connection.fetchone(query, (counter_name, amount))
         except Exception:
             LOGGER.exception(
                 "[Counters] Failed to increment counter %s by %d.",

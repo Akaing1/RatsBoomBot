@@ -2,8 +2,9 @@ bot = None
 db = None
 
 
-def set_runtime(*, twitch_bot, token_database):
+def set_runtime(*, twitch_bot, token_database) -> None:
     global bot, db
+
     bot = twitch_bot
     db = token_database
 

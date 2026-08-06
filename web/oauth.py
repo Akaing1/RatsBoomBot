@@ -7,6 +7,7 @@ from config.settings import settings
 
 TWITCH_AUTHORIZE_URL = "https://id.twitch.tv/oauth2/authorize"
 TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"
+TWITCH_USERS_URL = "https://api.twitch.tv/helix/users"
 
 
 @dataclass
@@ -26,19 +27,11 @@ class TwitchUser:
 
 
 def build_bot_oauth_url(force_verify: bool = True) -> str:
-    return _build_oauth_url(
-        redirect_uri=settings.BOT_REDIRECT_URI,
-        scopes=settings.BOT_SCOPES,
-        force_verify=force_verify
-    )
+    return _build_oauth_url(redirect_uri=settings.BOT_REDIRECT_URI, scopes=settings.BOT_SCOPES, force_verify=force_verify)
 
 
 def build_channel_oauth_url(force_verify: bool = True) -> str:
-    return _build_oauth_url(
-        redirect_uri=settings.CHANNEL_REDIRECT_URI,
-        scopes=settings.CHANNEL_SCOPES,
-        force_verify=force_verify
-    )
+    return _build_oauth_url(redirect_uri=settings.CHANNEL_REDIRECT_URI, scopes=settings.CHANNEL_SCOPES, force_verify=force_verify)
 
 
 def _build_oauth_url(*, redirect_uri: str, scopes: str, force_verify: bool) -> str:
@@ -46,7 +39,7 @@ def _build_oauth_url(*, redirect_uri: str, scopes: str, force_verify: bool) -> s
         "client_id": settings.CLIENT_ID,
         "redirect_uri": redirect_uri,
         "response_type": "code",
-        "scope": scopes,
+        "scope": scopes
     }
 
     if force_verify:
@@ -86,7 +79,7 @@ async def fetch_twitch_user(access_token: str) -> TwitchUser:
     }
 
     async with httpx.AsyncClient(timeout=15) as client:
-        response = await client.get("https://api.twitch.tv/helix/users", headers=headers)
+        response = await client.get(TWITCH_USERS_URL, headers=headers)
 
     response.raise_for_status()
     payload = response.json()

@@ -58,21 +58,18 @@ async def run_runtime() -> None:
 
                 LOGGER.info("[OAuth] Stored OAuth tokens loaded.")
 
-                set_runtime(
-                    twitch_bot=bot,
-                    token_database=database
-                )
+                set_runtime(twitch_bot=bot, token_database=database)
 
                 LOGGER.info("[Runtime] Shared runtime state initialized.")
 
-                admin_server = uvicorn.Server(
-                    uvicorn.Config(
-                        admin_app,
-                        host=settings.ADMIN_HOST,
-                        port=settings.ADMIN_PORT,
-                        log_level="info"
-                    )
+                admin_config = uvicorn.Config(
+                    admin_app,
+                    host=settings.ADMIN_HOST,
+                    port=settings.ADMIN_PORT,
+                    log_level="info"
                 )
+
+                admin_server = uvicorn.Server(admin_config)
 
                 LOGGER.info("[Runtime] Starting Twitch bot.")
                 LOGGER.info(
@@ -84,11 +81,7 @@ async def run_runtime() -> None:
                     perf_counter() - startup_started_at
                 )
 
-                await asyncio.gather(
-                    bot.start(load_tokens=False),
-                    admin_server.serve()
-                )
-
+                await asyncio.gather(bot.start(load_tokens=False), admin_server.serve())
     except asyncio.CancelledError:
         LOGGER.info("[Shutdown] Runtime tasks were cancelled.")
         raise
@@ -104,12 +97,7 @@ def configure_logging() -> None:
         level=logging.INFO,
         format="%(message)s",
         datefmt="[%X]",
-        handlers=[
-            RichHandler(
-                rich_tracebacks=True,
-                markup=True
-            )
-        ],
+        handlers=[RichHandler(rich_tracebacks=True, markup=True)],
         force=True
     )
 
@@ -122,9 +110,7 @@ def run() -> None:
     except KeyboardInterrupt:
         LOGGER.info("[Shutdown] Shutdown requested by user.")
     except Exception:
-        LOGGER.critical(
-            "[Shutdown] RatBoomBot stopped because of a fatal error."
-        )
+        LOGGER.critical("[Shutdown] RatBoomBot stopped because of a fatal error.")
         raise
     else:
         LOGGER.info("[Shutdown] RatBoomBot stopped cleanly.")

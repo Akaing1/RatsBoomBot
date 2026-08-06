@@ -6,11 +6,7 @@ from config.settings import settings
 
 def get_logs_directory() -> Path:
     logs_directory = Path(settings.STREAM_LOGS_PATH).resolve()
-
-    logs_directory.mkdir(
-        parents=True,
-        exist_ok=True
-    )
+    logs_directory.mkdir(parents=True, exist_ok=True)
 
     return logs_directory
 
@@ -43,13 +39,7 @@ def parse_session_directory_name(directory_name: str) -> tuple[str, str]:
 
 def resolve_log_file(channel_name: str, session_name: str) -> Path | None:
     logs_directory = get_logs_directory()
-
-    requested_file = (
-            logs_directory
-            / channel_name
-            / session_name
-            / "log.txt"
-    ).resolve()
+    requested_file = (logs_directory / channel_name / session_name / "log.txt").resolve()
 
     try:
         requested_file.relative_to(logs_directory)
