@@ -39,7 +39,6 @@ GLOBAL_COMPONENTS: tuple[type[commands.Component], ...] = (
 
 
 async def load_global_components(bot) -> None:
-
     LOGGER.info(
         "[Components] Loading %d global components.",
         len(GLOBAL_COMPONENTS)
@@ -73,13 +72,10 @@ async def load_global_components(bot) -> None:
 
 
 async def resolve_profile_users(bot) -> dict[str, User]:
-
-    channel_names = list(CHANNEL_PROFILES.keys())
+    channel_names = list(CHANNEL_PROFILES)
 
     if not channel_names:
-        LOGGER.info(
-            "[Profiles] No channel profiles are registered."
-        )
+        LOGGER.info("[Profiles] No channel profiles are registered.")
         return {}
 
     LOGGER.info(
@@ -88,11 +84,7 @@ async def resolve_profile_users(bot) -> dict[str, User]:
     )
 
     users = await bot.fetch_users(logins=channel_names)
-
-    users_by_login = {
-        user.name.lower(): user
-        for user in users
-    }
+    users_by_login = {user.name.lower(): user for user in users}
 
     LOGGER.info(
         "[Profiles] Resolved %d of %d configured channel profiles.",
@@ -104,8 +96,8 @@ async def resolve_profile_users(bot) -> dict[str, User]:
 
 
 async def load_channel_components(bot) -> None:
-
     LOGGER.info("[Profiles] Registering channel profiles.")
+
     register_channel_profiles()
 
     LOGGER.info(
@@ -113,10 +105,7 @@ async def load_channel_components(bot) -> None:
         len(CHANNEL_PROFILES)
     )
 
-    active_broadcaster_ids = {
-        str(broadcaster_id)
-        for broadcaster_id in bot.broadcaster_ids
-    }
+    active_broadcaster_ids = {str(broadcaster_id) for broadcaster_id in bot.broadcaster_ids}
 
     LOGGER.info(
         "[Profiles] Found %d authorized broadcaster accounts.",
@@ -160,24 +149,14 @@ async def load_channel_components(bot) -> None:
             broadcaster_id
         )
 
-        activate_profile(
-            broadcaster_id,
-            profile
-        )
-
+        activate_profile(broadcaster_id, profile)
         activated_profiles += 1
 
         for component_class in profile.components:
             component_name = component_class.__name__
 
             try:
-                await bot.add_component(
-                    component_class(
-                        bot,
-                        profile,
-                        broadcaster_id
-                    )
-                )
+                await bot.add_component(component_class(bot, profile, broadcaster_id))
             except Exception:
                 LOGGER.exception(
                     "[Components] Failed to load profile component %s for %s.",
@@ -208,7 +187,6 @@ async def load_channel_components(bot) -> None:
 
 
 async def load_components(bot) -> None:
-
     LOGGER.info("[Components] Beginning component loading.")
 
     await load_global_components(bot)

@@ -1,24 +1,12 @@
 from bot.channels.ninjakaing.commands.general import NinjakaingCommands
 from bot.channels.ninjakaing.commands.points import NinjakaingPointsCommands
-from bot.channels.ninjakaing.profile_details import (
-    NINJAKAING_COMMUNITY_MESSAGES,
-    NINJAKAING_POINTS,
-    NINJAKAING_RAID_MESSAGES,
-    NINJAKAING_REDEEMS,
-    NINJAKAING_TIMER_MESSAGES
-)
-from bot.profiles import (
-    ChannelProfile,
-    FeatureDefaults
-)
+from bot.channels.ninjakaing.profile_details import NINJAKAING_COMMUNITY_MESSAGES, NINJAKAING_POINTS, NINJAKAING_RAID_MESSAGES, NINJAKAING_REDEEMS, NINJAKAING_TIMER_MESSAGES
+from bot.profiles import ChannelProfile, FeatureDefaults
 
 
 NINJAKAING_PROFILE = ChannelProfile(
     channel_name="ninjakaing",
-    components=(
-        NinjakaingCommands,
-        NinjakaingPointsCommands
-    ),
+    components=(NinjakaingCommands, NinjakaingPointsCommands),
     features=FeatureDefaults(
         channel=True,
         timers=True,
