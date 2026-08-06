@@ -5,24 +5,14 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from config.settings import settings
-from web.routers import (
-    auth_router,
-    channels_router,
-    dashboard_router,
-    logs_router,
-    oauth_router
-)
+from web.routers import auth_router, channels_router, dashboard_router, logs_router, oauth_router
 
 WEB_DIRECTORY = Path(__file__).resolve().parent
 STATIC_DIRECTORY = WEB_DIRECTORY / "static"
 
 
 def create_app() -> FastAPI:
-    application = FastAPI(
-        title="RatsBoomBot Admin",
-        docs_url=None,
-        redoc_url=None
-    )
+    application = FastAPI(title="RatsBoomBot Admin", docs_url=None, redoc_url=None)
 
     application.add_middleware(
         SessionMiddleware,
@@ -33,11 +23,7 @@ def create_app() -> FastAPI:
         https_only=False
     )
 
-    application.mount(
-        "/static",
-        StaticFiles(directory=str(STATIC_DIRECTORY)),
-        name="static"
-    )
+    application.mount("/static", StaticFiles(directory=str(STATIC_DIRECTORY)), name="static")
 
     application.include_router(auth_router)
     application.include_router(dashboard_router)
