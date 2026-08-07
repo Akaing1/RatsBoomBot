@@ -21,7 +21,7 @@ def create_app() -> FastAPI:
         session_cookie="ratsboombot_admin",
         max_age=60 * 60 * 8,
         same_site="lax",
-        https_only=False
+        https_only=settings.SESSION_HTTPS_ONLY
     )
 
     application.mount("/static", StaticFiles(directory=str(STATIC_DIRECTORY)), name="static")
@@ -31,15 +31,6 @@ def create_app() -> FastAPI:
     application.include_router(oauth_router)
     application.include_router(channels_router)
     application.include_router(logs_router)
-
-    application.add_middleware(
-        SessionMiddleware,
-        secret_key=settings.SESSION_SECRET,
-        session_cookie="ratsboombot_admin",
-        max_age=60 * 60 * 8,
-        same_site="lax",
-        https_only=settings.SESSION_HTTPS_ONLY
-    )
 
     return application
 
