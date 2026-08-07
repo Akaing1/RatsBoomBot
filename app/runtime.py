@@ -10,6 +10,7 @@ from rich.logging import RichHandler
 
 from bot.bot import TwitchBot
 from config.settings import settings
+from config.version import APP_NAME, APP_VERSION
 from storage.database import setup_database
 from web.app import app as admin_app
 from web.state import set_runtime
@@ -24,7 +25,7 @@ async def run_runtime() -> None:
     database_path.parent.mkdir(parents=True, exist_ok=True)
 
     LOGGER.info(SEPARATOR)
-    LOGGER.info("[Startup] RatBoomBot v4.1.1 starting.")
+    LOGGER.info("[Startup] %s v%s starting.", APP_NAME, APP_VERSION)
     LOGGER.info("[Startup] Python %s", sys.version.split()[0])
     LOGGER.info("[Startup] Database path: %s", database_path)
     LOGGER.info("[Startup] Admin dashboard: %s", settings.ADMIN_BASE_URL)
@@ -66,7 +67,9 @@ async def run_runtime() -> None:
                     admin_app,
                     host=settings.ADMIN_HOST,
                     port=settings.ADMIN_PORT,
-                    log_level="info"
+                    log_level="info",
+                    proxy_headers=settings.TRUST_PROXY_HEADERS,
+                    forwarded_allow_ips="127.0.0.1" if settings.TRUST_PROXY_HEADERS else None
                 )
 
                 admin_server = uvicorn.Server(admin_config)

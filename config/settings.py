@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 VALID_BOT_DETECTION_MODES = {"learning", "shadow", "active"}
+VALID_ENVIRONMENTS = {"local", "production"}
 
 
 class Settings:
@@ -24,6 +25,10 @@ class Settings:
 
     ADMIN_SECRET = os.getenv("ADMIN_SECRET")
     SESSION_SECRET = os.getenv("SESSION_SECRET")
+
+    ENVIRONMENT = os.getenv("ENVIRONMENT", "local").strip().lower()
+    SESSION_HTTPS_ONLY = os.getenv("SESSION_HTTPS_ONLY", "false").strip().lower() == "true"
+    TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() == "true"
 
     BOT_REDIRECT_URI = os.getenv("BOT_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/bot")
     CHANNEL_REDIRECT_URI = os.getenv("CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/channel")
@@ -68,3 +73,9 @@ if not settings.SESSION_SECRET:
 
 if settings.BOT_DETECTION_MODE not in VALID_BOT_DETECTION_MODES:
     raise ValueError("BOT_DETECTION_MODE must be learning, shadow, or active.")
+
+if settings.ENVIRONMENT not in VALID_ENVIRONMENTS:
+    raise ValueError("ENVIRONMENT must be local or production.")
+
+if settings.ENVIRONMENT == "production" and not settings.SESSION_HTTPS_ONLY:
+    raise ValueError("SESSION_HTTPS_ONLY must be true in production.")
