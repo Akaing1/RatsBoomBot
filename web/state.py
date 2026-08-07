@@ -9,6 +9,13 @@ def set_runtime(*, twitch_bot, token_database) -> None:
     db = token_database
 
 
+def clear_runtime() -> None:
+    global bot, db
+
+    bot = None
+    db = None
+
+
 def get_bot():
     return bot
 

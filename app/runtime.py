@@ -13,10 +13,43 @@ from config.settings import settings
 from config.version import APP_NAME, APP_VERSION
 from storage.database import setup_database
 from web.app import app as admin_app
-from web.state import set_runtime
+from web.state import clear_runtime, set_runtime
 
 LOGGER = logging.getLogger("RatBoomBot")
 SEPARATOR = "=" * 60
+
+
+async def run_services(bot: TwitchBot, admin_server: uvicorn.Server) -> None:
+    bot_task = asyncio.create_task(bot.start(load_tokens=False), name="twitch-bot")
+    admin_task = asyncio.create_task(admin_server.serve(), name="admin-dashboard")
+    tasks = {bot_task, admin_task}
+
+    try:
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+        for task in done:
+            exception = task.exception()
+
+            if exception is not None:
+                raise exception
+
+        if admin_task in done and not bot_task.done():
+            LOGGER.info("[Shutdown] Admin dashboard stopped; closing Twitch bot.")
+            await bot.close()
+
+        if bot_task in done and not admin_task.done():
+            LOGGER.info("[Shutdown] Twitch bot stopped; closing admin dashboard.")
+            admin_server.should_exit = True
+
+        if pending:
+            await asyncio.gather(*pending)
+    finally:
+        admin_server.should_exit = True
+
+        if not bot_task.done():
+            await bot.close()
+
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def run_runtime() -> None:
@@ -84,7 +117,11 @@ async def run_runtime() -> None:
                     perf_counter() - startup_started_at
                 )
 
-                await asyncio.gather(bot.start(load_tokens=False), admin_server.serve())
+                try:
+                    await run_services(bot, admin_server)
+                finally:
+                    clear_runtime()
+                    LOGGER.info("[Runtime] Shared runtime state cleared.")
     except asyncio.CancelledError:
         LOGGER.info("[Shutdown] Runtime tasks were cancelled.")
         raise

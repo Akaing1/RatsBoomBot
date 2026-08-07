@@ -9,5 +9,7 @@ This directory contains deployment files for running RatsBoomBot as a Linux serv
 
 ## Planned install path
 
+
 ```text
 /opt/ratsboombot
+```
