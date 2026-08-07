@@ -2,8 +2,6 @@ twitchio~=3.2.2
 asqlite~=2.0.0
 
 python-dotenv~=1.2.2
-pystray~=0.19.5
-pillow~=12.3.0
 
 fastapi~=0.139.0
 uvicorn~=0.51.0
