@@ -1,47 +1,106 @@
 # RatsBoomBot
 
-RatsBoomBot is a modular Python Twitch chatbot built with TwitchIO, SQLite, and a rat-themed loyalty system.
+RatsBoomBot is a personal multi-channel Twitch chatbot built with Python, TwitchIO, FastAPI, and SQLite.
 
-The project is designed as a personal StreamElements-style replacement for a Twitch channel. Instead of keeping everything in one script, RatsBoomBot separates chat commands, Twitch event listeners, persistent storage, and long-running background services into clear modules.
+The project acts as a lightweight StreamElements-style replacement for a small group of Twitch channels. Shared functionality lives in reusable command, event, and service modules, while each broadcaster can define a separate channel profile containing their own point theme, messages, timer announcements, redeems, and channel-specific commands.
 
-Current release branch: `release/1.0.0`
+The project is primarily built for Ninjakaing and friends rather than as a public, one-size-fits-all Twitch bot.
+
+Current version: **4.1.1**
 
 ---
 
-## What the Bot Does
+## Features
 
 RatsBoomBot currently supports:
 
 - Twitch chat commands through TwitchIO
-- Twitch EventSub chat integration
-- OAuth token storage and refresh using SQLite
-- Rat-themed loyalty points called **Stale Bread**
-- Passive Stale Bread earning from chat activity
-- Stale Bread leaderboard
-- Stale Bread gambling
-- Stale Bread duels
-- Meme counters
-- Social link commands
-- Utility and fun commands
-- Moderation/fun timeout command
-- Viewer queue system for playing with viewers
-- Timer announcements while the broadcaster is live
-- Ad warning announcements
-- Follow, subscription, and resubscription chat messages
-- Auto-discovered help command
-- Optional Windows system tray launcher
+- Multi-broadcaster OAuth authorization
+- SQLite-backed token storage
+- Twitch token refresh and restoration
+- Shared commands and event listeners
+- Broadcaster-specific channel profiles
+- Per-channel loyalty-point themes
+- Passive points earned from chat activity
+- Leaderboards, gambling, and viewer duels
+- Daily and first channel-point redeems
+- Persistent meme counters
+- Viewer queues
+- Social-link commands
+- Rotating timer announcements
+- Upcoming ad warnings
+- Follow, subscription, raid, redeem, and stream events
+- Per-stream text logs
+- A FastAPI administration dashboard
+- Browser-based bot and broadcaster OAuth
+- Database migrations
+- Structured runtime logging
+- Automated tests
+- Optional Windows system-tray operation
 
 ---
 
 ## Tech Stack
 
 - Python 3.11+
-- TwitchIO `~3.2.2`
+- TwitchIO 3.2
 - SQLite
-- asqlite `~2.0.0`
+- asqlite
+- FastAPI
+- Uvicorn
+- Jinja2
+- HTTPX
+- Rich
 - python-dotenv
 - pystray
 - Pillow
+- pytest
+- pytest-asyncio
+
+---
+
+## Current Architecture
+
+RatsBoomBot is separated into several major layers:
+
+```text
+Application Runtime
+│
+├── Twitch Bot
+│   ├── Shared Commands
+│   ├── Shared Events
+│   ├── Channel Profiles
+│   ├── Channel-Specific Components
+│   └── Service Container
+│
+├── Storage
+│   ├── SQLite Connection Pool
+│   ├── OAuth Tokens
+│   ├── EventSub Subscription State
+│   ├── Viewer Data
+│   ├── Redeem Claims
+│   ├── Broadcaster Settings
+│   └── Versioned Migrations
+│
+├── Administration Dashboard
+│   ├── Authentication
+│   ├── Bot OAuth
+│   ├── Broadcaster OAuth
+│   ├── Channel Management
+│   └── Stream Log Browser
+│
+└── Windows Tray Application
+```
+
+The general responsibilities are:
+
+- **Commands** receive and validate chat input.
+- **Events** respond to Twitch and EventSub activity.
+- **Services** contain shared business logic and persistent operations.
+- **Profiles** configure channel-specific behavior.
+- **Storage** owns SQLite access and migrations.
+- **Web routers** provide dashboard and OAuth functionality.
+- **Runtime** coordinates startup and shutdown.
 
 ---
 
@@ -50,41 +109,95 @@ RatsBoomBot currently supports:
 ```text
 RatsBoomBot/
 │
+├── app/
+│   ├── runtime.py
+│   └── tray.py
+│
 ├── assets/
 │   └── NinjaDoro.ico
 │
 ├── bot/
-│   ├── commands/
-│   │   ├── counters.py
-│   │   ├── moderation.py
-│   │   ├── points.py
-│   │   ├── socials.py
-│   │   ├── utility.py
-│   │   └── viewer_queue.py
-│   │
-│   ├── events/
-│   │   └── chat.py
+│   ├── channels/
+│   │   ├── component.py
+│   │   │
+│   │   ├── developer_ninjakaing/
+│   │   │   ├── commands/
+│   │   │   ├── games/
+│   │   │   └── profile.py
+│   │   │
+│   │   └── ninjakaing/
+│   │       ├── commands/
+│   │       ├── games/
+│   │       └── profile.py
 │   │
 │   ├── services/
 │   │   ├── ad_announcement_service.py
 │   │   ├── broadcaster_service.py
+│   │   ├── broadcaster_settings_service.py
+│   │   ├── channel_service.py
 │   │   ├── counter_service.py
 │   │   ├── help_service.py
 │   │   ├── points_service.py
+│   │   ├── redeem_service.py
 │   │   ├── service_container.py
+│   │   ├── stream_log_service.py
 │   │   ├── timer_service.py
 │   │   └── viewer_queue_service.py
 │   │
-│   └── bot.py
+│   ├── shared/
+│   │   ├── commands/
+│   │   │   ├── counters.py
+│   │   │   ├── moderation.py
+│   │   │   ├── points.py
+│   │   │   ├── settings.py
+│   │   │   ├── shoutout.py
+│   │   │   ├── socials.py
+│   │   │   ├── utility.py
+│   │   │   └── viewer_queue.py
+│   │   │
+│   │   └── events/
+│   │       ├── chat.py
+│   │       ├── community.py
+│   │       ├── raids.py
+│   │       ├── redeems.py
+│   │       └── streams.py
+│   │
+│   ├── bot.py
+│   ├── component_loader.py
+│   └── profiles.py
 │
 ├── config/
 │   └── settings.py
 │
-├── database/
-│   └── db.py
+├── storage/
+│   ├── migrations/
+│   │   ├── v001_initial_schema.py
+│   │   └── v002_redeem_stats.py
+│   │
+│   ├── database.py
+│   └── migration_runner.py
+│
+├── tests/
+│   ├── conftest.py
+│   ├── test_admin_auth.py
+│   ├── test_log_browser.py
+│   ├── test_stream_log_service.py
+│   └── test_viewer_queue_service.py
+│
+├── web/
+│   ├── routers/
+│   │   ├── auth.py
+│   │   ├── channels.py
+│   │   ├── dashboard.py
+│   │   ├── logs.py
+│   │   └── oauth.py
+│   │
+│   ├── app.py
+│   ├── common.py
+│   └── log_browser.py
 │
 ├── main.py
-├── tray_launcher.py
+├── pytest.ini
 ├── requirements.txt
 ├── README.md
 └── .gitignore
@@ -92,44 +205,78 @@ RatsBoomBot/
 
 ---
 
-## Architecture Overview
+## Shared and Channel-Specific Behavior
 
-RatsBoomBot is built around a service-based structure.
+Version 4 introduced a distinction between globally reusable behavior and broadcaster-specific behavior.
 
-The `TwitchBot` class owns a `ServiceContainer`. The service container owns the bot's long-running services and shared business logic.
+### Shared Components
+
+Shared commands and events are loaded for every supported channel.
+
+Examples include:
+
+- Utility commands
+- Social commands
+- Viewer queues
+- Shoutouts
+- Settings commands
+- Moderation commands
+- Chat tracking
+- Follow and subscription events
+- Raids
+- Redeems
+- Stream online and offline events
+
+Shared files live under:
 
 ```text
-TwitchBot
-│
-├── Command Components
-│   ├── UtilityCommands
-│   ├── SocialCommands
-│   ├── PointsCommands
-│   ├── ModerationCommands
-│   ├── CounterCommands
-│   └── ViewerQueueCommands
-│
-├── Event Components
-│   └── ChatEvents
-│
-└── ServiceContainer
-    ├── BroadcasterService
-    ├── HelpService
-    ├── TimerService
-    ├── PointsService
-    ├── CounterService
-    ├── AdAnnouncementService
-    └── ViewerQueueService
+bot/shared/
 ```
 
-The general rule is:
+### Channel Profiles
 
-- Commands handle Twitch chat input.
-- Events listen for Twitch/EventSub activity.
-- Services contain business logic.
-- SQLite stores persistent data.
-- `.env` stores configuration.
-- User-facing language stays rat-themed.
+Each broadcaster can have a profile under:
+
+```text
+bot/channels/<channel_name>/profile.py
+```
+
+A profile can configure:
+
+- Twitch username
+- Channel-specific messages
+- Timer messages
+- Point-system name
+- Point-system command
+- Points earned per message
+- Message reward cooldown
+- Gamble chance
+- Duel expiration
+- Daily redeem behavior
+- First redeem behavior
+- Redeem milestones
+- Follow messages
+- Subscription messages
+- Raid messages
+- Channel-specific commands
+- Game-specific modules
+
+This allows Ninjakaing to keep rat-themed behavior without forcing the same theme onto every other channel.
+
+---
+
+## Included Channel Profiles
+
+The current repository includes profiles for:
+
+```text
+ninjakaing
+developer_ninjakaing
+```
+
+The developer channel is useful for testing profile loading, alternate point themes, commands, messages, and authorization without using the main channel.
+
+Additional broadcasters can be added by creating another package under `bot/channels/` and registering its profile.
 
 ---
 
@@ -140,26 +287,28 @@ The general rule is:
 ```bash
 git clone https://github.com/Akaing1/RatsBoomBot.git
 cd RatsBoomBot
-git checkout release/1.0.0
+git checkout release/4.1.1-local
 ```
 
-### 2. Create and Activate a Virtual Environment
+The `-local` branch names are repository development branches. Replace the checkout target with the final published release branch when applicable.
+
+### 2. Create a Virtual Environment
 
 Windows PowerShell:
 
-```bash
+```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
 Windows Command Prompt:
 
-```bash
+```bat
 python -m venv .venv
 .venv\Scripts\activate.bat
 ```
 
-macOS/Linux:
+macOS or Linux:
 
 ```bash
 python -m venv .venv
@@ -172,7 +321,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Create a `.env` File
+### 4. Create `.env`
 
 Create a `.env` file in the project root.
 
@@ -184,321 +333,613 @@ BOT_ID=
 OWNER_ID=
 
 PREFIX=!
-DATABASE_PATH=tokens.db
+
+DATABASE_PATH=.data/tokens.db
+STREAM_LOGS_PATH=.data/logs
+
+ADMIN_HOST=127.0.0.1
+ADMIN_PORT=4345
+ADMIN_BASE_URL=http://127.0.0.1:4345
+
+ADMIN_SECRET=
+SESSION_SECRET=
+
+BOT_REDIRECT_URI=http://127.0.0.1:4345/oauth/bot
+CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel
+
+BOT_SCOPES=user:read:chat user:write:chat user:bot
+CHANNEL_SCOPES=channel:bot moderator:manage:banned_users moderator:read:followers channel:read:redemptions channel:read:subscriptions channel:read:ads channel:manage:moderators
 
 IGNORED_USERS=streamelements,nightbot,ratsboombot
 
-DISCORD=
-YOUTUBE=
+DAILY_REDEEM_TITLE=Steal some cheese
+FIRST_REDEEM_TITLE=first
+
+DAILY_REDEEM_BREAD=100
+FIRST_REDEEM_BREAD=250
 ```
 
-### Environment Variable Notes
+Generate strong random values for:
+
+```env
+ADMIN_SECRET=
+SESSION_SECRET=
+```
+
+The application will refuse to start if either is missing.
+
+---
+
+## Environment Variables
 
 | Variable | Purpose |
 | --- | --- |
 | `CLIENT_ID` | Twitch application client ID |
 | `CLIENT_SECRET` | Twitch application client secret |
 | `BOT_ID` | Twitch user ID of the bot account |
-| `OWNER_ID` | Twitch user ID of the bot owner |
-| `PREFIX` | Chat command prefix, defaults to `!` |
-| `DATABASE_PATH` | SQLite database file path, defaults to `tokens.db` |
-| `IGNORED_USERS` | Comma-separated usernames that should not earn Stale Bread |
-| `DISCORD` | Discord invite/link used by social commands and timers |
-| `YOUTUBE` | YouTube link used by social commands and timers |
+| `OWNER_ID` | Twitch user ID of the primary owner account |
+| `PREFIX` | Chat command prefix |
+| `DATABASE_PATH` | SQLite database path |
+| `STREAM_LOGS_PATH` | Directory used for per-stream logs |
+| `ADMIN_HOST` | Dashboard bind address |
+| `ADMIN_PORT` | Dashboard port |
+| `ADMIN_BASE_URL` | Public base URL used by the dashboard |
+| `ADMIN_SECRET` | Password or secret used for dashboard authentication |
+| `SESSION_SECRET` | Secret used to sign dashboard sessions |
+| `BOT_REDIRECT_URI` | OAuth callback for the bot account |
+| `CHANNEL_REDIRECT_URI` | OAuth callback for broadcaster accounts |
+| `BOT_SCOPES` | OAuth scopes requested for the bot account |
+| `CHANNEL_SCOPES` | OAuth scopes requested for broadcasters |
+| `IGNORED_USERS` | Users excluded from passive point rewards |
+| `DAILY_REDEEM_TITLE` | Default title for the daily redeem |
+| `FIRST_REDEEM_TITLE` | Default title for the first redeem |
+| `DAILY_REDEEM_BREAD` | Default daily redeem reward |
+| `FIRST_REDEEM_BREAD` | Default first redeem reward |
+
+Profile values can override or replace some channel-facing defaults.
+
+---
+
+## Twitch Application Configuration
+
+Create a Twitch developer application and configure its OAuth redirect URLs.
+
+For local development, the expected callbacks are:
+
+```text
+http://127.0.0.1:4345/oauth/bot
+http://127.0.0.1:4345/oauth/channel
+```
+
+These must match the values configured in both Twitch and `.env`.
+
+---
+
+## OAuth Scopes
+
+### Bot Scopes
+
+```text
+user:read:chat
+user:write:chat
+user:bot
+```
+
+These allow the bot account to participate in Twitch chat through TwitchIO.
+
+### Broadcaster Scopes
+
+```text
+channel:bot
+moderator:manage:banned_users
+moderator:read:followers
+channel:read:redemptions
+channel:read:subscriptions
+channel:read:ads
+channel:manage:moderators
+```
+
+These support:
+
+- Registering the bot for a channel
+- Timeouts and bans
+- Follow events
+- Channel-point redeems
+- Subscription events
+- Ad schedules and ad warnings
+- Moderator lookup
+- Restoring moderator status after `!kamikaze`
+
+### Reauthorization Requirement
+
+Adding a scope to `.env` does not update previously issued tokens.
+
+After changing either scope list, reauthorize the affected account through the dashboard so Twitch issues a new token with the updated permissions.
 
 ---
 
 ## Running the Bot
 
-Development mode:
+### System Tray Mode
+
+Run:
 
 ```bash
 python main.py
 ```
 
-Windows tray launcher mode:
+Without additional arguments, the application launches using the Windows tray interface.
+
+### Runtime-Only Mode
+
+Run:
 
 ```bash
-pythonw tray_launcher.py
+python main.py --runtime
 ```
 
-The tray launcher starts the bot automatically and provides a small menu with:
+This starts the Twitch bot and FastAPI dashboard directly without the tray interface.
 
-- Start Bot
-- Stop Bot
-- Exit
-
-The tray icon uses:
+The dashboard is available by default at:
 
 ```text
-assets/NinjaDoro.ico
+http://127.0.0.1:4345
 ```
 
 ---
 
-## Twitch Authorization
+## Administration Dashboard
 
-RatsBoomBot uses TwitchIO `AutoBot`, stores OAuth tokens in SQLite, and reloads saved tokens when the bot starts.
+The FastAPI dashboard provides browser-based management for the bot.
 
-The bot currently creates EventSub subscriptions for:
+Current dashboard areas include:
 
-- Chat messages
-- Channel follows
-- Channel subscriptions
-- Channel resubscription messages
-- Channel bans
-- Ad break begin events
+- Administrator authentication
+- Bot-account OAuth
+- Broadcaster OAuth
+- Authorized channel management
+- Channel information
+- Stream-log browsing
+- Runtime access to the active bot and database
 
-The exact Twitch scopes needed depend on which features you enable. At minimum, the bot is written around chat read/write access, bot/broadcaster authorization, moderation timeout ability, follower/subscription events, and ad schedule access.
+The dashboard routes are split into separate routers:
 
-When a broadcaster authorizes the bot, the bot saves their token and adds them as a tracked broadcaster.
+```text
+web/routers/auth.py
+web/routers/channels.py
+web/routers/dashboard.py
+web/routers/logs.py
+web/routers/oauth.py
+```
+
+This keeps the main FastAPI application small and separates each feature area.
 
 ---
 
-## Database
+## Database and Migrations
 
 RatsBoomBot uses SQLite through `asqlite`.
 
-By default, the database path is:
+The default database location is:
 
 ```text
-tokens.db
+.data/tokens.db
 ```
 
-You can change this with:
+Database changes are applied through versioned migrations.
 
-```env
-DATABASE_PATH=your_database_name.db
-```
-
-### `tokens`
-
-Stores OAuth tokens.
+Current migrations include:
 
 ```text
-tokens
-------
-user_id TEXT PRIMARY KEY
-token   TEXT NOT NULL
-refresh TEXT NOT NULL
+v001_initial_schema.py
+v002_redeem_stats.py
 ```
 
-### `viewers`
+At startup, the migration runner:
 
-Stores chat activity and Stale Bread balances.
+1. Determines which migrations have already been applied.
+2. Runs any missing migrations in order.
+3. Records completed migrations.
+4. Reports whether the database is current.
+
+Do not manually recreate the database for ordinary schema upgrades. Add a new migration instead.
+
+---
+
+## Persistent Data
+
+The database stores information including:
+
+- OAuth access tokens
+- OAuth refresh tokens
+- EventSub subscription records
+- Authorized broadcaster records
+- Per-channel viewer balances
+- Viewer message counts
+- Counter values
+- Broadcaster settings
+- Redeem claims
+- Redeem statistics
+- Migration history
+
+Points are separated by broadcaster, meaning the same viewer can have a different balance in each channel.
+
+---
+
+## Logging
+
+Version 4.1 introduced structured logging throughout the core application.
+
+Logging covers:
+
+- Application startup
+- Runtime initialization
+- Database migrations
+- OAuth tokens
+- Broadcaster discovery
+- Channel-profile loading
+- Component loading
+- Service setup
+- Service startup and shutdown
+- Twitch EventSub activity
+- Chat events
+- Commands
+- Points
+- Redeems
+- Viewer queues
+- Timers
+- Ads
+- Stream logs
+- Moderation
+- Exceptions and background-task failures
+
+Common subsystem prefixes include:
 
 ```text
-viewers
--------
-user_id  TEXT PRIMARY KEY
-username TEXT NOT NULL
-points   INTEGER NOT NULL DEFAULT 0
-messages INTEGER NOT NULL DEFAULT 0
+[Startup]
+[Database]
+[OAuth]
+[Profiles]
+[Components]
+[Services]
+[Commands]
+[EventSub]
+[Chat]
+[Points]
+[Redeems]
+[Timers]
+[Ads]
+[Moderation]
+[Shutdown]
 ```
 
-Internally, Stale Bread is still stored as `points`.
+Routine high-volume activity is generally logged at `DEBUG`, while state changes and major lifecycle events use `INFO`.
 
-### `counters`
+Failures use contextual exception logging with tracebacks.
 
-Stores meme counter values.
+---
+
+## Stream Logs
+
+A separate text log is created for each detected live-stream session.
+
+The default root directory is:
 
 ```text
-counters
---------
-name  TEXT PRIMARY KEY
-value INTEGER NOT NULL DEFAULT 0
+.data/logs
 ```
+
+Logs are organized by channel and stream ID.
+
+Example:
+
+```text
+.data/logs/
+└── ninjakaing/
+    └── 2026-08-01_200000_stream-123456789/
+        └── log.txt
+```
+
+Stream logs may contain:
+
+- Chat messages
+- Follows
+- Subscriptions
+- Raids
+- Redeems
+- Stream lifecycle events
+- Bot startup and shutdown markers
+
+When the bot restarts during an active stream, it attempts to resume the existing stream session rather than create an unrelated duplicate.
+
+The dashboard includes a browser for reviewing these logs.
 
 ---
 
 ## Commands
 
-The default prefix is `!`.
+The default command prefix is:
 
-### Utility Commands
+```text
+!
+```
 
-| Command | Description                                       |
-| --- |---------------------------------------------------|
-| `!hi` | Greets the user.                                  |
-| `!hi @user` | Says hello to another user.                       |
-| `!choice option1 option2 option3` | Randomly chooses one option.                      |
-| `!kaboom` | Says the user blew up.                            |
-| `!kaboom @user` | Says the user blew up another user.               |
-| `!stinky` | Gives the user a random stinkiness percentage.    |
-| `!stinky @user` | Gives user user a random stinkiness percentage.   |
-| `!lucky` | Gives the user a random luck percentage.          |
-| `!lucky @user` | Gives another user a random luck percentage.      |
-| `!smart` | Gives the user a random smartness percentage.     |
-| `!smart @user` | Gives another user a random smartness percentage. |
-| `!lurk` | Sends a rat-themed lurk message.                  |
-| `!help` | Lists available commands discovered from the bot. |
+Actual commands can vary by active profile.
 
----
+### Shared Utility Commands
+
+| Command | Description |
+| --- | --- |
+| `!hi` | Greets the caller |
+| `!hi @user` | Greets another viewer |
+| `!choice ...` | Randomly chooses from the provided options |
+| `!kaboom` | Sends an explosion message |
+| `!stinky` | Generates a random stinkiness percentage |
+| `!lucky` | Generates a random luck percentage |
+| `!smart` | Generates a random smartness percentage |
+| `!lurk` | Sends a lurk response |
+| `!help` | Lists currently loaded commands |
 
 ### Social Commands
 
 | Command | Description |
 | --- | --- |
-| `!socials` | Shows configured Discord and YouTube links. |
-| `!socials discord` | Shows the Discord link. |
-| `!socials youtube` | Shows the YouTube link. |
+| `!socials` | Shows configured channel social links |
+| `!socials discord` | Shows the configured Discord link |
+| `!socials youtube` | Shows the configured YouTube link |
+| `!setdiscord <url>` | Updates the channel Discord link |
+| `!setyoutube <url>` | Updates the channel YouTube link |
 
-Social links come from:
+Settings commands require broadcaster or moderator permission.
 
-```env
-DISCORD=
-YOUTUBE=
-```
-
----
-
-### Stale Bread Commands
-
-Stale Bread is the bot's loyalty point system.
-
-Viewers earn Stale Bread by chatting. The bot tracks eligible chat messages and awards bread automatically.
-
-Current earning behavior:
-
-- Viewers earn **10 Stale Bread** per eligible message.
-- Each viewer has a **60-second cooldown** between earning events.
-- Ignored users do not earn Stale Bread.
-- Stale Bread is stored persistently in SQLite.
+### Timer Settings
 
 | Command | Description |
 | --- | --- |
-| `!bread` | Shows your Stale Bread balance. |
-| `!bread @user` | Shows another viewer's Stale Bread balance. |
-| `!bread leaderboard` | Shows the top 5 Stale Bread holders. |
-| `!bread add @user amount` | Adds Stale Bread to a viewer. Moderator/broadcaster intended. |
-| `!bread reset` | Resets every viewer's Stale Bread to 0. Broadcaster only. |
-| `!bread gamble amount` | Gambles a specific amount of Stale Bread. |
-| `!bread gamble all` | Gambles all of your Stale Bread. |
-| `!bread duel @user amount` | Challenges another viewer to a Stale Bread duel. |
-| `!bread duel @user all` | Challenges another viewer with all of your Stale Bread. |
-| `!bread duel accept` | Accepts a pending duel. |
-| `!bread duel decline` | Declines a pending duel. |
+| `!timers` | Shows whether timers are enabled |
+| `!timers on` | Enables timer announcements |
+| `!timers off` | Disables timer announcements |
 
-#### Gamble Rules
-
-- A gamble can use a number or `all`.
-- The viewer must have enough Stale Bread.
-- Winning chance is currently **45%**.
-- Winning adds the gambled amount.
-- Losing removes the gambled amount.
-- All-in wins and losses use special rat-themed messages.
-
-#### Duel Rules
-
-- A viewer challenges another viewer for a bread amount.
-- The opponent must accept or decline.
-- Pending duels expire after **60 seconds**.
-- The challenger and opponent cannot be the same user.
-- Both balances are checked when the duel is created.
-- Both balances are checked again when the duel is accepted.
-- The winner is randomly chosen.
-- The winner steals the duel amount from the loser.
-
----
-
-### Counter Commands
-
-Counter commands increment persistent SQLite-backed counters.
-
-| Command | Counter Key | Description                                 |
-| --- | --- |---------------------------------------------|
-| `!explode` | `explode` | Increments Rat's explosion count.           |
-| `!reklop` | `reklop` | Increments the Reklop meme counter.         |
-| `!randy` | `randy` | Increments Randy's int counter.             |
-| `!car` | `car` | Increments Car's creeper explosion counter. |
-
-Each counter is stored by name in the `counters` table and persists between bot restarts.
-
----
+Timer settings are persisted separately for each broadcaster.
 
 ### Viewer Queue Commands
 
-The viewer queue is an in-memory queue for playing with viewers on stream.
+| Command | Description |
+| --- | --- |
+| `!open` | Opens the viewer queue |
+| `!close` | Closes the viewer queue |
+| `!join` | Adds the caller to the queue |
+| `!leave` | Removes the caller from the queue |
+| `!queue` | Shows the queue preview |
+| `!next` | Selects the next viewer |
+| `!clear` | Clears the queue |
+
+Queue administration commands require broadcaster or moderator access.
+
+Viewer queues are currently held in memory and reset when the bot restarts.
+
+### Shoutout Command
 
 | Command | Description |
 | --- | --- |
-| `!open` | Opens the viewer queue. |
-| `!close` | Closes the viewer queue. |
-| `!join` | Adds the caller to the queue if the queue is open. |
-| `!leave` | Removes the caller from the queue if the queue is open. |
-| `!queue` | Shows the first 5 users in the queue. |
-| `!next` | Pulls the next viewer from the queue. Broadcaster/mod only. |
-| `!clear` | Clears the queue. Broadcaster/mod only. |
+| `!so <username>` | Sends a Twitch shoutout message |
 
-Current queue behavior:
+The shoutout command requires broadcaster or moderator permission.
 
-- The queue starts closed.
-- Viewers cannot join while it is closed.
-- Usernames are stored lowercase.
-- Duplicate joins are blocked.
-- `!queue` previews the first 5 users and shows how many more are waiting.
-- `!next` pops the first viewer from the queue.
-- `!clear` empties the queue.
-- Queue data is not stored in SQLite, so it resets when the bot restarts.
+### Counter Commands
 
-Implementation note:
+| Command | Description |
+| --- | --- |
+| `!explode` | Increments the explosion counter |
+| `!reklop` | Increments the Reklop counter |
+| `!randy` | Increments the Randy counter |
+| `!car` | Increments the car counter |
 
-- `!next` and `!clear` check for moderator or broadcaster access.
-- `!open` and `!close` currently do not check permissions in the command file.
-- `ViewerQueueService.next_viewer()` returns a closed-queue message string if the queue is closed, so the command should ideally handle that separately to avoid treating the message like a username.
+Counter values are stored persistently in SQLite.
 
 ---
 
-### Moderation/Fun Command
+## Point Systems
 
-| Command | Description                                                                                      |
-| --- |--------------------------------------------------------------------------------------------------|
-| `!kamikaze` | Times out the user for 10 seconds.                                                               |
-| `!kamikaze @user` | Attempts to time out another user for 10 seconds. If it misses, the user gets timed out instead. |
+Point-system commands and terminology are selected by the channel profile.
 
-Current behavior:
+For example:
 
-- Timeout duration is **10 seconds**.
-- Calling `!kamikaze` without a target times out the caller.
-- Targeting yourself times out the caller.
-- The broadcaster and moderators cannot be targeted.
-- The command rolls a random number from 1 to 100.
-- If the roll is greater than 75, the target gets timed out.
-- Otherwise, the caller gets timed out.
+- Ninjakaing can use a rat-themed Stale Bread system.
+- The developer channel can use an alternate test currency such as ores.
+
+A point profile can configure:
+
+- Whether points are enabled
+- Command name
+- Currency display name
+- Singular and plural terminology
+- Points earned per message
+- Message cooldown
+- Gamble chance
+- Duel expiration
+- Response messages
+
+Typical point commands include:
+
+```text
+!<points-command>
+!<points-command> @user
+!<points-command> leaderboard
+!<points-command> add @user <amount>
+!<points-command> reset
+!<points-command> gamble <amount>
+!<points-command> gamble all
+!<points-command> duel @user <amount>
+!<points-command> duel @user all
+!<points-command> duel accept
+!<points-command> duel decline
+```
+
+Balances are stored per broadcaster and per viewer.
+
+---
+
+## Gambling
+
+A viewer can gamble either a fixed amount or their entire balance.
+
+General behavior:
+
+- The amount must be positive.
+- The viewer must have enough points.
+- The win chance comes from the active profile.
+- A win adds the gambled amount.
+- A loss removes the gambled amount.
+- Profiles can define separate messages for ordinary and all-in results.
+
+---
+
+## Viewer Duels
+
+Viewers can challenge each other for points.
+
+General behavior:
+
+- A viewer cannot duel themselves.
+- Both users must have enough points.
+- A duel is stored as pending for the targeted opponent.
+- The opponent can accept or decline.
+- Pending duels expire after a profile-configured period.
+- Balances are checked again at acceptance time.
+- A winner is randomly selected.
+- The loser pays the duel amount to the winner.
+
+---
+
+## Channel-Point Redeems
+
+RatsBoomBot supports profile-configured channel-point redeem behavior.
+
+Current redeem types include:
+
+### Daily Redeem
+
+- Can be claimed once per viewer per stream.
+- Awards a profile-configured point amount.
+- Can have a random double-reward chance.
+- Tracks total lifetime claims.
+- Supports claim milestones.
+
+### First Redeem
+
+- Can only be claimed once per stream.
+- Awards a profile-configured point amount.
+- Records the first winner.
+- Supports lifetime milestones.
+
+Redeem claims are associated with the Twitch stream ID, preventing duplicate claims during the same broadcast.
+
+---
+
+## Timer Announcements
+
+Timer announcements are evaluated per channel.
+
+Current default service behavior:
+
+- Checks periodically in the background.
+- Only considers live broadcasters.
+- Requires enough time since the last announcement.
+- Requires enough recent chat activity.
+- Respects each channel's enabled or disabled setting.
+- Uses messages from the active channel profile.
+- Skips templates that require a missing social link.
+- Rotates through the available messages.
+
+This allows every channel to share the timer service while using its own announcement text.
+
+---
+
+## Ad Warnings
+
+The ad announcement service checks active broadcasters for upcoming scheduled ads.
+
+When an ad is close enough, the bot sends a warning message to that channel.
+
+The service avoids sending the same warning repeatedly for the same scheduled ad.
 
 ---
 
 ## Event Handling
 
-`ChatEvents` currently listens for:
+Shared events currently cover:
 
 ### Chat Messages
 
-On each chat message, the bot:
+Chat messages can:
 
-1. Logs the message.
-2. Tracks the message for timer announcements.
-3. Tracks the message for Stale Bread earning.
+- Be written to the active stream log
+- Count toward timer activity
+- Award passive points
+- Trigger commands through TwitchIO
 
-### Follows
+### Community Events
 
-Sends a rat-themed follower message:
+Community events include:
+
+- Follows
+- Subscriptions
+- Subscription messages
+- Related channel notifications
+
+Messages are rendered from the active channel profile.
+
+### Raids
+
+Raid events can:
+
+- Log the source channel
+- Record the viewer count
+- Send a profile-specific raid message
+- Write the raid to the active stream log
+
+### Redeems
+
+Channel-point redemption events are matched against the active profile and forwarded to `RedeemService`.
+
+### Stream Events
+
+Stream events start and stop stream-log sessions when a broadcaster goes online or offline.
+
+---
+
+## `!kamikaze`
+
+`!kamikaze` is a chat-based timeout command.
+
+Usage:
 
 ```text
-<user> has snuck their way into the basement! Thanks for following!
+!kamikaze
+!kamikaze @user
 ```
 
-### Subscriptions
+Current behavior:
 
-Sends a rat-themed subscription message:
+- Calling it without a target attempts to time out the caller.
+- Targeting yourself has the same result.
+- A target attempt rolls a random number.
+- On success, the target receives a short timeout.
+- On failure, the caller receives the timeout.
+- The broadcaster cannot be targeted.
+- The bot account cannot be targeted.
+- Regular moderators can be targeted.
+- The command checks moderator status before the timeout.
+- If a moderator is timed out, a background task restores their moderator status afterward.
+
+The broadcaster authorization token must include:
 
 ```text
-<user> has subscribed! Rats stronk together!
+channel:manage:moderators
 ```
 
-### Resubscriptions
-
-Sends a message including the cumulative subscription month count.
+Without this scope, the bot cannot reliably check or restore moderator status.
 
 ---
 
@@ -506,350 +947,351 @@ Sends a message including the cumulative subscription month count.
 
 ### `ServiceContainer`
 
-Creates and owns the bot's shared services:
-
-- `BroadcasterService`
-- `HelpService`
-- `TimerService`
-- `PointsService`
-- `CounterService`
-- `AdAnnouncementService`
-- `ViewerQueueService`
-
-It also controls startup and shutdown for long-running services.
+Creates shared service instances and manages their setup, startup, and shutdown order.
 
 ### `BroadcasterService`
 
-Tracks broadcasters that have authorized the bot.
+Tracks authorized broadcasters and resolves their Twitch information and live status.
 
-Main responsibilities:
+### `BroadcasterSettingsService`
 
-- Load known broadcaster IDs.
-- Add newly authorized broadcasters.
-- Check which broadcasters are live.
-- Check which broadcasters are offline.
+Persists channel settings such as:
 
-This service is used by timer announcements and ad warnings so the bot only sends certain automated messages to active/live channels.
+- Discord URL
+- YouTube URL
+- Timer enabled state
 
 ### `PointsService`
 
-Owns the Stale Bread system.
+Handles:
 
-Main responsibilities:
+- Viewer balances
+- Passive message rewards
+- Leaderboards
+- Point additions and removals
+- Resets
+- Gambling-related balance operations
+- Pending duels
+- Legacy point-data migration
 
-- Create the `viewers` table.
-- Track chat activity.
-- Apply earning cooldowns.
-- Add Stale Bread.
-- Remove Stale Bread.
-- Reset all balances.
-- Read leaderboard data.
-- Create, resolve, expire, and remove pending duels.
+### `RedeemService`
 
-Important constants:
+Handles:
 
-```python
-BREAD_PER_MESSAGE = 10
-MESSAGE_COOLDOWN_SECONDS = 60
-DUEL_EXPIRATION_SECONDS = 60
-```
+- Daily claims
+- First claims
+- Stream-specific duplicate prevention
+- Reward payouts
+- Claim counts
+- Milestones
+- Offline checks
 
 ### `CounterService`
 
-Owns persistent meme counters.
-
-Main responsibilities:
-
-- Create the `counters` table.
-- Read a counter value.
-- Increment a counter.
-- Store the updated counter value.
-
-### `HelpService`
-
-Discovers loaded commands from `self.bot.commands`.
-
-The help service recursively collects command names and subcommand names, then formats a single chat-friendly help message.
+Stores and increments persistent named counters.
 
 ### `TimerService`
 
-Sends rotating announcement messages while live.
-
-Current behavior:
-
-- Checks every **5 seconds**.
-- Requires a broadcaster to be live.
-- Requires **30 minutes** since the last announcement.
-- Requires **20 tracked chat messages** before sending.
-- Rotates through a small hardcoded list of messages.
-- Resets message count after sending an announcement.
-
-Current hardcoded timer messages promote:
-
-- Discord
-- YouTube
-- `!help`
+Tracks message activity and sends profile-specific announcements while channels are live.
 
 ### `AdAnnouncementService`
 
-Checks live broadcasters for upcoming ads.
-
-Current behavior:
-
-- Checks every **30 seconds**.
-- Looks at Twitch ad schedule data.
-- Warns chat when an ad is starting in approximately **60 seconds or less**.
-- Avoids warning twice for the same scheduled ad time.
-
-Current warning message:
-
-```text
-Hide! The humans are coming! Ads starting in ~<seconds> seconds!
-```
+Checks upcoming ad schedules and sends one warning per ad.
 
 ### `ViewerQueueService`
 
-Owns the viewer queue state.
+Maintains separate in-memory queues for each broadcaster.
 
-Main responsibilities:
+### `StreamLogService`
 
-- Open the queue.
-- Close the queue.
-- Add users.
-- Remove users.
-- List the queue.
-- Pop the next viewer.
-- Clear the queue.
-- Report queue size.
+Creates, resumes, writes, and closes per-stream log sessions.
 
-The queue uses:
+### `HelpService`
 
-```python
-collections.deque
+Discovers loaded commands and subcommands and formats the help response.
+
+---
+
+## Adding a New Channel
+
+A new channel generally needs:
+
+```text
+bot/channels/<channel_name>/
+├── commands/
+├── games/
+├── __init__.py
+└── profile.py
 ```
 
-It also keeps a `set` of usernames to prevent duplicate joins.
+The profile should define the channel's:
+
+- Twitch username
+- Enabled features
+- Point configuration
+- Redeem configuration
+- Community-event messages
+- Timer announcements
+- Channel-specific components
+
+The broadcaster must then authorize the application through the dashboard.
+
+Broadcaster IDs are resolved from Twitch usernames, so permanent IDs do not need to be manually hardcoded into every profile.
 
 ---
 
-## Startup Flow
+## Adding Channel-Specific Commands
 
-When `python main.py` runs:
+Channel-only commands belong under:
 
-1. Logging is configured.
-2. An SQLite connection pool is opened.
-3. `setup_database()` creates the `tokens` table if needed.
-4. Stored OAuth tokens are loaded.
-5. Stored broadcaster IDs are collected from token rows.
-6. Initial chat subscriptions are created for stored broadcasters.
-7. `TwitchBot` is created.
-8. Saved tokens are added back into TwitchIO.
-9. The bot starts with `load_tokens=False`.
-10. `setup_hook()` creates the `ServiceContainer`.
-11. Services create their required tables.
-12. Command and event components are added.
-13. Timer and ad services start.
-14. Loaded commands are logged.
+```text
+bot/channels/<channel_name>/commands/
+```
 
----
+General commands available to every channel belong under:
 
-## Windows Tray Launcher
+```text
+bot/shared/commands/
+```
 
-`tray_launcher.py` is an optional Windows-style launcher.
+Game-specific commands can be organized under:
 
-It uses:
+```text
+bot/channels/<channel_name>/games/
+```
 
-- `pystray`
-- `Pillow`
-- `subprocess`
-- `assets/NinjaDoro.ico`
-
-Behavior:
-
-- Starts the bot automatically when the tray app opens.
-- Launches `main.py` in a new console window.
-- Provides menu items to start, stop, and exit.
-- Terminates the bot process when stopped or when the tray app exits.
+The component loader imports the appropriate packages for each active profile.
 
 ---
 
-## Current Implementation Notes
+## Testing
 
-These are useful details to know while developing the bot:
+Run the complete test suite with:
 
-- Commands are intentionally thin and mostly call services.
-- Persistent features should use SQLite-backed services.
-- The viewer queue is currently memory-only.
-- Timer messages are hardcoded in `TimerService`.
-- Social links come from environment variables.
-- The help command lists loaded command names automatically.
-- Stale Bread is user-facing branding; internally, the database still uses `points`.
-- EventSub subscriptions are created both from saved tokens and when OAuth authorization happens.
-- The tray launcher assumes a Windows environment because it uses `subprocess.CREATE_NEW_CONSOLE`.
+```bash
+pytest
+```
 
----
+Current automated coverage includes:
 
-## Known Gaps / Future Improvements
+- Admin authentication
+- Log-browser behavior
+- Stream-log sessions
+- Viewer queues
 
-### Configuration
-
-- Add a real `.env.example` file to the repository.
-- Validate required environment variables at startup.
-- Avoid starting the bot when required values are missing.
-
-### Viewer Queue
-
-- Add moderator/broadcaster checks to `!open` and `!close`.
-- Make `ViewerQueueService.next_viewer()` return `None` or a structured result when the queue is closed.
-- Optionally persist the queue if stream restarts should not wipe it.
-- Add queue position lookup.
-- Add max queue size.
-- Add optional game/mode labels.
-
-### Commands
-
-- Add custom commands stored in SQLite.
-- Add edit/remove command support.
-- Add command aliases.
-- Add permissions metadata.
-- Improve command error messages.
-
-### Timers
-
-- Move timer messages to SQLite.
-- Add chat commands for adding/removing timers.
-- Add enable/disable state.
-- Add per-channel timer configuration.
-- Add dashboard support.
-
-### Stale Bread
-
-- Add daily claim command.
-- Add bread shop/rewards.
-- Add cooldown display.
-- Add transfer/gift command.
-- Add more mini-games.
-- Add clearer moderator-only checks and messages.
-
-### Dashboard
-
-Long-term dashboard ideas:
-
-- Start/stop bot
-- Reload commands
-- Manage timers
-- Manage custom commands
-- View leaderboard
-- Manage counters
-- Configure social links
-- View queue
-- Control queue
-- View logs
-
-### Integrations
-
-Possible future integrations:
-
-- OBS
-- Streamer.bot
-- Channel point redemptions
-- Giveaways
-- Quotes
-- AI chat features
-
----
-
-## Development Conventions
-
-Preferred project style:
-
-- Keep commands small.
-- Put reusable logic in services.
-- Keep Twitch event listeners simple.
-- Keep persistent state in SQLite.
-- Keep secrets and stream-specific values in `.env`.
-- Keep chat responses fun, rat-themed, and stream-specific.
-- Prefer reusable services over one-off command logic.
+New logic should generally include a focused test, especially for database behavior, permission checks, service lifecycle behavior, and profile-specific functionality.
 
 ---
 
 ## Troubleshooting
 
-### `ServiceContainer` has no attribute `viewer_queue`
+### The dashboard refuses to start
 
-Make sure your branch includes:
-
-```python
-from bot.services.viewer_queue_service import ViewerQueueService
-```
-
-and that `ServiceContainer.__init__()` contains:
-
-```python
-self.viewer_queue = ViewerQueueService(bot)
-```
-
-Also make sure the bot process was restarted after pulling changes.
-
-### Queue Commands Do Not Work
-
-Check that `ViewerQueueCommands` is imported and added in `bot/bot.py`:
-
-```python
-from bot.commands.viewer_queue import ViewerQueueCommands
-```
-
-and:
-
-```python
-await self.add_component(ViewerQueueCommands(self))
-```
-
-### Users Cannot Earn Stale Bread
-
-Check:
-
-- The bot is receiving chat messages.
-- The user is not listed in `IGNORED_USERS`.
-- The user is outside the 60-second earning cooldown.
-- The `viewers` table exists in SQLite.
-- `ChatEvents.event_message()` is loaded.
-
-### Social Commands Return Empty Links
-
-Check the `.env` values:
+Confirm these are present:
 
 ```env
-DISCORD=
-YOUTUBE=
+ADMIN_SECRET=
+SESSION_SECRET=
 ```
 
-### Timers Are Not Sending
+### OAuth redirects fail
 
-Timers only send when:
+Confirm the callback URLs match in all three places:
 
-- A tracked broadcaster is live.
-- At least 30 minutes have passed.
-- At least 20 chat messages have been tracked.
-- The bot can send messages to the broadcaster's chat.
+- Twitch developer-console application settings
+- `.env`
+- The address used to open the dashboard
 
-### Tray Launcher Does Not Start
+### A newly added scope is still missing
 
-Check:
+Reauthorize the account. Refreshing an old token does not add newly requested scopes.
 
-- `assets/NinjaDoro.ico` exists.
-- Dependencies are installed.
-- You are running in an environment that supports `pystray`.
-- On Windows, try running:
+### Moderator restoration fails
 
-```bash
-python tray_launcher.py
+Confirm the broadcaster token has:
+
+```text
+channel:manage:moderators
 ```
 
-instead of `pythonw tray_launcher.py` so errors are visible.
+Then reauthorize the broadcaster.
+
+### Follow events do not appear
+
+Confirm the broadcaster token includes:
+
+```text
+moderator:read:followers
+```
+
+Also confirm the relevant EventSub subscription was created successfully.
+
+### Redeems do not fire
+
+Confirm:
+
+```text
+channel:read:redemptions
+```
+
+is authorized and the reward title matches the active profile.
+
+### Subscription messages do not fire
+
+Confirm:
+
+```text
+channel:read:subscriptions
+```
+
+is authorized for the broadcaster.
+
+### Ads cannot be read
+
+Confirm:
+
+```text
+channel:read:ads
+```
+
+is authorized.
+
+### Database migrations fail
+
+Review the `[Database]` migration logs and verify that the SQLite file and its parent directory are writable.
+
+### No timer announcement is sent
+
+Timer announcements require:
+
+- The broadcaster to be live
+- Timers to be enabled
+- Enough elapsed time
+- Enough recent messages
+- At least one usable profile timer message
+
+### No stream log is created
+
+A stream log is only active while the service detects an active Twitch stream session.
 
 ---
 
-## Personal Project Note
+## Version History
 
-RatsBoomBot is a personal stream bot project. The goal is to slowly replace more external bot functionality with custom-built features that fit the stream's rat-themed identity.
+### 4.1.1 — Moderation Fix
+
+- Fixed moderator handling in `!kamikaze`.
+- Allowed ordinary moderators to remain valid command targets.
+- Added moderator-status checks before timeout execution.
+- Added delayed moderator restoration after the timeout.
+- Protected the broadcaster from targeting.
+- Protected the bot account from targeting.
+- Added the `channel:manage:moderators` broadcaster scope.
+- Improved moderator restoration logging and task retention.
+
+### 4.1.0 — Structured Logging
+
+- Added structured logging throughout the core application.
+- Standardized the main logger as `RatBoomBot`.
+- Added subsystem prefixes for easier log filtering.
+- Improved startup and shutdown visibility.
+- Added contextual logging to services, commands, events, storage, OAuth, and component loading.
+- Added traceback logging for unexpected failures.
+- Improved background-task lifecycle handling.
+- Moved high-volume routine activity to `DEBUG`.
+- Added meaningful state-change logs at `INFO`.
+
+### 4.0.0 — Channel Profile Refactor
+
+- Introduced broadcaster-specific channel profiles.
+- Separated shared commands from channel-specific commands.
+- Separated shared events from channel-specific behavior.
+- Added dynamic profile and component loading.
+- Added separate profile packages for Ninjakaing and the developer channel.
+- Moved rat-themed behavior into the Ninjakaing profile.
+- Added per-channel point-system themes.
+- Added per-channel timer messages.
+- Added per-channel follow, subscription, raid, and redeem messages.
+- Added per-channel social settings.
+- Refactored points into broadcaster-specific balances.
+- Expanded multi-broadcaster support.
+- Improved broadcaster discovery using Twitch usernames.
+- Reorganized the old global command and event packages under `bot/shared/`.
+
+### 3.0.0 — Migrations, Web Routers, and Tests
+
+- Added a versioned database migration system.
+- Added an initial-schema migration.
+- Added redeem-statistics migration support.
+- Added migration tracking and ordered execution.
+- Split the administration dashboard into dedicated FastAPI routers.
+- Added separate routers for authentication, channels, dashboard pages, logs, and OAuth.
+- Added shared web utilities.
+- Added a dedicated stream-log browser module.
+- Reduced the size and responsibilities of `web/app.py`.
+- Added pytest configuration.
+- Added automated tests for admin authentication.
+- Added automated tests for log browsing.
+- Added automated tests for stream logging.
+- Added automated tests for viewer queues.
+- Expanded development and test dependencies.
+
+### 2.0.0 — Runtime, Dashboard, OAuth, and Stream Operations
+
+- Added a coordinated application runtime.
+- Added concurrent Twitch bot and FastAPI dashboard operation.
+- Added a browser-based administration interface.
+- Added bot-account OAuth handling.
+- Added broadcaster authorization through the dashboard.
+- Added persistent broadcaster and EventSub state.
+- Added stream-log support.
+- Added administration secrets and signed sessions.
+- Added configurable dashboard host, port, and base URL.
+- Added separate bot and broadcaster redirect URIs.
+- Moved runtime configuration toward `.data` storage paths.
+- Expanded the service layer beyond the original chat-command implementation.
+- Added support for managing multiple authorized channels from one running application.
+- Improved Windows tray integration around the new runtime.
+
+### 1.0.0 — Initial Modular Release
+
+- Added a TwitchIO-based chatbot.
+- Added modular command components.
+- Added Twitch EventSub chat support.
+- Added SQLite-backed OAuth token storage.
+- Added a rat-themed Stale Bread loyalty system.
+- Added passive chat rewards.
+- Added leaderboards.
+- Added gambling.
+- Added viewer duels.
+- Added persistent counters.
+- Added viewer queues.
+- Added social commands.
+- Added utility commands.
+- Added timer announcements.
+- Added ad warnings.
+- Added follow and subscription responses.
+- Added a Windows tray launcher.
+
+---
+
+## Development Direction
+
+RatsBoomBot is intentionally designed for a small number of known channels.
+
+The goal is not to become a public bot platform. New features should favor:
+
+- Clear channel profiles
+- Reusable shared services
+- Simple configuration
+- Reliable logging
+- Safe moderation behavior
+- Persistent migrations
+- Focused tests
+- Easy maintenance for a small group of streamers
+
+---
+
+## License
+
+This is a personal project. Add a formal license before distributing or accepting outside contributions.

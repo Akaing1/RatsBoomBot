@@ -20,6 +20,7 @@ def authenticate_admin(request: Request, submitted_secret: str) -> bool:
     request.session.clear()
     request.session[ADMIN_SESSION_KEY] = True
     request.session[CSRF_SESSION_KEY] = secrets.token_urlsafe(32)
+
     return True
 
 
@@ -30,9 +31,11 @@ def logout_admin(request: Request) -> None:
 def get_csrf_token(request: Request) -> str:
     csrf_token = request.session.get(CSRF_SESSION_KEY)
 
-    if not csrf_token:
-        csrf_token = secrets.token_urlsafe(32)
-        request.session[CSRF_SESSION_KEY] = csrf_token
+    if csrf_token:
+        return csrf_token
+
+    csrf_token = secrets.token_urlsafe(32)
+    request.session[CSRF_SESSION_KEY] = csrf_token
 
     return csrf_token
 

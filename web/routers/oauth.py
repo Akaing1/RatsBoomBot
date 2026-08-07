@@ -4,17 +4,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from config.settings import settings
 from storage.database import save_token
 from web.admin_auth import require_admin
-from web.common import (
-    build_admin_context,
-    render_error,
-    templates
-)
-from web.oauth import (
-    build_bot_oauth_url,
-    build_channel_oauth_url,
-    exchange_code_for_token,
-    fetch_twitch_user
-)
+from web.common import build_admin_context, render_error, templates
+from web.oauth import build_bot_oauth_url, build_channel_oauth_url, exchange_code_for_token, fetch_twitch_user
 from web.state import get_bot, get_db
 
 router = APIRouter()
@@ -27,9 +18,7 @@ async def connect_channel(request: Request):
     if admin_redirect:
         return admin_redirect
 
-    return RedirectResponse(
-        build_channel_oauth_url()
-    )
+    return RedirectResponse(build_channel_oauth_url())
 
 
 @router.get("/connect/bot")
@@ -39,13 +28,11 @@ async def connect_bot(request: Request):
     if admin_redirect:
         return admin_redirect
 
-    return RedirectResponse(
-        build_bot_oauth_url()
-    )
+    return RedirectResponse(build_bot_oauth_url())
 
 
 @router.get("/oauth/channel", response_class=HTMLResponse)
-async def oauth_channel_callback(request: Request,code: str | None = None,error: str | None = None):
+async def oauth_channel_callback(request: Request, code: str | None = None, error: str | None = None):
     admin_redirect = require_admin(request)
 
     if admin_redirect:
@@ -68,15 +55,8 @@ async def oauth_channel_callback(request: Request,code: str | None = None,error:
         )
 
     try:
-        token_response = await exchange_code_for_token(
-            code=code,
-            redirect_uri=settings.CHANNEL_REDIRECT_URI
-        )
-
-        twitch_user = await fetch_twitch_user(
-            token_response.access_token
-        )
-
+        token_response = await exchange_code_for_token(code=code, redirect_uri=settings.CHANNEL_REDIRECT_URI)
+        twitch_user = await fetch_twitch_user(token_response.access_token)
         runtime_bot = get_bot()
         runtime_db = get_db()
 
@@ -86,7 +66,6 @@ async def oauth_channel_callback(request: Request,code: str | None = None,error:
                 token=token_response.access_token,
                 refresh=token_response.refresh_token
             )
-
         elif runtime_db is not None:
             await save_token(
                 db=runtime_db,
@@ -94,7 +73,6 @@ async def oauth_channel_callback(request: Request,code: str | None = None,error:
                 token=token_response.access_token,
                 refresh=token_response.refresh_token
             )
-
         else:
             return render_error(
                 request,
@@ -102,12 +80,11 @@ async def oauth_channel_callback(request: Request,code: str | None = None,error:
                 message="The RatsBoomBot runtime is not available.",
                 status_code=503
             )
-
-    except Exception as exc:
+    except Exception as error:
         return render_error(
             request,
             title="Channel connection failed",
-            message=repr(exc),
+            message=repr(error),
             status_code=500
         )
 
@@ -118,20 +95,13 @@ async def oauth_channel_callback(request: Request,code: str | None = None,error:
             request,
             active_page="dashboard",
             title="Channel connected",
-            message=(
-                f"RatsBoomBot is now connected to "
-                f"{twitch_user.display_name}."
-            )
+            message=f"RatsBoomBot is now connected to {twitch_user.display_name}."
         )
     )
 
 
-@router.get("/oauth/bot",response_class=HTMLResponse)
-async def oauth_bot_callback(
-    request: Request,
-    code: str | None = None,
-    error: str | None = None
-):
+@router.get("/oauth/bot", response_class=HTMLResponse)
+async def oauth_bot_callback(request: Request, code: str | None = None, error: str | None = None):
     admin_redirect = require_admin(request)
 
     if admin_redirect:
@@ -154,15 +124,8 @@ async def oauth_bot_callback(
         )
 
     try:
-        token_response = await exchange_code_for_token(
-            code=code,
-            redirect_uri=settings.BOT_REDIRECT_URI
-        )
-
-        twitch_user = await fetch_twitch_user(
-            token_response.access_token
-        )
-
+        token_response = await exchange_code_for_token(code=code, redirect_uri=settings.BOT_REDIRECT_URI)
+        twitch_user = await fetch_twitch_user(token_response.access_token)
         runtime_bot = get_bot()
         runtime_db = get_db()
 
@@ -172,7 +135,6 @@ async def oauth_bot_callback(
                 token=token_response.access_token,
                 refresh=token_response.refresh_token
             )
-
         elif runtime_db is not None:
             await save_token(
                 db=runtime_db,
@@ -180,7 +142,6 @@ async def oauth_bot_callback(
                 token=token_response.access_token,
                 refresh=token_response.refresh_token
             )
-
         else:
             return render_error(
                 request,
@@ -188,12 +149,11 @@ async def oauth_bot_callback(
                 message="The RatsBoomBot runtime is not available.",
                 status_code=503
             )
-
-    except Exception as exc:
+    except Exception as error:
         return render_error(
             request,
             title="Bot connection failed",
-            message=repr(exc),
+            message=repr(error),
             status_code=500
         )
 
@@ -204,9 +164,6 @@ async def oauth_bot_callback(
             request,
             active_page="dashboard",
             title="Bot account connected",
-            message=(
-                f"The bot account {twitch_user.display_name} "
-                f"was connected successfully."
-            )
+            message=f"The bot account {twitch_user.display_name} was connected successfully."
         )
     )

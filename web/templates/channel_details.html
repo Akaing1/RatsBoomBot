@@ -1,5 +1,75 @@
 {% extends "layout.html" %}
 
+{% macro toggle_card(broadcaster_id, toggle_type, toggle_name, display_name, state, description=None) %}
+    <article class="toggle-card {% if state.effective_enabled %}enabled{% else %}disabled{% endif %}">
+        <div class="toggle-card-content">
+            <div class="toggle-card-heading">
+                <div>
+                    <h4>{{ display_name }}</h4>
+
+                    {% if description %}
+                        <p>{{ description }}</p>
+                    {% endif %}
+                </div>
+
+                <span class="toggle-status {% if state.effective_enabled %}enabled{% else %}disabled{% endif %}">
+                    {% if state.effective_enabled %}Enabled{% else %}Disabled{% endif %}
+                </span>
+            </div>
+
+            <div class="toggle-meta">
+                <span>
+                    Default:
+                    <strong>{% if state.default_enabled %}On{% else %}Off{% endif %}</strong>
+                </span>
+
+                {% if state.override_enabled is not none %}
+                    <span class="toggle-override-label">
+                        Dashboard override:
+                        <strong>{% if state.override_enabled %}On{% else %}Off{% endif %}</strong>
+                    </span>
+                {% else %}
+                    <span>Using profile default</span>
+                {% endif %}
+            </div>
+
+            {% if state.blocked_by_profile %}
+                <p class="toggle-blocked-message">
+                    Disabled because the channel profile is currently off.
+                </p>
+            {% endif %}
+
+            {% if state.blocked_by_globals %}
+                <p class="toggle-blocked-message">
+                    Disabled because global commands are currently off.
+                </p>
+            {% endif %}
+        </div>
+
+        <form class="toggle-actions" method="post" action="/channels/{{ broadcaster_id }}/toggles">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="toggle_type" value="{{ toggle_type }}">
+            <input type="hidden" name="toggle_name" value="{{ toggle_name }}">
+
+            {% if state.effective_enabled %}
+                <button class="button toggle-disable-button" type="submit" name="action" value="disable">
+                    Disable
+                </button>
+            {% else %}
+                <button class="button primary" type="submit" name="action" value="enable">
+                    Enable
+                </button>
+            {% endif %}
+
+            {% if state.override_enabled is not none %}
+                <button class="button secondary" type="submit" name="action" value="reset">
+                    Use Default
+                </button>
+            {% endif %}
+        </form>
+    </article>
+{% endmacro %}
+
 {% block title %}{{ broadcaster.name or "Channel" }} | RatsBoomBot{% endblock %}
 
 {% block content %}
@@ -23,7 +93,7 @@
 
             <p class="page-description">
                 {% if broadcaster.login %}
-                    @{{ broadcaster.login }} ·
+                    @{{ broadcaster.login }} &middot;
                 {% endif %}
 
                 Twitch ID: {{ broadcaster.id }}
@@ -53,15 +123,10 @@
 
         <div class="status-row">
             <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
-
-            <strong>
-                {% if broadcaster.is_live %}Live{% else %}Offline{% endif %}
-            </strong>
+            <strong>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
         </div>
 
-        <p class="card-detail">
-            Current Twitch broadcast status.
-        </p>
+        <p class="card-detail">Current Twitch broadcast status.</p>
     </article>
 
     <article class="status-card">
@@ -69,10 +134,7 @@
 
         <div class="status-row">
             <span class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"></span>
-
-            <strong>
-                {% if queue_open %}Open{% else %}Closed{% endif %}
-            </strong>
+            <strong>{% if queue_open %}Open{% else %}Closed{% endif %}</strong>
         </div>
 
         <p class="card-detail">
@@ -87,10 +149,179 @@
             {{ (1 if channel_settings.discord_url else 0) + (1 if channel_settings.youtube_url else 0) }}
         </div>
 
-        <p class="card-detail">
-            Configured Discord and YouTube links.
-        </p>
+        <p class="card-detail">Configured Discord and YouTube links.</p>
     </article>
+</section>
+
+{% if toggle_message %}
+    <div class="toggle-feedback {% if toggle_result == 'success' %}success{% else %}error{% endif %}" role="status">
+        <span class="toggle-feedback-icon">
+            {% if toggle_result == "success" %}&#10003;{% else %}!{% endif %}
+        </span>
+
+        <span>{{ toggle_message }}</span>
+    </div>
+{% endif %}
+
+<section class="panel toggle-management-panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Channel configuration</p>
+            <h3>Feature toggles</h3>
+
+            <p class="panel-description">
+                Control channel systems, grouped global commands, and independent commands for this channel.
+            </p>
+        </div>
+    </div>
+
+    <div class="toggle-section">
+        <div class="toggle-section-heading">
+            <div>
+                <h4>Channel Features</h4>
+
+                <p>
+                    Core systems, services, profile components, and automated event responses.
+                </p>
+            </div>
+        </div>
+
+        <div class="toggle-grid">
+            {% for feature, state in channel_features.items() %}
+                {% set display_name = feature.value | replace("_", " ") | title %}
+
+                {% if feature.value == "channel" %}
+                    {% set description = "Master switch for the channel profile and all profile-dependent behavior." %}
+                {% elif feature.value == "timers" %}
+                    {% set description = "Controls automated timer messages during live streams." %}
+                {% elif feature.value == "points" %}
+                    {% set description = "Controls points earning, balances, custom points commands, gambling, and duels." %}
+                {% elif feature.value == "redeems" %}
+                    {% set description = "Controls profile-configured Twitch channel point redeem handling." %}
+                {% elif feature.value == "community_events" %}
+                    {% set description = "Controls follow, subscription, and resubscription response messages." %}
+                {% elif feature.value == "raid_responses" %}
+                    {% set description = "Controls incoming raid messages and automatic raider shoutout messages." %}
+                {% else %}
+                    {% set description = none %}
+                {% endif %}
+
+                {{ toggle_card(
+                    broadcaster.id,
+                    "feature",
+                    feature.value,
+                    display_name,
+                    state,
+                    description
+                ) }}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="toggle-section">
+        <div class="toggle-section-heading">
+            <div>
+                <h4>Global Command Groups</h4>
+
+                <p>
+                    Commands loaded for every channel but controlled here as related command families.
+                </p>
+            </div>
+        </div>
+
+        <div class="toggle-grid">
+            {% for group, state in global_groups.items() %}
+                {% if group.value == "globals" %}
+                    {% set display_name = "All Global Commands" %}
+                    {% set description = "Master switch for every grouped and independent global command." %}
+                {% elif group.value == "points" %}
+                    {% set display_name = "Generic Points Commands" %}
+                    {% set description = "Controls the !points command group without disabling the underlying points system." %}
+                {% elif group.value == "viewer_queue" %}
+                    {% set display_name = "Viewer Queue Commands" %}
+                    {% set description = "Controls !open, !close, !join, !leave, !queue, !next, !remove, and !clear." %}
+                {% elif group.value == "shoutouts" %}
+                    {% set display_name = "Manual Shoutouts" %}
+                    {% set description = "Controls the !so and !shoutout commands." %}
+                {% elif group.value == "socials" %}
+                    {% set display_name = "Social Commands" %}
+                    {% set description = "Controls !socials, !socials discord, and !socials youtube." %}
+                {% elif group.value == "settings" %}
+                    {% set display_name = "Settings Commands" %}
+                    {% set description = "Controls !setdiscord, !setyoutube, and !timers." %}
+                {% else %}
+                    {% set display_name = group.value | replace("_", " ") | title %}
+                    {% set description = none %}
+                {% endif %}
+
+                {{ toggle_card(
+                    broadcaster.id,
+                    "global_group",
+                    group.value,
+                    display_name,
+                    state,
+                    description
+                ) }}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="toggle-section">
+        <div class="toggle-section-heading">
+            <div>
+                <h4>Independent Global Commands</h4>
+
+                <p>
+                    Utility, counter, and recreational commands that can be configured individually.
+                </p>
+            </div>
+        </div>
+
+        <div class="toggle-grid">
+            {% for command, state in global_commands.items() %}
+                {% set display_name = "!" ~ command.value %}
+
+                {% if command.value == "hi" %}
+                    {% set description = "Greets the caller or another selected viewer." %}
+                {% elif command.value == "choice" %}
+                    {% set description = "Randomly selects one option supplied by the viewer." %}
+                {% elif command.value == "kaboom" %}
+                    {% set description = "Posts a playful explosion message for the caller or another viewer." %}
+                {% elif command.value == "stinky" %}
+                    {% set description = "Generates a random stinky percentage." %}
+                {% elif command.value == "lucky" %}
+                    {% set description = "Generates a random luck percentage." %}
+                {% elif command.value == "smart" %}
+                    {% set description = "Generates a random smart percentage." %}
+                {% elif command.value == "lurk" %}
+                    {% set description = "Posts the channel lurk response." %}
+                {% elif command.value == "help" %}
+                    {% set description = "Displays the bot command list." %}
+                {% elif command.value == "explode" %}
+                    {% set description = "Increments the explode counter. Also controls the !rat alias." %}
+                {% elif command.value == "reklop" %}
+                    {% set description = "Increments and displays the Reklop counter." %}
+                {% elif command.value == "randy" %}
+                    {% set description = "Increments and displays the Randy counter." %}
+                {% elif command.value == "car" %}
+                    {% set description = "Increments and displays the car counter." %}
+                {% elif command.value == "kamikaze" %}
+                    {% set description = "Controls the recreational timeout command." %}
+                {% else %}
+                    {% set description = none %}
+                {% endif %}
+
+                {{ toggle_card(
+                    broadcaster.id,
+                    "global_command",
+                    command.value,
+                    display_name,
+                    state,
+                    description
+                ) }}
+            {% endfor %}
+        </div>
+    </div>
 </section>
 
 <div class="channel-detail-grid">
@@ -167,15 +398,44 @@
             </span>
         </div>
 
+        {% if queue_message %}
+            <div class="queue-feedback {% if queue_result == 'removed' %}success{% else %}error{% endif %}" role="status">
+                <span class="queue-feedback-icon">
+                    {% if queue_result == "removed" %}&#10003;{% else %}!{% endif %}
+                </span>
+
+                <span>{{ queue_message }}</span>
+            </div>
+        {% endif %}
+
         {% if queue_users %}
-            <ol class="queue-list">
+            <ul class="queue-list">
                 {% for username in queue_users %}
-                    <li>
+                    <li class="queue-list-item">
                         <span class="queue-position">{{ loop.index }}</span>
-                        <span>@{{ username }}</span>
+
+                        <strong class="queue-username">@{{ username }}</strong>
+
+                        <form
+                            method="post"
+                            action="/channels/{{ broadcaster.id }}/viewer-queue/remove"
+                            onsubmit="return confirm('Remove @{{ username }} from the viewer queue?');"
+                        >
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="position" value="{{ loop.index }}">
+
+                            <button
+                                class="queue-remove-button"
+                                type="submit"
+                                aria-label="Remove @{{ username }} from the queue"
+                                title="Remove @{{ username }}"
+                            >
+                                &times;
+                            </button>
+                        </form>
                     </li>
                 {% endfor %}
-            </ol>
+            </ul>
         {% else %}
             <div class="compact-empty-state">
                 <h4>The queue is empty</h4>
@@ -189,40 +449,33 @@
                 </p>
             </div>
         {% endif %}
-
-        <p class="panel-note">
-
-        </p>
     </section>
+
     <section class="panel danger-zone">
-    <div class="panel-header">
-        <div>
-            <p class="eyebrow danger-eyebrow">Remove Channel</p>
-            <h3>Removing this channel disconnects RatsBoomBot.</h3>
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow danger-eyebrow">Remove Channel</p>
+                <h3>Removing this channel disconnects RatsBoomBot.</h3>
+            </div>
         </div>
-    </div>
 
-    <p class="page-description">
-        The OAuth token will be deleted and the bot will immediately disconnect from this channel.
-    The streamer can reconnect later using the dashboard. Historical data such as points,
-    redeems, and statistics will remain intact.
-    </p>
+        <p class="page-description">
+            The OAuth token will be deleted and the bot will immediately disconnect from this channel.
+            The streamer can reconnect later using the dashboard. Historical data such as points,
+            redeems, and statistics will remain intact.
+        </p>
 
-    <form
-        method="post"
-        action="/channels/{{ broadcaster.id }}/delete"
-        onsubmit="return confirm('Remove {{ broadcaster.name or broadcaster.id }} from RatsBoomBot?');"
-    >
-        <input
-            type="hidden"
-            name="csrf_token"
-            value="{{ csrf_token }}"
+        <form
+            method="post"
+            action="/channels/{{ broadcaster.id }}/delete"
+            onsubmit="return confirm('Remove {{ broadcaster.name or broadcaster.id }} from RatsBoomBot?');"
         >
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <button class="button danger" type="submit">
-            Remove Channel
-        </button>
-    </form>
-</section>
+            <button class="button danger" type="submit">
+                Remove Channel
+            </button>
+        </form>
+    </section>
 </div>
 {% endblock %}

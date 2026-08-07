@@ -1,11 +1,12 @@
 import logging
+from time import perf_counter
 from typing import Any
 
 import asqlite
 
 from storage.migrations import MIGRATIONS, Migration
 
-LOGGER = logging.getLogger("Bot")
+LOGGER = logging.getLogger("RatBoomBot")
 
 
 async def create_migration_table(connection: Any) -> None:
@@ -43,7 +44,13 @@ async def record_migration(connection: Any, migration: Migration) -> None:
 
 
 async def run_migration(connection: Any, migration: Migration) -> None:
-    LOGGER.info("Applying database migration %s: %s", migration.version, migration.name)
+    started_at = perf_counter()
+
+    LOGGER.info(
+        "[Database] Applying migration %s: %s.",
+        migration.version,
+        migration.name
+    )
 
     await connection.execute("BEGIN")
 
@@ -53,23 +60,50 @@ async def run_migration(connection: Any, migration: Migration) -> None:
         await connection.commit()
     except Exception:
         await connection.rollback()
-        LOGGER.exception("Database migration %s failed: %s", migration.version, migration.name)
+
+        LOGGER.exception(
+            "[Database] Migration %s failed and was rolled back: %s.",
+            migration.version,
+            migration.name
+        )
         raise
 
-    LOGGER.info("Applied database migration %s: %s", migration.version, migration.name)
+    LOGGER.info(
+        "[Database] Applied migration %s in %.3f seconds: %s.",
+        migration.version,
+        perf_counter() - started_at,
+        migration.name
+    )
 
 
 async def run_migrations(db: asqlite.Pool) -> None:
+    started_at = perf_counter()
+
+    LOGGER.debug("[Database] Ensuring the migration history table exists.")
+
     async with db.acquire() as connection:
         await create_migration_table(connection)
         await connection.commit()
 
         applied_versions = await get_applied_versions(connection)
+        pending_migrations = [migration for migration in MIGRATIONS if migration.version not in applied_versions]
 
-        for migration in MIGRATIONS:
-            if migration.version in applied_versions:
-                continue
+        LOGGER.info(
+            "[Database] Found %d registered migrations: %d applied, %d pending.",
+            len(MIGRATIONS),
+            len(applied_versions),
+            len(pending_migrations)
+        )
 
+        for migration in pending_migrations:
             await run_migration(connection, migration)
 
-    LOGGER.info("Database migrations are up to date.")
+    if not pending_migrations:
+        LOGGER.info("[Database] Database migrations are up to date.")
+        return
+
+    LOGGER.info(
+        "[Database] Applied %d pending migrations in %.3f seconds.",
+        len(pending_migrations),
+        perf_counter() - started_at
+    )
