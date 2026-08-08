@@ -1,4 +1,6 @@
 import logging
+import asyncio
+import logging
 
 from twitchio.ext import commands
 
@@ -16,6 +18,9 @@ class TwitchBot(commands.AutoBot):
         self.token_database = token_database
         self.broadcaster_ids = [str(broadcaster_id) for broadcaster_id in broadcaster_ids]
         self.services: ServiceContainer | None = None
+
+        self._close_lock = asyncio.Lock()
+        self._closed = False
 
         LOGGER.info(
             "[Startup] Creating Twitch client for bot account %s with %d broadcasters and %d EventSub subscriptions.",
@@ -67,35 +72,35 @@ class TwitchBot(commands.AutoBot):
         LOGGER.info("[Startup] Twitch bot setup hook completed.")
 
     async def close(self) -> None:
-        LOGGER.info("[Shutdown] Closing Twitch bot.")
+        async with self._close_lock:
+            if self._closed:
+                return
 
-        services = self.services
+            LOGGER.info("[Shutdown] Closing Twitch bot.")
 
-        if services is not None:
-            LOGGER.info("[Services] Stopping background services.")
+            services = self.services
+
+            if services is not None:
+                LOGGER.info("[Services] Stopping background services.")
+
+                try:
+                    await services.stop()
+                except Exception:
+                    LOGGER.exception(
+                        "[Services] Failed while stopping background services."
+                    )
+                else:
+                    LOGGER.info("[Services] Background services stopped.")
 
             try:
-                await services.stop()
+                await super().close()
             except Exception:
-                LOGGER.exception(
-                    "[Services] Failed while stopping background services."
-                )
-            else:
-                LOGGER.info("[Services] Background services stopped.")
+                LOGGER.exception("[Shutdown] Failed while closing Twitch client.")
+                raise
 
-        try:
-            await super().close()
-        except Exception:
-            LOGGER.exception("[Shutdown] Failed while closing Twitch client.")
-            raise
+            self._closed = True
 
-        LOGGER.info("[Shutdown] Twitch bot closed.")
-
-    async def event_ready(self) -> None:
-        LOGGER.info(
-            "[Startup] Twitch bot logged in successfully as user %s.",
-            self.bot_id
-        )
+            LOGGER.info("[Shutdown] Twitch bot closed.")
 
     async def add_token(self, token: str, refresh: str):
         LOGGER.debug("[OAuth] Adding OAuth token to Twitch client.")
