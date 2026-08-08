@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=ratsbot
-Group=ratsbot
+User=rats-bot
+Group=rats-bot
 WorkingDirectory=/opt/ratsboombot
 EnvironmentFile=/opt/ratsboombot/.env
 ExecStart=/opt/ratsboombot/.venv/bin/python /opt/ratsboombot/main.py
