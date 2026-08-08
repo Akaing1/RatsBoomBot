@@ -11,6 +11,8 @@ BACKUP_DIR="$APP_DIR/deploy/linux/backup"
 DATABASE_PATH="$APP_DIR/.data/tokens.db"
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 
+MAX_BACKUPS=3
+
 echo "[Deploy] Starting RatsBoomBot deployment."
 
 cd "$APP_DIR"
@@ -22,6 +24,18 @@ mkdir -p "$BACKUP_DIR"
 if [ -f "$DATABASE_PATH" ]; then
     sqlite3 "$DATABASE_PATH" ".backup '$BACKUP_DIR/tokens-$TIMESTAMP.db'"
     echo "[Deploy] Database backup created: tokens-$TIMESTAMP.db"
+
+    echo "[Deploy] Pruning old database backups."
+
+    find "$BACKUP_DIR" \
+        -maxdepth 1 \
+        -type f \
+        -name 'tokens-*.db' \
+        -printf '%T@ %p\n' \
+        | sort -nr \
+        | tail -n +$((MAX_BACKUPS + 1)) \
+        | cut -d' ' -f2- \
+        | xargs -r rm -f
 else
     echo "[Deploy] WARNING: Database not found; skipping backup."
 fi
