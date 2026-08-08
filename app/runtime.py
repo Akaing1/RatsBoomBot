@@ -3,6 +3,7 @@ import logging
 import sys
 from pathlib import Path
 from time import perf_counter
+from aiohttp.web_runner import GracefulExit
 
 import asqlite
 import uvicorn
@@ -146,8 +147,8 @@ def run() -> None:
 
     try:
         asyncio.run(run_runtime())
-    except KeyboardInterrupt:
-        LOGGER.info("[Shutdown] Shutdown requested by user.")
+    except (KeyboardInterrupt, GracefulExit):
+        LOGGER.info("[Shutdown] Shutdown requested.")
     except Exception:
         LOGGER.critical("[Shutdown] RatBoomBot stopped because of a fatal error.")
         raise
