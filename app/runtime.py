@@ -124,7 +124,6 @@ async def run_runtime() -> None:
                     LOGGER.info("[Runtime] Shared runtime state cleared.")
     except asyncio.CancelledError:
         LOGGER.info("[Shutdown] Runtime tasks were cancelled.")
-        raise
     except Exception:
         LOGGER.exception("[Startup] Fatal error while running RatBoomBot.")
         raise
