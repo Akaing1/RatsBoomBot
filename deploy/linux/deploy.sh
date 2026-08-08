@@ -17,6 +17,10 @@ echo "[Deploy] Starting RatsBoomBot deployment."
 
 cd "$APP_DIR"
 
+PREVIOUS_COMMIT="$(git rev-parse HEAD)"
+
+echo "[Deploy] Current commit: $PREVIOUS_COMMIT"
+
 echo "[Deploy] Creating pre-deployment database backup."
 
 mkdir -p "$BACKUP_DIR"
@@ -46,6 +50,10 @@ git fetch origin
 echo "[Deploy] Updating current branch."
 git pull --ff-only
 
+NEW_COMMIT="$(git rev-parse HEAD)"
+
+echo "[Deploy] New commit: $NEW_COMMIT"
+
 echo "[Deploy] Installing dependencies."
 "$VENV_DIR/bin/python" -m pip install -r requirements.txt
 
@@ -72,4 +80,30 @@ for attempt in {1..15}; do
 done
 
 echo "[Deploy] ERROR: RatsBoomBot did not become healthy."
-exit 1
+echo "[Deploy] Rolling back to commit $PREVIOUS_COMMIT."
+
+git reset --hard "$PREVIOUS_COMMIT"
+
+echo "[Deploy] Restoring dependencies for previous commit."
+"$VENV_DIR/bin/python" -m pip install -r requirements.txt
+
+echo "[Deploy] Restarting rolled-back service."
+sudo systemctl restart "$SERVICE_NAME"
+
+echo "[Deploy] Verifying rollback."
+
+for attempt in {1..15}; do
+    if curl --fail --silent "$HEALTH_URL" > /dev/null; then
+        echo "[Deploy] Rollback succeeded."
+        echo "[Deploy] Previous version restored: $PREVIOUS_COMMIT"
+        exit 1
+    fi
+
+    echo "[Deploy] Rollback health check $attempt/15 failed; retrying in 2 seconds."
+    sleep 2
+done
+
+echo "[Deploy] CRITICAL: Rollback failed."
+echo "[Deploy] Manual intervention is required."
+
+exit 2
