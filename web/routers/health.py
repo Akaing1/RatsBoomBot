@@ -6,15 +6,11 @@ from config.version import APP_NAME, APP_VERSION
 router = APIRouter()
 
 
-# @router.get("/health")
-# async def health():
-#     return {
-#         "status": "healthy",
-#         "application": APP_NAME,
-#         "version": APP_VERSION,
-#         "environment": settings.ENVIRONMENT
-#     }
-
 @router.get("/health")
 async def health():
-    raise RuntimeError("Intentional rollback test")
+    return {
+        "status": "healthy",
+        "application": APP_NAME,
+        "version": APP_VERSION,
+        "environment": settings.ENVIRONMENT
+    }
