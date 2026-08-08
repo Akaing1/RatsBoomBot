@@ -7,9 +7,24 @@ VENV_DIR="$APP_DIR/.venv"
 SERVICE_NAME="ratsboombot"
 HEALTH_URL="http://127.0.0.1:4345/health"
 
+BACKUP_DIR="$APP_DIR/deploy/linux/backup"
+DATABASE_PATH="$APP_DIR/.data/tokens.db"
+TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
+
 echo "[Deploy] Starting RatsBoomBot deployment."
 
 cd "$APP_DIR"
+
+echo "[Deploy] Creating pre-deployment database backup."
+
+mkdir -p "$BACKUP_DIR"
+
+if [ -f "$DATABASE_PATH" ]; then
+    sqlite3 "$DATABASE_PATH" ".backup '$BACKUP_DIR/tokens-$TIMESTAMP.db'"
+    echo "[Deploy] Database backup created: tokens-$TIMESTAMP.db"
+else
+    echo "[Deploy] WARNING: Database not found; skipping backup."
+fi
 
 echo "[Deploy] Fetching latest code."
 git fetch origin
