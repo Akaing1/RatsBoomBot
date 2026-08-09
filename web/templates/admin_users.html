@@ -50,7 +50,6 @@
             <h3>Administrators</h3>
         </div>
     </div>
-
     <div class="channel-list">
         {% for administrator in administrators %}
             <article class="channel-row">
@@ -71,6 +70,26 @@
                         {% endif %}
                     </span>
                 </div>
+
+                {% if administrator.role != "owner" %}
+                    <form method="post" action="/admin/users/{{ administrator.id }}/enabled">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                        {% if administrator.is_enabled %}
+                            <input type="hidden" name="action" value="disable">
+
+                            <button class="button secondary" type="submit">
+                                Disable
+                            </button>
+                        {% else %}
+                            <input type="hidden" name="action" value="enable">
+
+                            <button class="button primary" type="submit">
+                                Enable
+                            </button>
+                        {% endif %}
+                    </form>
+                {% endif %}
             </article>
         {% endfor %}
     </div>

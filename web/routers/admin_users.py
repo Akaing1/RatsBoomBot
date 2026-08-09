@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from storage.admin_repository import create_administrator, get_administrator_by_username, list_administrators
+from storage.admin_repository import create_administrator, get_administrator_by_username, list_administrators, set_administrator_enabled, get_administrator_by_id
 from web.admin_auth import require_owner, validate_csrf_token
 from web.common import build_admin_context, templates
 from web.passwords import hash_password
@@ -73,3 +73,34 @@ async def create_admin_user(request: Request, username: str = Form(...), passwor
     await create_administrator(db, username, password_hash)
 
     return RedirectResponse(url="/admin/users?result=created", status_code=303)
+
+
+@router.post("/{administrator_id}/enabled")
+async def update_admin_enabled(request: Request, administrator_id: int, action: str = Form(...), csrf_token: str = Form(...)):
+    owner_redirect = await require_owner(request)
+
+    if owner_redirect:
+        return owner_redirect
+
+    validate_csrf_token(request, csrf_token)
+
+    db = get_db()
+
+    if db is None:
+        return RedirectResponse(url="/admin/users?result=runtime_unavailable", status_code=303)
+
+    administrator = await get_administrator_by_id(db, administrator_id)
+
+    if administrator is None:
+        return RedirectResponse(url="/admin/users?result=user_not_found", status_code=303)
+
+    if administrator.role == "owner":
+        return RedirectResponse(url="/admin/users?result=owner_protected", status_code=303)
+
+    if action not in {"enable", "disable"}:
+        return RedirectResponse(url="/admin/users?result=invalid_action", status_code=303)
+
+    await set_administrator_enabled(db, administrator_id, action == "enable")
+
+    result = "enabled" if action == "enable" else "disabled"
+    return RedirectResponse(url=f"/admin/users?result={result}", status_code=303)
