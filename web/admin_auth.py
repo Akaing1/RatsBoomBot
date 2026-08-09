@@ -16,19 +16,23 @@ async def get_current_administrator(request: Request) -> Administrator | None:
     administrator_id = request.session.get(ADMIN_SESSION_KEY)
 
     if administrator_id is None:
+        request.state.administrator = None
         return None
 
     db = get_db()
 
     if db is None:
+        request.state.administrator = None
         return None
 
     administrator = await get_administrator_by_id(db, int(administrator_id))
 
     if administrator is None or not administrator.is_enabled:
         request.session.clear()
+        request.state.administrator = None
         return None
 
+    request.state.administrator = administrator
     return administrator
 
 

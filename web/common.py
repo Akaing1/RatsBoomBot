@@ -16,7 +16,8 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIRECTORY))
 def build_admin_context(request: Request, *, active_page: str, **values: Any) -> dict[str, Any]:
     context: dict[str, Any] = {
         "active_page": active_page,
-        "csrf_token": get_csrf_token(request)
+        "csrf_token": get_csrf_token(request),
+        "administrator": getattr(request.state, "administrator", None)
     }
 
     context.update(values)
