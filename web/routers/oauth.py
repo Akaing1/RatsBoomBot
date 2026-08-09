@@ -6,7 +6,7 @@ from storage.database import save_token
 from web.admin_auth import require_admin
 from web.channel_auth import create_channel_oauth_state, login_channel_user, validate_channel_oauth_state
 from web.common import build_admin_context, render_error, templates
-from web.oauth import build_bot_oauth_url, build_channel_oauth_url, exchange_code_for_token, fetch_twitch_user
+from web.oauth import build_bot_oauth_url, build_channel_oauth_url, build_public_channel_oauth_url, exchange_code_for_token, fetch_twitch_user
 from web.state import get_bot, get_db
 
 router = APIRouter()
@@ -182,7 +182,7 @@ async def public_connect_page(request: Request):
 @router.get("/connect/twitch")
 async def public_connect_twitch(request: Request):
     state = create_channel_oauth_state(request)
-    return RedirectResponse(build_channel_oauth_url(state=state))
+    return RedirectResponse(build_public_channel_oauth_url(state=state))
 
 
 @router.get("/oauth/channel/connect", response_class=HTMLResponse)
