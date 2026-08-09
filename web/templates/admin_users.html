@@ -21,6 +21,18 @@
     <div class="alert success-alert">
         Administrator account created successfully.
     </div>
+{% elif result == "enabled" %}
+    <div class="alert success-alert">
+        Administrator account enabled.
+    </div>
+{% elif result == "disabled" %}
+    <div class="alert success-alert">
+        Administrator account disabled.
+    </div>
+{% elif result == "password_reset" %}
+    <div class="alert success-alert">
+        Administrator password reset successfully.
+    </div>
 {% elif result == "username_exists" %}
     <div class="alert error-alert">
         That username is already in use.
@@ -41,6 +53,18 @@
     <div class="alert error-alert">
         The database is currently unavailable.
     </div>
+{% elif result == "owner_protected" %}
+    <div class="alert error-alert">
+        Owner accounts cannot be modified here.
+    </div>
+{% elif result == "user_not_found" %}
+    <div class="alert error-alert">
+        Administrator account not found.
+    </div>
+{% elif result == "invalid_action" %}
+    <div class="alert error-alert">
+        Invalid administrator action.
+    </div>
 {% endif %}
 
 <section class="panel">
@@ -50,6 +74,7 @@
             <h3>Administrators</h3>
         </div>
     </div>
+
     <div class="channel-list">
         {% for administrator in administrators %}
             <article class="channel-row">
@@ -72,23 +97,51 @@
                 </div>
 
                 {% if administrator.role != "owner" %}
-                    <form method="post" action="/admin/users/{{ administrator.id }}/enabled">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div class="admin-user-actions">
+                        <form method="post" action="/admin/users/{{ administrator.id }}/enabled">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-                        {% if administrator.is_enabled %}
-                            <input type="hidden" name="action" value="disable">
+                            {% if administrator.is_enabled %}
+                                <input type="hidden" name="action" value="disable">
+
+                                <button class="button secondary" type="submit">
+                                    Disable
+                                </button>
+                            {% else %}
+                                <input type="hidden" name="action" value="enable">
+
+                                <button class="button primary" type="submit">
+                                    Enable
+                                </button>
+                            {% endif %}
+                        </form>
+
+                        <form class="admin-password-reset" method="post" action="/admin/users/{{ administrator.id }}/password">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                            <input
+                                name="password"
+                                type="password"
+                                placeholder="New password"
+                                autocomplete="new-password"
+                                minlength="12"
+                                required
+                            >
+
+                            <input
+                                name="confirm_password"
+                                type="password"
+                                placeholder="Confirm password"
+                                autocomplete="new-password"
+                                minlength="12"
+                                required
+                            >
 
                             <button class="button secondary" type="submit">
-                                Disable
+                                Reset Password
                             </button>
-                        {% else %}
-                            <input type="hidden" name="action" value="enable">
-
-                            <button class="button primary" type="submit">
-                                Enable
-                            </button>
-                        {% endif %}
-                    </form>
+                        </form>
+                    </div>
                 {% endif %}
             </article>
         {% endfor %}

@@ -146,3 +146,24 @@ async def set_administrator_enabled(db: asqlite.Pool, administrator_id: int, is_
         "[Administrators] Updated administrator %s.",
         administrator_id
     )
+
+
+async def set_administrator_password(db: asqlite.Pool, administrator_id: int, password_hash: str) -> None:
+    query = """
+    UPDATE administrators
+    SET password_hash = ?
+    WHERE id = ?
+    """
+
+    LOGGER.info(
+        "[Administrators] Updating password for administrator %s.",
+        administrator_id
+    )
+
+    async with db.acquire() as connection:
+        await connection.execute(query, (password_hash, administrator_id))
+
+    LOGGER.info(
+        "[Administrators] Updated password for administrator %s.",
+        administrator_id
+    )

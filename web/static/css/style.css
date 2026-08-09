@@ -699,3 +699,45 @@ body.login-page {
         width: 100%;
     }
 }
+
+.admin-user-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: auto;
+}
+
+.admin-password-reset {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.admin-password-reset input {
+    width: 170px;
+    min-height: 42px;
+    padding: 0 13px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    outline: none;
+    background: var(--background);
+    color: var(--text);
+}
+
+.admin-password-reset input::placeholder {
+    color: var(--muted);
+}
+
+.admin-password-reset input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, .14);
+}
+
+.admin-password-reset input {
+    width: 170px;
+}
+
+.admin-user-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}

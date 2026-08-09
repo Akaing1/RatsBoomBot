@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from storage.admin_repository import create_administrator, get_administrator_by_username, list_administrators, set_administrator_enabled, get_administrator_by_id
+from storage.admin_repository import create_administrator, get_administrator_by_username, list_administrators, set_administrator_enabled, get_administrator_by_id, set_administrator_password
 from web.admin_auth import require_owner, validate_csrf_token
 from web.common import build_admin_context, templates
 from web.passwords import hash_password
@@ -73,6 +73,40 @@ async def create_admin_user(request: Request, username: str = Form(...), passwor
     await create_administrator(db, username, password_hash)
 
     return RedirectResponse(url="/admin/users?result=created", status_code=303)
+
+
+@router.post("/{administrator_id}/password")
+async def reset_admin_password(request: Request, administrator_id: int, password: str = Form(...), confirm_password: str = Form(...), csrf_token: str = Form(...)):
+    owner_redirect = await require_owner(request)
+
+    if owner_redirect:
+        return owner_redirect
+
+    validate_csrf_token(request, csrf_token)
+
+    db = get_db()
+
+    if db is None:
+        return RedirectResponse(url="/admin/users?result=runtime_unavailable", status_code=303)
+
+    administrator = await get_administrator_by_id(db, administrator_id)
+
+    if administrator is None:
+        return RedirectResponse(url="/admin/users?result=user_not_found", status_code=303)
+
+    if administrator.role == "owner":
+        return RedirectResponse(url="/admin/users?result=owner_protected", status_code=303)
+
+    if password != confirm_password:
+        return RedirectResponse(url="/admin/users?result=password_mismatch", status_code=303)
+
+    if len(password) < MINIMUM_PASSWORD_LENGTH:
+        return RedirectResponse(url="/admin/users?result=password_too_short", status_code=303)
+
+    password_hash = hash_password(password)
+    await set_administrator_password(db, administrator_id, password_hash)
+
+    return RedirectResponse(url="/admin/users?result=password_reset", status_code=303)
 
 
 @router.post("/{administrator_id}/enabled")
