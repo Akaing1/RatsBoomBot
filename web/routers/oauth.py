@@ -39,7 +39,7 @@ async def oauth_channel_callback(request: Request, code: str | None = None, erro
         return admin_redirect
 
     if error:
-        return render_error(
+        return await render_error(
             request,
             title="Channel authorization failed",
             message=error,
@@ -47,7 +47,7 @@ async def oauth_channel_callback(request: Request, code: str | None = None, erro
         )
 
     if not code:
-        return render_error(
+        return await render_error(
             request,
             title="Channel authorization failed",
             message="No authorization code was provided.",
@@ -74,14 +74,14 @@ async def oauth_channel_callback(request: Request, code: str | None = None, erro
                 refresh=token_response.refresh_token
             )
         else:
-            return render_error(
+            return await render_error(
                 request,
                 title="Runtime unavailable",
                 message="The RatsBoomBot runtime is not available.",
                 status_code=503
             )
     except Exception as error:
-        return render_error(
+        return await render_error(
             request,
             title="Channel connection failed",
             message=repr(error),
@@ -108,7 +108,7 @@ async def oauth_bot_callback(request: Request, code: str | None = None, error: s
         return admin_redirect
 
     if error:
-        return render_error(
+        return await render_error(
             request,
             title="Bot authorization failed",
             message=error,
@@ -116,7 +116,7 @@ async def oauth_bot_callback(request: Request, code: str | None = None, error: s
         )
 
     if not code:
-        return render_error(
+        return await render_error(
             request,
             title="Bot authorization failed",
             message="No authorization code was provided.",
@@ -143,14 +143,14 @@ async def oauth_bot_callback(request: Request, code: str | None = None, error: s
                 refresh=token_response.refresh_token
             )
         else:
-            return render_error(
+            return await render_error(
                 request,
                 title="Runtime unavailable",
                 message="The RatsBoomBot runtime is not available.",
                 status_code=503
             )
     except Exception as error:
-        return render_error(
+        return await render_error(
             request,
             title="Bot connection failed",
             message=repr(error),

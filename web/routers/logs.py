@@ -86,7 +86,7 @@ async def log_details_page(request: Request, channel_name: str, session_name: st
     log_file = resolve_log_file(channel_name, session_name)
 
     if log_file is None:
-        return render_error(
+        return await render_error(
             request,
             active_page="logs",
             title="Log not found",
@@ -97,7 +97,7 @@ async def log_details_page(request: Request, channel_name: str, session_name: st
     try:
         log_content = log_file.read_text(encoding="utf-8", errors="replace")
     except OSError as error:
-        return render_error(
+        return await render_error(
             request,
             active_page="logs",
             title="Could not read log",
@@ -135,7 +135,7 @@ async def download_log(request: Request, channel_name: str, session_name: str):
     log_file = resolve_log_file(channel_name, session_name)
 
     if log_file is None:
-        return render_error(
+        return await render_error(
             request,
             active_page="logs",
             title="Log not found",

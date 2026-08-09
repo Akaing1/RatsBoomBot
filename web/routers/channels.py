@@ -13,8 +13,8 @@ from web.state import get_bot, get_db
 router = APIRouter(prefix="/channels")
 
 
-def get_runtime_error(request: Request):
-    return render_error(
+async def get_runtime_error(request: Request):
+    return await render_error(
         request,
         active_page="channels",
         title="Runtime unavailable",
@@ -23,8 +23,8 @@ def get_runtime_error(request: Request):
     )
 
 
-def get_channel_error(request: Request):
-    return render_error(
+async def get_channel_error(request: Request):
+    return await render_error(
         request,
         active_page="channels",
         title="Channel not found",
@@ -88,7 +88,7 @@ async def channel_details_page(request: Request, broadcaster_id: str):
     runtime_bot = get_bot()
 
     if runtime_bot is None or runtime_bot.services is None:
-        return get_runtime_error(request)
+        return await get_runtime_error(request)
 
     services = runtime_bot.services
     broadcaster_service = services.broadcasters
@@ -146,7 +146,7 @@ async def update_channel_toggle(
     runtime_bot = get_bot()
 
     if runtime_bot is None or runtime_bot.services is None:
-        return get_runtime_error(request)
+        return await get_runtime_error(request)
 
     broadcaster = get_broadcaster(runtime_bot, broadcaster_id)
 
@@ -239,7 +239,7 @@ async def delete_broadcaster(request: Request, broadcaster_id: str, csrf_token: 
     validate_csrf_token(request, csrf_token)
 
     if str(broadcaster_id) == str(settings.BOT_ID):
-        return render_error(
+        return await render_error(
             request,
             active_page="channels",
             title="Cannot remove bot account",
@@ -251,7 +251,7 @@ async def delete_broadcaster(request: Request, broadcaster_id: str, csrf_token: 
     runtime_db = get_db()
 
     if runtime_bot is None or runtime_bot.services is None or runtime_db is None:
-        return get_runtime_error(request)
+        return await get_runtime_error(request)
 
     services = runtime_bot.services
     broadcaster = get_broadcaster(runtime_bot, broadcaster_id)
@@ -287,7 +287,7 @@ async def remove_viewer_from_queue(
     runtime_bot = get_bot()
 
     if runtime_bot is None or runtime_bot.services is None:
-        return get_runtime_error(request)
+        return await get_runtime_error(request)
 
     broadcaster = get_broadcaster(runtime_bot, broadcaster_id)
 
