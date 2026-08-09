@@ -27,7 +27,7 @@ def get_active_log_paths() -> set[Path]:
 
 @router.get("", response_class=HTMLResponse)
 async def logs_page(request: Request):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect
@@ -78,7 +78,7 @@ async def logs_page(request: Request):
 
 @router.get("/{channel_name}/{session_name}", response_class=HTMLResponse)
 async def log_details_page(request: Request, channel_name: str, session_name: str):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect
@@ -127,7 +127,7 @@ async def log_details_page(request: Request, channel_name: str, session_name: st
 
 @router.get("/{channel_name}/{session_name}/download")
 async def download_log(request: Request, channel_name: str, session_name: str):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect

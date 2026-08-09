@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.get("/connect/channel")
 async def connect_channel(request: Request):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect
@@ -23,7 +23,7 @@ async def connect_channel(request: Request):
 
 @router.get("/connect/bot")
 async def connect_bot(request: Request):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect
@@ -33,7 +33,7 @@ async def connect_bot(request: Request):
 
 @router.get("/oauth/channel", response_class=HTMLResponse)
 async def oauth_channel_callback(request: Request, code: str | None = None, error: str | None = None):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect
@@ -102,7 +102,7 @@ async def oauth_channel_callback(request: Request, code: str | None = None, erro
 
 @router.get("/oauth/bot", response_class=HTMLResponse)
 async def oauth_bot_callback(request: Request, code: str | None = None, error: str | None = None):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect

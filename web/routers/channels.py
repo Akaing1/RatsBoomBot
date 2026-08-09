@@ -49,7 +49,7 @@ def redirect_to_channel(broadcaster_id: str, **query_values) -> RedirectResponse
 
 @router.get("", response_class=HTMLResponse)
 async def channels_page(request: Request):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect
@@ -80,7 +80,7 @@ async def channels_page(request: Request):
 
 @router.get("/{broadcaster_id}", response_class=HTMLResponse)
 async def channel_details_page(request: Request, broadcaster_id: str):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect
@@ -136,7 +136,7 @@ async def update_channel_toggle(
     action: str = Form(...),
     csrf_token: str = Form(...)
 ):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect
@@ -231,7 +231,7 @@ async def update_channel_toggle(
 
 @router.post("/{broadcaster_id}/delete")
 async def delete_broadcaster(request: Request, broadcaster_id: str, csrf_token: str = Form(...)):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect
@@ -277,7 +277,7 @@ async def remove_viewer_from_queue(
     position: int = Form(...),
     csrf_token: str = Form(...)
 ):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect

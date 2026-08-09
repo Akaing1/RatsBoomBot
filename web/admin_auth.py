@@ -3,7 +3,6 @@ import secrets
 from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from config.settings import settings
 from storage.admin_repository import Administrator, get_administrator_by_id, get_administrator_by_username
 from web.passwords import verify_password
 from web.state import get_db
@@ -57,16 +56,6 @@ async def authenticate_administrator(request: Request, username: str, password: 
     request.session[CSRF_SESSION_KEY] = secrets.token_urlsafe(32)
 
     return administrator
-
-
-def authenticate_admin_secret(request: Request, submitted_secret: str) -> bool:
-    if not secrets.compare_digest(submitted_secret, settings.ADMIN_SECRET):
-        return False
-
-    request.session.clear()
-    request.session[CSRF_SESSION_KEY] = secrets.token_urlsafe(32)
-
-    return True
 
 
 def logout_admin(request: Request) -> None:
