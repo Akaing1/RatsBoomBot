@@ -60,6 +60,13 @@
                 >
                     Logs
                 </a>
+
+                <a
+                    class="nav-link {% if active_page == 'account' %}active{% endif %}"
+                    href="/account/password"
+                >
+                    Account
+                </a>
             </nav>
             <form class="sidebar-logout" method="post" action="/logout">
                 <input

@@ -31,6 +31,7 @@ class Settings:
 
     BOT_REDIRECT_URI = os.getenv("BOT_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/bot")
     CHANNEL_REDIRECT_URI = os.getenv("CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/channel")
+    PUBLIC_CHANNEL_REDIRECT_URI = os.getenv("PUBLIC_CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/channel/connect")
 
     BOT_SCOPES = os.getenv("BOT_SCOPES", "user:read:chat user:write:chat user:bot")
 
