@@ -20,7 +20,7 @@
         {% endif %}
 
         <div>
-            <p class="eyebrow">Your RatsBoomBot channel</p>
+            <p class="eyebrow">Rat's Boom Bot</p>
             <h2>{{ broadcaster.name or "Unknown channel" }}</h2>
 
             <p class="page-description">
@@ -157,12 +157,61 @@
             </span>
         </div>
 
+        {% if queue_message %}
+            <div
+                class="queue-feedback {% if queue_result == 'removed' %}success{% else %}error{% endif %}"
+                role="status"
+            >
+                <span class="queue-feedback-icon">
+                    {% if queue_result == "removed" %}
+                        &#10003;
+                    {% else %}
+                        !
+                    {% endif %}
+                </span>
+
+                <span>{{ queue_message }}</span>
+            </div>
+        {% endif %}
+
         {% if queue_users %}
             <ul class="queue-list">
                 {% for username in queue_users %}
-                    <li>
-                        <span class="queue-position">{{ loop.index }}</span>
-                        <strong>@{{ username }}</strong>
+                    <li class="queue-list-item">
+                        <span class="queue-position">
+                            {{ loop.index }}
+                        </span>
+
+                        <strong class="queue-username">
+                            @{{ username }}
+                        </strong>
+
+                        <form
+                            method="post"
+                            action="/channel/viewer-queue/remove"
+                            onsubmit="return confirm('Remove @{{ username }} from the viewer queue?');"
+                        >
+                            <input
+                                type="hidden"
+                                name="csrf_token"
+                                value="{{ csrf_token }}"
+                            >
+
+                            <input
+                                type="hidden"
+                                name="position"
+                                value="{{ loop.index }}"
+                            >
+
+                            <button
+                                class="queue-remove-button"
+                                type="submit"
+                                aria-label="Remove @{{ username }} from the queue"
+                                title="Remove @{{ username }}"
+                            >
+                                &times;
+                            </button>
+                        </form>
                     </li>
                 {% endfor %}
             </ul>
