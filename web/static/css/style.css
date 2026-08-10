@@ -741,3 +741,29 @@ body.login-page {
     flex-wrap: wrap;
     justify-content: flex-end;
 }
+
+.channel-user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 24px 0;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--background);
+}
+
+.channel-user-details div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.channel-user-details span {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.channel-user-details strong {
+    font-size: 14px;
+}
