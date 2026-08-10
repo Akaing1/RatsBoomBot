@@ -392,6 +392,38 @@ Before adding a new component:
 5. Prefer extending an established RatsBoomBot pattern over introducing a
    generic framework pattern.
 
+## 19. Function and Method Calls
+
+Keep function and method calls on a single line whenever the complete call remains
+reasonably readable. Do not expand calls merely because they contain multiple
+arguments or a moderately long value.
+
+Preferred:
+
+    self._collect_command(subcommand, command_names)
+
+    return RedirectResponse(url="/channel?queue_result=remove_failed&queue_message=The+bot+runtime+is+unavailable.", status_code=303)
+
+Avoid:
+
+    self._collect_command(
+        subcommand,
+        command_names
+    )
+
+    return RedirectResponse(
+        url=(
+            "/channel?"
+            "queue_result=remove_failed&"
+            "queue_message=The+bot+runtime+is+unavailable."
+        ),
+        status_code=303
+    )
+
+Split a call across multiple lines only when keeping it on one line would make the
+code genuinely difficult to read, such as calls containing complex nested
+expressions, callbacks, or several lengthy arguments.
+
 
 ## Quick Reference
 
