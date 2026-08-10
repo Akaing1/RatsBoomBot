@@ -767,3 +767,16 @@ body.login-page {
 .channel-user-details strong {
     font-size: 14px;
 }
+
+.streamer-dashboard {
+    width: 100%;
+    max-width: 1250px;
+    margin: 0 auto;
+    padding: 72px 48px 48px;
+}
+
+@media (max-width: 900px) {
+    .streamer-dashboard {
+        padding: 28px 20px;
+    }
+}
