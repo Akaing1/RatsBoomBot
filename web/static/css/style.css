@@ -699,3 +699,84 @@ body.login-page {
         width: 100%;
     }
 }
+
+.admin-user-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: auto;
+}
+
+.admin-password-reset {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.admin-password-reset input {
+    width: 170px;
+    min-height: 42px;
+    padding: 0 13px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    outline: none;
+    background: var(--background);
+    color: var(--text);
+}
+
+.admin-password-reset input::placeholder {
+    color: var(--muted);
+}
+
+.admin-password-reset input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, .14);
+}
+
+.admin-password-reset input {
+    width: 170px;
+}
+
+.admin-user-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.channel-user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 24px 0;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--background);
+}
+
+.channel-user-details div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.channel-user-details span {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.channel-user-details strong {
+    font-size: 14px;
+}
+
+.streamer-dashboard {
+    width: 100%;
+    max-width: 1250px;
+    margin: 0 auto;
+    padding: 72px 48px 48px;
+}
+
+@media (max-width: 900px) {
+    .streamer-dashboard {
+        padding: 28px 20px;
+    }
+}

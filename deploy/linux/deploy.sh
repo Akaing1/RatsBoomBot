@@ -5,6 +5,7 @@ set -euo pipefail
 APP_DIR="/opt/ratsboombot"
 VENV_DIR="$APP_DIR/.venv"
 SERVICE_NAME="ratsboombot"
+DEPLOY_BRANCH="feature/admin-dash"
 HEALTH_URL="http://127.0.0.1:4345/health"
 
 BACKUP_DIR="$APP_DIR/deploy/linux/backup"
@@ -45,10 +46,17 @@ else
 fi
 
 echo "[Deploy] Fetching latest code."
-git fetch origin
+git fetch origin "$DEPLOY_BRANCH"
 
-echo "[Deploy] Updating current branch."
-git pull --ff-only
+CURRENT_BRANCH="$(git branch --show-current)"
+
+if [ "$CURRENT_BRANCH" != "$DEPLOY_BRANCH" ]; then
+    echo "[Deploy] Switching from $CURRENT_BRANCH to $DEPLOY_BRANCH."
+    git checkout "$DEPLOY_BRANCH"
+fi
+
+echo "[Deploy] Updating $DEPLOY_BRANCH."
+git pull --ff-only origin "$DEPLOY_BRANCH"
 
 NEW_COMMIT="$(git rev-parse HEAD)"
 

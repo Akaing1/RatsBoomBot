@@ -16,7 +16,8 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIRECTORY))
 def build_admin_context(request: Request, *, active_page: str, **values: Any) -> dict[str, Any]:
     context: dict[str, Any] = {
         "active_page": active_page,
-        "csrf_token": get_csrf_token(request)
+        "csrf_token": get_csrf_token(request),
+        "administrator": getattr(request.state, "administrator", None)
     }
 
     context.update(values)
@@ -24,14 +25,14 @@ def build_admin_context(request: Request, *, active_page: str, **values: Any) ->
     return context
 
 
-def render_error(request: Request, *, title: str, message: str, status_code: int, active_page: str = "dashboard") -> HTMLResponse:
+async def render_error(request: Request, *, title: str, message: str, status_code: int, active_page: str = "dashboard") -> HTMLResponse:
     context: dict[str, Any] = {
         "active_page": active_page,
         "title": title,
         "message": message
     }
 
-    if is_admin_authenticated(request):
+    if await is_admin_authenticated(request):
         context["csrf_token"] = get_csrf_token(request)
 
     return templates.TemplateResponse(

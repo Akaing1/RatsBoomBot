@@ -4,6 +4,8 @@ from web.routers.dashboard import router as dashboard_router
 from web.routers.health import router as health_router
 from web.routers.logs import router as logs_router
 from web.routers.oauth import router as oauth_router
+from web.routers.admin_users import router as admin_users_router
+from web.routers.channel_user import router as channel_user_router
 
 __all__ = [
     "auth_router",
@@ -11,5 +13,7 @@ __all__ = [
     "dashboard_router",
     "health_router",
     "logs_router",
-    "oauth_router"
+    "oauth_router",
+    "admin_users_router",
+    "channel_user_router"
 ]
