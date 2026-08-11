@@ -84,11 +84,11 @@ def test_logout_clears_session_and_requires_login() -> None:
     request.session["admin_authenticated"] = True
     request.session["csrf_token"] = "token"
 
-    assert require_admin(request) is None
+    assert await require_admin(request) is None
 
     logout_admin(request)
 
-    redirect = require_admin(request)
+    redirect = await require_admin(request)
 
     assert request.session == {}
     assert redirect is not None

@@ -1,0 +1,9 @@
+[Unit]
+Description=RatsBoomBot SQLite Backup
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=ratsbot
+Group=ratsbot
+ExecStart=/opt/ratsboombot/deploy/linux/backup/backup.sh

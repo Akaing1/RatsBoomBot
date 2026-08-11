@@ -20,9 +20,10 @@ def test_open_join_and_next_viewer() -> None:
     assert "position: 1" in join_message.lower()
     assert service.list_queue("channel-1") == ["rat"]
 
-    found, next_message = service.next_viewer("channel-1")
+    found, viewers, next_message = service.next_viewers("channel-1")
 
     assert found is True
+    assert viewers == ["rat"]
     assert "@rat" in next_message
     assert service.size("channel-1") == 0
 

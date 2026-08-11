@@ -10,7 +10,7 @@ router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    admin_redirect = require_admin(request)
+    admin_redirect = await require_admin(request)
 
     if admin_redirect:
         return admin_redirect

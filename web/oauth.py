@@ -27,14 +27,32 @@ class TwitchUser:
 
 
 def build_bot_oauth_url(force_verify: bool = True) -> str:
-    return _build_oauth_url(redirect_uri=settings.BOT_REDIRECT_URI, scopes=settings.BOT_SCOPES, force_verify=force_verify)
+    return _build_oauth_url(
+        redirect_uri=settings.BOT_REDIRECT_URI,
+        scopes=settings.BOT_SCOPES,
+        force_verify=force_verify
+    )
 
 
-def build_channel_oauth_url(force_verify: bool = True) -> str:
-    return _build_oauth_url(redirect_uri=settings.CHANNEL_REDIRECT_URI, scopes=settings.CHANNEL_SCOPES, force_verify=force_verify)
+def build_channel_oauth_url(force_verify: bool = True, state: str | None = None) -> str:
+    return _build_oauth_url(
+        redirect_uri=settings.CHANNEL_REDIRECT_URI,
+        scopes=settings.CHANNEL_SCOPES,
+        force_verify=force_verify,
+        state=state
+    )
 
 
-def _build_oauth_url(*, redirect_uri: str, scopes: str, force_verify: bool) -> str:
+def build_public_channel_oauth_url(force_verify: bool = True, state: str | None = None) -> str:
+    return _build_oauth_url(
+        redirect_uri=settings.PUBLIC_CHANNEL_REDIRECT_URI,
+        scopes=settings.CHANNEL_SCOPES,
+        force_verify=force_verify,
+        state=state
+    )
+
+
+def _build_oauth_url(*, redirect_uri: str, scopes: str, force_verify: bool, state: str | None = None) -> str:
     params = {
         "client_id": settings.CLIENT_ID,
         "redirect_uri": redirect_uri,
@@ -44,6 +62,9 @@ def _build_oauth_url(*, redirect_uri: str, scopes: str, force_verify: bool) -> s
 
     if force_verify:
         params["force_verify"] = "true"
+
+    if state:
+        params["state"] = state
 
     return f"{TWITCH_AUTHORIZE_URL}?{urlencode(params)}"
 
