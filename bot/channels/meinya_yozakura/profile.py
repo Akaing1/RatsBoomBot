@@ -3,7 +3,7 @@ from bot.channels.meinya_yozakura.commands.points import MeinyaPointsCommands
 from bot.channels.meinya_yozakura.profile_details import MEINYA_COMMUNITY_MESSAGES, MEINYA_POINTS, MEINYA_RAID_MESSAGES, MEINYA_REDEEMS, MEINYA_TIMER_MESSAGES
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
-MEINYA = ChannelProfile(
+MEINYA_PROFILE = ChannelProfile(
     channel_name="MeinyaYozakura",
     components=(MeinyaCommands, MeinyaPointsCommands),
     features=FeatureDefaults(
