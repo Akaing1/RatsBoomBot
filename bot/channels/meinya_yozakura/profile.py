@@ -5,7 +5,7 @@ from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 MEINYA_PROFILE = ChannelProfile(
     channel_name="MeinyaYozakura",
-    components=(MeinyaCommands, MeinyaPointsCommands),
+    components=(MeinyaCommands,),
     features=FeatureDefaults(
         channel=False,
         timers=False,
