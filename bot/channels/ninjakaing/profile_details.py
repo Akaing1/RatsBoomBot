@@ -39,7 +39,7 @@ NINJAKAING_RAID_MESSAGES = RaidMessages(
 
 
 NINJAKAING_REDEEMS = RedeemConfig(
-    daily_title="Daily Bread",
+    daily_title="Steal Some Cheese",
     first_title="First",
     daily_amount=100,
     first_amount=250,

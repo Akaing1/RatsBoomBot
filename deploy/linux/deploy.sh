@@ -5,7 +5,7 @@ set -euo pipefail
 APP_DIR="/opt/ratsboombot"
 VENV_DIR="$APP_DIR/.venv"
 SERVICE_NAME="ratsboombot"
-DEPLOY_BRANCH="feature/admin-dash"
+DEPLOY_BRANCH="release/5.3.7"
 HEALTH_URL="http://127.0.0.1:4345/health"
 
 BACKUP_DIR="$APP_DIR/deploy/linux/backup"
