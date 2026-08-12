@@ -31,6 +31,24 @@ def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
     return is_moderator or is_broadcaster
 
 
+async def get_shoutout_game_name(bot, username: str) -> str | None:
+    try:
+        target = await bot.fetch_user(login=username)
+
+        if target is None:
+            return None
+
+        channel_info = await target.fetch_channel_info()
+    except Exception:
+        LOGGER.exception(
+            "[Shoutouts] Failed to fetch channel information for %s.",
+            username
+        )
+        return None
+
+    return channel_info.game_name or None
+
+
 async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool:
     broadcaster_id = str(broadcaster_id)
     username = clean_username(username)
@@ -41,11 +59,13 @@ async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool
         )
         return False
 
+    game_name = await get_shoutout_game_name(bot, username)
     channel = bot.create_partialuser(broadcaster_id)
-    message = (
-        f"Go check out @{username}! "
-        f"They are a cool rat: https://twitch.tv/{username}"
-    )
+
+    if game_name:
+        message = f"Go check out @{username}! They were last playing {game_name}. They are a cool rat: https://twitch.tv/{username}"
+    else:
+        message = f"Go check out @{username}! They are a cool rat: https://twitch.tv/{username}"
 
     try:
         await channel.send_message(sender=bot.user, message=message)
