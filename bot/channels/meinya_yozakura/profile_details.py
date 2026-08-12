@@ -9,7 +9,13 @@ from bot.profiles import (
 
 
 MEINYA_TIMER_MESSAGES = (
-    "Timer Placeholder"
+    "Still a regular stinky? Upgrade to premium stinky — get ad-free viewing, sub emotes, sub badge, and support the blood sakura garden 🩸",
+    "2.0 MODEL RIGGING GOAL ON THRONE: https://throne.com/meinya/item/81c32121-0be2-44c6-b29f-be926b04b92b Help fund the Meinya model 🖤 Donating toward this is absolutely never expected — just lurking, chatting, and hanging out already supports me a ton ♡",
+    "Still a wandering soul? Join the Blood Sakura Shrine by following before you get lost!",
+    "You can support my stream by tipping on Throne or using Twitch Bits :3 (Everything that comes from the stream goes back into my stream ^^.): https://throne.com/meinya",
+    "Stinky car is now a youtuber HYPERS ! For now we're only posting vods and some clips, but, maybe we'll do full videos in the future, who knows Shrug Go ahead and subscribe, it's greatly appreciated https://www.youtube.com/@MeinyaYozakura",
+    "Join the Garden :3 <3 https://discord.gg/E7Q2yTmVp4"
+
 )
 
 
