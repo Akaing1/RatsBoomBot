@@ -6,21 +6,26 @@ from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 MEINYA_PROFILE = ChannelProfile(
     channel_name="MeinyaYozakura",
     components=(MeinyaCommands,),
+    protected_user_ids=(
+        "1251948863",  # Ninjakaing
+        "486983829",  # WxlfiiX
+        "104646528"  # Brlp39
+    ),
     features=FeatureDefaults(
-        channel=False,
-        timers=False,
+        channel=True,
+        timers=True,
         points=False,
         redeems=False,
         community_events=False,
-        raid_responses=False
+        raid_responses=True
     ),
     globals=GlobalCommandDefaults(
         enabled=True,
         points=False,
         viewer_queue=False,
-        shoutouts=False,
-        socials=False,
-        settings=False,
+        shoutouts=True,
+        socials=True,
+        settings=True,
         hi=False,
         choice=False,
         kaboom=False,

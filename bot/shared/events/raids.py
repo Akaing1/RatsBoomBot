@@ -31,15 +31,18 @@ class RaidEvents(commands.Component):
             return
 
         raider_name = getattr(raider, "name", None)
+        raider_id = getattr(raider, "id", None)
         broadcaster_name = getattr(broadcaster, "name", None) or "unknown"
         broadcaster_id = str(broadcaster.id)
 
-        if not raider_name:
+        if not raider_name or raider_id is None:
             LOGGER.warning(
-                "[Events] Could not determine the raider name from payload: %r",
+                "[Events] Could not determine the raider identity from payload: %r",
                 payload
             )
             return
+
+        raider_id = str(raider_id)
 
         try:
             viewer_count = int(viewer_count)
@@ -124,6 +127,26 @@ class RaidEvents(commands.Component):
                 "[Events] Incoming raid message is disabled for %s (%s).",
                 broadcaster_name,
                 broadcaster_id
+            )
+
+        queued, response, position = services.shoutouts.enqueue(broadcaster_id=broadcaster_id, user_id=raider_id,
+                                                                username=raider_name, requested_by="raid")
+
+        if queued:
+            LOGGER.info(
+                "[Shoutouts] Raider %s (%s) was added to broadcaster %s shoutout queue at position %d.",
+                raider_name,
+                raider_id,
+                broadcaster_id,
+                position
+            )
+        else:
+            LOGGER.info(
+                "[Shoutouts] Native shoutout was not queued for raider %s (%s) in broadcaster %s: %s",
+                raider_name,
+                raider_id,
+                broadcaster_id,
+                response
             )
 
         try:
