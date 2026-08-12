@@ -1,2 +1,2 @@
 APP_NAME = "RatsBoomBot"
-APP_VERSION = "5.3.8"
+APP_VERSION = "5.4.1"
