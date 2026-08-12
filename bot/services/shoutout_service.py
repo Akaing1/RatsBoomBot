@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from collections import defaultdict, deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
 from twitchio import HTTPException
@@ -15,12 +15,14 @@ class QueuedShoutout:
     username: str
     requested_by: str
     queued_at: datetime
+    attempts: int = 0
 
 
 class ShoutoutService:
     GLOBAL_COOLDOWN = timedelta(minutes=2)
     TARGET_COOLDOWN = timedelta(hours=1)
     CHECK_INTERVAL_SECONDS = 10
+    MAX_ATTEMPTS = 3
 
     def __init__(self, bot):
         self.bot = bot
@@ -147,6 +149,31 @@ class ShoutoutService:
             return
 
         if result == "failed":
+            attempts = queued_shoutout.attempts + 1
+
+            if attempts < self.MAX_ATTEMPTS:
+                queue[0] = replace(queued_shoutout, attempts=attempts)
+
+                LOGGER.warning(
+                    "[Shoutouts] Native shoutout attempt %d of %d failed for %s (%s) in broadcaster %s. The shoutout will be retried.",
+                    attempts,
+                    self.MAX_ATTEMPTS,
+                    queued_shoutout.username,
+                    queued_shoutout.user_id,
+                    broadcaster_id
+                )
+                return
+
+            queue.popleft()
+            self.queued_user_ids[broadcaster_id].discard(queued_shoutout.user_id)
+
+            LOGGER.error(
+                "[Shoutouts] Removed %s (%s) from broadcaster %s queue after %d failed native shoutout attempts.",
+                queued_shoutout.username,
+                queued_shoutout.user_id,
+                broadcaster_id,
+                attempts
+            )
             return
 
         queue.popleft()
