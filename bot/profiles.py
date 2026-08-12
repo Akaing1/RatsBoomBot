@@ -209,6 +209,7 @@ class PointsConfig:
 class ChannelProfile:
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
+    protected_user_ids: tuple[str, ...] = ()
     features: FeatureDefaults = FeatureDefaults()
     globals: GlobalCommandDefaults = GlobalCommandDefaults()
     timer_messages: tuple[str, ...] = ()
@@ -216,6 +217,9 @@ class ChannelProfile:
     raid_messages: RaidMessages = RaidMessages()
     redeems: RedeemConfig = RedeemConfig()
     points: PointsConfig = PointsConfig()
+
+    def is_user_protected(self, user_id: str) -> bool:
+        return str(user_id) in self.protected_user_ids
 
 
 CHANNEL_PROFILES: dict[str, ChannelProfile] = {}
