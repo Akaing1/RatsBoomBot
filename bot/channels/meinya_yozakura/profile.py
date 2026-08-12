@@ -13,19 +13,19 @@ MEINYA_PROFILE = ChannelProfile(
     ),
     features=FeatureDefaults(
         channel=True,
-        timers=False,
+        timers=True,
         points=False,
         redeems=False,
         community_events=False,
-        raid_responses=False
+        raid_responses=True
     ),
     globals=GlobalCommandDefaults(
         enabled=True,
         points=False,
         viewer_queue=False,
         shoutouts=True,
-        socials=False,
-        settings=False,
+        socials=True,
+        settings=True,
         hi=False,
         choice=False,
         kaboom=False,
