@@ -211,6 +211,8 @@ body.login-page {
     color: #ff8784;
 }
 .sidebar-logout .button:hover { border-color: rgba(239,83,80,.85); background: rgba(239,83,80,.27); color: #fff; }
+.deployment-stamp { margin: 16px 0 0; color: var(--muted); font-size: 11px; text-align: center; }
+.login-deployment-stamp { position: fixed; right: 18px; bottom: 14px; margin: 0; }
 
 @media (max-width: 900px) {
     .app-shell { display: block; }

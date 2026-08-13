@@ -14,7 +14,7 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', path='/css/style.css') }}?v=2"
+        href="{{ url_for('static', path='/css/style.css') }}?v=3"
     >
 </head>
 
@@ -68,6 +68,7 @@
                     Account
                 </a>
             </nav>
+
             <form class="sidebar-logout" method="post" action="/logout">
                 <input
                     type="hidden"
@@ -79,6 +80,8 @@
                     Log Out
                 </button>
             </form>
+
+            <p class="deployment-stamp">{{ deployment_stamp() }}</p>
         </aside>
 
         <main class="main-content">
