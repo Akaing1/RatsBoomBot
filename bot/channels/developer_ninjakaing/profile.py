@@ -13,7 +13,7 @@ DEVELOPER_NINJAKAING_PROFILE = ChannelProfile(
         points=True,
         redeems=False,
         community_events=True,
-        raid_responses=False
+        raid_responses=True
     ),
     globals=GlobalCommandDefaults(
         enabled=True,

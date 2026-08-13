@@ -6,7 +6,7 @@ import time
 from twitchio import User
 from twitchio.ext import commands
 
-from bot.profiles import GlobalCommandName
+from bot.profiles import GlobalCommandName, get_active_profile
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_command_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -17,15 +17,28 @@ class ModActionCommands(commands.Component):
     KAMIKAZE_SUCCESS_THRESHOLD = 90
     REMOD_DELAY_SECONDS = 12
     KAMIKAZE_COOLDOWN_SECONDS = 60 * 10
+    KAMIKAZE_COOLDOWN_NOTICE_SPLIT_SECONDS = 60 * 5
 
     def __init__(self, bot):
         self.bot = bot
         self._remod_tasks: set[asyncio.Task] = set()
         self._kamikaze_cooldowns: dict[tuple[str, str], float] = {}
+        self._kamikaze_cooldown_notices: dict[tuple[str, str], set[str]] = {}
 
     @staticmethod
     def is_broadcaster(user_id: str, broadcaster_id: str) -> bool:
         return str(user_id) == str(broadcaster_id)
+
+    def is_protected_target(self, user_id: str, broadcaster_id: str) -> bool:
+        if self.is_broadcaster(user_id, broadcaster_id) or self.is_bot(user_id):
+            return True
+
+        profile = get_active_profile(broadcaster_id)
+
+        if profile is None:
+            return False
+
+        return profile.is_user_protected(user_id)
 
     def is_bot(self, user_id: str) -> bool:
         bot_id = getattr(self.bot, "bot_id", None)
@@ -39,9 +52,6 @@ class ModActionCommands(commands.Component):
 
         return str(user_id) == str(bot_id)
 
-    def is_protected_target(self, user_id: str, broadcaster_id: str) -> bool:
-        return self.is_broadcaster(user_id, broadcaster_id) or self.is_bot(user_id)
-
     def get_kamikaze_cooldown_remaining(self, broadcaster_id: str, user_id: str) -> int:
         key = (str(broadcaster_id), str(user_id))
         cooldown_ends_at = self._kamikaze_cooldowns.get(key)
@@ -53,6 +63,7 @@ class ModActionCommands(commands.Component):
 
         if remaining <= 0:
             self._kamikaze_cooldowns.pop(key, None)
+            self._kamikaze_cooldown_notices.pop(key, None)
             return 0
 
         return max(1, int(remaining) + 1)
@@ -60,6 +71,18 @@ class ModActionCommands(commands.Component):
     def start_kamikaze_cooldown(self, broadcaster_id: str, user_id: str) -> None:
         key = (str(broadcaster_id), str(user_id))
         self._kamikaze_cooldowns[key] = time.monotonic() + self.KAMIKAZE_COOLDOWN_SECONDS
+        self._kamikaze_cooldown_notices[key] = set()
+
+    def should_send_kamikaze_cooldown_notice(self, broadcaster_id: str, user_id: str, remaining_seconds: int) -> bool:
+        key = (str(broadcaster_id), str(user_id))
+        notice_window = "final" if remaining_seconds <= self.KAMIKAZE_COOLDOWN_NOTICE_SPLIT_SECONDS else "initial"
+        sent_windows = self._kamikaze_cooldown_notices.setdefault(key, set())
+
+        if notice_window in sent_windows:
+            return False
+
+        sent_windows.add(notice_window)
+        return True
 
     @staticmethod
     def format_cooldown(seconds: int) -> str:
@@ -204,16 +227,24 @@ class ModActionCommands(commands.Component):
         cooldown_remaining = self.get_kamikaze_cooldown_remaining(broadcaster_id, caller_id)
 
         if cooldown_remaining > 0:
-            cooldown_text = self.format_cooldown(cooldown_remaining)
-
-            LOGGER.debug(
-                "[Commands] User %s attempted !kamikaze during cooldown in broadcaster %s with %s remaining.",
-                caller.name,
+            should_send_notice = self.should_send_kamikaze_cooldown_notice(
                 broadcaster_id,
-                cooldown_text
+                caller_id,
+                cooldown_remaining
             )
 
-            await ctx.reply(f"!kamikaze is on cooldown for you. Try again in {cooldown_text}.")
+            if should_send_notice:
+                cooldown_text = self.format_cooldown(cooldown_remaining)
+
+                LOGGER.debug(
+                    "[Commands] User %s attempted !kamikaze during cooldown in broadcaster %s with %s remaining.",
+                    caller.name,
+                    broadcaster_id,
+                    cooldown_text
+                )
+
+                await ctx.reply(f"!kamikaze is on cooldown for you. Try again in {cooldown_text}.")
+
             return
 
         if target is None or caller_id == str(target.id):
@@ -246,7 +277,7 @@ class ModActionCommands(commands.Component):
 
         target_id = str(target.id)
 
-        if self.is_protected_target(target_id, broadcaster_id):
+        if self.is_protected_target(target_id, broadcaster_id ):
             LOGGER.info(
                 "[Mod Actions] User %s attempted to target protected user %s with !kamikaze in broadcaster %s.",
                 caller.name,
