@@ -20,9 +20,9 @@ MEINYA_TIMER_MESSAGES = (
 
 
 MEINYA_COMMUNITY_MESSAGES = CommunityMessages(
-    follow="Thanks for following, {username}!",
-    subscription="Thanks for subscribing, {username}!",
-    resubscription="Thanks for subscribing for {months} months, {username}!"
+    follow="A new wandering spirit has joined the Garden! 🌸 Thank you for the follow {username}, Nya! ✨~",
+    subscription="🌸 A sacred bond has been forged! Thank you {username} for subscribing and supporting the Garden.~ You are now an elite guardian of the Blood Sakura Garden! Enjoy the perks and cute emotes :3. Mya~ ✨",
+    resubscription="🌸 Another month in the Sakura Garden! Thank you for staying by my side for {months} months {username}, mya~"
 )
 
 
