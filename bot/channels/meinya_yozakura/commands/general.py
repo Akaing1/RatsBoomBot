@@ -10,14 +10,14 @@ class MeinyaCommands(ChannelComponent):
         super().__init__(bot, profile, broadcaster_id)
 
     @commands.command(name="raid")
-    async def friend_test(self, ctx: commands.Context) -> None:
+    async def raid(self, ctx: commands.Context) -> None:
         if not await self.require_profile_channel(ctx):
             return
 
         await ctx.send("TombRaid GlitchCat PowerUpL NYXI RAID PowerUpR GlitchCat TombRaid")
 
     @commands.command(name="subraid")
-    async def friend_test(self, ctx: commands.Context) -> None:
+    async def subraid(self, ctx: commands.Context) -> None:
         if not await self.require_profile_channel(ctx):
             return
 
