@@ -224,6 +224,16 @@ class ModActionCommands(commands.Component):
             broadcaster_id
         )
 
+        if self.is_protected_target(caller_id, broadcaster_id):
+            LOGGER.info(
+                "[Mod Actions] Protected user %s attempted to use !kamikaze in broadcaster %s.",
+                caller.name,
+                broadcaster_id
+            )
+
+            await ctx.reply("The !kamikaze command is not available to protected users.")
+            return
+
         cooldown_remaining = self.get_kamikaze_cooldown_remaining(broadcaster_id, caller_id)
 
         if cooldown_remaining > 0:
@@ -248,16 +258,6 @@ class ModActionCommands(commands.Component):
             return
 
         if target is None or caller_id == str(target.id):
-            if self.is_protected_target(caller_id, broadcaster_id):
-                LOGGER.info(
-                    "[Mod Actions] Protected user %s attempted to target themselves with !kamikaze in broadcaster %s.",
-                    caller.name,
-                    broadcaster_id
-                )
-
-                await ctx.reply("You cannot bomb this target, try someone else.")
-                return
-
             self.start_kamikaze_cooldown(broadcaster_id, caller_id)
 
             await ctx.reply("You bomb yourself...")
@@ -277,15 +277,22 @@ class ModActionCommands(commands.Component):
 
         target_id = str(target.id)
 
-        if self.is_protected_target(target_id, broadcaster_id ):
+        if self.is_protected_target(target_id, broadcaster_id):
+            self.start_kamikaze_cooldown(broadcaster_id, caller_id)
+
+            await ctx.reply(f"{caller.name} tried to bomb a protected target and blew themselves up instead.")
+
+            timed_out = await self.timeout_with_moderator_restore(channel, broadcaster_id, caller_id, caller.name)
+
+            if not timed_out:
+                return
+
             LOGGER.info(
-                "[Mod Actions] User %s attempted to target protected user %s with !kamikaze in broadcaster %s.",
+                "[Mod Actions] User %s targeted protected user %s with !kamikaze and was timed out in broadcaster %s.",
                 caller.name,
                 target.name,
                 broadcaster_id
             )
-
-            await ctx.reply("You cannot bomb this target, try someone else.")
             return
 
         self.start_kamikaze_cooldown(broadcaster_id, caller_id)
@@ -317,16 +324,6 @@ class ModActionCommands(commands.Component):
                 f"{target.name} has been blown up and timed out for "
                 f"{self.KAMIKAZE_DURATION_SECONDS} seconds."
             )
-            return
-
-        if self.is_protected_target(caller_id, broadcaster_id):
-            LOGGER.info(
-                "[Mod Actions] Protected user %s missed !kamikaze but was not timed out in broadcaster %s.",
-                caller.name,
-                broadcaster_id
-            )
-
-            await ctx.send(f"{caller.name} missed, but they are protected from the explosion.")
             return
 
         timed_out = await self.timeout_with_moderator_restore(channel, broadcaster_id, caller_id, caller.name)
