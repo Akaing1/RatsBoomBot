@@ -7,6 +7,32 @@ from pathlib import Path
 LOGGER = logging.getLogger("RatBoomBot")
 
 
+class StreamSessionLogHandler(logging.Handler):
+
+    def __init__(self, stream_log_service) -> None:
+        super().__init__(level=logging.INFO)
+        self.stream_log_service = stream_log_service
+        self.handling_record = False
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if self.handling_record:
+            return
+
+        self.handling_record = True
+
+        try:
+            message = self.format(record)
+
+            for broadcaster_id in list(self.stream_log_service.active_sessions):
+                self.stream_log_service.write(
+                    broadcaster_id,
+                    record.levelname,
+                    message
+                )
+        finally:
+            self.handling_record = False
+
+
 @dataclass
 class StreamLogSession:
     broadcaster_id: str
@@ -22,6 +48,8 @@ class StreamLogService:
         self.broadcasters = broadcaster_service
         self.logs_path = Path(logs_path)
         self.active_sessions: dict[str, StreamLogSession] = {}
+        self.log_handler = StreamSessionLogHandler(self)
+        self.log_handler.setFormatter(logging.Formatter("%(message)s"))
 
     async def setup(self) -> None:
         LOGGER.info(
@@ -37,6 +65,9 @@ class StreamLogService:
                 self.logs_path
             )
             raise
+
+        if self.log_handler not in LOGGER.handlers:
+            LOGGER.addHandler(self.log_handler)
 
         await self.start_live_sessions()
 
@@ -61,6 +92,7 @@ class StreamLogService:
             )
 
         self.active_sessions.clear()
+        LOGGER.removeHandler(self.log_handler)
 
         LOGGER.info("[Stream Logs] Stream logging stopped.")
 
