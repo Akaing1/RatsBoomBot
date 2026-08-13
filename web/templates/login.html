@@ -12,7 +12,7 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', path='/css/style.css') }}"
+        href="{{ url_for('static', path='/css/style.css') }}?v=3"
     >
 </head>
 
@@ -71,5 +71,7 @@
             </button>
         </form>
     </main>
+
+    <p class="deployment-stamp login-deployment-stamp">{{ deployment_stamp() }}</p>
 </body>
 </html>

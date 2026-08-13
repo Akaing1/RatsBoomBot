@@ -5,12 +5,14 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from config.version import get_deployment_stamp
 from web.admin_auth import get_csrf_token, is_admin_authenticated
 
 WEB_DIRECTORY = Path(__file__).resolve().parent
 TEMPLATES_DIRECTORY = WEB_DIRECTORY / "templates"
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIRECTORY))
+templates.env.globals["deployment_stamp"] = get_deployment_stamp
 
 
 def build_admin_context(request: Request, *, active_page: str, **values: Any) -> dict[str, Any]:

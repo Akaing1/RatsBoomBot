@@ -10,6 +10,7 @@ HEALTH_URL="http://127.0.0.1:4345/health"
 
 BACKUP_DIR="$APP_DIR/deploy/linux/backup"
 DATABASE_PATH="$APP_DIR/.data/tokens.db"
+DEPLOYMENT_STAMP_PATH="$APP_DIR/.data/deployment.txt"
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 
 MAX_BACKUPS=3
@@ -19,6 +20,11 @@ echo "[Deploy] Starting RatsBoomBot deployment."
 cd "$APP_DIR"
 
 PREVIOUS_COMMIT="$(git rev-parse HEAD)"
+PREVIOUS_DEPLOYMENT_STAMP=""
+
+if [ -f "$DEPLOYMENT_STAMP_PATH" ]; then
+    PREVIOUS_DEPLOYMENT_STAMP="$(<"$DEPLOYMENT_STAMP_PATH")"
+fi
 
 echo "[Deploy] Current commit: $PREVIOUS_COMMIT"
 
@@ -68,6 +74,15 @@ echo "[Deploy] Installing dependencies."
 echo "[Deploy] Running compile checks."
 "$VENV_DIR/bin/python" -m compileall app bot config storage web main.py
 
+APP_VERSION="$("$VENV_DIR/bin/python" -c 'from config.version import APP_VERSION; print(APP_VERSION)')"
+DEPLOYMENT_STAMP="$(date '+%m.%d.%Y')-v$APP_VERSION"
+
+mkdir -p "$(dirname "$DEPLOYMENT_STAMP_PATH")"
+printf '%s\n' "$DEPLOYMENT_STAMP" > "$DEPLOYMENT_STAMP_PATH"
+
+echo "[Deploy] Application version: v$APP_VERSION"
+echo "[Deploy] Deployment stamp: $DEPLOYMENT_STAMP"
+
 echo "[Deploy] Restarting systemd service."
 sudo systemctl restart "$SERVICE_NAME"
 
@@ -91,6 +106,12 @@ echo "[Deploy] ERROR: RatsBoomBot did not become healthy."
 echo "[Deploy] Rolling back to commit $PREVIOUS_COMMIT."
 
 git reset --hard "$PREVIOUS_COMMIT"
+
+if [ -n "$PREVIOUS_DEPLOYMENT_STAMP" ]; then
+    printf '%s\n' "$PREVIOUS_DEPLOYMENT_STAMP" > "$DEPLOYMENT_STAMP_PATH"
+else
+    rm -f "$DEPLOYMENT_STAMP_PATH"
+fi
 
 echo "[Deploy] Restoring dependencies for previous commit."
 "$VENV_DIR/bin/python" -m pip install -r requirements.txt
