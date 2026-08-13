@@ -16,7 +16,7 @@ MEINYA_PROFILE = ChannelProfile(
         timers=True,
         points=False,
         redeems=False,
-        community_events=False,
+        community_events=True,
         raid_responses=True
     ),
     globals=GlobalCommandDefaults(
