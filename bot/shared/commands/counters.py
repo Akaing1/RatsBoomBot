@@ -105,7 +105,7 @@ class CounterCommands(commands.Component):
 
     @commands.command(name="bark", aliases=["wxlfiix"])
     async def bark(self, ctx: commands.Context) -> None:
-        bark_count = await self.increment_counter(ctx, "explode", GlobalCommandName.BARK)
+        bark_count = await self.increment_counter(ctx, "wxlfiix", GlobalCommandName.BARK)
 
         if bark_count is None:
             return
