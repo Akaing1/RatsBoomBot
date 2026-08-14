@@ -88,7 +88,7 @@ class CounterCommands(commands.Component):
 
         await ctx.send(
             f"Reklop is a femboy o7! He has been with "
-            f"{reklop_count} guys! ninjak83Yay2"
+            f"{reklop_count} guys!"
         )
 
     @commands.command(name="randy")
@@ -100,7 +100,7 @@ class CounterCommands(commands.Component):
 
         await ctx.send(
             f"Randy has inted {randy_count} times. "
-            "He is a terrorist player and should be banned. ninjak83Sip"
+            "He is a terrorist player and should be banned."
         )
 
     @commands.command(name="car")
@@ -112,5 +112,5 @@ class CounterCommands(commands.Component):
 
         await ctx.send(
             f"Car has been blown up by a creeper "
-            f"{car_count} times! ninjak83Heh"
+            f"{car_count} times!"
         )
