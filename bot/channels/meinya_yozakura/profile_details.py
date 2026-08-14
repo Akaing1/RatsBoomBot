@@ -42,7 +42,7 @@ MEINYA_REDEEMS = RedeemConfig(
     claim_milestones=(10, 25, 50, 100, 250, 500, 1000),
     messages=RedeemMessages(
         stream_offline="@{username}, this redeem only works while the stream is live.",
-        daily_already_claimed="@{username}, you already given your blood offering for today.",
+        daily_already_claimed="@{username}, you have already given your blood offering for today.",
         daily_success=(
             "@{username} has given their daily blood offering "
             "and received {amount} sakura petals! They have offered their blood "
