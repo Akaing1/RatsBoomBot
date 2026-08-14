@@ -63,11 +63,14 @@
         <p class="card-label">Viewer queue</p>
 
         <div class="status-row">
-            <span class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"></span>
-            <strong>{% if queue_open %}Open{% else %}Closed{% endif %}</strong>
+            <span
+                id="queue-status-indicator"
+                class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"
+            ></span>
+            <strong id="queue-status-label">{% if queue_open %}Open{% else %}Closed{% endif %}</strong>
         </div>
 
-        <p class="card-detail">
+        <p id="queue-size-label" class="card-detail">
             {{ queue_size }} viewer{% if queue_size != 1 %}s{% endif %} currently waiting.
         </p>
     </article>
@@ -148,7 +151,7 @@
                 <h3>Viewer queue</h3>
             </div>
 
-            <span class="channel-state {% if queue_open %}live{% endif %}">
+            <span id="queue-panel-state" class="channel-state {% if queue_open %}live{% endif %}">
                 {% if queue_open %}
                     Open
                 {% else %}
@@ -174,8 +177,9 @@
             </div>
         {% endif %}
 
-        {% if queue_users %}
-            <ul class="queue-list">
+        <div id="viewer-queue-content">
+            {% if queue_users %}
+                <ul class="queue-list">
                 {% for username in queue_users %}
                     <li class="queue-list-item">
                         <span class="queue-position">
@@ -214,20 +218,171 @@
                         </form>
                     </li>
                 {% endfor %}
-            </ul>
-        {% else %}
-            <div class="compact-empty-state">
-                <h4>The queue is empty</h4>
+                </ul>
+            {% else %}
+                <div class="compact-empty-state">
+                    <h4>The queue is empty</h4>
 
-                <p>
-                    {% if queue_open %}
-                        Viewers can join with <strong>!join</strong>.
-                    {% else %}
-                        The viewer queue is currently closed.
-                    {% endif %}
-                </p>
-            </div>
-        {% endif %}
+                    <p>
+                        {% if queue_open %}
+                            Viewers can join with <strong>!join</strong>.
+                        {% else %}
+                            The viewer queue is currently closed.
+                        {% endif %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
     </section>
 </div>
+
+<script>
+    (() => {
+        const endpoint = "/channel/api/viewer-queue";
+        const csrfToken = {{ csrf_token | tojson }};
+        const statusIndicator = document.getElementById("queue-status-indicator");
+        const statusLabel = document.getElementById("queue-status-label");
+        const sizeLabel = document.getElementById("queue-size-label");
+        const panelState = document.getElementById("queue-panel-state");
+        const queueContent = document.getElementById("viewer-queue-content");
+        let requestInProgress = false;
+        let lastQueueSignature = null;
+
+        function buildRemoveForm(username, position) {
+            const form = document.createElement("form");
+            form.method = "post";
+            form.action = "/channel/viewer-queue/remove";
+            form.addEventListener("submit", event => {
+                if (!window.confirm(`Remove @${username} from the viewer queue?`)) {
+                    event.preventDefault();
+                }
+            });
+
+            const csrfInput = document.createElement("input");
+            csrfInput.type = "hidden";
+            csrfInput.name = "csrf_token";
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+
+            const positionInput = document.createElement("input");
+            positionInput.type = "hidden";
+            positionInput.name = "position";
+            positionInput.value = String(position);
+            form.appendChild(positionInput);
+
+            const button = document.createElement("button");
+            button.className = "queue-remove-button";
+            button.type = "submit";
+            button.setAttribute("aria-label", `Remove @${username} from the queue`);
+            button.title = `Remove @${username}`;
+            button.textContent = "×";
+            form.appendChild(button);
+
+            return form;
+        }
+
+        function renderQueue(data) {
+            const isOpen = Boolean(data.open);
+            const users = Array.isArray(data.users) ? data.users : [];
+            const size = users.length;
+            const queueSignature = JSON.stringify([isOpen, users]);
+
+            if (queueSignature === lastQueueSignature) {
+                return;
+            }
+
+            lastQueueSignature = queueSignature;
+
+            statusIndicator.classList.toggle("online", isOpen);
+            statusIndicator.classList.toggle("offline", !isOpen);
+            statusLabel.textContent = isOpen ? "Open" : "Closed";
+            sizeLabel.textContent = `${size} viewer${size === 1 ? "" : "s"} currently waiting.`;
+            panelState.classList.toggle("live", isOpen);
+            panelState.textContent = isOpen ? "Open" : "Closed";
+            queueContent.replaceChildren();
+
+            if (users.length === 0) {
+                const emptyState = document.createElement("div");
+                emptyState.className = "compact-empty-state";
+
+                const heading = document.createElement("h4");
+                heading.textContent = "The queue is empty";
+                emptyState.appendChild(heading);
+
+                const message = document.createElement("p");
+                if (isOpen) {
+                    message.append("Viewers can join with ");
+                    const command = document.createElement("strong");
+                    command.textContent = "!join";
+                    message.append(command, ".");
+                } else {
+                    message.textContent = "The viewer queue is currently closed.";
+                }
+                emptyState.appendChild(message);
+                queueContent.appendChild(emptyState);
+                return;
+            }
+
+            const list = document.createElement("ul");
+            list.className = "queue-list";
+
+            users.forEach((username, index) => {
+                const position = index + 1;
+                const item = document.createElement("li");
+                item.className = "queue-list-item";
+
+                const positionLabel = document.createElement("span");
+                positionLabel.className = "queue-position";
+                positionLabel.textContent = String(position);
+                item.appendChild(positionLabel);
+
+                const usernameLabel = document.createElement("strong");
+                usernameLabel.className = "queue-username";
+                usernameLabel.textContent = `@${username}`;
+                item.appendChild(usernameLabel);
+                item.appendChild(buildRemoveForm(username, position));
+                list.appendChild(item);
+            });
+
+            queueContent.appendChild(list);
+        }
+
+        async function refreshQueue() {
+            if (requestInProgress || document.hidden) {
+                return;
+            }
+
+            requestInProgress = true;
+            try {
+                const response = await fetch(endpoint, {
+                    headers: { "Accept": "application/json" },
+                    cache: "no-store"
+                });
+
+                if (response.status === 401) {
+                    window.location.assign("/connect");
+                    return;
+                }
+
+                if (!response.ok) {
+                    return;
+                }
+
+                renderQueue(await response.json());
+            } catch (error) {
+                // Keep the last successfully rendered queue during transient network errors.
+            } finally {
+                requestInProgress = false;
+            }
+        }
+
+        refreshQueue();
+        window.setInterval(refreshQueue, 2000);
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) {
+                refreshQueue();
+            }
+        });
+    })();
+</script>
 {% endblock %}
