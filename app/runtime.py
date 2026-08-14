@@ -1,3 +1,6 @@
+
+
+
 import asyncio
 import logging
 import sys
@@ -10,6 +13,7 @@ import uvicorn
 from rich.logging import RichHandler
 
 from bot.bot import TwitchBot
+from app.runtime_logs import runtime_log_buffer
 from config.settings import settings
 from config.version import APP_NAME, APP_VERSION
 from storage.database import setup_database
@@ -140,6 +144,11 @@ def configure_logging() -> None:
         handlers=[RichHandler(rich_tracebacks=True, markup=True)],
         force=True
     )
+
+    logger = logging.getLogger("RatBoomBot")
+
+    if runtime_log_buffer not in logger.handlers:
+        logger.addHandler(runtime_log_buffer)
 
 
 def run() -> None:
