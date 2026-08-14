@@ -7,13 +7,11 @@ from bot.profiles import (
     RedeemMessages
 )
 
-
 NINJAKAING_TIMER_MESSAGES = (
     "Lost something? Maybe you left it in the basement: {discord_url}",
     "Missed something? Go check out Rat's YouTube! {youtube_url}",
     "Ready to gamble? Use !help to get a list of commands you can use!"
 )
-
 
 NINJAKAING_COMMUNITY_MESSAGES = CommunityMessages(
     follow=(
@@ -29,7 +27,6 @@ NINJAKAING_COMMUNITY_MESSAGES = CommunityMessages(
     )
 )
 
-
 NINJAKAING_RAID_MESSAGES = RaidMessages(
     incoming=(
         "@{raider_name} has raided the basement with "
@@ -37,22 +34,13 @@ NINJAKAING_RAID_MESSAGES = RaidMessages(
     )
 )
 
-
 NINJAKAING_REDEEMS = RedeemConfig(
     daily_title="Steal Some Cheese",
-    first_title="First",
+    first_title="first",
     daily_amount=100,
     first_amount=250,
     daily_double_chance=0.05,
-    claim_milestones=(
-        10,
-        25,
-        50,
-        100,
-        250,
-        500,
-        1000
-    ),
+    claim_milestones=(10, 25, 50, 100, 250, 500, 1000),
     messages=RedeemMessages(
         stream_offline=(
             "@{username}, this redeem only works while "
@@ -95,7 +83,6 @@ NINJAKAING_REDEEMS = RedeemConfig(
         )
     )
 )
-
 
 NINJAKAING_POINTS = PointsConfig(
     command_name="bread",

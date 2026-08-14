@@ -34,14 +34,52 @@ MEINYA_RAID_MESSAGES = RaidMessages(
 
 
 MEINYA_REDEEMS = RedeemConfig(
-    daily_title="Daily Points",
-    first_title="First",
+    daily_title="Daily Check-in",
+    first_title="FIRST",
     daily_amount=100,
     first_amount=250,
     daily_double_chance=0.05,
     claim_milestones=(10, 25, 50, 100, 250, 500, 1000),
     messages=RedeemMessages(
-
+        stream_offline=(
+            "@{username}, this redeem only works while "
+            "the stream is live."
+        ),
+        daily_already_claimed=(
+            "@{username}, you already given your "
+            "blood offering for today."
+        ),
+        daily_success=(
+            "@{username} has given their daily blood offering "
+            "and received {amount} sakura petals! They have offered their blood"
+            "{claim_count} times!"
+        ),
+        daily_double=(
+            "You have received a blessing! @{username} has been "
+            "rewarded with {amount} sakura petals! They have offered their blood"
+            "{claim_count} times!"
+        ),
+        daily_milestone=(
+            "A dedicated Devotee! @{username} has offered their blood"
+            "{claim_count} times!"
+        ),
+        first_already_claimed_by=(
+            "@{username}, this stream's first blessing was already "
+            "given to @{winner}."
+        ),
+        first_already_claimed=(
+            "@{username}, this stream's first blessing was already "
+            "given."
+        ),
+        first_success=(
+            "@{username} was given the first blessing for the stream "
+            "and received {amount} sakura petals! They have been blessed "
+            "first {claim_count} times!"
+        ),
+        first_milestone=(
+            "Milestone! @{username} has blessed first "
+            "{claim_count} times!"
+        )
     )
 )
 
