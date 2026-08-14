@@ -1,3 +1,8 @@
+
+
+
+
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -14,7 +19,7 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', path='/css/style.css') }}?v=3"
+        href="{{ url_for('static', path='/css/style.css') }}?v=4"
     >
 </head>
 
@@ -55,10 +60,24 @@
                 {% endif %}
 
                 <a
+                    class="nav-link {% if active_page == 'performance' %}active{% endif %}"
+                    href="/performance"
+                >
+                    Performance
+                </a>
+
+                <a
+                    class="nav-link {% if active_page == 'runtime_logs' %}active{% endif %}"
+                    href="/runtime-logs"
+                >
+                    Runtime Logs
+                </a>
+
+                <a
                     class="nav-link {% if active_page == 'logs' %}active{% endif %}"
                     href="/logs"
                 >
-                    Logs
+                    Stream Logs
                 </a>
 
                 <a
