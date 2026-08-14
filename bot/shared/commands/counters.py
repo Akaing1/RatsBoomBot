@@ -103,6 +103,15 @@ class CounterCommands(commands.Component):
             "He is a terrorist player and should be banned."
         )
 
+    @commands.command(name="bark", aliases=["wxlfiix"])
+    async def bark(self, ctx: commands.Context) -> None:
+        bark_count = await self.increment_counter(ctx, "explode", GlobalCommandName.BARK)
+
+        if bark_count is None:
+            return
+
+        await ctx.send(f"There have been {bark_count} barking incidents! Someone stop @WxlfiiX!")
+
     @commands.command(name="car")
     async def car(self, ctx: commands.Context) -> None:
         car_count = await self.increment_counter(ctx, "car", GlobalCommandName.CAR)

@@ -32,6 +32,7 @@ MILKY_GALAXYVT_PROFILE = ChannelProfile(
         explode=False,
         reklop=False,
         randy=False,
+        bark=False,
         car=False,
         kamikaze=False
     ),
