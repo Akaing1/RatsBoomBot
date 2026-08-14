@@ -305,16 +305,34 @@ class RedeemService:
         user_id = str(user_id)
 
         query = """
-        SELECT COUNT(*) AS claim_count
-        FROM redeem_claims
-        WHERE broadcaster_id = ?
-          AND user_id = ?
-          AND redeem_type = ?
+        SELECT
+            (
+                SELECT COUNT(*)
+                FROM redeem_claims
+                WHERE broadcaster_id = ?
+                  AND user_id = ?
+                  AND redeem_type = ?
+            ) + (
+                SELECT COALESCE(SUM(claim_count), 0)
+                FROM imported_redeem_totals
+                WHERE broadcaster_id = ?
+                  AND user_id = ?
+                  AND redeem_type = ?
+            ) AS claim_count
         """
+
+        values = (
+            broadcaster_id,
+            user_id,
+            redeem_type,
+            broadcaster_id,
+            user_id,
+            redeem_type
+        )
 
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(query, (broadcaster_id, user_id, redeem_type))
+                row = await connection.fetchone(query, values)
         except Exception:
             LOGGER.exception(
                 "[Redeems] Failed to load %s claim count for user %s in broadcaster %s.",
