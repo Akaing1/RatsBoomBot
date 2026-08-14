@@ -1,7 +1,10 @@
+
+
+
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName
 from web.admin_auth import get_csrf_token, validate_csrf_token
@@ -10,6 +13,35 @@ from web.common import templates
 from web.state import get_bot
 
 router = APIRouter()
+
+
+@router.get("/channel/api/viewer-queue", response_class=JSONResponse)
+async def channel_viewer_queue_state(request: Request):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+
+    services = runtime_bot.services
+    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+
+    if broadcaster is None:
+        logout_channel_user(request)
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    viewer_queue = services.viewer_queue
+    queue_users = viewer_queue.list_queue(broadcaster_id)
+
+    return JSONResponse({
+        "open": viewer_queue.is_queue_open(broadcaster_id),
+        "size": len(queue_users),
+        "users": queue_users
+    })
 
 
 @router.get("/channel", response_class=HTMLResponse)
