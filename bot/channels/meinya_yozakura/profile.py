@@ -5,7 +5,7 @@ from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 MEINYA_PROFILE = ChannelProfile(
     channel_name="MeinyaYozakura",
-    components=(MeinyaCommands,),
+    components=(MeinyaCommands, MeinyaPointsCommands),
     protected_user_ids=(
         "1251948863",  # Ninjakaing
         "486983829",  # WxlfiiX
@@ -15,13 +15,13 @@ MEINYA_PROFILE = ChannelProfile(
         channel=True,
         timers=True,
         points=False,
-        redeems=False,
+        redeems=True,
         community_events=True,
         raid_responses=True
     ),
     globals=GlobalCommandDefaults(
         enabled=True,
-        points=False,
+        points=True,
         viewer_queue=False,
         shoutouts=True,
         socials=True,

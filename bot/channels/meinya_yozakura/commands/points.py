@@ -12,56 +12,56 @@ class MeinyaPointsCommands(ChannelComponent):
         super().__init__(bot, profile, broadcaster_id)
         self.handler = PointsCommandHandler(bot)
 
-    @commands.group(name="points", invoke_fallback=True)
-    async def points(self, ctx: commands.Context, target: User = None) -> None:
+    @commands.group(name="petals", invoke_fallback=True)
+    async def petals(self, ctx: commands.Context, target: User = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
         await self.handler.show_balance(ctx, target, "points")
 
-    @points.command(name="leaderboard")
+    @petals.command(name="leaderboard")
     async def points_leaderboard(self, ctx: commands.Context) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
         await self.handler.show_leaderboard(ctx, "points")
 
-    @points.command(name="reset")
+    @petals.command(name="reset")
     async def points_reset(self, ctx: commands.Context) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
         await self.handler.reset_points(ctx, "points")
 
-    @points.command(name="add")
+    @petals.command(name="add")
     async def points_add(self, ctx: commands.Context, target: User, amount: int) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
         await self.handler.add_points(ctx, target, amount, "points")
 
-    @points.command(name="gamble")
+    @petals.command(name="gamble")
     async def points_gamble(self, ctx: commands.Context, amount: str) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
         await self.handler.gamble(ctx, amount, "points")
 
-    @points.group(name="duel", invoke_fallback=True)
+    @petals.group(name="duel", invoke_fallback=True)
     async def points_duel(self, ctx: commands.Context, opponent: User = None, amount: str = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
         await self.handler.create_duel(ctx, opponent, amount, "points")
 
-    @points_duel.command(name="accept")
+    @petals.command(name="accept")
     async def points_duel_accept(self, ctx: commands.Context) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
         await self.handler.accept_duel(ctx, "points")
 
-    @points_duel.command(name="decline")
+    @petals.command(name="decline")
     async def points_duel_decline(self, ctx: commands.Context) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return

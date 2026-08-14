@@ -41,57 +41,72 @@ MEINYA_REDEEMS = RedeemConfig(
     daily_double_chance=0.05,
     claim_milestones=(10, 25, 50, 100, 250, 500, 1000),
     messages=RedeemMessages(
-        stream_offline=(
-            "@{username}, this redeem only works while "
-            "the stream is live."
-        ),
-        daily_already_claimed=(
-            "@{username}, you already given your "
-            "blood offering for today."
-        ),
+        stream_offline="@{username}, this redeem only works while the stream is live.",
+        daily_already_claimed="@{username}, you already given your blood offering for today.",
         daily_success=(
             "@{username} has given their daily blood offering "
-            "and received {amount} sakura petals! They have offered their blood"
+            "and received {amount} sakura petals! They have offered their blood "
             "{claim_count} times!"
         ),
         daily_double=(
             "You have received a blessing! @{username} has been "
-            "rewarded with {amount} sakura petals! They have offered their blood"
+            "rewarded with {amount} sakura petals! They have offered their blood "
             "{claim_count} times!"
         ),
-        daily_milestone=(
-            "A dedicated Devotee! @{username} has offered their blood"
-            "{claim_count} times!"
-        ),
-        first_already_claimed_by=(
-            "@{username}, this stream's first blessing was already "
-            "given to @{winner}."
-        ),
-        first_already_claimed=(
-            "@{username}, this stream's first blessing was already "
-            "given."
-        ),
+        daily_milestone="A dedicated Devotee! @{username} has offered their blood {claim_count} times!",
+        first_already_claimed_by="@{username}, this stream's first blessing was already given to @{winner}.",
+        first_already_claimed="@{username}, this stream's first blessing was already given.",
         first_success=(
             "@{username} was given the first blessing for the stream "
             "and received {amount} sakura petals! They have been blessed "
             "first {claim_count} times!"
         ),
-        first_milestone=(
-            "Milestone! @{username} has blessed first "
-            "{claim_count} times!"
-        )
+        first_milestone="Milestone! @{username} has blessed first {claim_count} times!"
     )
 )
 
 
 MEINYA_POINTS = PointsConfig(
-    command_name="points",
+    command_name="petals",
     points_per_message=10,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,
     duel_expiration_seconds=60,
     messages=PointsMessages(
-
+        balance_self="{username}, you have {points} sakura petals!",
+        balance_other="{username} has {points} sakura petals!",
+        leaderboard_empty="No sakura petals have been gathered in the Garden yet.",
+        leaderboard_entry="{position}. {username}: {points} sakura petals",
+        leaderboard_title="Top sakura petal collectors: {leaderboard}",
+        reset_denied="Only the broadcaster can clear the Garden's sakura petals.",
+        reset_success="The Garden's sakura petals have been reset.",
+        add_denied="Only moderators can give sakura petals to viewers.",
+        add_invalid="The SakuraPetal amount must be greater than 0.",
+        add_success="Added {amount} sakura petals to {username}.",
+        gamble_no_points="You do not have any sakura petals to gamble.",
+        gamble_usage="Use it like this: !{command} gamble 50 or !{command} gamble all",
+        gamble_invalid="You need to gamble at least 1 SakuraPetal.",
+        gamble_insufficient="You only have {points} sakura petals.",
+        gamble_win="{username} gained {amount} sakura petals and now has {new_balance}!",
+        gamble_all_win="{username} doubled their sakura petals and now has {new_balance}!",
+        gamble_loss="{username} lost {amount} sakura petals and now has {new_balance}.",
+        gamble_all_loss="{username} lost all their sakura petals.",
+        duel_usage="Use it like this: !{command} duel @user 100",
+        duel_amount_invalid="The duel amount must be a number or 'all'.",
+        duel_self="You cannot challenge yourself to a SakuraPetal duel.",
+        duel_invalid="The duel amount must be greater than 0.",
+        duel_challenger_insufficient="You only have {points} sakura petals.",
+        duel_opponent_insufficient="{username} only has {points} sakura petals.",
+        duel_challenge=(
+            "@{opponent}, @{challenger} challenged you to a duel for "
+            "{amount} sakura petals! Type !{command} duel accept or "
+            "!{command} duel decline. This duel expires in "
+            "{expiration} seconds."
+        ),
+        duel_missing="You do not have a pending sakura petal duel, or it expired.",
+        duel_cancelled="The duel was cancelled because someone no longer has enough sakura petals.",
+        duel_result="@{winner} defeated @{loser} and won {amount} sakura petals.",
+        duel_declined="{username} declined the SakuraPetal duel."
     )
 )
 
