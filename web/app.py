@@ -9,6 +9,7 @@ from config.version import APP_NAME, APP_VERSION
 from web.routers import admin_users_router, auth_router, channel_user_router, channels_router, dashboard_router, health_router, logs_router, oauth_router, performance_router, runtime_logs_router
 WEB_DIRECTORY = Path(__file__).resolve().parent
 STATIC_DIRECTORY = WEB_DIRECTORY / "static"
+ASSETS_DIRECTORY = WEB_DIRECTORY.parent / "assets"
 
 
 def create_app() -> FastAPI:
@@ -24,6 +25,7 @@ def create_app() -> FastAPI:
     )
 
     application.mount("/static", StaticFiles(directory=str(STATIC_DIRECTORY)), name="static")
+    application.mount("/assets", StaticFiles(directory=str(ASSETS_DIRECTORY)), name="assets")
 
     application.include_router(auth_router)
     application.include_router(dashboard_router)
