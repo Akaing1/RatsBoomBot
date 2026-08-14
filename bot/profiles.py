@@ -38,6 +38,7 @@ class GlobalCommandName(Enum):
     EXPLODE = "explode"
     REKLOP = "reklop"
     RANDY = "randy"
+    BARK = "bark"
     CAR = "car"
 
     KAMIKAZE = "kamikaze"
@@ -81,6 +82,7 @@ class GlobalCommandDefaults:
     explode: bool = True
     reklop: bool = True
     randy: bool = True
+    bark: bool = True
     car: bool = True
 
     kamikaze: bool = True

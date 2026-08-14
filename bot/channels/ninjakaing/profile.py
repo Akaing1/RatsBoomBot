@@ -33,6 +33,7 @@ NINJAKAING_PROFILE = ChannelProfile(
         explode=True,
         reklop=True,
         randy=True,
+        bark=True,
         car=True,
         kamikaze=True
     ),
