@@ -10,16 +10,22 @@
 
     <title>Connect with Twitch | RatsBoomBot</title>
 
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+
     <link
         rel="stylesheet"
-        href="{{ url_for('static', path='/css/style.css') }}?v=2"
+        href="{{ url_for('static', path='/css/style.css') }}?v=3"
     >
 </head>
 
 <body class="login-page">
     <main class="login-card">
         <div class="brand login-brand">
-            <div class="brand-mark">R</div>
+            <img
+                class="brand-mark"
+                src="{{ url_for('assets', path='/NinjaDoro.ico') }}"
+                alt="RatsBoomBot icon"
+            >
 
             <div>
                 <h1>RatsBoomBot</h1>
