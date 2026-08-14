@@ -1,0 +1,122 @@
+{% extends "layout.html" %}
+
+{% block title %}Performance | RatsBoomBot Admin{% endblock %}
+
+{% block content %}
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Server health</p>
+            <h2>Performance</h2>
+            <p class="page-description">
+                Live Raspberry Pi and RatsBoomBot resource usage. Metrics refresh every two seconds.
+            </p>
+        </div>
+
+        <span id="metrics-status" class="live-status">Connecting</span>
+    </section>
+
+    <section class="performance-grid">
+        <article class="metric-card">
+            <p class="card-label">CPU usage</p>
+            <strong id="cpu-percent" class="metric">—</strong>
+            <div class="progress-track"><span id="cpu-progress"></span></div>
+            <p id="cpu-detail" class="card-detail">Waiting for the second sample.</p>
+        </article>
+
+        <article class="metric-card">
+            <p class="card-label">Memory usage</p>
+            <strong id="memory-percent" class="metric">—</strong>
+            <div class="progress-track"><span id="memory-progress"></span></div>
+            <p id="memory-detail" class="card-detail">Loading memory information.</p>
+        </article>
+
+        <article class="metric-card">
+            <p class="card-label">Disk usage</p>
+            <strong id="disk-percent" class="metric">—</strong>
+            <div class="progress-track"><span id="disk-progress"></span></div>
+            <p id="disk-detail" class="card-detail">Loading disk information.</p>
+        </article>
+
+        <article class="metric-card">
+            <p class="card-label">Bot process memory</p>
+            <strong id="process-memory" class="metric">—</strong>
+            <p class="card-detail">Resident memory currently used by RatsBoomBot.</p>
+        </article>
+
+        <article class="metric-card">
+            <p class="card-label">Server uptime</p>
+            <strong id="system-uptime" class="metric metric-compact">—</strong>
+            <p class="card-detail">Time since the Raspberry Pi last started.</p>
+        </article>
+
+        <article class="metric-card">
+            <p class="card-label">Load average</p>
+            <strong id="load-average" class="metric metric-compact">—</strong>
+            <p class="card-detail">Average system load over 1, 5, and 15 minutes.</p>
+        </article>
+    </section>
+
+    <script>
+        const formatBytes = (value) => {
+            if (value === null || value === undefined) return "Unavailable";
+            const units = ["B", "KB", "MB", "GB", "TB"];
+            let amount = Number(value);
+            let unit = 0;
+            while (amount >= 1024 && unit < units.length - 1) {
+                amount /= 1024;
+                unit += 1;
+            }
+            return `${amount.toFixed(unit < 2 ? 0 : 1)} ${units[unit]}`;
+        };
+
+        const formatUptime = (value) => {
+            if (value === null || value === undefined) return "Unavailable";
+            const seconds = Math.floor(value);
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${days}d ${hours}h ${minutes}m`;
+        };
+
+        const setProgress = (id, value) => {
+            document.getElementById(id).style.width = `${Math.max(0, Math.min(value || 0, 100))}%`;
+        };
+
+        const updateMetrics = (metrics) => {
+            const cpu = metrics.cpu_percent;
+            document.getElementById("cpu-percent").textContent = cpu === null ? "Sampling" : `${cpu}%`;
+            document.getElementById("cpu-detail").textContent = metrics.cpu_temperature_celsius === null ? "Temperature unavailable" : `${metrics.cpu_temperature_celsius}°C`;
+            setProgress("cpu-progress", cpu);
+
+            document.getElementById("memory-percent").textContent = metrics.memory_percent === null ? "Unavailable" : `${metrics.memory_percent}%`;
+            document.getElementById("memory-detail").textContent = `${formatBytes(metrics.memory_used_bytes)} used · ${formatBytes(metrics.memory_available_bytes)} available`;
+            setProgress("memory-progress", metrics.memory_percent);
+
+            document.getElementById("disk-percent").textContent = `${metrics.disk_percent}%`;
+            document.getElementById("disk-detail").textContent = `${formatBytes(metrics.disk_free_bytes)} free of ${formatBytes(metrics.disk_total_bytes)}`;
+            setProgress("disk-progress", metrics.disk_percent);
+
+            document.getElementById("process-memory").textContent = formatBytes(metrics.process_memory_bytes);
+            document.getElementById("system-uptime").textContent = formatUptime(metrics.system_uptime_seconds);
+            document.getElementById("load-average").textContent = metrics.load_average ? metrics.load_average.join(" / ") : "Unavailable";
+        };
+
+        const refreshMetrics = async () => {
+            const status = document.getElementById("metrics-status");
+
+            try {
+                const response = await fetch("/performance/data", {cache: "no-store"});
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                updateMetrics(await response.json());
+                status.textContent = "Live";
+                status.classList.add("connected");
+            } catch (error) {
+                status.textContent = "Disconnected";
+                status.classList.remove("connected");
+            }
+        };
+
+        refreshMetrics();
+        window.setInterval(refreshMetrics, 2000);
+    </script>
+{% endblock %}
