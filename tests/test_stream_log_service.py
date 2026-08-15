@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from bot.services.stream_log_service import StreamLogService
+from bot.services.stream.stream_logs import StreamLogService
 
 
 @dataclass

@@ -7,7 +7,7 @@ from bot.profiles import GlobalCommandGroup
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
 
 if TYPE_CHECKING:
-    from bot.services.service_container import ServiceContainer
+    from bot.services.container import ServiceContainer
 
 LOGGER = logging.getLogger("RatBoomBot")
 
