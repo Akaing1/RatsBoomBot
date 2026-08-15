@@ -1,7 +1,8 @@
 from bot.profiles import (
     CommunityMessages,
     PointsConfig,
-    PointsMessages
+    PointsMessages,
+    ShoutoutMessages
 )
 
 
@@ -20,6 +21,17 @@ DEVELOPER_NINJAKAING_COMMUNITY_MESSAGES = CommunityMessages(
     ),
     resubscription=(
         "{username} has been here for {months} months!"
+    )
+)
+
+
+DEVELOPER_NINJAKAING_SHOUTOUT_MESSAGES = ShoutoutMessages(
+    with_game=(
+        "Deploy some support to @{username}! They were last debugging "
+        "{game_name}: {channel_url}"
+    ),
+    without_game=(
+        "Deploy some support to @{username}: {channel_url}"
     )
 )
 

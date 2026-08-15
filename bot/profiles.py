@@ -116,6 +116,17 @@ class RaidMessages:
 
 
 @dataclass(frozen=True)
+class ShoutoutMessages:
+    with_game: str = (
+        "Go check out @{username}! They were last playing {game_name}. "
+        "They are a cool rat: {channel_url}"
+    )
+    without_game: str = (
+        "Go check out @{username}! They are a cool rat: {channel_url}"
+    )
+
+
+@dataclass(frozen=True)
 class RedeemMessages:
     stream_offline: str = "@{username}, this redeem only works while the stream is live."
     daily_already_claimed: str = "@{username}, you already claimed your stream daily reward."
@@ -217,6 +228,7 @@ class ChannelProfile:
     timer_messages: tuple[str, ...] = ()
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
+    shoutout_messages: ShoutoutMessages = ShoutoutMessages()
     redeems: RedeemConfig = RedeemConfig()
     points: PointsConfig = PointsConfig()
 
