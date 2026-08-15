@@ -219,6 +219,13 @@ class PointsConfig:
 
 
 @dataclass(frozen=True)
+class OverwatchConfig:
+    player_id: str = ""
+    platform: str = "pc"
+    allowed_games: tuple[str, ...] = ("Overwatch 2",)
+
+
+@dataclass(frozen=True)
 class ChannelProfile:
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
@@ -231,6 +238,7 @@ class ChannelProfile:
     shoutout_messages: ShoutoutMessages = ShoutoutMessages()
     redeems: RedeemConfig = RedeemConfig()
     points: PointsConfig = PointsConfig()
+    overwatch: OverwatchConfig = OverwatchConfig()
 
     def is_user_protected(self, user_id: str) -> bool:
         return str(user_id) in self.protected_user_ids

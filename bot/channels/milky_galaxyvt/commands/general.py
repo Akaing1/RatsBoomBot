@@ -15,4 +15,3 @@ class MilkyGalaxyCommands(ChannelComponent):
             return
 
         await ctx.send("Template is loaded!")
-
