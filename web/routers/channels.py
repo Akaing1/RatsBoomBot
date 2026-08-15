@@ -1,7 +1,7 @@
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName
 from config.settings import settings
@@ -45,6 +45,24 @@ def redirect_to_channel(broadcaster_id: str, **query_values) -> RedirectResponse
         url = f"{url}?{query}"
 
     return RedirectResponse(url=url, status_code=303)
+
+
+async def get_redemption_dashboard_data(services, broadcaster_id: str) -> dict[str, object]:
+    active_session = services.stream_logs.get_active_session(broadcaster_id)
+    stream_id = active_session.stream_id if active_session is not None else None
+    using_previous_stream = False
+
+    if stream_id is None:
+        stream_id = await services.redeems.get_latest_stream_id(broadcaster_id)
+        using_previous_stream = stream_id is not None
+
+    activity = await services.redeems.get_dashboard_activity(
+        broadcaster_id=broadcaster_id,
+        stream_id=stream_id
+    )
+    activity["using_previous_stream"] = using_previous_stream
+
+    return activity
 
 
 @router.get("", response_class=HTMLResponse)
@@ -101,6 +119,7 @@ async def channel_details_page(request: Request, broadcaster_id: str):
 
     channel_settings = await services.broadcaster_settings.get_settings(broadcaster_id)
     viewer_queue = services.viewer_queue
+    redemption_activity = await get_redemption_dashboard_data(services, broadcaster_id)
     channel_features = services.features.get_channel_features(broadcaster_id)
     global_groups = services.features.get_global_groups(broadcaster_id)
     global_commands = services.features.get_global_commands(broadcaster_id)
@@ -116,6 +135,7 @@ async def channel_details_page(request: Request, broadcaster_id: str):
             queue_open=viewer_queue.is_queue_open(broadcaster_id),
             queue_users=viewer_queue.list_queue(broadcaster_id),
             queue_size=viewer_queue.size(broadcaster_id),
+            redemption_activity=redemption_activity,
             channel_features=channel_features,
             global_groups=global_groups,
             global_commands=global_commands,
@@ -125,6 +145,37 @@ async def channel_details_page(request: Request, broadcaster_id: str):
             toggle_message=request.query_params.get("toggle_message")
         )
     )
+
+
+@router.get("/{broadcaster_id}/api/activity", response_class=JSONResponse)
+async def channel_activity_state(request: Request, broadcaster_id: str):
+    admin_redirect = await require_admin(request)
+
+    if admin_redirect:
+        return JSONResponse({"detail": "Administrator authentication required."}, status_code=401)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+
+    services = runtime_bot.services
+    broadcaster = get_broadcaster(runtime_bot, broadcaster_id)
+
+    if broadcaster is None:
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    viewer_queue = services.viewer_queue
+    queue_users = viewer_queue.list_queue(broadcaster_id)
+
+    return JSONResponse({
+        "queue": {
+            "open": viewer_queue.is_queue_open(broadcaster_id),
+            "size": len(queue_users),
+            "users": queue_users
+        },
+        "redemptions": await get_redemption_dashboard_data(services, broadcaster_id)
+    })
 
 
 @router.post("/{broadcaster_id}/toggles")
