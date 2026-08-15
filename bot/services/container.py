@@ -2,19 +2,10 @@ import logging
 
 from config.settings import settings
 
-from bot.services.ad_announcement_service import AdAnnouncementService
-from bot.services.broadcaster_service import BroadcasterService
-from bot.services.broadcaster_settings_service import BroadcasterSettingsService
-from bot.services.counter_service import CounterService
-from bot.services.feature_toggle_service import FeatureToggleService
-from bot.services.help_service import HelpService
-from bot.services.moderation_service import ModerationService
-from bot.services.points_service import PointsService
-from bot.services.redeem_service import RedeemService
-from bot.services.shoutout_service import ShoutoutService
-from bot.services.stream_log_service import StreamLogService
-from bot.services.timer_service import TimerService
-from bot.services.viewer_queue_service import ViewerQueueService
+from bot.services.channels import BroadcasterService, BroadcasterSettingsService, FeatureToggleService
+from bot.services.engagement import CounterService, PointsService, RedeemService, ViewerQueueService
+from bot.services.stream import AdAnnouncementService, ShoutoutService, StreamLogService, TimerService
+from bot.services.support import HelpService, ModerationService
 
 LOGGER = logging.getLogger("RatBoomBot")
 

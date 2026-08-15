@@ -5,7 +5,7 @@ import logging
 from twitchio.ext import commands
 
 from bot.component_loader import load_components
-from bot.services.service_container import ServiceContainer
+from bot.services.container import ServiceContainer
 from config.settings import settings
 from storage.database import create_broadcaster_subscriptions, save_token
 

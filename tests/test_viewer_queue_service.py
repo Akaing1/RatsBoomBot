@@ -1,4 +1,4 @@
-from bot.services.viewer_queue_service import ViewerQueueService
+from bot.services.engagement.viewer_queue import ViewerQueueService
 
 
 def test_queue_starts_closed() -> None:

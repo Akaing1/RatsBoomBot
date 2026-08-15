@@ -2,7 +2,7 @@ import asqlite
 import pytest
 
 from bot.profiles import RedeemConfig
-from bot.services.redeem_service import RedeemService
+from bot.services.engagement.redeems import RedeemService
 
 
 @pytest.mark.asyncio
