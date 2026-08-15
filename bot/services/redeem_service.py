@@ -166,7 +166,10 @@ class RedeemService:
 
         try:
             async with self.db.acquire() as connection:
-                cursor = await connection.execute(query, values)
+                await connection.execute(query, values)
+                change_row = await connection.fetchone(
+                    "SELECT changes() AS inserted"
+                )
         except Exception:
             LOGGER.exception(
                 "[Redeems] Failed to save redemption activity for %s in broadcaster %s.",
@@ -175,7 +178,7 @@ class RedeemService:
             )
             raise
 
-        return cursor.rowcount > 0
+        return bool(change_row and change_row["inserted"])
 
     async def get_latest_stream_id(self, broadcaster_id: str) -> str | None:
         query = """
