@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>Admin Login | RatsBoomBot</title>
+
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='/css/style.css') }}?v=7"
+    >
+</head>
+
+<body class="login-page">
+    <main class="login-card">
+        <div class="brand login-brand">
+            <img
+                class="brand-mark"
+                src="{{ url_for('assets', path='/NinjaDoro.ico') }}"
+                alt="RatsBoomBot icon"
+            >
+
+            <div>
+                <h1>RatsBoomBot</h1>
+                <p>Administration</p>
+            </div>
+        </div>
+
+        <p class="eyebrow">Protected access</p>
+        <h2>Admin Login</h2>
+
+        <p class="page-description">
+            Sign in with your administrator account to continue.
+        </p>
+
+        {% if error %}
+            <div class="alert error-alert">
+                The username or password was incorrect.
+            </div>
+        {% endif %}
+
+        <form class="settings-form" method="post" action="/login">
+            <div class="form-group">
+                <label for="username">Username</label>
+
+                <input
+                    id="username"
+                    name="username"
+                    type="text"
+                    autocomplete="username"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autocomplete="current-password"
+                    required
+                >
+            </div>
+
+            <button class="button primary" type="submit">
+                Sign In
+            </button>
+        </form>
+    </main>
+
+    <p class="deployment-stamp login-deployment-stamp">{{ deployment_stamp() }}</p>
+</body>
+</html>

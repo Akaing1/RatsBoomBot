@@ -1,0 +1,104 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Stream Logs | RatsBoomBot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Stream history</p>
+        <h2>Logs</h2>
+
+        <p class="page-description">
+            Review channel activity recorded during live Twitch sessions.
+            Offline bot activity and application startup logs are not stored here.
+        </p>
+    </div>
+</header>
+
+<section class="status-grid logs-summary-grid">
+    <article class="status-card">
+        <p class="card-label">Saved stream sessions</p>
+
+        <div class="metric">
+            {{ log_count }}
+        </div>
+
+        <p class="card-detail">
+            Total live-stream session logs stored locally.
+        </p>
+    </article>
+
+    <article class="status-card">
+        <p class="card-label">Currently active</p>
+
+        <div class="metric">
+            {{ log_sessions | selectattr("is_active") | list | length }}
+        </div>
+
+        <p class="card-detail">
+            Stream logs currently receiving new events.
+        </p>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Sessions</p>
+            <h3>Saved stream logs</h3>
+        </div>
+    </div>
+
+    {% if log_sessions %}
+        <div class="log-session-list">
+            {% for session in log_sessions %}
+                <article class="log-session-row">
+                    <div class="log-session-icon">
+                        {{ session.channel_name[0] | upper }}
+                    </div>
+
+                    <div class="log-session-details">
+                        <div class="log-session-title">
+                            <strong>{{ session.channel_name }}</strong>
+
+                            {% if session.is_active %}
+                                <span class="log-active-badge">
+                                    Active
+                                </span>
+                            {% endif %}
+                        </div>
+
+                        <span>
+                            {{ session.started_at }}
+                        </span>
+
+                        <span>
+                            Stream ID: {{ session.stream_id }}
+                        </span>
+                    </div>
+
+                    <div class="log-session-meta">
+                        <span>{{ session.file_size }}</span>
+
+                        <a
+                            class="button secondary"
+                            href="/logs/{{ session.channel_name }}/{{ session.session_name }}"
+                        >
+                            View Log
+                        </a>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h4>No stream logs yet</h4>
+
+            <p>
+                A log will be created the next time a connected channel
+                begins streaming while RatsBoomBot is running.
+            </p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
