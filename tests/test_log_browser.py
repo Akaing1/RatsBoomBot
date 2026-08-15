@@ -1,5 +1,5 @@
 from config.settings import settings
-from web.log_browser import (
+from web.shared.log_browser import (
     format_file_size,
     get_logs_directory,
     parse_session_directory_name,
