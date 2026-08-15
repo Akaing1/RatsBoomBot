@@ -3,7 +3,7 @@ import re
 
 from twitchio.ext import commands
 
-from bot.profiles import GlobalCommandGroup
+from bot.profiles import GlobalCommandGroup, ShoutoutMessages, get_active_profile, render_profile_message
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -61,11 +61,24 @@ async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool
 
     game_name = await get_shoutout_game_name(bot, username)
     channel = bot.create_partialuser(broadcaster_id)
+    profile = get_active_profile(broadcaster_id)
+    messages = profile.shoutout_messages if profile is not None else ShoutoutMessages()
+    template = messages.with_game if game_name else messages.without_game
+    channel_url = f"https://twitch.tv/{username}"
 
-    if game_name:
-        message = f"Go check out @{username}! They were last playing {game_name}. They are a cool rat: https://twitch.tv/{username}"
-    else:
-        message = f"Go check out @{username}! They are a cool rat: https://twitch.tv/{username}"
+    message = render_profile_message(
+        template,
+        username=username,
+        game_name=game_name or "",
+        channel_url=channel_url
+    )
+
+    if not message:
+        LOGGER.warning(
+            "[Shoutouts] Shoutout message was empty or invalid for broadcaster %s.",
+            broadcaster_id
+        )
+        return False
 
     try:
         await channel.send_message(sender=bot.user, message=message)
@@ -196,3 +209,4 @@ class ShoutoutCommands(commands.Component):
             broadcaster_id,
             position
         )
+        

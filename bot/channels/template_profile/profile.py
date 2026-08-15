@@ -1,6 +1,6 @@
 from bot.channels.template_profile.commands.general import TemplateCommands
 from bot.channels.template_profile.commands.points import TemplatePointsCommands
-from bot.channels.template_profile.profile_details import TEMPLATE_COMMUNITY_MESSAGES, TEMPLATE_POINTS, TEMPLATE_RAID_MESSAGES, TEMPLATE_REDEEMS, TEMPLATE_TIMER_MESSAGES
+from bot.channels.template_profile.profile_details import TEMPLATE_COMMUNITY_MESSAGES, TEMPLATE_POINTS, TEMPLATE_RAID_MESSAGES, TEMPLATE_REDEEMS, TEMPLATE_TIMER_MESSAGES, TEMPLATE_SHOUTOUT_MESSAGES
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 TEMPLATE_PROFILE = ChannelProfile(
@@ -40,5 +40,6 @@ TEMPLATE_PROFILE = ChannelProfile(
     community_messages=TEMPLATE_COMMUNITY_MESSAGES,
     raid_messages=TEMPLATE_RAID_MESSAGES,
     redeems=TEMPLATE_REDEEMS,
-    points=TEMPLATE_POINTS
+    points=TEMPLATE_POINTS,
+    shoutout_messages=TEMPLATE_SHOUTOUT_MESSAGES
 )

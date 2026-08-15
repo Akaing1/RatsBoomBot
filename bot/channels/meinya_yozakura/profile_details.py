@@ -4,7 +4,8 @@ from bot.profiles import (
     PointsMessages,
     RaidMessages,
     RedeemConfig,
-    RedeemMessages
+    RedeemMessages,
+    ShoutoutMessages
 )
 
 
@@ -29,6 +30,18 @@ MEINYA_COMMUNITY_MESSAGES = CommunityMessages(
 MEINYA_RAID_MESSAGES = RaidMessages(
     incoming=(
         "@{raider_name} raided with {viewer_count} {viewer_word}!"
+    )
+)
+
+
+MEINYA_SHOUTOUT_MESSAGES = ShoutoutMessages(
+    with_game=(
+        "Go show @{username} some love! They were last playing {game_name}. "
+        "Visit their corner of the garden: {channel_url}"
+    ),
+    without_game=(
+        "Go show @{username} some love! Visit their corner of the garden: "
+        "{channel_url}"
     )
 )
 
