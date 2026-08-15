@@ -1,6 +1,6 @@
 from bot.channels.developer_ninjakaing.commands.general import DeveloperNinjakaingCommands
 from bot.channels.developer_ninjakaing.commands.points import DeveloperPointsCommands
-from bot.channels.developer_ninjakaing.profile_details import DEVELOPER_NINJAKAING_COMMUNITY_MESSAGES, DEVELOPER_NINJAKAING_POINTS, DEVELOPER_NINJAKAING_TIMER_MESSAGES, DEVELOPER_NINJAKAING_REDEEMS, DEVELOPER_NINJAKAING_SHOUTOUT_MESSAGES
+from bot.channels.developer_ninjakaing.profile_details import DEVELOPER_NINJAKAING_COMMUNITY_MESSAGES, DEVELOPER_NINJAKAING_POINTS, DEVELOPER_NINJAKAING_TIMER_MESSAGES, DEVELOPER_NINJAKAING_SHOUTOUT_MESSAGES
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 
