@@ -2,6 +2,7 @@ import logging
 import random
 import sqlite3
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from bot.profiles import FeatureName, RedeemConfig, get_active_profile, render_profile_message
 
@@ -76,6 +77,33 @@ class RedeemService:
 
                 await connection.execute(
                     """
+                    CREATE TABLE IF NOT EXISTS redemption_events (
+                        redemption_id TEXT PRIMARY KEY,
+                        broadcaster_id TEXT NOT NULL,
+                        user_id TEXT NOT NULL,
+                        username TEXT NOT NULL,
+                        reward_title TEXT NOT NULL,
+                        user_input TEXT,
+                        stream_id TEXT,
+                        redeemed_at TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+
+                await connection.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_redemption_events_stream
+                    ON redemption_events (
+                        broadcaster_id,
+                        stream_id,
+                        redeemed_at
+                    )
+                    """
+                )
+
+                await connection.execute(
+                    """
                     CREATE UNIQUE INDEX IF NOT EXISTS idx_redeem_claims_first
                     ON redeem_claims (
                         broadcaster_id,
@@ -91,7 +119,180 @@ class RedeemService:
 
         LOGGER.info("[Redeems] Redeem claim storage ready.")
 
-    async def handle_redemption(self, *, broadcaster_id: str, user_id: str, username: str, reward_title: str, redemption_id: str | None = None) -> RedeemResult:
+    async def record_activity(self, *, redemption_id: str | None, broadcaster_id: str, user_id: str,
+                              username: str, reward_title: str, user_input: str | None,
+                              stream_id: str | None, redeemed_at=None) -> bool:
+        if not redemption_id:
+            LOGGER.warning(
+                "[Redeems] Could not save redemption activity for %s because its ID was missing.",
+                username
+            )
+            return False
+
+        if isinstance(redeemed_at, datetime):
+            if redeemed_at.tzinfo is None:
+                redeemed_at_value = redeemed_at.replace(tzinfo=UTC).isoformat()
+            else:
+                redeemed_at_value = redeemed_at.astimezone(UTC).isoformat()
+        elif redeemed_at:
+            redeemed_at_value = str(redeemed_at)
+        else:
+            redeemed_at_value = datetime.now(UTC).isoformat()
+
+        query = """
+        INSERT OR IGNORE INTO redemption_events (
+            redemption_id,
+            broadcaster_id,
+            user_id,
+            username,
+            reward_title,
+            user_input,
+            stream_id,
+            redeemed_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        values = (
+            str(redemption_id),
+            str(broadcaster_id),
+            str(user_id),
+            username,
+            reward_title,
+            user_input or None,
+            str(stream_id) if stream_id is not None else None,
+            redeemed_at_value
+        )
+
+        try:
+            async with self.db.acquire() as connection:
+                cursor = await connection.execute(query, values)
+        except Exception:
+            LOGGER.exception(
+                "[Redeems] Failed to save redemption activity for %s in broadcaster %s.",
+                username,
+                broadcaster_id
+            )
+            raise
+
+        return cursor.rowcount > 0
+
+    async def get_latest_stream_id(self, broadcaster_id: str) -> str | None:
+        query = """
+        SELECT stream_id
+        FROM (
+            SELECT stream_id, created_at AS activity_at
+            FROM redemption_events
+            WHERE broadcaster_id = ?
+              AND stream_id IS NOT NULL
+
+            UNION ALL
+
+            SELECT stream_id, created_at AS activity_at
+            FROM redeem_claims
+            WHERE broadcaster_id = ?
+              AND stream_id != 'legacy'
+        )
+        ORDER BY activity_at DESC
+        LIMIT 1
+        """
+
+        try:
+            async with self.db.acquire() as connection:
+                row = await connection.fetchone(query, (str(broadcaster_id), str(broadcaster_id)))
+        except Exception:
+            LOGGER.exception(
+                "[Redeems] Failed to find the latest redemption stream for broadcaster %s.",
+                broadcaster_id
+            )
+            raise
+
+        return str(row["stream_id"]) if row else None
+
+    async def get_dashboard_activity(self, *, broadcaster_id: str, stream_id: str | None,
+                                     limit: int = 100) -> dict[str, object]:
+        if stream_id is None:
+            return {"stream_id": None, "checkins": [], "redemptions": []}
+
+        broadcaster_id = str(broadcaster_id)
+        stream_id = str(stream_id)
+        safe_limit = max(1, min(int(limit), 200))
+
+        claims_query = """
+        SELECT username, redeem_type, created_at
+        FROM redeem_claims
+        WHERE broadcaster_id = ?
+          AND stream_id = ?
+        ORDER BY created_at ASC, id ASC
+        LIMIT ?
+        """
+
+        redemptions_query = """
+        SELECT redemption_id, username, reward_title, user_input, redeemed_at
+        FROM redemption_events
+        WHERE broadcaster_id = ?
+          AND stream_id = ?
+        ORDER BY redeemed_at DESC
+        LIMIT ?
+        """
+
+        try:
+            async with self.db.acquire() as connection:
+                claim_rows = await connection.fetchall(
+                    claims_query,
+                    (broadcaster_id, stream_id, safe_limit)
+                )
+                redemption_rows = await connection.fetchall(
+                    redemptions_query,
+                    (broadcaster_id, stream_id, safe_limit)
+                )
+        except Exception:
+            LOGGER.exception(
+                "[Redeems] Failed to load dashboard activity for broadcaster %s stream %s.",
+                broadcaster_id,
+                stream_id
+            )
+            raise
+
+        config = self.get_redeem_config(broadcaster_id)
+        excluded_titles: set[str] = set()
+
+        if config is not None:
+            excluded_titles = {
+                title.strip().lower()
+                for title in (config.daily_title, config.first_title)
+                if title.strip()
+            }
+
+        checkins = [
+            {
+                "username": row["username"],
+                "type": row["redeem_type"],
+                "redeemed_at": row["created_at"]
+            }
+            for row in claim_rows
+        ]
+
+        redemptions = [
+            {
+                "id": row["redemption_id"],
+                "username": row["username"],
+                "reward_title": row["reward_title"],
+                "user_input": row["user_input"],
+                "redeemed_at": row["redeemed_at"]
+            }
+            for row in redemption_rows
+            if row["reward_title"].strip().lower() not in excluded_titles
+        ]
+
+        return {
+            "stream_id": stream_id,
+            "checkins": checkins,
+            "redemptions": redemptions
+        }
+
+    async def handle_redemption(self, *, broadcaster_id: str, user_id: str, username: str, reward_title: str,
+                                redemption_id: str | None = None, stream_id: str | None = None) -> RedeemResult:
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
 
@@ -114,7 +315,8 @@ class RedeemService:
             broadcaster_id
         )
 
-        stream_id = await self.get_current_stream_id(broadcaster_id)
+        if stream_id is None:
+            stream_id = await self.get_current_stream_id(broadcaster_id)
 
         if stream_id is None:
             LOGGER.info(

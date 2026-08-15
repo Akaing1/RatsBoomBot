@@ -6,6 +6,7 @@ from storage.migrations.v001_initial_schema import migrate as migrate_initial_sc
 from storage.migrations.v002_redeem_stats import migrate as migrate_redeem_stats
 from storage.migrations.v003_administrators import migrate as migrate_administrators
 from storage.migrations.v004_imported_redeem_totals import migrate as migrate_imported_redeem_totals
+from storage.migrations.v005_redemption_activity import migrate as migrate_redemption_activity
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -21,5 +22,6 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=1, name="initial_schema", run=migrate_initial_schema),
     Migration(version=2, name="redeem_stats", run=migrate_redeem_stats),
     Migration(version=3, name="administrators", run=migrate_administrators),
-    Migration(version=4, name="imported_redeem_totals", run=migrate_imported_redeem_totals)
+    Migration(version=4, name="imported_redeem_totals", run=migrate_imported_redeem_totals),
+    Migration(version=5, name="redemption_activity", run=migrate_redemption_activity)
 )
