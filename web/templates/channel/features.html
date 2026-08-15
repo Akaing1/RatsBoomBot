@@ -1,0 +1,278 @@
+{% extends "channel/layout.html" %}
+
+{% macro toggle_card(toggle_type, toggle_name, display_name, state) %}
+    <article class="toggle-card {% if state.effective_enabled %}enabled{% else %}disabled{% endif %}">
+        <div class="toggle-card-content">
+            <div class="toggle-card-heading">
+                <div>
+                    <h4>{{ display_name }}</h4>
+                </div>
+
+                <span class="toggle-status {% if state.effective_enabled %}enabled{% else %}disabled{% endif %}">
+                    {% if state.effective_enabled %}
+                        Enabled
+                    {% else %}
+                        Disabled
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="toggle-meta">
+                <span>
+                    Profile default:
+                    <strong>
+                        {% if state.default_enabled %}
+                            On
+                        {% else %}
+                            Off
+                        {% endif %}
+                    </strong>
+                </span>
+
+                {% if state.override_enabled is not none %}
+                    <span class="toggle-override-label">
+                        Dashboard override:
+                        <strong>
+                            {% if state.override_enabled %}
+                                On
+                            {% else %}
+                                Off
+                            {% endif %}
+                        </strong>
+                    </span>
+                {% else %}
+                    <span>Using profile default</span>
+                {% endif %}
+            </div>
+
+            {% if state.blocked_by_profile %}
+                <p class="toggle-blocked-message">
+                    This toggle is blocked because the channel profile is disabled.
+                </p>
+            {% endif %}
+
+            {% if state.blocked_by_globals %}
+                <p class="toggle-blocked-message">
+                    This toggle is blocked because global commands are disabled.
+                </p>
+            {% endif %}
+        </div>
+
+        <form
+            class="toggle-actions"
+            method="post"
+            action="/channel/features/toggles"
+        >
+            <input
+                type="hidden"
+                name="csrf_token"
+                value="{{ csrf_token }}"
+            >
+
+            <input
+                type="hidden"
+                name="toggle_type"
+                value="{{ toggle_type }}"
+            >
+
+            <input
+                type="hidden"
+                name="toggle_name"
+                value="{{ toggle_name }}"
+            >
+
+            {% if state.effective_enabled %}
+                <button
+                    class="button toggle-disable-button"
+                    type="submit"
+                    name="action"
+                    value="disable"
+                >
+                    Disable
+                </button>
+            {% else %}
+                <button
+                    class="button primary"
+                    type="submit"
+                    name="action"
+                    value="enable"
+                >
+                    Enable
+                </button>
+            {% endif %}
+
+            {% if state.override_enabled is not none %}
+                <button
+                    class="button secondary"
+                    type="submit"
+                    name="action"
+                    value="reset"
+                >
+                    Use Default
+                </button>
+            {% endif %}
+        </form>
+    </article>
+{% endmacro %}
+
+{% block title %}
+    Features | {{ broadcaster.name or "Your Channel" }} | RatsBoomBot
+{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div class="channel-heading">
+        {% if broadcaster.profile_image_url %}
+            <img
+                class="channel-heading-image"
+                src="{{ broadcaster.profile_image_url }}"
+                alt="{{ broadcaster.name or broadcaster.id }}"
+            >
+        {% else %}
+            <div class="channel-heading-placeholder">
+                {{ (broadcaster.name or broadcaster.id)[0] | upper }}
+            </div>
+        {% endif %}
+
+        <div>
+            <p class="eyebrow">Rat's Boom Bot</p>
+
+            <h2>Features</h2>
+
+            <p class="page-description">
+                Manage the bot features and commands available in
+                {{ broadcaster.name or "your channel" }}.
+            </p>
+        </div>
+    </div>
+
+    <div class="header-actions">
+        <a class="button secondary" href="/channel">
+            Back to Overview
+        </a>
+    </div>
+</header>
+
+{% if toggle_message %}
+    <div
+        class="toggle-feedback {% if toggle_result == 'success' %}success{% else %}error{% endif %}"
+        role="status"
+    >
+        <span class="toggle-feedback-icon">
+            {% if toggle_result == "success" %}
+                &#10003;
+            {% else %}
+                !
+            {% endif %}
+        </span>
+
+        <span>{{ toggle_message }}</span>
+    </div>
+{% endif %}
+
+<section class="panel toggle-management-panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Channel configuration</p>
+
+            <h3>Feature toggles</h3>
+
+            <p class="panel-description">
+                Enable or disable bot systems and commands for your channel.
+                Changes take effect immediately.
+            </p>
+        </div>
+    </div>
+
+    <div class="toggle-section">
+        <div class="toggle-section-heading">
+            <div>
+                <h4>Channel Features</h4>
+
+                <p>
+                    Core systems, automated messages, events, points, and redeems.
+                </p>
+            </div>
+        </div>
+
+        <div class="toggle-grid">
+            {% for feature, state in channel_features.items() %}
+                {% if feature.value == "channel" %}
+                    {% set display_name = "Channel Profile" %}
+                {% else %}
+                    {% set display_name = feature.value | replace("_", " ") | title %}
+                {% endif %}
+
+                {{ toggle_card(
+                    "feature",
+                    feature.value,
+                    display_name,
+                    state
+                ) }}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="toggle-section">
+        <div class="toggle-section-heading">
+            <div>
+                <h4>Global Command Groups</h4>
+
+                <p>
+                    Enable or disable related groups of global commands.
+                </p>
+            </div>
+        </div>
+
+        <div class="toggle-grid">
+            {% for group, state in global_groups.items() %}
+                {% if group.value == "globals" %}
+                    {% set display_name = "All Global Commands" %}
+                {% elif group.value == "points" %}
+                    {% set display_name = "Points Commands" %}
+                {% elif group.value == "viewer_queue" %}
+                    {% set display_name = "Viewer Queue Commands" %}
+                {% elif group.value == "shoutouts" %}
+                    {% set display_name = "Shoutout Commands" %}
+                {% elif group.value == "socials" %}
+                    {% set display_name = "Social Commands" %}
+                {% elif group.value == "settings" %}
+                    {% set display_name = "Settings Commands" %}
+                {% else %}
+                    {% set display_name = group.value | replace("_", " ") | title %}
+                {% endif %}
+
+                {{ toggle_card(
+                    "global_group",
+                    group.value,
+                    display_name,
+                    state
+                ) }}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="toggle-section">
+        <div class="toggle-section-heading">
+            <div>
+                <h4>Independent Global Commands</h4>
+
+                <p>
+                    Control utility, counter, and recreational commands individually.
+                </p>
+            </div>
+        </div>
+
+        <div class="toggle-grid">
+            {% for command, state in global_commands.items() %}
+                {{ toggle_card(
+                    "global_command",
+                    command.value,
+                    "!" ~ command.value,
+                    state
+                ) }}
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

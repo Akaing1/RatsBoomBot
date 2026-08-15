@@ -1,0 +1,1061 @@
+diff --git a/scripts/create_owner.py b/scripts/create_owner.py
+index b41de2a..d0fbcc4 100644
+--- a/scripts/create_owner.py
++++ b/scripts/create_owner.py
+@@ -7,7 +7,7 @@ import asqlite
+ from config.settings import settings
+ from storage.admin_repository import create_administrator, get_administrator_by_username, list_administrators
+ from storage.migration_runner import run_migrations
+-from web.passwords import hash_password
++from web.shared.passwords import hash_password
+ 
+ 
+ MINIMUM_PASSWORD_LENGTH = 12
+diff --git a/tests/test_admin_auth.py b/tests/test_admin_auth.py
+index c15622d..dffb630 100644
+--- a/tests/test_admin_auth.py
++++ b/tests/test_admin_auth.py
+@@ -1,17 +1,10 @@
+ import pytest
+ from fastapi import HTTPException
+-
+-from config.settings import settings
+-from web.admin_auth import (
+-    authenticate_admin,
+-    get_csrf_token,
+-    is_admin_authenticated,
+-    logout_admin,
+-    require_admin,
+-    validate_csrf_token
+-)
+ from starlette.requests import Request
+ 
++import web.admin.auth as admin_auth
++from web.admin.auth import get_csrf_token, logout_admin, require_admin, validate_csrf_token
++
+ 
+ def create_request() -> Request:
+     scope = {
+@@ -29,41 +22,20 @@ def create_request() -> Request:
+     return Request(scope)
+ 
+ 
+-def test_authenticate_admin_accepts_correct_secret(monkeypatch) -> None:
+-    monkeypatch.setattr(settings,"ADMIN_SECRET","correct-secret")
+-
+-    request = create_request()
+-    authenticated = authenticate_admin(request, "correct-secret")
+-
+-    assert authenticated is True
+-    assert is_admin_authenticated(request) is True
+-    assert request.session["csrf_token"]
+-
+-
+-def test_authenticate_admin_rejects_wrong_secret(monkeypatch) -> None:
+-    monkeypatch.setattr(settings,"ADMIN_SECRET","correct-secret")
+-
+-    request = create_request()
+-
+-    authenticated = authenticate_admin(request,"wrong-secret")
+-
+-    assert authenticated is False
+-    assert request.session == {}
+-
+-
+ def test_csrf_token_is_stable_for_session() -> None:
+     request = create_request()
+ 
+     first_token = get_csrf_token(request)
+     second_token = get_csrf_token(request)
++
+     assert first_token == second_token
+ 
+ 
+ def test_validate_csrf_token_rejects_missing_token() -> None:
+     request = create_request()
+ 
+-    with pytest.raises( HTTPException) as exception:
+-        validate_csrf_token(request,"anything")
++    with pytest.raises(HTTPException) as exception:
++        validate_csrf_token(request, "anything")
+ 
+     assert exception.value.status_code == 403
+ 
+@@ -73,21 +45,33 @@ def test_validate_csrf_token_rejects_wrong_token() -> None:
+     request.session["csrf_token"] = "expected"
+ 
+     with pytest.raises(HTTPException) as exception:
+-        validate_csrf_token(request,"wrong")
++        validate_csrf_token(request, "wrong")
+ 
+     assert exception.value.status_code == 403
+ 
+ 
+-def test_logout_clears_session_and_requires_login() -> None:
+-    request = create_request()
++@pytest.mark.asyncio
++async def test_require_admin_allows_authenticated_request(monkeypatch) -> None:
++    async def authenticated(_request: Request) -> bool:
++        return True
+ 
+-    request.session["admin_authenticated"] = True
+-    request.session["csrf_token"] = "token"
++    monkeypatch.setattr(admin_auth, "is_admin_authenticated", authenticated)
+ 
+-    assert await require_admin(request) is None
++    assert await require_admin(create_request()) is None
+ 
+-    logout_admin(request)
+ 
++@pytest.mark.asyncio
++async def test_logout_clears_session_and_requires_login(monkeypatch) -> None:
++    async def unauthenticated(_request: Request) -> bool:
++        return False
++
++    monkeypatch.setattr(admin_auth, "is_admin_authenticated", unauthenticated)
++
++    request = create_request()
++    request.session["administrator_id"] = 1
++    request.session["csrf_token"] = "token"
++
++    logout_admin(request)
+     redirect = await require_admin(request)
+ 
+     assert request.session == {}
+diff --git a/tests/test_log_browser.py b/tests/test_log_browser.py
+index 56ba110..96b5990 100644
+--- a/tests/test_log_browser.py
++++ b/tests/test_log_browser.py
+@@ -1,5 +1,5 @@
+ from config.settings import settings
+-from web.log_browser import (
++from web.shared.log_browser import (
+     format_file_size,
+     get_logs_directory,
+     parse_session_directory_name,
+diff --git a/tests/test_passwords.py b/tests/test_passwords.py
+index 759275e..3226d53 100644
+--- a/tests/test_passwords.py
++++ b/tests/test_passwords.py
+@@ -1,4 +1,4 @@
+-from web.passwords import hash_password, password_needs_rehash, verify_password
++from web.shared.passwords import hash_password, password_needs_rehash, verify_password
+ 
+ 
+ def test_hash_password_does_not_store_plaintext():
+diff --git a/web/README.md b/web/README.md
+new file mode 100644
+index 0000000..28a55aa
+--- /dev/null
++++ b/web/README.md
+@@ -0,0 +1,11 @@
++# Web package
++
++The web application is a single FastAPI deployment organized into three internal areas:
++
++- `admin/` contains administrator authentication and admin-only routes.
++- `channel/` contains Twitch streamer authentication and the streamer dashboard routes.
++- `shared/` contains infrastructure used by both sides, including templates, OAuth helpers, metrics, and health checks.
++
++Templates follow the same boundary under `templates/admin/` and `templates/channel/`. Static assets remain shared under `static/`.
++
++`app.py` is the composition root. It mounts shared assets and registers routers exported by each package. Moving a router between packages must not change its public URL.
+diff --git a/web/admin/__init__.py b/web/admin/__init__.py
+new file mode 100644
+index 0000000..6558b57
+--- /dev/null
++++ b/web/admin/__init__.py
+@@ -0,0 +1 @@
++"""Administrative dashboard package."""
+diff --git a/web/admin_auth.py b/web/admin/auth.py
+similarity index 98%
+rename from web/admin_auth.py
+rename to web/admin/auth.py
+index b76ad17..c7c3cdd 100644
+--- a/web/admin_auth.py
++++ b/web/admin/auth.py
+@@ -4,7 +4,7 @@ from fastapi import HTTPException, Request
+ from fastapi.responses import RedirectResponse
+ 
+ from storage.admin_repository import Administrator, get_administrator_by_id, get_administrator_by_username
+-from web.passwords import verify_password
++from web.shared.passwords import verify_password
+ from web.state import get_db
+ 
+ 
+diff --git a/web/admin/routers/__init__.py b/web/admin/routers/__init__.py
+new file mode 100644
+index 0000000..a4f8d2c
+--- /dev/null
++++ b/web/admin/routers/__init__.py
+@@ -0,0 +1,19 @@
++from web.admin.routers.administrators import router as administrators_router
++from web.admin.routers.auth import router as auth_router
++from web.admin.routers.channels import router as channels_router
++from web.admin.routers.dashboard import router as dashboard_router
++from web.admin.routers.logs import router as logs_router
++from web.admin.routers.oauth import router as oauth_router
++from web.admin.routers.performance import router as performance_router
++from web.admin.routers.runtime_logs import router as runtime_logs_router
++
++__all__ = (
++    "administrators_router",
++    "auth_router",
++    "channels_router",
++    "dashboard_router",
++    "logs_router",
++    "oauth_router",
++    "performance_router",
++    "runtime_logs_router"
++)
+diff --git a/web/routers/admin_users.py b/web/admin/routers/administrators.py
+similarity index 95%
+rename from web/routers/admin_users.py
+rename to web/admin/routers/administrators.py
+index e28f7a1..ecf77aa 100644
+--- a/web/routers/admin_users.py
++++ b/web/admin/routers/administrators.py
+@@ -2,9 +2,9 @@ from fastapi import APIRouter, Form, Request
+ from fastapi.responses import HTMLResponse, RedirectResponse
+ 
+ from storage.admin_repository import create_administrator, get_administrator_by_username, list_administrators, set_administrator_enabled, get_administrator_by_id, set_administrator_password
+-from web.admin_auth import require_owner, validate_csrf_token
+-from web.common import build_admin_context, templates
+-from web.passwords import hash_password
++from web.admin.auth import require_owner, validate_csrf_token
++from web.shared.common import build_admin_context, templates
++from web.shared.passwords import hash_password
+ from web.state import get_db
+ 
+ 
+@@ -29,7 +29,7 @@ async def admin_users_page(request: Request, result: str | None = None):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="admin_users.html",
++        name="admin/administrators.html",
+         context=build_admin_context(
+             request,
+             active_page="users",
+diff --git a/web/routers/auth.py b/web/admin/routers/auth.py
+similarity index 92%
+rename from web/routers/auth.py
+rename to web/admin/routers/auth.py
+index 3ad138d..17a4b72 100644
+--- a/web/routers/auth.py
++++ b/web/admin/routers/auth.py
+@@ -2,9 +2,9 @@ from fastapi import APIRouter, Form, Request
+ from fastapi.responses import HTMLResponse, RedirectResponse
+ 
+ from storage.admin_repository import set_administrator_password
+-from web.admin_auth import authenticate_administrator, get_current_administrator, is_admin_authenticated, logout_admin, require_admin, validate_csrf_token
+-from web.common import build_admin_context, templates
+-from web.passwords import hash_password, verify_password
++from web.admin.auth import authenticate_administrator, get_current_administrator, is_admin_authenticated, logout_admin, require_admin, validate_csrf_token
++from web.shared.common import build_admin_context, templates
++from web.shared.passwords import hash_password, verify_password
+ from web.state import get_db
+ 
+ 
+@@ -19,7 +19,7 @@ async def login_page(request: Request, error: str | None = None):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="login.html",
++        name="admin/login.html",
+         context={"error": error}
+     )
+ 
+@@ -43,7 +43,7 @@ async def change_password_page(request: Request, result: str | None = None):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="change_password.html",
++        name="admin/change_password.html",
+         context=build_admin_context(
+             request,
+             active_page="account",
+diff --git a/web/routers/channels.py b/web/admin/routers/channels.py
+similarity index 98%
+rename from web/routers/channels.py
+rename to web/admin/routers/channels.py
+index 5a2b42f..89da328 100644
+--- a/web/routers/channels.py
++++ b/web/admin/routers/channels.py
+@@ -6,8 +6,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+ from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName
+ from config.settings import settings
+ from storage.database import delete_token
+-from web.admin_auth import require_admin, validate_csrf_token
+-from web.common import build_admin_context, render_error, templates
++from web.admin.auth import require_admin, validate_csrf_token
++from web.shared.common import build_admin_context, render_error, templates
+ from web.state import get_bot, get_db
+ 
+ router = APIRouter(prefix="/channels")
+@@ -86,7 +86,7 @@ async def channels_page(request: Request):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="channels.html",
++        name="admin/channels.html",
+         context=build_admin_context(
+             request,
+             active_page="channels",
+@@ -126,7 +126,7 @@ async def channel_details_page(request: Request, broadcaster_id: str):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="channel_details.html",
++        name="admin/channel_details.html",
+         context=build_admin_context(
+             request,
+             active_page="channels",
+diff --git a/web/routers/dashboard.py b/web/admin/routers/dashboard.py
+similarity index 89%
+rename from web/routers/dashboard.py
+rename to web/admin/routers/dashboard.py
+index e4c4680..31aa27e 100644
+--- a/web/routers/dashboard.py
++++ b/web/admin/routers/dashboard.py
+@@ -1,8 +1,8 @@
+ from fastapi import APIRouter, Request
+ from fastapi.responses import HTMLResponse
+ 
+-from web.admin_auth import require_admin
+-from web.common import build_admin_context, templates
++from web.admin.auth import require_admin
++from web.shared.common import build_admin_context, templates
+ from web.state import get_bot, get_db
+ 
+ router = APIRouter()
+@@ -31,7 +31,7 @@ async def dashboard(request: Request):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="dashboard.html",
++        name="admin/dashboard.html",
+         context=build_admin_context(
+             request,
+             active_page="dashboard",
+diff --git a/web/routers/logs.py b/web/admin/routers/logs.py
+similarity index 93%
+rename from web/routers/logs.py
+rename to web/admin/routers/logs.py
+index 833d13b..b932add 100644
+--- a/web/routers/logs.py
++++ b/web/admin/routers/logs.py
+@@ -3,9 +3,9 @@ from pathlib import Path
+ from fastapi import APIRouter, Request
+ from fastapi.responses import FileResponse, HTMLResponse
+ 
+-from web.admin_auth import require_admin
+-from web.common import build_admin_context, render_error, templates
+-from web.log_browser import format_file_size, get_logs_directory, parse_session_directory_name, resolve_log_file
++from web.admin.auth import require_admin
++from web.shared.common import build_admin_context, render_error, templates
++from web.shared.log_browser import format_file_size, get_logs_directory, parse_session_directory_name, resolve_log_file
+ from web.state import get_bot
+ 
+ router = APIRouter(prefix="/logs")
+@@ -66,7 +66,7 @@ async def logs_page(request: Request):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="logs.html",
++        name="admin/logs.html",
+         context=build_admin_context(
+             request,
+             active_page="logs",
+@@ -110,7 +110,7 @@ async def log_details_page(request: Request, channel_name: str, session_name: st
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="log_details.html",
++        name="admin/log_details.html",
+         context=build_admin_context(
+             request,
+             active_page="logs",
+diff --git a/web/routers/oauth.py b/web/admin/routers/oauth.py
+similarity index 61%
+rename from web/routers/oauth.py
+rename to web/admin/routers/oauth.py
+index e820b52..b046563 100644
+--- a/web/routers/oauth.py
++++ b/web/admin/routers/oauth.py
+@@ -3,10 +3,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
+ 
+ from config.settings import settings
+ from storage.database import save_token
+-from web.admin_auth import require_admin
+-from web.channel_auth import create_channel_oauth_state, login_channel_user, validate_channel_oauth_state
+-from web.common import build_admin_context, render_error, templates
+-from web.oauth import build_bot_oauth_url, build_channel_oauth_url, build_public_channel_oauth_url, exchange_code_for_token, fetch_twitch_user
++from web.admin.auth import require_admin
++from web.shared.common import build_admin_context, render_error, templates
++from web.shared.oauth import build_bot_oauth_url, build_channel_oauth_url, exchange_code_for_token, fetch_twitch_user
+ from web.state import get_bot, get_db
+ 
+ router = APIRouter()
+@@ -91,7 +90,7 @@ async def oauth_channel_callback(request: Request, code: str | None = None, erro
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="auth_success.html",
++        name="admin/auth_success.html",
+         context=build_admin_context(
+             request,
+             active_page="dashboard",
+@@ -160,7 +159,7 @@ async def oauth_bot_callback(request: Request, code: str | None = None, error: s
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="auth_success.html",
++        name="admin/auth_success.html",
+         context=build_admin_context(
+             request,
+             active_page="dashboard",
+@@ -168,89 +167,3 @@ async def oauth_bot_callback(request: Request, code: str | None = None, error: s
+             message=f"The bot account {twitch_user.display_name} was connected successfully."
+         )
+     )
+-
+-
+-@router.get("/connect", response_class=HTMLResponse)
+-async def public_connect_page(request: Request):
+-    return templates.TemplateResponse(
+-        request=request,
+-        name="connect.html",
+-        context={}
+-    )
+-
+-
+-@router.get("/connect/twitch")
+-async def public_connect_twitch(request: Request):
+-    state = create_channel_oauth_state(request)
+-    return RedirectResponse(build_public_channel_oauth_url(state=state))
+-
+-
+-@router.get("/oauth/channel/connect", response_class=HTMLResponse)
+-async def public_channel_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+-    if not validate_channel_oauth_state(request, state):
+-        return await render_error(
+-            request,
+-            title="Channel authorization failed",
+-            message="The Twitch authorization request could not be verified.",
+-            status_code=400
+-        )
+-
+-    if error:
+-        return await render_error(
+-            request,
+-            title="Channel authorization failed",
+-            message=error,
+-            status_code=400
+-        )
+-
+-    if not code:
+-        return await render_error(
+-            request,
+-            title="Channel authorization failed",
+-            message="No authorization code was provided.",
+-            status_code=400
+-        )
+-
+-    try:
+-        token_response = await exchange_code_for_token(code=code, redirect_uri=settings.PUBLIC_CHANNEL_REDIRECT_URI)
+-        twitch_user = await fetch_twitch_user(token_response.access_token)
+-        runtime_bot = get_bot()
+-        runtime_db = get_db()
+-
+-        if runtime_bot is not None:
+-            await runtime_bot.onboard_broadcaster(
+-                user_id=twitch_user.user_id,
+-                token=token_response.access_token,
+-                refresh=token_response.refresh_token
+-            )
+-        elif runtime_db is not None:
+-            await save_token(
+-                db=runtime_db,
+-                user_id=twitch_user.user_id,
+-                token=token_response.access_token,
+-                refresh=token_response.refresh_token
+-            )
+-        else:
+-            return await render_error(
+-                request,
+-                title="Runtime unavailable",
+-                message="The RatsBoomBot runtime is not available.",
+-                status_code=503
+-            )
+-
+-        login_channel_user(
+-            request,
+-            twitch_user.user_id,
+-            twitch_user.login,
+-            twitch_user.display_name
+-        )
+-
+-    except Exception as error:
+-        return await render_error(
+-            request,
+-            title="Channel connection failed",
+-            message=repr(error),
+-            status_code=500
+-        )
+-
+-    return RedirectResponse(url="/channel", status_code=303)
+diff --git a/web/routers/performance.py b/web/admin/routers/performance.py
+similarity index 77%
+rename from web/routers/performance.py
+rename to web/admin/routers/performance.py
+index bcc67e7..026ee6b 100644
+--- a/web/routers/performance.py
++++ b/web/admin/routers/performance.py
+@@ -1,9 +1,9 @@
+ from fastapi import APIRouter, HTTPException, Request
+ from fastapi.responses import HTMLResponse
+ 
+-from web.admin_auth import is_admin_authenticated, require_admin
+-from web.common import build_admin_context, templates
+-from web.system_metrics import system_metrics
++from web.admin.auth import is_admin_authenticated, require_admin
++from web.shared.common import build_admin_context, templates
++from web.shared.system_metrics import system_metrics
+ 
+ router = APIRouter(prefix="/performance")
+ 
+@@ -17,7 +17,7 @@ async def performance_page(request: Request):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="performance.html",
++        name="admin/performance.html",
+         context=build_admin_context(request, active_page="performance")
+     )
+ 
+diff --git a/web/routers/runtime_logs.py b/web/admin/routers/runtime_logs.py
+similarity index 84%
+rename from web/routers/runtime_logs.py
+rename to web/admin/routers/runtime_logs.py
+index 7299b89..cd57ca5 100644
+--- a/web/routers/runtime_logs.py
++++ b/web/admin/routers/runtime_logs.py
+@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, Query, Request
+ from fastapi.responses import HTMLResponse
+ 
+ from app.runtime_logs import runtime_log_buffer
+-from web.admin_auth import is_admin_authenticated, require_admin
+-from web.common import build_admin_context, templates
++from web.admin.auth import is_admin_authenticated, require_admin
++from web.shared.common import build_admin_context, templates
+ 
+ router = APIRouter(prefix="/runtime-logs")
+ 
+@@ -17,7 +17,7 @@ async def runtime_logs_page(request: Request):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="runtime_logs.html",
++        name="admin/runtime_logs.html",
+         context=build_admin_context(request, active_page="runtime_logs")
+     )
+ 
+diff --git a/web/app.py b/web/app.py
+index 7d5fa37..cf2c900 100644
+--- a/web/app.py
++++ b/web/app.py
+@@ -6,7 +6,19 @@ from starlette.middleware.sessions import SessionMiddleware
+ 
+ from config.settings import settings
+ from config.version import APP_NAME, APP_VERSION
+-from web.routers import admin_users_router, auth_router, channel_user_router, channels_router, dashboard_router, health_router, logs_router, oauth_router, performance_router, runtime_logs_router
++from web.admin.routers import (
++    administrators_router,
++    auth_router as admin_auth_router,
++    channels_router,
++    dashboard_router as admin_dashboard_router,
++    logs_router,
++    oauth_router as admin_oauth_router,
++    performance_router,
++    runtime_logs_router
++)
++from web.channel.routers import dashboard_router as channel_dashboard_router
++from web.channel.routers import oauth_router as channel_oauth_router
++from web.shared.routers import health_router
+ WEB_DIRECTORY = Path(__file__).resolve().parent
+ STATIC_DIRECTORY = WEB_DIRECTORY / "static"
+ ASSETS_DIRECTORY = WEB_DIRECTORY.parent / "assets"
+@@ -27,16 +39,17 @@ def create_app() -> FastAPI:
+     application.mount("/static", StaticFiles(directory=str(STATIC_DIRECTORY)), name="static")
+     application.mount("/assets", StaticFiles(directory=str(ASSETS_DIRECTORY)), name="assets")
+ 
+-    application.include_router(auth_router)
+-    application.include_router(dashboard_router)
+-    application.include_router(oauth_router)
++    application.include_router(admin_auth_router)
++    application.include_router(admin_dashboard_router)
++    application.include_router(admin_oauth_router)
+     application.include_router(channels_router)
+-    application.include_router(channel_user_router)
++    application.include_router(channel_dashboard_router)
++    application.include_router(channel_oauth_router)
+     application.include_router(logs_router)
+     application.include_router(performance_router)
+     application.include_router(runtime_logs_router)
+     application.include_router(health_router)
+-    application.include_router(admin_users_router)
++    application.include_router(administrators_router)
+ 
+     return application
+ 
+diff --git a/web/channel/__init__.py b/web/channel/__init__.py
+new file mode 100644
+index 0000000..a4954fe
+--- /dev/null
++++ b/web/channel/__init__.py
+@@ -0,0 +1 @@
++"""Streamer-facing channel dashboard package."""
+diff --git a/web/channel_auth.py b/web/channel/auth.py
+similarity index 100%
+rename from web/channel_auth.py
+rename to web/channel/auth.py
+diff --git a/web/channel/routers/__init__.py b/web/channel/routers/__init__.py
+new file mode 100644
+index 0000000..9f4643e
+--- /dev/null
++++ b/web/channel/routers/__init__.py
+@@ -0,0 +1,4 @@
++from web.channel.routers.dashboard import router as dashboard_router
++from web.channel.routers.oauth import router as oauth_router
++
++__all__ = ("dashboard_router", "oauth_router")
+diff --git a/web/routers/channel_user.py b/web/channel/routers/dashboard.py
+similarity index 97%
+rename from web/routers/channel_user.py
+rename to web/channel/routers/dashboard.py
+index 7f11129..bbbeeba 100644
+--- a/web/routers/channel_user.py
++++ b/web/channel/routers/dashboard.py
+@@ -4,9 +4,9 @@ from fastapi import APIRouter, Form, Request
+ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+ 
+ from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName
+-from web.admin_auth import get_csrf_token, validate_csrf_token
+-from web.channel_auth import CHANNEL_USER_ID_KEY, logout_channel_user
+-from web.common import templates
++from web.admin.auth import get_csrf_token, validate_csrf_token
++from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
++from web.shared.common import templates
+ from web.state import get_bot
+ 
+ router = APIRouter()
+@@ -93,7 +93,7 @@ async def channel_dashboard(request: Request):
+     if runtime_bot is None or runtime_bot.services is None:
+         return templates.TemplateResponse(
+             request=request,
+-            name="channel_dashboard.html",
++            name="channel/dashboard.html",
+             context={
+                 "broadcaster": None,
+                 "runtime_unavailable": True,
+@@ -118,7 +118,7 @@ async def channel_dashboard(request: Request):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="channel_dashboard.html",
++        name="channel/dashboard.html",
+         context={
+             "broadcaster": broadcaster,
+             "runtime_unavailable": False,
+@@ -155,7 +155,7 @@ async def channel_features_page(request: Request):
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="channel_features.html",
++        name="channel/features.html",
+         context={
+             "active_page": "features",
+             "broadcaster": broadcaster,
+diff --git a/web/channel/routers/oauth.py b/web/channel/routers/oauth.py
+new file mode 100644
+index 0000000..4bc0ba7
+--- /dev/null
++++ b/web/channel/routers/oauth.py
+@@ -0,0 +1,97 @@
++from fastapi import APIRouter, Request
++from fastapi.responses import HTMLResponse, RedirectResponse
++
++from config.settings import settings
++from storage.database import save_token
++from web.channel.auth import create_channel_oauth_state, login_channel_user, validate_channel_oauth_state
++from web.shared.common import render_error, templates
++from web.shared.oauth import build_public_channel_oauth_url, exchange_code_for_token, fetch_twitch_user
++from web.state import get_bot, get_db
++
++router = APIRouter()
++
++
++@router.get("/connect", response_class=HTMLResponse)
++async def public_connect_page(request: Request):
++    return templates.TemplateResponse(
++        request=request,
++        name="channel/connect.html",
++        context={}
++    )
++
++
++@router.get("/connect/twitch")
++async def public_connect_twitch(request: Request):
++    state = create_channel_oauth_state(request)
++    return RedirectResponse(build_public_channel_oauth_url(state=state))
++
++
++@router.get("/oauth/channel/connect", response_class=HTMLResponse)
++async def public_channel_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
++    if not validate_channel_oauth_state(request, state):
++        return await render_error(
++            request,
++            title="Channel authorization failed",
++            message="The Twitch authorization request could not be verified.",
++            status_code=400
++        )
++
++    if error:
++        return await render_error(
++            request,
++            title="Channel authorization failed",
++            message=error,
++            status_code=400
++        )
++
++    if not code:
++        return await render_error(
++            request,
++            title="Channel authorization failed",
++            message="No authorization code was provided.",
++            status_code=400
++        )
++
++    try:
++        token_response = await exchange_code_for_token(code=code, redirect_uri=settings.PUBLIC_CHANNEL_REDIRECT_URI)
++        twitch_user = await fetch_twitch_user(token_response.access_token)
++        runtime_bot = get_bot()
++        runtime_db = get_db()
++
++        if runtime_bot is not None:
++            await runtime_bot.onboard_broadcaster(
++                user_id=twitch_user.user_id,
++                token=token_response.access_token,
++                refresh=token_response.refresh_token
++            )
++        elif runtime_db is not None:
++            await save_token(
++                db=runtime_db,
++                user_id=twitch_user.user_id,
++                token=token_response.access_token,
++                refresh=token_response.refresh_token
++            )
++        else:
++            return await render_error(
++                request,
++                title="Runtime unavailable",
++                message="The RatsBoomBot runtime is not available.",
++                status_code=503
++            )
++
++        login_channel_user(
++            request,
++            twitch_user.user_id,
++            twitch_user.login,
++            twitch_user.display_name
++        )
++
++    except Exception as error:
++        return await render_error(
++            request,
++            title="Channel connection failed",
++            message=repr(error),
++            status_code=500
++        )
++
++    return RedirectResponse(url="/channel", status_code=303)
+diff --git a/web/routers/__init__.py b/web/routers/__init__.py
+deleted file mode 100644
+index ef0c96e..0000000
+--- a/web/routers/__init__.py
++++ /dev/null
+@@ -1,23 +0,0 @@
+-from web.routers.auth import router as auth_router
+-from web.routers.channels import router as channels_router
+-from web.routers.dashboard import router as dashboard_router
+-from web.routers.health import router as health_router
+-from web.routers.logs import router as logs_router
+-from web.routers.performance import router as performance_router
+-from web.routers.runtime_logs import router as runtime_logs_router
+-from web.routers.oauth import router as oauth_router
+-from web.routers.admin_users import router as admin_users_router
+-from web.routers.channel_user import router as channel_user_router
+-
+-__all__ = [
+-    "auth_router",
+-    "channels_router",
+-    "dashboard_router",
+-    "health_router",
+-    "logs_router",
+-    "performance_router",
+-    "runtime_logs_router",
+-    "oauth_router",
+-    "admin_users_router",
+-    "channel_user_router"
+-]
+\ No newline at end of file
+diff --git a/web/shared/__init__.py b/web/shared/__init__.py
+new file mode 100644
+index 0000000..216a255
+--- /dev/null
++++ b/web/shared/__init__.py
+@@ -0,0 +1 @@
++"""Infrastructure shared by the admin and channel dashboards."""
+diff --git a/web/common.py b/web/shared/common.py
+similarity index 89%
+rename from web/common.py
+rename to web/shared/common.py
+index f73bf4d..e1e1414 100644
+--- a/web/common.py
++++ b/web/shared/common.py
+@@ -6,9 +6,9 @@ from fastapi.responses import HTMLResponse
+ from fastapi.templating import Jinja2Templates
+ 
+ from config.version import get_deployment_stamp
+-from web.admin_auth import get_csrf_token, is_admin_authenticated
++from web.admin.auth import get_csrf_token, is_admin_authenticated
+ 
+-WEB_DIRECTORY = Path(__file__).resolve().parent
++WEB_DIRECTORY = Path(__file__).resolve().parents[1]
+ TEMPLATES_DIRECTORY = WEB_DIRECTORY / "templates"
+ 
+ templates = Jinja2Templates(directory=str(TEMPLATES_DIRECTORY))
+@@ -39,7 +39,7 @@ async def render_error(request: Request, *, title: str, message: str, status_cod
+ 
+     return templates.TemplateResponse(
+         request=request,
+-        name="error.html",
++        name="admin/error.html",
+         context=context,
+         status_code=status_code
+     )
+diff --git a/web/log_browser.py b/web/shared/log_browser.py
+similarity index 100%
+rename from web/log_browser.py
+rename to web/shared/log_browser.py
+diff --git a/web/oauth.py b/web/shared/oauth.py
+similarity index 100%
+rename from web/oauth.py
+rename to web/shared/oauth.py
+diff --git a/web/passwords.py b/web/shared/passwords.py
+similarity index 100%
+rename from web/passwords.py
+rename to web/shared/passwords.py
+diff --git a/web/shared/routers/__init__.py b/web/shared/routers/__init__.py
+new file mode 100644
+index 0000000..7df45c7
+--- /dev/null
++++ b/web/shared/routers/__init__.py
+@@ -0,0 +1,3 @@
++from web.shared.routers.health import router as health_router
++
++__all__ = ("health_router",)
+diff --git a/web/routers/health.py b/web/shared/routers/health.py
+similarity index 100%
+rename from web/routers/health.py
+rename to web/shared/routers/health.py
+diff --git a/web/system_metrics.py b/web/shared/system_metrics.py
+similarity index 100%
+rename from web/system_metrics.py
+rename to web/shared/system_metrics.py
+diff --git a/web/templates/admin_users.html b/web/templates/admin/administrators.html
+similarity index 99%
+rename from web/templates/admin_users.html
+rename to web/templates/admin/administrators.html
+index 50855d9..70c8ecc 100644
+--- a/web/templates/admin_users.html
++++ b/web/templates/admin/administrators.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% block title %}
+     Administrator Users | RatsBoomBot
+diff --git a/web/templates/auth_success.html b/web/templates/admin/auth_success.html
+similarity index 91%
+rename from web/templates/auth_success.html
+rename to web/templates/admin/auth_success.html
+index 528a924..05f86fd 100644
+--- a/web/templates/auth_success.html
++++ b/web/templates/admin/auth_success.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% block title %}{{ title }} | RatsBoomBot{% endblock %}
+ 
+diff --git a/web/templates/change_password.html b/web/templates/admin/change_password.html
+similarity index 98%
+rename from web/templates/change_password.html
+rename to web/templates/admin/change_password.html
+index 9988a77..5783e4c 100644
+--- a/web/templates/change_password.html
++++ b/web/templates/admin/change_password.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% block title %}
+     Change Password | RatsBoomBot
+diff --git a/web/templates/channel_details.html b/web/templates/admin/channel_details.html
+similarity index 99%
+rename from web/templates/channel_details.html
+rename to web/templates/admin/channel_details.html
+index c910cde..e013a6c 100644
+--- a/web/templates/channel_details.html
++++ b/web/templates/admin/channel_details.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% macro toggle_card(broadcaster_id, toggle_type, toggle_name, display_name, state, description=None) %}
+     <article class="toggle-card {% if state.effective_enabled %}enabled{% else %}disabled{% endif %}">
+diff --git a/web/templates/channels.html b/web/templates/admin/channels.html
+similarity index 99%
+rename from web/templates/channels.html
+rename to web/templates/admin/channels.html
+index 2cb881d..de62fb0 100644
+--- a/web/templates/channels.html
++++ b/web/templates/admin/channels.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% block title %}Channels | RatsBoomBot{% endblock %}
+ 
+diff --git a/web/templates/dashboard.html b/web/templates/admin/dashboard.html
+similarity index 99%
+rename from web/templates/dashboard.html
+rename to web/templates/admin/dashboard.html
+index e2faeca..cd04ff3 100644
+--- a/web/templates/dashboard.html
++++ b/web/templates/admin/dashboard.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% block title %}
+     Admin Dashboard | RatsBoomBot
+diff --git a/web/templates/error.html b/web/templates/admin/error.html
+similarity index 91%
+rename from web/templates/error.html
+rename to web/templates/admin/error.html
+index fcba437..74411cd 100644
+--- a/web/templates/error.html
++++ b/web/templates/admin/error.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% block title %}{{ title }} | RatsBoomBot{% endblock %}
+ 
+diff --git a/web/templates/layout.html b/web/templates/admin/layout.html
+similarity index 100%
+rename from web/templates/layout.html
+rename to web/templates/admin/layout.html
+diff --git a/web/templates/log_details.html b/web/templates/admin/log_details.html
+similarity index 97%
+rename from web/templates/log_details.html
+rename to web/templates/admin/log_details.html
+index f3d049f..cc5ebec 100644
+--- a/web/templates/log_details.html
++++ b/web/templates/admin/log_details.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% block title %}{{ channel_name }} Log | RatsBoomBot{% endblock %}
+ 
+diff --git a/web/templates/login.html b/web/templates/admin/login.html
+similarity index 100%
+rename from web/templates/login.html
+rename to web/templates/admin/login.html
+diff --git a/web/templates/logs.html b/web/templates/admin/logs.html
+similarity index 98%
+rename from web/templates/logs.html
+rename to web/templates/admin/logs.html
+index 5f718e3..4895256 100644
+--- a/web/templates/logs.html
++++ b/web/templates/admin/logs.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% block title %}Stream Logs | RatsBoomBot{% endblock %}
+ 
+diff --git a/web/templates/performance.html b/web/templates/admin/performance.html
+similarity index 99%
+rename from web/templates/performance.html
+rename to web/templates/admin/performance.html
+index 951d0e5..811e54c 100644
+--- a/web/templates/performance.html
++++ b/web/templates/admin/performance.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% block title %}Performance | RatsBoomBot Admin{% endblock %}
+ 
+diff --git a/web/templates/runtime_logs.html b/web/templates/admin/runtime_logs.html
+similarity index 98%
+rename from web/templates/runtime_logs.html
+rename to web/templates/admin/runtime_logs.html
+index f4077f1..0faefa2 100644
+--- a/web/templates/runtime_logs.html
++++ b/web/templates/admin/runtime_logs.html
+@@ -1,4 +1,4 @@
+-{% extends "layout.html" %}
++{% extends "admin/layout.html" %}
+ 
+ {% block title %}Runtime Logs | RatsBoomBot Admin{% endblock %}
+ 
+diff --git a/web/templates/connect.html b/web/templates/channel/connect.html
+similarity index 100%
+rename from web/templates/connect.html
+rename to web/templates/channel/connect.html
+diff --git a/web/templates/channel_dashboard.html b/web/templates/channel/dashboard.html
+similarity index 99%
+rename from web/templates/channel_dashboard.html
+rename to web/templates/channel/dashboard.html
+index c7c2654..744e2f5 100644
+--- a/web/templates/channel_dashboard.html
++++ b/web/templates/channel/dashboard.html
+@@ -1,4 +1,4 @@
+-{% extends "channel_layout.html" %}
++{% extends "channel/layout.html" %}
+ 
+ {% block title %}
+     {{ broadcaster.name or "Your Channel" }} | RatsBoomBot
+diff --git a/web/templates/channel_features.html b/web/templates/channel/features.html
+similarity index 99%
+rename from web/templates/channel_features.html
+rename to web/templates/channel/features.html
+index 8715905..1894a1c 100644
+--- a/web/templates/channel_features.html
++++ b/web/templates/channel/features.html
+@@ -1,4 +1,4 @@
+-{% extends "channel_layout.html" %}
++{% extends "channel/layout.html" %}
+ 
+ {% macro toggle_card(toggle_type, toggle_name, display_name, state) %}
+     <article class="toggle-card {% if state.effective_enabled %}enabled{% else %}disabled{% endif %}">
+diff --git a/web/templates/channel_layout.html b/web/templates/channel/layout.html
+similarity index 100%
+rename from web/templates/channel_layout.html
+rename to web/templates/channel/layout.html

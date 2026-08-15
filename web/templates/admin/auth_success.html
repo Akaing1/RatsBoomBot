@@ -1,0 +1,13 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{{ title }} | RatsBoomBot{% endblock %}
+
+{% block content %}
+<section class="message-card success-card">
+    <div class="message-icon">✓</div>
+    <p class="eyebrow">Authorization complete</p>
+    <h2>{{ title }}</h2>
+    <p>{{ message }}</p>
+    <a class="button primary" href="/">Return to dashboard</a>
+</section>
+{% endblock %}
