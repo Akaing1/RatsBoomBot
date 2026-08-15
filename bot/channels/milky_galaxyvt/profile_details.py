@@ -4,7 +4,8 @@ from bot.profiles import (
     PointsMessages,
     RaidMessages,
     RedeemConfig,
-    RedeemMessages
+    RedeemMessages,
+    ShoutoutMessages
 )
 
 
@@ -23,6 +24,16 @@ MILKY_GALAXYVT_COMMUNITY_MESSAGES = CommunityMessages(
 MILKY_GALAXYVT_RAID_MESSAGES = RaidMessages(
     incoming=(
         "@{raider_name} raided with {viewer_count} {viewer_word}!"
+    )
+)
+
+MILKY_GALAXYVT_SHOUTOUT_MESSAGES = ShoutoutMessages(
+    with_game=(
+        "Go check out @{username}! They were last playing {game_name}. "
+        "They are a cool rat: {channel_url}"
+    ),
+    without_game=(
+        "Go check out @{username}! They are a cool rat: {channel_url}"
     )
 )
 
