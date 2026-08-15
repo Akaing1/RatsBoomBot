@@ -816,3 +816,32 @@ body.login-page {
         padding: 28px 20px;
     }
 }
+
+.activity-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent) transparent;
+}
+
+.activity-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+
+.activity-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.activity-scroll::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: rgba(139, 92, 246, .65);
+    background-clip: padding-box;
+}
+
+.activity-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+    background-clip: padding-box;
+}
+
+.activity-scroll::-webkit-scrollbar-button {
+    display: none;
+}
