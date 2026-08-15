@@ -3,7 +3,7 @@ import logging
 from config.settings import settings
 
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, FeatureToggleService
-from bot.services.engagement import CounterService, PointsService, RedeemService, ViewerQueueService
+from bot.services.engagement import CounterService, OverwatchService, PointsService, RedeemService, ViewerQueueService
 from bot.services.stream import AdAnnouncementService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
 
@@ -29,6 +29,7 @@ class ServiceContainer:
         self.ads = AdAnnouncementService(bot, self.broadcasters)
         self.viewer_queue = ViewerQueueService(bot)
         self.redeems = RedeemService(bot, db, self.points)
+        self.overwatch = OverwatchService(bot, db)
         self.moderation = ModerationService(bot, db)
         self.shoutouts = ShoutoutService(bot)
 
@@ -44,6 +45,7 @@ class ServiceContainer:
             ("PointsService", self.points),
             ("CounterService", self.counters),
             ("RedeemService", self.redeems),
+            ("OverwatchService", self.overwatch),
             ("ModerationService", self.moderation),
             ("StreamLogService", self.stream_logs)
         )
