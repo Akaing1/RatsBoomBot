@@ -64,9 +64,7 @@ MILKY_GALAXYVT_POINTS = PointsConfig(
 )
 
 
-# Replace this with Milky's case-sensitive BattleTag, using a dash instead of #.
-# Example: Milky-1234
 MILKY_GALAXYVT_OVERWATCH = OverwatchConfig(
-    player_id="Galaxy#17159",
+    player_id="Galaxy-17159",
     platform="pc"
 )
