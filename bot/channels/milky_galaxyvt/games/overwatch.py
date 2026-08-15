@@ -35,8 +35,8 @@ class MilkyGalaxyOverwatchCommands(ChannelComponent):
 
     @commands.command(name="ow")
     async def overwatch_summary(self, ctx: commands.Context) -> None:
-        # if not await self.require_overwatch(ctx):
-        #     return
+        if not await self.require_overwatch(ctx):
+            return
 
         session = await self.bot.services.overwatch.get_session(self.broadcaster_id)
 
@@ -54,8 +54,8 @@ class MilkyGalaxyOverwatchCommands(ChannelComponent):
 
     @commands.command(name="owrank")
     async def overwatch_rank(self, ctx: commands.Context) -> None:
-        # if not await self.require_overwatch(ctx):
-        #     return
+        if not await self.require_overwatch(ctx):
+            return
 
         try:
             ranks = await self.bot.services.overwatch.fetch_ranks(self.profile.overwatch)
@@ -71,8 +71,8 @@ class MilkyGalaxyOverwatchCommands(ChannelComponent):
 
     @commands.command(name="owrecord")
     async def overwatch_record(self, ctx: commands.Context, result: str | None = None) -> None:
-        # if not await self.require_overwatch(ctx):
-        #     return
+        if not await self.require_overwatch(ctx):
+            return
 
         if not self.is_mod_or_broadcaster(ctx, self.broadcaster_id):
             await ctx.send("Only Milky or a moderator can record Overwatch match results.")
@@ -88,8 +88,8 @@ class MilkyGalaxyOverwatchCommands(ChannelComponent):
 
     @commands.command(name="owreset")
     async def overwatch_reset(self, ctx: commands.Context) -> None:
-        # if not await self.require_overwatch(ctx):
-        #     return
+        if not await self.require_overwatch(ctx):
+            return
 
         if not self.is_mod_or_broadcaster(ctx, self.broadcaster_id):
             await ctx.send("Only Milky or a moderator can reset the Overwatch session.")
