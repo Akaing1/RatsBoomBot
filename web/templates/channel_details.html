@@ -133,11 +133,11 @@
         <p class="card-label">Viewer queue</p>
 
         <div class="status-row">
-            <span class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"></span>
-            <strong>{% if queue_open %}Open{% else %}Closed{% endif %}</strong>
+            <span id="queue-status-indicator" class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"></span>
+            <strong id="queue-status-label">{% if queue_open %}Open{% else %}Closed{% endif %}</strong>
         </div>
 
-        <p class="card-detail">
+        <p id="queue-size-label" class="card-detail">
             {{ queue_size }} viewer{% if queue_size != 1 %}s{% endif %} currently waiting.
         </p>
     </article>
@@ -162,6 +162,111 @@
         <span>{{ toggle_message }}</span>
     </div>
 {% endif %}
+
+<div class="channel-dashboard-grid">
+    <div class="redemption-panel-grid">
+        <section class="panel activity-panel">
+            <div class="panel-header">
+                <div><p class="eyebrow">Stream activity</p><h3>Check-ins</h3></div>
+                <span class="channel-state activity-stream-label">
+                    {% if not redemption_activity.stream_id %}Waiting{% elif redemption_activity.using_previous_stream %}Previous{% else %}Current{% endif %}
+                </span>
+            </div>
+
+            <div id="checkin-activity-content" class="activity-scroll">
+                {% if redemption_activity.checkins %}
+                    <ul class="activity-list">
+                        {% for checkin in redemption_activity.checkins %}
+                            <li class="activity-list-item">
+                                <div class="activity-main"><strong>@{{ checkin.username }}</strong><span>{{ checkin.redeemed_at }}</span></div>
+                                <span class="activity-badge {% if checkin.type == 'first' %}first{% endif %}">{% if checkin.type == "first" %}FIRST{% else %}Check-in{% endif %}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="compact-empty-state"><h4>No check-ins yet</h4><p>Daily and FIRST claims will appear here.</p></div>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="panel activity-panel">
+            <div class="panel-header">
+                <div><p class="eyebrow">Stream activity</p><h3>Redeems</h3></div>
+                <span class="channel-state activity-stream-label">
+                    {% if not redemption_activity.stream_id %}Waiting{% elif redemption_activity.using_previous_stream %}Previous{% else %}Current{% endif %}
+                </span>
+            </div>
+
+            <div id="redemption-activity-content" class="activity-scroll">
+                {% if redemption_activity.redemptions %}
+                    <ul class="activity-list">
+                        {% for redemption in redemption_activity.redemptions %}
+                            <li class="activity-list-item redemption-activity-item">
+                                <div class="activity-main">
+                                    <strong>{{ redemption.reward_title }}</strong>
+                                    <span>@{{ redemption.username }} &middot; {{ redemption.redeemed_at }}</span>
+                                    {% if redemption.user_input %}<p>{{ redemption.user_input }}</p>{% endif %}
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="compact-empty-state"><h4>No other redeems yet</h4><p>Other channel point rewards will appear here.</p></div>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+
+    <div class="channel-dashboard-side">
+        <section class="panel">
+            <div class="panel-header">
+                <div><p class="eyebrow">Viewer games</p><h3>Viewer queue</h3></div>
+                <span id="queue-panel-state" class="channel-state {% if queue_open %}live{% endif %}">{% if queue_open %}Open{% else %}Closed{% endif %}</span>
+            </div>
+
+            {% if queue_message %}
+                <div class="queue-feedback {% if queue_result == 'removed' %}success{% else %}error{% endif %}" role="status">
+                    <span class="queue-feedback-icon">{% if queue_result == "removed" %}&#10003;{% else %}!{% endif %}</span>
+                    <span>{{ queue_message }}</span>
+                </div>
+            {% endif %}
+
+            <div id="viewer-queue-content">
+                {% if queue_users %}
+                    <ul class="queue-list">
+                        {% for username in queue_users %}
+                            <li class="queue-list-item">
+                                <span class="queue-position">{{ loop.index }}</span>
+                                <strong class="queue-username">@{{ username }}</strong>
+                                <form method="post" action="/channels/{{ broadcaster.id }}/viewer-queue/remove" onsubmit="return confirm('Remove @{{ username }} from the viewer queue?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <input type="hidden" name="position" value="{{ loop.index }}">
+                                    <button class="queue-remove-button" type="submit" aria-label="Remove @{{ username }} from the queue" title="Remove @{{ username }}">&times;</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="compact-empty-state"><h4>The queue is empty</h4><p>{% if queue_open %}Viewers can join with <strong>!join</strong>.{% else %}The viewer queue is currently closed.{% endif %}</p></div>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-header"><div><p class="eyebrow">Community</p><h3>Social links</h3></div></div>
+            <div class="social-link-list">
+                <article class="social-link-row">
+                    <div><strong>Discord</strong><p>{% if channel_settings.discord_url %}{{ channel_settings.discord_url }}{% else %}No Discord link configured.{% endif %}</p></div>
+                    {% if channel_settings.discord_url %}<a class="button secondary" href="{{ channel_settings.discord_url }}" target="_blank" rel="noopener noreferrer">Open</a>{% endif %}
+                </article>
+                <article class="social-link-row">
+                    <div><strong>YouTube</strong><p>{% if channel_settings.youtube_url %}{{ channel_settings.youtube_url }}{% else %}No YouTube link configured.{% endif %}</p></div>
+                    {% if channel_settings.youtube_url %}<a class="button secondary" href="{{ channel_settings.youtube_url }}" target="_blank" rel="noopener noreferrer">Open</a>{% endif %}
+                </article>
+            </div>
+        </section>
+    </div>
+</div>
 
 <section class="panel toggle-management-panel">
     <div class="panel-header">
@@ -326,133 +431,7 @@
     </div>
 </section>
 
-<div class="channel-detail-grid">
-    <section class="panel">
-        <div class="panel-header">
-            <div>
-                <p class="eyebrow">Community</p>
-                <h3>Social links</h3>
-            </div>
-        </div>
-
-        <div class="social-link-list">
-            <article class="social-link-row">
-                <div>
-                    <strong>Discord</strong>
-
-                    {% if channel_settings.discord_url %}
-                        <p>{{ channel_settings.discord_url }}</p>
-                    {% else %}
-                        <p>No Discord link configured.</p>
-                    {% endif %}
-                </div>
-
-                {% if channel_settings.discord_url %}
-                    <a
-                        class="button secondary"
-                        href="{{ channel_settings.discord_url }}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        Open
-                    </a>
-                {% endif %}
-            </article>
-
-            <article class="social-link-row">
-                <div>
-                    <strong>YouTube</strong>
-
-                    {% if channel_settings.youtube_url %}
-                        <p>{{ channel_settings.youtube_url }}</p>
-                    {% else %}
-                        <p>No YouTube link configured.</p>
-                    {% endif %}
-                </div>
-
-                {% if channel_settings.youtube_url %}
-                    <a
-                        class="button secondary"
-                        href="{{ channel_settings.youtube_url }}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        Open
-                    </a>
-                {% endif %}
-            </article>
-        </div>
-
-        <p class="panel-note">
-            Social links can currently be updated through the Twitch chat settings commands.
-        </p>
-    </section>
-
-    <section class="panel">
-        <div class="panel-header">
-            <div>
-                <p class="eyebrow">Viewer games</p>
-                <h3>Viewer queue</h3>
-            </div>
-
-            <span class="channel-state {% if queue_open %}live{% endif %}">
-                {% if queue_open %}Open{% else %}Closed{% endif %}
-            </span>
-        </div>
-
-        {% if queue_message %}
-            <div class="queue-feedback {% if queue_result == 'removed' %}success{% else %}error{% endif %}" role="status">
-                <span class="queue-feedback-icon">
-                    {% if queue_result == "removed" %}&#10003;{% else %}!{% endif %}
-                </span>
-
-                <span>{{ queue_message }}</span>
-            </div>
-        {% endif %}
-
-        {% if queue_users %}
-            <ul class="queue-list">
-                {% for username in queue_users %}
-                    <li class="queue-list-item">
-                        <span class="queue-position">{{ loop.index }}</span>
-
-                        <strong class="queue-username">@{{ username }}</strong>
-
-                        <form
-                            method="post"
-                            action="/channels/{{ broadcaster.id }}/viewer-queue/remove"
-                            onsubmit="return confirm('Remove @{{ username }} from the viewer queue?');"
-                        >
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <input type="hidden" name="position" value="{{ loop.index }}">
-
-                            <button
-                                class="queue-remove-button"
-                                type="submit"
-                                aria-label="Remove @{{ username }} from the queue"
-                                title="Remove @{{ username }}"
-                            >
-                                &times;
-                            </button>
-                        </form>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <div class="compact-empty-state">
-                <h4>The queue is empty</h4>
-
-                <p>
-                    {% if queue_open %}
-                        Viewers can join with <strong>!join</strong>.
-                    {% else %}
-                        Open the queue in chat before viewers can join.
-                    {% endif %}
-                </p>
-            </div>
-        {% endif %}
-    </section>
-
+<div class="channel-removal-section">
     <section class="panel danger-zone">
         <div class="panel-header">
             <div>
@@ -480,4 +459,197 @@
         </form>
     </section>
 </div>
+
+<script>
+    (() => {
+        const endpoint = "/channels/{{ broadcaster.id }}/api/activity";
+        const csrfToken = {{ csrf_token | tojson }};
+        const removeAction = "/channels/{{ broadcaster.id }}/viewer-queue/remove";
+        const queueIndicator = document.getElementById("queue-status-indicator");
+        const queueLabel = document.getElementById("queue-status-label");
+        const queueSize = document.getElementById("queue-size-label");
+        const queueState = document.getElementById("queue-panel-state");
+        const queueContent = document.getElementById("viewer-queue-content");
+        const checkinContent = document.getElementById("checkin-activity-content");
+        const redemptionContent = document.getElementById("redemption-activity-content");
+        const streamLabels = document.querySelectorAll(".activity-stream-label");
+        let requestInProgress = false;
+        let lastSignature = null;
+
+        function formatTime(value) {
+            if (!value) return "";
+            let normalized = String(value);
+            if (!normalized.includes("T")) normalized = `${normalized.replace(" ", "T")}Z`;
+            const date = new Date(normalized);
+            return Number.isNaN(date.getTime())
+                ? String(value)
+                : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        }
+
+        function emptyState(headingText, detailText) {
+            const wrapper = document.createElement("div");
+            wrapper.className = "compact-empty-state";
+            const heading = document.createElement("h4");
+            heading.textContent = headingText;
+            const detail = document.createElement("p");
+            detail.textContent = detailText;
+            wrapper.append(heading, detail);
+            return wrapper;
+        }
+
+        function renderQueue(queue) {
+            const isOpen = Boolean(queue.open);
+            const users = Array.isArray(queue.users) ? queue.users : [];
+            queueIndicator.classList.toggle("online", isOpen);
+            queueIndicator.classList.toggle("offline", !isOpen);
+            queueLabel.textContent = isOpen ? "Open" : "Closed";
+            queueSize.textContent = `${users.length} viewer${users.length === 1 ? "" : "s"} currently waiting.`;
+            queueState.classList.toggle("live", isOpen);
+            queueState.textContent = isOpen ? "Open" : "Closed";
+            queueContent.replaceChildren();
+
+            if (!users.length) {
+                queueContent.appendChild(emptyState(
+                    "The queue is empty",
+                    isOpen ? "Viewers can join with !join." : "The viewer queue is currently closed."
+                ));
+                return;
+            }
+
+            const list = document.createElement("ul");
+            list.className = "queue-list";
+            users.forEach((username, index) => {
+                const position = index + 1;
+                const item = document.createElement("li");
+                item.className = "queue-list-item";
+
+                const number = document.createElement("span");
+                number.className = "queue-position";
+                number.textContent = String(position);
+                const user = document.createElement("strong");
+                user.className = "queue-username";
+                user.textContent = `@${username}`;
+
+                const form = document.createElement("form");
+                form.method = "post";
+                form.action = removeAction;
+                form.addEventListener("submit", event => {
+                    if (!window.confirm(`Remove @${username} from the viewer queue?`)) event.preventDefault();
+                });
+                [["csrf_token", csrfToken], ["position", String(position)]].forEach(([name, value]) => {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = name;
+                    input.value = value;
+                    form.appendChild(input);
+                });
+                const button = document.createElement("button");
+                button.className = "queue-remove-button";
+                button.type = "submit";
+                button.title = `Remove @${username}`;
+                button.setAttribute("aria-label", button.title);
+                button.textContent = "×";
+                form.appendChild(button);
+                item.append(number, user, form);
+                list.appendChild(item);
+            });
+            queueContent.appendChild(list);
+        }
+
+        function renderCheckins(checkins) {
+            checkinContent.replaceChildren();
+            if (!checkins.length) {
+                checkinContent.appendChild(emptyState("No check-ins yet", "Daily and FIRST claims will appear here."));
+                return;
+            }
+            const list = document.createElement("ul");
+            list.className = "activity-list";
+            checkins.forEach(checkin => {
+                const item = document.createElement("li");
+                item.className = "activity-list-item";
+                const main = document.createElement("div");
+                main.className = "activity-main";
+                const user = document.createElement("strong");
+                user.textContent = `@${checkin.username}`;
+                const time = document.createElement("span");
+                time.textContent = formatTime(checkin.redeemed_at);
+                main.append(user, time);
+                const badge = document.createElement("span");
+                badge.className = `activity-badge${checkin.type === "first" ? " first" : ""}`;
+                badge.textContent = checkin.type === "first" ? "FIRST" : "Check-in";
+                item.append(main, badge);
+                list.appendChild(item);
+            });
+            checkinContent.appendChild(list);
+        }
+
+        function renderRedemptions(redemptions) {
+            redemptionContent.replaceChildren();
+            if (!redemptions.length) {
+                redemptionContent.appendChild(emptyState("No other redeems yet", "Other channel point rewards will appear here."));
+                return;
+            }
+            const list = document.createElement("ul");
+            list.className = "activity-list";
+            redemptions.forEach(redemption => {
+                const item = document.createElement("li");
+                item.className = "activity-list-item redemption-activity-item";
+                const main = document.createElement("div");
+                main.className = "activity-main";
+                const title = document.createElement("strong");
+                title.textContent = redemption.reward_title;
+                const meta = document.createElement("span");
+                const time = formatTime(redemption.redeemed_at);
+                meta.textContent = `@${redemption.username}${time ? ` · ${time}` : ""}`;
+                main.append(title, meta);
+                if (redemption.user_input) {
+                    const input = document.createElement("p");
+                    input.textContent = redemption.user_input;
+                    main.appendChild(input);
+                }
+                item.appendChild(main);
+                list.appendChild(item);
+            });
+            redemptionContent.appendChild(list);
+        }
+
+        function render(data) {
+            const redemptions = data.redemptions || {};
+            const signature = JSON.stringify(data);
+            if (signature === lastSignature) return;
+            lastSignature = signature;
+            renderQueue(data.queue || {});
+            renderCheckins(Array.isArray(redemptions.checkins) ? redemptions.checkins : []);
+            renderRedemptions(Array.isArray(redemptions.redemptions) ? redemptions.redemptions : []);
+            const streamLabel = !redemptions.stream_id
+                ? "Waiting"
+                : redemptions.using_previous_stream ? "Previous" : "Current";
+            streamLabels.forEach(label => {
+                label.textContent = streamLabel;
+                label.classList.toggle("live", Boolean(redemptions.stream_id) && !redemptions.using_previous_stream);
+            });
+        }
+
+        async function refresh() {
+            if (requestInProgress || document.hidden) return;
+            requestInProgress = true;
+            try {
+                const response = await fetch(endpoint, { headers: { "Accept": "application/json" }, cache: "no-store" });
+                if (response.status === 401) {
+                    window.location.assign("/login");
+                    return;
+                }
+                if (response.ok) render(await response.json());
+            } catch (error) {
+                // Preserve the last successful render through transient network errors.
+            } finally {
+                requestInProgress = false;
+            }
+        }
+
+        refresh();
+        window.setInterval(refresh, 2000);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+    })();
+</script>
 {% endblock %}
