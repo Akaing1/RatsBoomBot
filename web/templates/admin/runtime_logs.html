@@ -57,7 +57,7 @@
             polling = true;
 
             try {
-                const response = await fetch(`/runtime-logs/data?after=${lastEntryId}`, {cache: "no-store"});
+                const response = await fetch(`/admin/runtime-logs/data?after=${lastEntryId}`, {cache: "no-store"});
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const payload = await response.json();
 

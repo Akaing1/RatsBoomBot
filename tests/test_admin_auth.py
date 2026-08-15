@@ -77,4 +77,24 @@ async def test_logout_clears_session_and_requires_login(monkeypatch) -> None:
     assert request.session == {}
     assert redirect is not None
     assert redirect.status_code == 303
-    assert redirect.headers["location"] == "/login"
+    assert redirect.headers["location"] == "/admin/login"
+
+
+@pytest.mark.asyncio
+async def test_expired_admin_session_preserves_channel_login(monkeypatch) -> None:
+    request = create_request()
+    request.session.update({
+        "administrator_id": 1,
+        "administrator_session_started": 100.0,
+        "csrf_token": "token",
+        "channel_user_id": "123",
+        "channel_user_login": "streamer"
+    })
+
+    monkeypatch.setattr(admin_auth.time, "time", lambda: 100.0 + 60 * 60 * 9)
+
+    assert await admin_auth.get_current_administrator(request) is None
+    assert "administrator_id" not in request.session
+    assert "administrator_session_started" not in request.session
+    assert request.session["channel_user_id"] == "123"
+    assert request.session["channel_user_login"] == "streamer"

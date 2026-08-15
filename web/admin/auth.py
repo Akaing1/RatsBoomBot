@@ -1,21 +1,42 @@
 import secrets
+import time
 
 from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
 
+from config.settings import settings
 from storage.admin_repository import Administrator, get_administrator_by_id, get_administrator_by_username
 from web.shared.passwords import verify_password
 from web.state import get_db
 
 
 ADMIN_SESSION_KEY = "administrator_id"
+ADMIN_SESSION_STARTED_KEY = "administrator_session_started"
 CSRF_SESSION_KEY = "csrf_token"
+
+
+def clear_admin_session(request: Request) -> None:
+    request.session.pop(ADMIN_SESSION_KEY, None)
+    request.session.pop(ADMIN_SESSION_STARTED_KEY, None)
+    request.session.pop(CSRF_SESSION_KEY, None)
 
 
 async def get_current_administrator(request: Request) -> Administrator | None:
     administrator_id = request.session.get(ADMIN_SESSION_KEY)
 
     if administrator_id is None:
+        request.state.administrator = None
+        return None
+
+    session_started = request.session.get(ADMIN_SESSION_STARTED_KEY)
+
+    if not isinstance(session_started, (int, float)):
+        clear_admin_session(request)
+        request.state.administrator = None
+        return None
+
+    if time.time() - session_started > settings.ADMIN_SESSION_MAX_AGE_SECONDS:
+        clear_admin_session(request)
         request.state.administrator = None
         return None
 
@@ -28,7 +49,7 @@ async def get_current_administrator(request: Request) -> Administrator | None:
     administrator = await get_administrator_by_id(db, int(administrator_id))
 
     if administrator is None or not administrator.is_enabled:
-        request.session.clear()
+        clear_admin_session(request)
         request.state.administrator = None
         return None
 
@@ -55,15 +76,16 @@ async def authenticate_administrator(request: Request, username: str, password: 
     if not verify_password(administrator.password_hash, password):
         return None
 
-    request.session.clear()
+    clear_admin_session(request)
     request.session[ADMIN_SESSION_KEY] = administrator.id
+    request.session[ADMIN_SESSION_STARTED_KEY] = time.time()
     request.session[CSRF_SESSION_KEY] = secrets.token_urlsafe(32)
 
     return administrator
 
 
 def logout_admin(request: Request) -> None:
-    request.session.clear()
+    clear_admin_session(request)
 
 
 def get_csrf_token(request: Request) -> str:
@@ -91,16 +113,16 @@ async def require_admin(request: Request) -> RedirectResponse | None:
     if await is_admin_authenticated(request):
         return None
 
-    return RedirectResponse(url="/login", status_code=303)
+    return RedirectResponse(url="/admin/login", status_code=303)
 
 
 async def require_owner(request: Request) -> RedirectResponse | None:
     administrator = await get_current_administrator(request)
 
     if administrator is None:
-        return RedirectResponse(url="/login", status_code=303)
+        return RedirectResponse(url="/admin/login", status_code=303)
 
     if administrator.role != "owner":
-        return RedirectResponse(url="/", status_code=303)
+        return RedirectResponse(url="/admin", status_code=303)
 
     return None

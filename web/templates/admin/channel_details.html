@@ -46,7 +46,7 @@
             {% endif %}
         </div>
 
-        <form class="toggle-actions" method="post" action="/channels/{{ broadcaster_id }}/toggles">
+        <form class="toggle-actions" method="post" action="/admin/channels/{{ broadcaster_id }}/toggles">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="toggle_type" value="{{ toggle_type }}">
             <input type="hidden" name="toggle_name" value="{{ toggle_name }}">
@@ -102,7 +102,7 @@
     </div>
 
     <div class="header-actions">
-        <a class="button secondary" href="/channels">Back to Channels</a>
+        <a class="button secondary" href="/admin/channels">Back to Channels</a>
 
         {% if broadcaster.login %}
             <a
@@ -238,7 +238,7 @@
                             <li class="queue-list-item">
                                 <span class="queue-position">{{ loop.index }}</span>
                                 <strong class="queue-username">@{{ username }}</strong>
-                                <form method="post" action="/channels/{{ broadcaster.id }}/viewer-queue/remove" onsubmit="return confirm('Remove @{{ username }} from the viewer queue?');">
+                                <form method="post" action="/admin/channels/{{ broadcaster.id }}/viewer-queue/remove" onsubmit="return confirm('Remove @{{ username }} from the viewer queue?');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <input type="hidden" name="position" value="{{ loop.index }}">
                                     <button class="queue-remove-button" type="submit" aria-label="Remove @{{ username }} from the queue" title="Remove @{{ username }}">&times;</button>
@@ -448,7 +448,7 @@
 
         <form
             method="post"
-            action="/channels/{{ broadcaster.id }}/delete"
+            action="/admin/channels/{{ broadcaster.id }}/delete"
             onsubmit="return confirm('Remove {{ broadcaster.name or broadcaster.id }} from RatsBoomBot?');"
         >
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -462,9 +462,9 @@
 
 <script>
     (() => {
-        const endpoint = "/channels/{{ broadcaster.id }}/api/activity";
+        const endpoint = "/admin/channels/{{ broadcaster.id }}/api/activity";
         const csrfToken = {{ csrf_token | tojson }};
-        const removeAction = "/channels/{{ broadcaster.id }}/viewer-queue/remove";
+        const removeAction = "/admin/channels/{{ broadcaster.id }}/viewer-queue/remove";
         const queueIndicator = document.getElementById("queue-status-indicator");
         const queueLabel = document.getElementById("queue-status-label");
         const queueSize = document.getElementById("queue-size-label");
@@ -636,7 +636,7 @@
             try {
                 const response = await fetch(endpoint, { headers: { "Accept": "application/json" }, cache: "no-store" });
                 if (response.status === 401) {
-                    window.location.assign("/login");
+                    window.location.assign("/admin/login");
                     return;
                 }
                 if (response.ok) render(await response.json());

@@ -15,7 +15,7 @@ MINIMUM_PASSWORD_LENGTH = 12
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str | None = None):
     if await is_admin_authenticated(request):
-        return RedirectResponse(url="/", status_code=303)
+        return RedirectResponse(url="/admin", status_code=303)
 
     return templates.TemplateResponse(
         request=request,
@@ -29,9 +29,9 @@ async def login(request: Request, username: str = Form(...), password: str = For
     administrator = await authenticate_administrator(request, username, password)
 
     if administrator is None:
-        return RedirectResponse(url="/login?error=invalid_credentials", status_code=303)
+        return RedirectResponse(url="/admin/login?error=invalid_credentials", status_code=303)
 
-    return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url="/admin", status_code=303)
 
 
 @router.get("/account/password", response_class=HTMLResponse)
@@ -65,32 +65,32 @@ async def change_password(request: Request, current_password: str = Form(...), n
     db = get_db()
 
     if administrator is None or db is None:
-        return RedirectResponse(url="/account/password?result=runtime_unavailable", status_code=303)
+        return RedirectResponse(url="/admin/account/password?result=runtime_unavailable", status_code=303)
 
     if not verify_password(administrator.password_hash, current_password):
-        return RedirectResponse(url="/account/password?result=incorrect_password", status_code=303)
+        return RedirectResponse(url="/admin/account/password?result=incorrect_password", status_code=303)
 
     if new_password != confirm_password:
-        return RedirectResponse(url="/account/password?result=password_mismatch", status_code=303)
+        return RedirectResponse(url="/admin/account/password?result=password_mismatch", status_code=303)
 
     if len(new_password) < MINIMUM_PASSWORD_LENGTH:
-        return RedirectResponse(url="/account/password?result=password_too_short", status_code=303)
+        return RedirectResponse(url="/admin/account/password?result=password_too_short", status_code=303)
 
     if verify_password(administrator.password_hash, new_password):
-        return RedirectResponse(url="/account/password?result=same_password", status_code=303)
+        return RedirectResponse(url="/admin/account/password?result=same_password", status_code=303)
 
     password_hash = hash_password(new_password)
     await set_administrator_password(db, administrator.id, password_hash)
 
-    return RedirectResponse(url="/account/password?result=changed", status_code=303)
+    return RedirectResponse(url="/admin/account/password?result=changed", status_code=303)
 
 
 @router.post("/logout")
 async def logout(request: Request, csrf_token: str = Form(...)):
     if not await is_admin_authenticated(request):
-        return RedirectResponse(url="/login", status_code=303)
+        return RedirectResponse(url="/admin/login", status_code=303)
 
     validate_csrf_token(request, csrf_token)
     logout_admin(request)
 
-    return RedirectResponse(url="/login", status_code=303)
+    return RedirectResponse(url="/admin/login", status_code=303)

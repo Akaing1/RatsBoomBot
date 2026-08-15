@@ -13,7 +13,7 @@
     </div>
 
     <div class="header-actions">
-        <a class="button primary" href="/connect/channel">Connect Channel</a>
+        <a class="button primary" href="/admin/connect/channel">Connect Channel</a>
     </div>
 </header>
 
@@ -95,7 +95,7 @@
                             </a>
                         {% endif %}
 
-                        <a class="button primary" href="/channels/{{ broadcaster.id }}">
+                        <a class="button primary" href="/admin/channels/{{ broadcaster.id }}">
                             Manage
                         </a>
                     </div>
@@ -106,7 +106,7 @@
         <div class="empty-state">
             <h4>No channels connected</h4>
             <p>Authorize a Twitch channel to begin managing it.</p>
-            <a class="button primary" href="/connect/channel">Connect first channel</a>
+            <a class="button primary" href="/admin/connect/channel">Connect first channel</a>
         </div>
     {% endif %}
 </section>
