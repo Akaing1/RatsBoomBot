@@ -33,14 +33,14 @@
             <nav class="navigation">
                 <a
                     class="nav-link {% if active_page == 'dashboard' %}active{% endif %}"
-                    href="/"
+                    href="/admin"
                 >
                     Dashboard
                 </a>
 
                 <a
                     class="nav-link {% if active_page == 'channels' %}active{% endif %}"
-                    href="/channels"
+                    href="/admin/channels"
                 >
                     Channels
                 </a>
@@ -56,34 +56,34 @@
 
                 <a
                     class="nav-link {% if active_page == 'performance' %}active{% endif %}"
-                    href="/performance"
+                    href="/admin/performance"
                 >
                     Performance
                 </a>
 
                 <a
                     class="nav-link {% if active_page == 'runtime_logs' %}active{% endif %}"
-                    href="/runtime-logs"
+                    href="/admin/runtime-logs"
                 >
                     Runtime Logs
                 </a>
 
                 <a
                     class="nav-link {% if active_page == 'logs' %}active{% endif %}"
-                    href="/logs"
+                    href="/admin/logs"
                 >
                     Stream Logs
                 </a>
 
                 <a
                     class="nav-link {% if active_page == 'account' %}active{% endif %}"
-                    href="/account/password"
+                    href="/admin/account/password"
                 >
                     Account
                 </a>
             </nav>
 
-            <form class="sidebar-logout" method="post" action="/logout">
+            <form class="sidebar-logout" method="post" action="/admin/logout">
                 <input
                     type="hidden"
                     name="csrf_token"

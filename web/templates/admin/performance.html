@@ -105,7 +105,7 @@
             const status = document.getElementById("metrics-status");
 
             try {
-                const response = await fetch("/performance/data", {cache: "no-store"});
+                const response = await fetch("/admin/performance/data", {cache: "no-store"});
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 updateMetrics(await response.json());
                 status.textContent = "Live";

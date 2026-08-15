@@ -39,7 +39,7 @@ def get_broadcaster(runtime_bot, broadcaster_id: str):
 
 def redirect_to_channel(broadcaster_id: str, **query_values) -> RedirectResponse:
     query = urlencode({key: value for key, value in query_values.items() if value is not None})
-    url = f"/channels/{broadcaster_id}"
+    url = f"/admin/channels/{broadcaster_id}"
 
     if query:
         url = f"{url}?{query}"
@@ -318,7 +318,7 @@ async def delete_broadcaster(request: Request, broadcaster_id: str, csrf_token: 
     services.broadcasters.remove_broadcaster(broadcaster_id)
     services.viewer_queue.remove_queue(broadcaster_id)
 
-    return RedirectResponse(url="/channels?removed=1", status_code=303)
+    return RedirectResponse(url="/admin/channels?removed=1", status_code=303)
 
 
 @router.post("/{broadcaster_id}/viewer-queue/remove")

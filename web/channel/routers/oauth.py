@@ -3,12 +3,20 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config.settings import settings
 from storage.database import save_token
-from web.channel.auth import create_channel_oauth_state, login_channel_user, validate_channel_oauth_state
+from web.channel.auth import CHANNEL_USER_ID_KEY, create_channel_oauth_state, login_channel_user, validate_channel_oauth_state
 from web.shared.common import render_error, templates
 from web.shared.oauth import build_public_channel_oauth_url, exchange_code_for_token, fetch_twitch_user
 from web.state import get_bot, get_db
 
 router = APIRouter()
+
+
+@router.get("/", include_in_schema=False)
+async def channel_entry_point(request: Request):
+    if request.session.get(CHANNEL_USER_ID_KEY):
+        return RedirectResponse(url="/channel", status_code=303)
+
+    return RedirectResponse(url="/connect", status_code=303)
 
 
 @router.get("/connect", response_class=HTMLResponse)

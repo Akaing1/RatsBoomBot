@@ -8,7 +8,7 @@ from web.shared.passwords import hash_password
 from web.state import get_db
 
 
-router = APIRouter(prefix="/admin/users")
+router = APIRouter(prefix="/users")
 
 MINIMUM_PASSWORD_LENGTH = 12
 
@@ -23,7 +23,7 @@ async def admin_users_page(request: Request, result: str | None = None):
     db = get_db()
 
     if db is None:
-        return RedirectResponse(url="/", status_code=303)
+        return RedirectResponse(url="/admin", status_code=303)
 
     administrators = await list_administrators(db)
 

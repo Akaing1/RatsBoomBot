@@ -135,12 +135,14 @@ ADMIN_PORT=4345
 ADMIN_BASE_URL=http://127.0.0.1:4345
 
 SESSION_SECRET=
+ADMIN_SESSION_MAX_AGE_SECONDS=28800
+CHANNEL_SESSION_MAX_AGE_SECONDS=2592000
 ENVIRONMENT=local
 SESSION_HTTPS_ONLY=false
 TRUST_PROXY_HEADERS=false
 
-BOT_REDIRECT_URI=http://127.0.0.1:4345/oauth/bot
-CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel
+BOT_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/bot
+CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/channel
 PUBLIC_CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel/connect
 
 BOT_SCOPES=user:read:chat user:write:chat user:bot
@@ -153,6 +155,11 @@ LOG_LEVEL=INFO
 
 Generate a long random value for `SESSION_SECRET`. The application refuses to start without it.
 
+The signed browser session lasts for `CHANNEL_SESSION_MAX_AGE_SECONDS` so broadcasters do not need to
+repeat Twitch OAuth on every visit. Administrator authentication expires independently after
+`ADMIN_SESSION_MAX_AGE_SECONDS`. Keep `SESSION_SECRET` stable across deployments or all existing browser
+sessions will become invalid.
+
 `BOT_DETECTION_MODE` accepts `learning`, `shadow`, or `active`. `ENVIRONMENT` accepts `local` or `production`.
 
 ## Twitch Application Configuration
@@ -162,8 +169,8 @@ Create a Twitch developer application and register every OAuth callback exactly 
 Local callbacks:
 
 ```text
-http://127.0.0.1:4345/oauth/bot
-http://127.0.0.1:4345/oauth/channel
+http://127.0.0.1:4345/admin/oauth/bot
+http://127.0.0.1:4345/admin/oauth/channel
 http://127.0.0.1:4345/oauth/channel/connect
 ```
 
@@ -177,11 +184,13 @@ Changing a scope does not update existing tokens. Reauthorize the affected accou
 python main.py
 ```
 
-The bot runtime and web dashboard start together. The default local dashboard is:
+The bot runtime and web dashboard start together. The default streamer entry point is:
 
 ```text
 http://127.0.0.1:4345
 ```
+
+The administrator dashboard is available at `http://127.0.0.1:4345/admin`.
 
 The health endpoint is available at `/health` and returns the application name, version, environment, and health state.
 
