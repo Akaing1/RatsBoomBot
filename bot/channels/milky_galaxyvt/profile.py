@@ -6,23 +6,23 @@ from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 MILKY_GALAXYVT_PROFILE = ChannelProfile(
     channel_name="Milky_GalaxyVT",
-    components=(MilkyGalaxyCommands, MilkyGalaxyOverwatchCommands),
+    components=(MilkyGalaxyCommands, MilkyGalaxyPointsCommands, MilkyGalaxyOverwatchCommands),
     features=FeatureDefaults(
-        channel=False,
-        timers=False,
-        points=False,
-        redeems=False,
+        channel=True,
+        timers=True,
+        points=True,
+        redeems=True,
         community_events=False,
-        raid_responses=False
+        raid_responses=True
     ),
     globals=GlobalCommandDefaults(
-        enabled=False,
-        points=False,
+        enabled=True,
+        points=True,
         viewer_queue=False,
-        shoutouts=False,
-        socials=False,
-        settings=False,
-        clips=False,
+        shoutouts=True,
+        socials=True,
+        settings=True,
+        clips=True,
         hi=False,
         choice=False,
         kaboom=False,
@@ -36,7 +36,7 @@ MILKY_GALAXYVT_PROFILE = ChannelProfile(
         randy=False,
         bark=False,
         car=False,
-        kamikaze=False
+        kamikaze=True
     ),
     timer_messages=MILKY_GALAXYVT_TIMER_MESSAGES,
     community_messages=MILKY_GALAXYVT_COMMUNITY_MESSAGES,

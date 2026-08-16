@@ -169,6 +169,7 @@ button, input { font: inherit; }
 .activity-main p { margin: 5px 0 0; color: var(--text); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .activity-badge { flex: 0 0 auto; padding: 4px 7px; border: 1px solid rgba(139,92,246,.35); border-radius: 999px; background: rgba(139,92,246,.1); color: var(--accent); font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .activity-badge.first { border-color: rgba(245,196,81,.4); background: rgba(245,196,81,.1); color: #f5c451; }
+.activity-badge.second { border-color: rgba(126,185,255,.4); background: rgba(126,185,255,.1); color: #7eb9ff; }
 .redemption-activity-item { display: block; }
 .social-link-list { display: flex; flex-direction: column; }
 .social-link-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 0; border-top: 1px solid var(--border); }
