@@ -15,9 +15,12 @@ STEOHANYY_TIMER_MESSAGES = (
 
 
 STEOHANYY_COMMUNITY_MESSAGES = CommunityMessages(
-    follow="Thanks for following, {username}!",
-    subscription="Thanks for subscribing, {username}!",
-    resubscription="Thanks for subscribing for {months} months, {username}!"
+    follow="@{username} pulled up a seat at the bar! Welcome in!",
+    subscription="@{username} just ordered a fresh round! Thanks for subscribing!",
+    resubscription=(
+        "@{username} has kept their tab open for {months} months! "
+        "Thanks for another round—cheers!"
+    )
 )
 
 
