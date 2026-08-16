@@ -1,4 +1,6 @@
 from bot.profiles import (
+    ClipConfig,
+    ClipMessages,
     CommunityMessages,
     PointsConfig,
     PointsMessages,
@@ -6,6 +8,19 @@ from bot.profiles import (
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages
+)
+
+
+TEMPLATE_CLIPS = ClipConfig(
+    duration=60,
+    short_duration=30,
+    cooldown_seconds=120,
+    processing_timeout_seconds=15,
+    title="{channel_name} clipped by {username}",
+    messages=ClipMessages(
+        processing="Creating a {duration}-second clip for @{username}...",
+        success="@{username} caught that! {clip_url}"
+    )
 )
 
 

@@ -22,6 +22,7 @@ MILKY_GALAXYVT_PROFILE = ChannelProfile(
         shoutouts=False,
         socials=False,
         settings=False,
+        clips=False,
         hi=False,
         choice=False,
         kaboom=False,

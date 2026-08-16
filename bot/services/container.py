@@ -3,7 +3,7 @@ import logging
 from config.settings import settings
 
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, FeatureToggleService
-from bot.services.engagement import CounterService, OverwatchService, PointsService, RedeemService, ViewerQueueService
+from bot.services.engagement import ClipService, CounterService, OverwatchService, PointsService, RedeemService, ViewerQueueService
 from bot.services.stream import AdAnnouncementService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
 
@@ -32,6 +32,7 @@ class ServiceContainer:
         self.overwatch = OverwatchService(bot, db)
         self.moderation = ModerationService(bot, db)
         self.shoutouts = ShoutoutService(bot)
+        self.clips = ClipService(bot)
 
         LOGGER.info("[Services] Service container created.")
 

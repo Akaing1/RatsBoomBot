@@ -354,6 +354,9 @@
                 {% elif group.value == "settings" %}
                     {% set display_name = "Settings Commands" %}
                     {% set description = "Controls !setdiscord, !setyoutube, and !timers." %}
+                {% elif group.value == "clips" %}
+                    {% set display_name = "Clip Commands" %}
+                    {% set description = "Controls !clip, !clips, and the short 30-second clip option." %}
                 {% else %}
                     {% set display_name = group.value | replace("_", " ") | title %}
                     {% set description = none %}
