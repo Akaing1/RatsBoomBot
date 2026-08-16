@@ -6,7 +6,7 @@ from bot.profiles import ChannelProfile, FeatureName
 from bot.shared.commands.points import PointsCommandHandler
 
 
-class SteohanyydrinksCommands(ChannelComponent):
+class SteohanyyPointsCommands(ChannelComponent):
 
     def __init__(self, bot, profile: ChannelProfile, broadcaster_id: str):
         super().__init__(bot, profile, broadcaster_id)

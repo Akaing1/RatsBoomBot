@@ -59,40 +59,39 @@ STEOHANYY_POINTS = PointsConfig(
     gamble_win_chance=0.45,
     duel_expiration_seconds=60,
     messages=PointsMessages(
-        balance_self="{username}, you have {points} drinks!",
-        balance_other="{username} has {points} sakura petals!",
-        leaderboard_empty="No sakura petals have been gathered in the Garden yet.",
-        leaderboard_entry="{position}. {username}: {points} sakura petals",
-        leaderboard_title="Top sakura petal collectors: {leaderboard}",
-        reset_denied="Only the broadcaster can clear the Garden's sakura petals.",
-        reset_success="The Garden's sakura petals have been reset.",
-        add_denied="Only moderators can give sakura petals to viewers.",
-        add_invalid="The SakuraPetal amount must be greater than 0.",
-        add_success="Added {amount} sakura petals to {username}.",
-        gamble_no_points="You do not have any sakura petals to gamble.",
+        balance_self="{username}, you have {points} drinks stocked behind the bar!",
+        balance_other="{username} has {points} drinks stocked behind the bar!",
+        leaderboard_empty="The bar is empty—nobody has collected any drinks yet.",
+        leaderboard_entry="{position}. {username}: {points} drinks",
+        leaderboard_title="The bar's top drink collectors: {leaderboard}",
+        reset_denied="Only the broadcaster can clear out the bar.",
+        reset_success="Last call! Every drink has been cleared from the bar.",
+        add_denied="Only moderators can serve drinks to viewers.",
+        add_invalid="The number of drinks must be greater than 0.",
+        add_success="Served {amount} drinks to {username}.",
+        gamble_no_points="You do not have any drinks to put on the line.",
         gamble_usage="Use it like this: !{command} gamble 50 or !{command} gamble all",
-        gamble_invalid="You need to gamble at least 1 SakuraPetal.",
-        gamble_insufficient="You only have {points} sakura petals.",
-        gamble_win="{username} gained {amount} sakura petals and now has {new_balance}!",
-        gamble_all_win="{username} doubled their sakura petals and now has {new_balance}!",
-        gamble_loss="{username} lost {amount} sakura petals and now has {new_balance}.",
-        gamble_all_loss="{username} lost all their sakura petals.",
+        gamble_invalid="You need to gamble at least 1 drink.",
+        gamble_insufficient="You only have {points} drinks available.",
+        gamble_win="{username} won {amount} drinks and now has {new_balance}! Cheers!",
+        gamble_all_win="{username} doubled their entire drink order and now has {new_balance}!",
+        gamble_loss="{username} spilled {amount} drinks and now has {new_balance}.",
+        gamble_all_loss="{username} spilled their entire drink order. The bar is dry!",
         duel_usage="Use it like this: !{command} duel @user 100",
-        duel_amount_invalid="The duel amount must be a number or 'all'.",
-        duel_self="You cannot challenge yourself to a SakuraPetal duel.",
-        duel_invalid="The duel amount must be greater than 0.",
-        duel_challenger_insufficient="You only have {points} sakura petals.",
-        duel_opponent_insufficient="{username} only has {points} sakura petals.",
+        duel_amount_invalid="The drink amount must be a number or 'all'.",
+        duel_self="You cannot challenge yourself to a drink-off.",
+        duel_invalid="The drink-off must be for at least 1 drink.",
+        duel_challenger_insufficient="You only have {points} drinks available.",
+        duel_opponent_insufficient="{username} only has {points} drinks available.",
         duel_challenge=(
-            "@{opponent}, @{challenger} challenged you to a duel for "
-            "{amount} sakura petals! Type !{command} duel accept or "
-            "!{command} duel decline. This duel expires in "
-            "{expiration} seconds."
+            "@{opponent}, @{challenger} challenged you to a drink-off for "
+            "{amount} drinks! Type !{command} duel accept or !{command} duel "
+            "decline. This challenge expires in {expiration} seconds."
         ),
-        duel_missing="You do not have a pending sakura petal duel, or it expired.",
-        duel_cancelled="The duel was cancelled because someone no longer has enough sakura petals.",
-        duel_result="@{winner} defeated @{loser} and won {amount} sakura petals.",
-        duel_declined="{username} declined the SakuraPetal duel."
+        duel_missing="You do not have a pending drink-off, or the challenge expired.",
+        duel_cancelled="The drink-off was cancelled because someone no longer has enough drinks.",
+        duel_result="@{winner} outdrank @{loser} and won {amount} drinks!",
+        duel_declined="{username} declined the drink-off."
     )
 )
 
