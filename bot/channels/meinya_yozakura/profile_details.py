@@ -30,6 +30,12 @@ MEINYA_COMMUNITY_MESSAGES = CommunityMessages(
 MEINYA_RAID_MESSAGES = RaidMessages(
     incoming=(
         "@{raider_name} raided with {viewer_count} {viewer_word}!"
+    ),
+    outgoing="TombRaid GlitchCat PowerUpL NYXI RAID PowerUpR GlitchCat TombRaid",
+    outgoing_subscriber=(
+        "meinya3Sprays meinya3Bark Meinya sprays us if we don't raid "
+        "meinya3Sprays meinya3Bark Meinya sprays us if we don't raid "
+        "meinya3Sprays meinya3Bark Meinya sprays us if we don't raid"
     )
 )
 
@@ -122,4 +128,3 @@ MEINYA_POINTS = PointsConfig(
         duel_declined="{username} declined the SakuraPetal duel."
     )
 )
-

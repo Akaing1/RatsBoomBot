@@ -146,7 +146,7 @@ CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/channel
 PUBLIC_CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel/connect
 
 BOT_SCOPES=user:read:chat user:write:chat user:bot
-CHANNEL_SCOPES=channel:bot moderator:manage:banned_users moderator:read:followers moderator:read:blocked_terms moderator:read:chat_settings moderator:read:unban_requests moderator:read:chat_messages moderator:read:warnings moderator:read:moderators moderator:read:vips channel:read:redemptions channel:read:subscriptions channel:read:ads channel:manage:moderators moderator:manage:shoutouts
+CHANNEL_SCOPES=channel:bot moderator:manage:banned_users moderator:read:followers moderator:read:blocked_terms moderator:read:chat_settings moderator:read:unban_requests moderator:read:chat_messages moderator:read:warnings moderator:read:moderators moderator:read:vips channel:read:redemptions channel:read:subscriptions channel:read:ads channel:manage:raids channel:manage:moderators moderator:manage:shoutouts
 
 SERYBOT_USER_ID=402337290
 BOT_DETECTION_MODE=learning
@@ -268,9 +268,10 @@ The default prefix is `!`. Available commands depend on the active profile and d
 | Settings | `!timers`, `!timers on`, `!timers off` |
 | Counters | `!explode`, `!reklop`, `!randy`, `!car` |
 | Shoutouts | `!so <username>` |
+| Raids | `!startraid <channel>` |
 | Moderation | `!kamikaze <username>` |
 
-Queue administration, settings, shoutout, and moderation actions require broadcaster or moderator permissions where applicable.
+Queue administration, settings, shoutout, and moderation actions require broadcaster or moderator permissions where applicable. `!startraid` is broadcaster-only and requires the broadcaster to authorize the `channel:manage:raids` scope.
 
 Point commands use the active profile's configured command name. They support balance checks, leaderboards, broadcaster resets, moderator grants, gambling, and viewer duels.
 

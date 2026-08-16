@@ -52,6 +52,7 @@ class Settings:
         "channel:read:redemptions "
         "channel:read:subscriptions "
         "channel:read:ads "
+        "channel:manage:raids "
         "channel:manage:moderators "
         "moderator:manage:shoutouts"
     )

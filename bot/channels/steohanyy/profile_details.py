@@ -27,7 +27,9 @@ STEOHANYY_COMMUNITY_MESSAGES = CommunityMessages(
 STEOHANYY_RAID_MESSAGES = RaidMessages(
     incoming=(
         "@{raider_name} raided with {viewer_count} {viewer_word}!"
-    )
+    ),
+    outgoing="Last call! We're bringing the bar to @{target_name}! Cheers!",
+    outgoing_subscriber="Grab your drinks—the bar is raiding @{target_name}! Cheers!"
 )
 
 
@@ -97,4 +99,3 @@ STEOHANYY_POINTS = PointsConfig(
         duel_declined="{username} declined the drink-off."
     )
 )
-

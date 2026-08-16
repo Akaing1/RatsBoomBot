@@ -24,7 +24,9 @@ TEMPLATE_COMMUNITY_MESSAGES = CommunityMessages(
 TEMPLATE_RAID_MESSAGES = RaidMessages(
     incoming=(
         "@{raider_name} raided with {viewer_count} {viewer_word}!"
-    )
+    ),
+    outgoing="We're raiding @{target_name}!",
+    outgoing_subscriber="Subscriber raid message for @{target_name}!"
 )
 
 
@@ -62,4 +64,3 @@ TEMPLATE_POINTS = PointsConfig(
 
     )
 )
-
