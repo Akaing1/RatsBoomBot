@@ -41,7 +41,7 @@ class ClipService:
 
             title = render_profile_message(config.title, channel_name=channel_name, username=username)
             broadcaster = self.bot.create_partialuser(broadcaster_id)
-            created_clip = await broadcaster.create_clip(token_for=broadcaster_id, title=title, duration=float(duration))
+            created_clip = await broadcaster.create_clip(token_for=broadcaster_id, title=title, duration=duration)
             self._cooldowns[broadcaster_id] = asyncio.get_running_loop().time() + config.cooldown_seconds
             return created_clip
 
