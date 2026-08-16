@@ -113,6 +113,8 @@ class CommunityMessages:
 @dataclass(frozen=True)
 class RaidMessages:
     incoming: str | None = None
+    outgoing: str | None = None
+    outgoing_subscriber: str | None = None
 
 
 @dataclass(frozen=True)

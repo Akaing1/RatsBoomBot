@@ -35,7 +35,9 @@ NINJAKAING_RAID_MESSAGES = RaidMessages(
     incoming=(
         "@{raider_name} has raided the basement with "
         "{viewer_count} {viewer_word}! Rats stronk together!"
-    )
+    ),
+    outgoing="The basement is raiding @{target_name}! Rats stronk together!",
+    outgoing_subscriber="Rats stronk together! The basement is raiding @{target_name}!"
 )
 
 

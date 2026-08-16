@@ -25,7 +25,9 @@ MILKY_GALAXYVT_COMMUNITY_MESSAGES = CommunityMessages(
 MILKY_GALAXYVT_RAID_MESSAGES = RaidMessages(
     incoming=(
         "@{raider_name} raided with {viewer_count} {viewer_word}!"
-    )
+    ),
+    outgoing="Milky's galaxy is raiding @{target_name}!",
+    outgoing_subscriber="The galaxy is on the move! We're raiding @{target_name}!"
 )
 
 MILKY_GALAXYVT_SHOUTOUT_MESSAGES = ShoutoutMessages(
