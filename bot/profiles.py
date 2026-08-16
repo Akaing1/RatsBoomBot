@@ -23,6 +23,7 @@ class GlobalCommandGroup(Enum):
     SHOUTOUTS = "shoutouts"
     SOCIALS = "socials"
     SETTINGS = "settings"
+    CLIPS = "clips"
 
 
 class GlobalCommandName(Enum):
@@ -69,6 +70,7 @@ class GlobalCommandDefaults:
     shoutouts: bool = True
     socials: bool = True
     settings: bool = True
+    clips: bool = True
 
     hi: bool = True
     choice: bool = True
@@ -126,6 +128,29 @@ class ShoutoutMessages:
     without_game: str = (
         "Go check out @{username}! They are a cool rat: {channel_url}"
     )
+
+
+@dataclass(frozen=True)
+class ClipMessages:
+    processing: str = "Creating a {duration}-second clip for @{username}..."
+    success: str = "@{username} caught that! {clip_url}"
+    cooldown: str = "@{username}, clips are on cooldown for another {seconds} seconds."
+    in_progress: str = "@{username}, another clip is already being created."
+    offline: str = "@{username}, clips can only be created while the stream is live."
+    unavailable: str = "@{username}, clips are not available for this stream."
+    authorization_required: str = "The broadcaster needs to reconnect their Twitch account before clips can be created."
+    failed: str = "@{username}, Twitch could not create that clip. Please try again later."
+    usage: str = "Use !clip for 60 seconds or !clip short for 30 seconds."
+
+
+@dataclass(frozen=True)
+class ClipConfig:
+    duration: int = 60
+    short_duration: int = 30
+    cooldown_seconds: int = 120
+    processing_timeout_seconds: int = 15
+    title: str = "{channel_name} clipped by {username}"
+    messages: ClipMessages = ClipMessages()
 
 
 @dataclass(frozen=True)
@@ -238,6 +263,7 @@ class ChannelProfile:
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
     shoutout_messages: ShoutoutMessages = ShoutoutMessages()
+    clips: ClipConfig = ClipConfig()
     redeems: RedeemConfig = RedeemConfig()
     points: PointsConfig = PointsConfig()
     overwatch: OverwatchConfig = OverwatchConfig()

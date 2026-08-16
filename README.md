@@ -19,6 +19,7 @@ Active development branch: **`feature/admin-dash`**
 - Channel-point daily and first redeems
 - Follow, subscription, raid, redeem, stream, and ad events
 - Social links and rotating timer announcements
+- Viewer-created 60-second and 30-second clips with shared cooldown protection
 - Persistent counters and per-stream text logs
 - Password-based administrator accounts with owner-only account management
 - A protected administrator dashboard for runtime, channel, feature, queue, OAuth, and log management
@@ -146,7 +147,7 @@ CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/channel
 PUBLIC_CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel/connect
 
 BOT_SCOPES=user:read:chat user:write:chat user:bot
-CHANNEL_SCOPES=channel:bot moderator:manage:banned_users moderator:read:followers moderator:read:blocked_terms moderator:read:chat_settings moderator:read:unban_requests moderator:read:chat_messages moderator:read:warnings moderator:read:moderators moderator:read:vips channel:read:redemptions channel:read:subscriptions channel:read:ads channel:manage:raids channel:manage:moderators moderator:manage:shoutouts
+CHANNEL_SCOPES=channel:bot moderator:manage:banned_users moderator:read:followers moderator:read:blocked_terms moderator:read:chat_settings moderator:read:unban_requests moderator:read:chat_messages moderator:read:warnings moderator:read:moderators moderator:read:vips channel:read:redemptions channel:read:subscriptions channel:read:ads clips:edit channel:manage:raids channel:manage:moderators moderator:manage:shoutouts
 
 SERYBOT_USER_ID=402337290
 BOT_DETECTION_MODE=learning

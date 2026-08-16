@@ -21,6 +21,7 @@ STEOHANYY_PROFILE = ChannelProfile(
         shoutouts=True,
         socials=False,
         settings=False,
+        clips=True,
         hi=False,
         choice=False,
         kaboom=False,

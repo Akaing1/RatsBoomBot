@@ -26,6 +26,7 @@ MEINYA_PROFILE = ChannelProfile(
         shoutouts=True,
         socials=True,
         settings=True,
+        clips=True,
         hi=False,
         choice=False,
         kaboom=False,

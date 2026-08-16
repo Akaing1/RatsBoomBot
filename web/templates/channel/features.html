@@ -238,6 +238,8 @@
                     {% set display_name = "Social Commands" %}
                 {% elif group.value == "settings" %}
                     {% set display_name = "Settings Commands" %}
+                {% elif group.value == "clips" %}
+                    {% set display_name = "Clip Commands" %}
                 {% else %}
                     {% set display_name = group.value | replace("_", " ") | title %}
                 {% endif %}

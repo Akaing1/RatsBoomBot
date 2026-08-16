@@ -22,6 +22,7 @@ NINJAKAING_PROFILE = ChannelProfile(
         shoutouts=True,
         socials=True,
         settings=True,
+        clips=True,
         hi=True,
         choice=True,
         kaboom=True,
