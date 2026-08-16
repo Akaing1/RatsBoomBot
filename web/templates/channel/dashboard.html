@@ -110,8 +110,8 @@
                                     <span>{{ checkin.redeemed_at }}</span>
                                 </div>
 
-                                <span class="activity-badge {% if checkin.type == 'first' %}first{% endif %}">
-                                    {% if checkin.type == "first" %}FIRST{% else %}Check-in{% endif %}
+                                <span class="activity-badge {% if checkin.type in ('first', 'second') %}{{ checkin.type }}{% endif %}">
+                                    {% if checkin.type == "first" %}FIRST{% elif checkin.type == "second" %}SECOND{% else %}Check-in{% endif %}
                                 </span>
                             </li>
                         {% endfor %}
@@ -119,7 +119,7 @@
                 {% else %}
                     <div class="compact-empty-state">
                         <h4>No check-ins yet</h4>
-                        <p>Daily and FIRST claims will appear here.</p>
+                        <p>Daily, FIRST, and SECOND claims will appear here.</p>
                     </div>
                 {% endif %}
             </div>
@@ -470,7 +470,7 @@
                 renderEmptyState(
                     checkinContent,
                     "No check-ins yet",
-                    "Daily and FIRST claims will appear here."
+                    "Daily, FIRST, and SECOND claims will appear here."
                 );
                 return;
             }
@@ -495,8 +495,8 @@
                 item.appendChild(main);
 
                 const badge = document.createElement("span");
-                badge.className = `activity-badge${checkin.type === "first" ? " first" : ""}`;
-                badge.textContent = checkin.type === "first" ? "FIRST" : "Check-in";
+                badge.className = `activity-badge${["first", "second"].includes(checkin.type) ? ` ${checkin.type}` : ""}`;
+                badge.textContent = checkin.type === "first" ? "FIRST" : checkin.type === "second" ? "SECOND" : "Check-in";
                 item.appendChild(badge);
                 list.appendChild(item);
             });

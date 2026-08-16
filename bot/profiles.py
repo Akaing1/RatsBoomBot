@@ -185,17 +185,43 @@ class RedeemMessages:
         "Milestone! @{username} has claimed first "
         "{claim_count} times!"
     )
+    second_already_claimed_by: str = (
+        "@{username}, this stream's second redeem was already "
+        "claimed by @{winner}."
+    )
+    second_already_claimed: str = "@{username}, this stream's second redeem was already claimed."
+    second_success: str = (
+        "@{username} was second this stream and received "
+        "{amount} points! They have claimed second "
+        "{claim_count} times!"
+    )
+    second_milestone: str = (
+        "Milestone! @{username} has claimed second "
+        "{claim_count} times!"
+    )
+    timeout_success: str = "@{username} has timed themselves out for {minutes} minutes!"
+    timeout_failed: str = "@{username}, Twitch could not time you out."
+
+
+@dataclass(frozen=True)
+class TimeoutRedeemConfig:
+    title: str = ""
+    duration_seconds: int = 0
+    reason: str = "Bye bye."
 
 
 @dataclass(frozen=True)
 class RedeemConfig:
     daily_title: str = ""
     first_title: str = ""
+    second_title: str = ""
     daily_amount: int = 0
     first_amount: int = 0
+    second_amount: int = 0
     daily_double_chance: float = 0.05
     claim_milestones: tuple[int, ...] = (10, 25, 50, 100, 250, 500, 1000)
     messages: RedeemMessages = RedeemMessages()
+    timeout: TimeoutRedeemConfig = TimeoutRedeemConfig()
 
 
 @dataclass(frozen=True)

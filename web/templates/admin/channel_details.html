@@ -179,12 +179,12 @@
                         {% for checkin in redemption_activity.checkins %}
                             <li class="activity-list-item">
                                 <div class="activity-main"><strong>@{{ checkin.username }}</strong><span>{{ checkin.redeemed_at }}</span></div>
-                                <span class="activity-badge {% if checkin.type == 'first' %}first{% endif %}">{% if checkin.type == "first" %}FIRST{% else %}Check-in{% endif %}</span>
+                                <span class="activity-badge {% if checkin.type in ('first', 'second') %}{{ checkin.type }}{% endif %}">{% if checkin.type == "first" %}FIRST{% elif checkin.type == "second" %}SECOND{% else %}Check-in{% endif %}</span>
                             </li>
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <div class="compact-empty-state"><h4>No check-ins yet</h4><p>Daily and FIRST claims will appear here.</p></div>
+                    <div class="compact-empty-state"><h4>No check-ins yet</h4><p>Daily, FIRST, and SECOND claims will appear here.</p></div>
                 {% endif %}
             </div>
         </section>
@@ -562,7 +562,7 @@
         function renderCheckins(checkins) {
             checkinContent.replaceChildren();
             if (!checkins.length) {
-                checkinContent.appendChild(emptyState("No check-ins yet", "Daily and FIRST claims will appear here."));
+                checkinContent.appendChild(emptyState("No check-ins yet", "Daily, FIRST, and SECOND claims will appear here."));
                 return;
             }
             const list = document.createElement("ul");
@@ -578,8 +578,8 @@
                 time.textContent = formatTime(checkin.redeemed_at);
                 main.append(user, time);
                 const badge = document.createElement("span");
-                badge.className = `activity-badge${checkin.type === "first" ? " first" : ""}`;
-                badge.textContent = checkin.type === "first" ? "FIRST" : "Check-in";
+                badge.className = `activity-badge${["first", "second"].includes(checkin.type) ? ` ${checkin.type}` : ""}`;
+                badge.textContent = checkin.type === "first" ? "FIRST" : checkin.type === "second" ? "SECOND" : "Check-in";
                 item.append(main, badge);
                 list.appendChild(item);
             });

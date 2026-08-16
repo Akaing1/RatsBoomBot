@@ -18,6 +18,7 @@ class RedeemResult:
 class RedeemService:
     DAILY_REDEEM_TYPE = "daily"
     FIRST_REDEEM_TYPE = "first"
+    SECOND_REDEEM_TYPE = "second"
 
     def __init__(self, bot, db, points_service):
         self.bot = bot
@@ -61,6 +62,7 @@ class RedeemService:
 
                 await connection.execute("DROP INDEX IF EXISTS idx_redeem_claims_daily")
                 await connection.execute("DROP INDEX IF EXISTS idx_redeem_claims_first")
+                await connection.execute("DROP INDEX IF EXISTS idx_redeem_claims_second")
 
                 await connection.execute(
                     """
@@ -111,6 +113,18 @@ class RedeemService:
                         stream_id
                     )
                     WHERE redeem_type = 'first'
+                    """
+                )
+
+                await connection.execute(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_redeem_claims_second
+                    ON redeem_claims (
+                        broadcaster_id,
+                        redeem_type,
+                        stream_id
+                    )
+                    WHERE redeem_type = 'second'
                     """
                 )
         except Exception:
@@ -263,7 +277,7 @@ class RedeemService:
         if config is not None:
             excluded_titles = {
                 title.strip().lower()
-                for title in (config.daily_title, config.first_title)
+                for title in (config.daily_title, config.first_title, config.second_title)
                 if title.strip()
             }
 
@@ -307,8 +321,11 @@ class RedeemService:
         normalized_reward = reward_title.strip().lower()
         daily_title = config.daily_title.strip().lower()
         first_title = config.first_title.strip().lower()
+        second_title = config.second_title.strip().lower()
+        timeout_title = config.timeout.title.strip().lower()
+        handled_titles = {title for title in (daily_title, first_title, second_title, timeout_title) if title}
 
-        if normalized_reward not in {daily_title, first_title}:
+        if normalized_reward not in handled_titles:
             return RedeemResult(handled=False)
 
         LOGGER.info(
@@ -350,6 +367,19 @@ class RedeemService:
                 config=config,
                 redemption_id=redemption_id
             )
+
+        if normalized_reward == second_title:
+            return await self.claim_second(
+                broadcaster_id=broadcaster_id,
+                user_id=user_id,
+                username=username,
+                stream_id=stream_id,
+                config=config,
+                redemption_id=redemption_id
+            )
+
+        if normalized_reward == timeout_title:
+            return await self.timeout_redeemer(broadcaster_id=broadcaster_id, user_id=user_id, username=username, config=config)
 
         return RedeemResult(handled=False)
 
@@ -459,12 +489,8 @@ class RedeemService:
 
             return RedeemResult(handled=True, message=message)
 
-        await self.points.add_points(
-            broadcaster_id=broadcaster_id,
-            user_id=user_id,
-            username=username,
-            amount=config.first_amount
-        )
+        if config.first_amount > 0:
+            await self.points.add_points(broadcaster_id=broadcaster_id, user_id=user_id, username=username, amount=config.first_amount)
 
         claim_count = await self.get_claim_count(
             broadcaster_id=broadcaster_id,
@@ -503,6 +529,58 @@ class RedeemService:
             if milestone:
                 message = f"{message or ''}{milestone}"
 
+        return RedeemResult(handled=True, message=message)
+
+    async def claim_second(self, *, broadcaster_id: str, user_id: str, username: str, stream_id: str, config: RedeemConfig, redemption_id: str | None = None) -> RedeemResult:
+        try:
+            await self._insert_claim(
+                broadcaster_id=broadcaster_id,
+                user_id=user_id,
+                username=username,
+                redeem_type=self.SECOND_REDEEM_TYPE,
+                stream_id=stream_id,
+                redemption_id=redemption_id
+            )
+        except sqlite3.IntegrityError:
+            winner = await self.get_position_winner(broadcaster_id=broadcaster_id, stream_id=stream_id, redeem_type=self.SECOND_REDEEM_TYPE)
+            LOGGER.debug("[Redeems] Second reward for stream %s was already claimed by %s.", stream_id, winner or "an unknown viewer")
+
+            if winner:
+                message = render_profile_message(config.messages.second_already_claimed_by, username=username, winner=winner)
+            else:
+                message = render_profile_message(config.messages.second_already_claimed, username=username)
+
+            return RedeemResult(handled=True, message=message)
+
+        if config.second_amount > 0:
+            await self.points.add_points(broadcaster_id=broadcaster_id, user_id=user_id, username=username, amount=config.second_amount)
+
+        claim_count = await self.get_claim_count(broadcaster_id=broadcaster_id, user_id=user_id, redeem_type=self.SECOND_REDEEM_TYPE)
+        LOGGER.info("[Redeems] User %s claimed second for stream %s and received %d points.", username, stream_id, config.second_amount)
+        message = render_profile_message(config.messages.second_success, username=username, amount=config.second_amount, claim_count=claim_count)
+
+        if self.is_milestone(config, claim_count):
+            milestone = render_profile_message(config.messages.second_milestone, username=username, amount=config.second_amount, claim_count=claim_count)
+
+            if milestone:
+                message = f"{message or ''}{milestone}"
+
+        return RedeemResult(handled=True, message=message)
+
+    async def timeout_redeemer(self, *, broadcaster_id: str, user_id: str, username: str, config: RedeemConfig) -> RedeemResult:
+        timeout = config.timeout
+        broadcaster = self.bot.create_partialuser(broadcaster_id)
+
+        try:
+            await broadcaster.timeout_user(moderator=broadcaster_id, user=user_id, duration=timeout.duration_seconds, reason=timeout.reason)
+        except Exception:
+            LOGGER.exception("[Redeems] Failed to time out user %s in broadcaster %s.", username, broadcaster_id)
+            message = render_profile_message(config.messages.timeout_failed, username=username)
+            return RedeemResult(handled=True, message=message)
+
+        minutes = timeout.duration_seconds // 60
+        LOGGER.info("[Redeems] Timed out user %s for %d seconds in broadcaster %s.", username, timeout.duration_seconds, broadcaster_id)
+        message = render_profile_message(config.messages.timeout_success, username=username, minutes=minutes, seconds=timeout.duration_seconds)
         return RedeemResult(handled=True, message=message)
 
     async def get_claim_count(self, *, broadcaster_id: str, user_id: str, redeem_type: str) -> int:
@@ -553,6 +631,9 @@ class RedeemService:
         return int(row["claim_count"])
 
     async def get_first_winner(self, *, broadcaster_id: str, stream_id: str) -> str | None:
+        return await self.get_position_winner(broadcaster_id=broadcaster_id, stream_id=stream_id, redeem_type=self.FIRST_REDEEM_TYPE)
+
+    async def get_position_winner(self, *, broadcaster_id: str, stream_id: str, redeem_type: str) -> str | None:
         broadcaster_id = str(broadcaster_id)
         stream_id = str(stream_id)
 
@@ -567,10 +648,11 @@ class RedeemService:
 
         try:
             async with self.db.acquire() as connection:
-                row = await connection.fetchone(query, (broadcaster_id, self.FIRST_REDEEM_TYPE, stream_id))
+                row = await connection.fetchone(query, (broadcaster_id, redeem_type, stream_id))
         except Exception:
             LOGGER.exception(
-                "[Redeems] Failed to load first winner for stream %s.",
+                "[Redeems] Failed to load %s winner for stream %s.",
+                redeem_type,
                 stream_id
             )
             raise
