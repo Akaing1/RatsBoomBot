@@ -2,12 +2,23 @@ from bot.profiles import (
     ClipConfig,
     ClipMessages,
     CommunityMessages,
+    FirstChatShoutout,
     PointsConfig,
     PointsMessages,
     RaidMessages,
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages
+)
+
+
+TEMPLATE_FIRST_CHAT_SHOUTOUTS = (
+    FirstChatShoutout(
+        user_id="TWITCH_USER_ID",
+        username="twitch_username",
+        message="Welcome in @{username}! Go show them some love: {channel_url}",
+        native_shoutout=True
+    ),
 )
 
 

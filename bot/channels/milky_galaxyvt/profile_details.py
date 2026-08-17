@@ -1,5 +1,6 @@
 from bot.profiles import (
     CommunityMessages,
+    FirstChatShoutout,
     PointsConfig,
     PointsMessages,
     OverwatchConfig,
@@ -9,6 +10,16 @@ from bot.profiles import (
     ShoutoutMessages,
     TargetTimeoutRedeemConfig,
     TimeoutRedeemConfig
+)
+
+
+MILKY_GALAXYVT_FIRST_CHAT_SHOUTOUTS = (
+    FirstChatShoutout(
+        user_id="1251948863",
+        username="ninjakaing",
+        message="Our favorite rat @{username} has arrived! {channel_url}",
+        native_shoutout=True
+    ),
 )
 
 
