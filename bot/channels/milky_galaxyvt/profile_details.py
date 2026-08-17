@@ -52,7 +52,7 @@ MILKY_GALAXYVT_SHOUTOUT_MESSAGES = ShoutoutMessages(
 
 
 MILKY_GALAXYVT_REDEEMS = RedeemConfig(
-    daily_title="",
+    daily_title="Catch a Comet (daily)",
     first_title="First",
     second_title="Second",
     daily_amount=0,
