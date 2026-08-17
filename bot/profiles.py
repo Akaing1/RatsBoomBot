@@ -211,6 +211,17 @@ class TimeoutRedeemConfig:
 
 
 @dataclass(frozen=True)
+class TargetTimeoutRedeemConfig:
+    title: str
+    target_user_id: str
+    target_username: str
+    duration_seconds: int
+    success_message: str = "@{target_username} has been timed out for {minutes} minutes!"
+    failure_message: str = "Twitch could not time out @{target_username}."
+    reason: str = "Targeted channel point redemption."
+
+
+@dataclass(frozen=True)
 class RedeemConfig:
     daily_title: str = ""
     first_title: str = ""
@@ -222,6 +233,7 @@ class RedeemConfig:
     claim_milestones: tuple[int, ...] = (10, 25, 50, 100, 250, 500, 1000)
     messages: RedeemMessages = RedeemMessages()
     timeout: TimeoutRedeemConfig = TimeoutRedeemConfig()
+    target_timeouts: tuple[TargetTimeoutRedeemConfig, ...] = ()
 
 
 @dataclass(frozen=True)
