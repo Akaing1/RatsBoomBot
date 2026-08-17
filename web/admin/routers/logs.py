@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import APIRouter, Form, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from web.admin.auth import require_admin
+from web.admin.auth import require_admin, validate_csrf_token
 from web.shared.common import build_admin_context, render_error, templates
 from web.shared.log_browser import format_file_size, get_logs_directory, parse_session_directory_name, resolve_log_file
 from web.state import get_bot
@@ -71,7 +71,8 @@ async def logs_page(request: Request):
             request,
             active_page="logs",
             log_sessions=log_sessions,
-            log_count=len(log_sessions)
+            log_count=len(log_sessions),
+            delete_result=request.query_params.get("delete_result")
         )
     )
 
@@ -146,3 +147,43 @@ async def download_log(request: Request, channel_name: str, session_name: str):
     download_name = f"{channel_name}_{session_name}_log.txt"
 
     return FileResponse(path=log_file, media_type="text/plain", filename=download_name)
+
+
+@router.get("/{channel_name}/{session_name}/delete")
+async def delete_log(request: Request, channel_name: str, session_name: str, csrf_token: str = Form(...)):
+    admin_redirect = await require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
+    validate_csrf_token(request, csrf_token)
+    log_file = resolve_log_file(channel_name, session_name)
+
+    if log_file is None:
+        return RedirectResponse(
+            url="/admin/logs?delete_result=missing",
+            status_code=303
+        )
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return RedirectResponse(
+            url="/admin/logs?delete_result=unavailable",
+            status_code=303
+        )
+
+    deleted, message = runtime_bot.services.stream_logs.delete_log(log_file)
+
+    if not deleted:
+        result = "active" if "Active" in message else "failed"
+
+        return RedirectResponse(
+            url=f"/admin/logs?delete_result={result}",
+            status_code=303
+        )
+
+    return RedirectResponse(
+        url="/admin/logs?delete_result=deleted",
+        status_code=303
+    )

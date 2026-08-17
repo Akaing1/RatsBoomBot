@@ -345,6 +345,11 @@ body.login-page {
     gap: 16px;
 }
 
+.log-session-meta form,
+.header-actions form {
+    margin: 0;
+}
+
 .log-active-badge {
     display: inline-flex;
     align-items: center;

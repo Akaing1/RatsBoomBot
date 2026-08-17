@@ -36,6 +36,24 @@
         >
             Download Log
         </a>
+
+        {% if not is_active %}
+            <form
+                method="post"
+                action="/admin/logs/{{ channel_name }}/{{ session_name }}/delete"
+                onsubmit="return confirm('Delete this stream log permanently?');"
+            >
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token }}"
+                >
+
+                <button class="button danger" type="submit">
+                    Delete Log
+                </button>
+            </form>
+        {% endif %}
     </div>
 </header>
 

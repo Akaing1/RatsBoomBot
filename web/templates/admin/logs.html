@@ -49,6 +49,25 @@
         </div>
     </div>
 
+    {% if delete_result %}
+        <div
+            class="queue-feedback {% if delete_result == 'deleted' %}success{% else %}error{% endif %}"
+            role="status"
+        >
+            {% if delete_result == "deleted" %}
+                Stream log deleted.
+            {% elif delete_result == "active" %}
+                Active stream logs cannot be deleted.
+            {% elif delete_result == "missing" %}
+                That stream log no longer exists.
+            {% elif delete_result == "unavailable" %}
+                The bot services are currently unavailable.
+            {% else %}
+                The stream log could not be deleted.
+            {% endif %}
+        </div>
+    {% endif %}
+
     {% if log_sessions %}
         <div class="log-session-list">
             {% for session in log_sessions %}
@@ -86,6 +105,24 @@
                         >
                             View Log
                         </a>
+
+                        {% if not session.is_active %}
+                            <form
+                                method="post"
+                                action="/admin/logs/{{ session.channel_name }}/{{ session.session_name }}/delete"
+                                onsubmit="return confirm('Delete this stream log permanently?');"
+                            >
+                                <input
+                                    type="hidden"
+                                    name="csrf_token"
+                                    value="{{ csrf_token }}"
+                                >
+
+                                <button class="button danger" type="submit">
+                                    Delete
+                                </button>
+                            </form>
+                        {% endif %}
                     </div>
                 </article>
             {% endfor %}
