@@ -96,6 +96,6 @@ async def test_milky_slime_mason_redeem_times_out_configured_target(tmp_path) ->
         "moderator": "channel-1",
         "user": "208244235",
         "duration": 86400,
-        "reason": "Slime Mason channel point redemption."
+        "reason": "You've been slimed out."
     }]
-    assert result.message == "@unfitend has been slimed and timed out for 24 hours!"
+    assert result.message == "@unfitend has been slimed out for 24 hours!"

@@ -6,6 +6,8 @@ from datetime import UTC, datetime, timedelta
 
 from twitchio import HTTPException
 
+from bot.profiles import ShoutoutMessages, get_active_profile, render_profile_message
+
 LOGGER = logging.getLogger("RatBoomBot")
 
 
@@ -96,6 +98,41 @@ class ShoutoutService:
         )
 
         return True, f"@{username} was added to the shoutout queue at position {position}.", position
+
+    async def send_chat_message(self, broadcaster_id: str, username: str, template: str | None = None) -> bool:
+        broadcaster_id = str(broadcaster_id)
+
+        try:
+            target = await self.bot.fetch_user(login=username)
+            channel_info = await target.fetch_channel_info() if target is not None else None
+        except Exception:
+            LOGGER.exception("[Shoutouts] Failed to fetch channel information for %s.", username)
+            channel_info = None
+
+        game_name = getattr(channel_info, "game_name", None) or ""
+        profile = get_active_profile(broadcaster_id)
+        messages = profile.shoutout_messages if profile is not None else ShoutoutMessages()
+        selected_template = template or (messages.with_game if game_name else messages.without_game)
+        message = render_profile_message(
+            selected_template,
+            username=username,
+            game_name=game_name,
+            channel_url=f"https://twitch.tv/{username}"
+        )
+
+        if not message:
+            LOGGER.warning("[Shoutouts] Shoutout message was empty or invalid for broadcaster %s.", broadcaster_id)
+            return False
+
+        try:
+            channel = self.bot.create_partialuser(broadcaster_id)
+            await channel.send_message(sender=self.bot.user, message=message)
+        except Exception:
+            LOGGER.exception("[Shoutouts] Failed to send shoutout message for %s in broadcaster %s.", username, broadcaster_id)
+            return False
+
+        LOGGER.info("[Shoutouts] Sent shoutout message for %s in broadcaster %s.", username, broadcaster_id)
+        return True
 
     async def run_worker(self) -> None:
         while self.running:

@@ -8,6 +8,7 @@ from storage.migrations.v003_administrators import migrate as migrate_administra
 from storage.migrations.v004_imported_redeem_totals import migrate as migrate_imported_redeem_totals
 from storage.migrations.v005_redemption_activity import migrate as migrate_redemption_activity
 from storage.migrations.v006_second_redeem import migrate as migrate_second_redeem
+from storage.migrations.v007_first_chat_shoutouts import migrate as migrate_first_chat_shoutouts
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -25,5 +26,6 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=3, name="administrators", run=migrate_administrators),
     Migration(version=4, name="imported_redeem_totals", run=migrate_imported_redeem_totals),
     Migration(version=5, name="redemption_activity", run=migrate_redemption_activity),
-    Migration(version=6, name="second_redeem", run=migrate_second_redeem)
+    Migration(version=6, name="second_redeem", run=migrate_second_redeem),
+    Migration(version=7, name="first_chat_shoutouts", run=migrate_first_chat_shoutouts)
 )

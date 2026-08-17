@@ -3,7 +3,7 @@ import re
 
 from twitchio.ext import commands
 
-from bot.profiles import GlobalCommandGroup, ShoutoutMessages, get_active_profile, render_profile_message
+from bot.profiles import GlobalCommandGroup
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -31,26 +31,7 @@ def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
     return is_moderator or is_broadcaster
 
 
-async def get_shoutout_game_name(bot, username: str) -> str | None:
-    try:
-        target = await bot.fetch_user(login=username)
-
-        if target is None:
-            return None
-
-        channel_info = await target.fetch_channel_info()
-    except Exception:
-        LOGGER.exception(
-            "[Shoutouts] Failed to fetch channel information for %s.",
-            username
-        )
-        return None
-
-    return channel_info.game_name or None
-
-
 async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool:
-    broadcaster_id = str(broadcaster_id)
     username = clean_username(username)
 
     if not username:
@@ -59,44 +40,7 @@ async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool
         )
         return False
 
-    game_name = await get_shoutout_game_name(bot, username)
-    channel = bot.create_partialuser(broadcaster_id)
-    profile = get_active_profile(broadcaster_id)
-    messages = profile.shoutout_messages if profile is not None else ShoutoutMessages()
-    template = messages.with_game if game_name else messages.without_game
-    channel_url = f"https://twitch.tv/{username}"
-
-    message = render_profile_message(
-        template,
-        username=username,
-        game_name=game_name or "",
-        channel_url=channel_url
-    )
-
-    if not message:
-        LOGGER.warning(
-            "[Shoutouts] Shoutout message was empty or invalid for broadcaster %s.",
-            broadcaster_id
-        )
-        return False
-
-    try:
-        await channel.send_message(sender=bot.user, message=message)
-    except Exception:
-        LOGGER.exception(
-            "[Shoutouts] Failed to send shoutout message for %s in broadcaster %s.",
-            username,
-            broadcaster_id
-        )
-        return False
-
-    LOGGER.info(
-        "[Shoutouts] Sent shoutout message for %s in broadcaster %s.",
-        username,
-        broadcaster_id
-    )
-
-    return True
+    return await bot.services.shoutouts.send_chat_message(broadcaster_id, username)
 
 
 class ShoutoutCommands(commands.Component):
@@ -209,4 +153,3 @@ class ShoutoutCommands(commands.Component):
             broadcaster_id,
             position
         )
-        

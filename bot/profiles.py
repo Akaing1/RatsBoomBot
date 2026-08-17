@@ -131,6 +131,14 @@ class ShoutoutMessages:
 
 
 @dataclass(frozen=True)
+class FirstChatShoutout:
+    user_id: str
+    username: str
+    message: str | None = None
+    native_shoutout: bool = True
+
+
+@dataclass(frozen=True)
 class ClipMessages:
     processing: str = "Creating a {duration}-second clip for @{username}..."
     success: str = "@{username} caught that! {clip_url}"
@@ -301,6 +309,7 @@ class ChannelProfile:
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
     shoutout_messages: ShoutoutMessages = ShoutoutMessages()
+    first_chat_shoutouts: tuple[FirstChatShoutout, ...] = ()
     clips: ClipConfig = ClipConfig()
     redeems: RedeemConfig = RedeemConfig()
     points: PointsConfig = PointsConfig()
