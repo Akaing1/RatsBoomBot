@@ -1,27 +1,29 @@
 from bot.channels.developer_ninjakaing.commands.general import DeveloperNinjakaingCommands
 from bot.channels.developer_ninjakaing.commands.points import DeveloperPointsCommands
-from bot.channels.developer_ninjakaing.profile_details import DEVELOPER_NINJAKAING_COMMUNITY_MESSAGES, DEVELOPER_NINJAKAING_POINTS, DEVELOPER_NINJAKAING_TIMER_MESSAGES, DEVELOPER_NINJAKAING_SHOUTOUT_MESSAGES
+from bot.channels.developer_ninjakaing.profile_details import DEVELOPER_NINJAKAING_CLIPS, DEVELOPER_NINJAKAING_COMMUNITY_MESSAGES, DEVELOPER_NINJAKAING_FIRST_CHAT_SHOUTOUTS, DEVELOPER_NINJAKAING_POINTS, DEVELOPER_NINJAKAING_RAID_MESSAGES, DEVELOPER_NINJAKAING_REDEEMS, DEVELOPER_NINJAKAING_TIMER_MESSAGES, DEVELOPER_NINJAKAING_SHOUTOUT_MESSAGES
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 
 DEVELOPER_NINJAKAING_PROFILE = ChannelProfile(
     channel_name="developer_ninjakaing",
     components=(DeveloperNinjakaingCommands, DeveloperPointsCommands),
+    protected_user_ids=("1251948863",),
     features=FeatureDefaults(
         channel=True,
         timers=True,
         points=True,
-        redeems=False,
+        redeems=True,
         community_events=True,
         raid_responses=True
     ),
     globals=GlobalCommandDefaults(
         enabled=True,
         points=True,
-        viewer_queue=False,
+        viewer_queue=True,
         shoutouts=True,
-        socials=False,
+        socials=True,
         settings=True,
+        clips=True,
         hi=True,
         choice=True,
         kaboom=True,
@@ -29,16 +31,20 @@ DEVELOPER_NINJAKAING_PROFILE = ChannelProfile(
         lucky=True,
         smart=True,
         lurk=True,
-        help=False,
-        explode=False,
-        reklop=False,
-        randy=False,
-        bark=False,
-        car=False,
-        kamikaze=False
+        help=True,
+        explode=True,
+        reklop=True,
+        randy=True,
+        bark=True,
+        car=True,
+        kamikaze=True
     ),
     timer_messages=DEVELOPER_NINJAKAING_TIMER_MESSAGES,
     community_messages=DEVELOPER_NINJAKAING_COMMUNITY_MESSAGES,
+    raid_messages=DEVELOPER_NINJAKAING_RAID_MESSAGES,
     shoutout_messages=DEVELOPER_NINJAKAING_SHOUTOUT_MESSAGES,
+    first_chat_shoutouts=DEVELOPER_NINJAKAING_FIRST_CHAT_SHOUTOUTS,
+    clips=DEVELOPER_NINJAKAING_CLIPS,
+    redeems=DEVELOPER_NINJAKAING_REDEEMS,
     points=DEVELOPER_NINJAKAING_POINTS
 )
