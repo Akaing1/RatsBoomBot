@@ -21,6 +21,12 @@ DEVELOPER_NINJAKAING_FIRST_CHAT_SHOUTOUTS = (
         message="The lead developer @{username} has entered the test environment! {channel_url}",
         native_shoutout=True
     ),
+    FirstChatShoutout(
+        user_id="1185298405",
+        username="randomuser1727",
+        # message="An explosive threat @{username} has entered the test environment! {channel_url}",
+        native_shoutout=True
+    )
 )
 
 
