@@ -19,7 +19,7 @@ MILKY_GALAXYVT_FIRST_CHAT_SHOUTOUTS = (
         username="ninjakaing",
         message="Our favorite rat @{username} has arrived! {channel_url}",
         native_shoutout=True
-    )
+    ),
 )
 
 
