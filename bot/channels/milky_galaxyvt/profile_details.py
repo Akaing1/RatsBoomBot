@@ -84,7 +84,7 @@ MILKY_GALAXYVT_REDEEMS = RedeemConfig(
             target_user_id="208244235",
             target_username="unfitend",
             duration_seconds=86400,
-            success_message="@{target_username} has been slimed and timed out for {hours} hours!",
+            success_message="@{target_username} has been slimed out for {hours} hours!",
             failure_message="Twitch could not unleash the slime on @{target_username}.",
             reason="You've been slimed out."
         ),
