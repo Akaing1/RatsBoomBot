@@ -149,7 +149,7 @@ async def download_log(request: Request, channel_name: str, session_name: str):
     return FileResponse(path=log_file, media_type="text/plain", filename=download_name)
 
 
-@router.get("/{channel_name}/{session_name}/delete")
+@router.post("/{channel_name}/{session_name}/delete")
 async def delete_log(request: Request, channel_name: str, session_name: str, csrf_token: str = Form(...)):
     admin_redirect = await require_admin(request)
 
