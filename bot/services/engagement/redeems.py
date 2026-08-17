@@ -4,7 +4,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from bot.profiles import FeatureName, RedeemConfig, get_active_profile, render_profile_message
+from bot.profiles import FeatureName, RedeemConfig, TargetTimeoutRedeemConfig, get_active_profile, render_profile_message
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -323,9 +323,10 @@ class RedeemService:
         first_title = config.first_title.strip().lower()
         second_title = config.second_title.strip().lower()
         timeout_title = config.timeout.title.strip().lower()
+        target_timeout = next((timeout for timeout in config.target_timeouts if timeout.title.strip().lower() == normalized_reward), None)
         handled_titles = {title for title in (daily_title, first_title, second_title, timeout_title) if title}
 
-        if normalized_reward not in handled_titles:
+        if normalized_reward not in handled_titles and target_timeout is None:
             return RedeemResult(handled=False)
 
         LOGGER.info(
@@ -380,6 +381,9 @@ class RedeemService:
 
         if normalized_reward == timeout_title:
             return await self.timeout_redeemer(broadcaster_id=broadcaster_id, user_id=user_id, username=username, config=config)
+
+        if target_timeout is not None:
+            return await self.timeout_target(broadcaster_id=broadcaster_id, redeemer_username=username, timeout=target_timeout)
 
         return RedeemResult(handled=False)
 
@@ -581,6 +585,29 @@ class RedeemService:
         minutes = timeout.duration_seconds // 60
         LOGGER.info("[Redeems] Timed out user %s for %d seconds in broadcaster %s.", username, timeout.duration_seconds, broadcaster_id)
         message = render_profile_message(config.messages.timeout_success, username=username, minutes=minutes, seconds=timeout.duration_seconds)
+        return RedeemResult(handled=True, message=message)
+
+    async def timeout_target(self, *, broadcaster_id: str, redeemer_username: str, timeout: TargetTimeoutRedeemConfig) -> RedeemResult:
+        broadcaster = self.bot.create_partialuser(broadcaster_id)
+
+        try:
+            await broadcaster.timeout_user(moderator=broadcaster_id, user=timeout.target_user_id, duration=timeout.duration_seconds, reason=timeout.reason)
+        except Exception:
+            LOGGER.exception("[Redeems] Failed to time out target %s in broadcaster %s.", timeout.target_username, broadcaster_id)
+            message = render_profile_message(timeout.failure_message, username=redeemer_username, target_username=timeout.target_username)
+            return RedeemResult(handled=True, message=message)
+
+        minutes = timeout.duration_seconds // 60
+        hours = timeout.duration_seconds // 3600
+        LOGGER.info("[Redeems] User %s redeemed a %d-second timeout for target %s in broadcaster %s.", redeemer_username, timeout.duration_seconds, timeout.target_username, broadcaster_id)
+        message = render_profile_message(
+            timeout.success_message,
+            username=redeemer_username,
+            target_username=timeout.target_username,
+            minutes=minutes,
+            hours=hours,
+            seconds=timeout.duration_seconds
+        )
         return RedeemResult(handled=True, message=message)
 
     async def get_claim_count(self, *, broadcaster_id: str, user_id: str, redeem_type: str) -> int:

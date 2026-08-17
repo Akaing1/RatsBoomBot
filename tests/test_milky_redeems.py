@@ -78,3 +78,24 @@ async def test_milky_timeout_redeem_times_out_the_redeemer(tmp_path) -> None:
         "reason": "Redeemed 3 Minute Timeout."
     }]
     assert result.message == "@alice has timed themselves out for 3 minutes!"
+
+
+@pytest.mark.asyncio
+async def test_milky_slime_mason_redeem_times_out_configured_target(tmp_path) -> None:
+    database_path = tmp_path / "milky-target-timeout.db"
+    bot = FakeBot()
+
+    async with asqlite.create_pool(str(database_path)) as database:
+        await run_migrations(database)
+        service = RedeemService(bot=bot, db=database, points_service=FakePointsService())
+        await service.setup()
+        service.get_redeem_config = lambda broadcaster_id: MILKY_GALAXYVT_REDEEMS
+        result = await service.handle_redemption(broadcaster_id="channel-1", user_id="user-1", username="alice", reward_title="Slime Mason", stream_id="stream-1")
+
+    assert bot.broadcaster.timeouts == [{
+        "moderator": "channel-1",
+        "user": "208244235",
+        "duration": 86400,
+        "reason": "Slime Mason channel point redemption."
+    }]
+    assert result.message == "@unfitend has been slimed and timed out for 24 hours!"

@@ -7,6 +7,7 @@ from bot.profiles import (
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
+    TargetTimeoutRedeemConfig,
     TimeoutRedeemConfig
 )
 
@@ -76,6 +77,17 @@ MILKY_GALAXYVT_REDEEMS = RedeemConfig(
         title="3 Minute Timeout",
         duration_seconds=180,
         reason="Redeemed 3 Minute Timeout."
+    ),
+    target_timeouts=(
+        TargetTimeoutRedeemConfig(
+            title="Slime Mason",
+            target_user_id="208244235",
+            target_username="unfitend",
+            duration_seconds=86400,
+            success_message="@{target_username} has been slimed out for {hours} hours!",
+            failure_message="Twitch could not slime out @{target_username}.",
+            reason="You've been slimed out."
+        ),
     )
 )
 
