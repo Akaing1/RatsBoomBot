@@ -1,5 +1,6 @@
 import logging
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -43,6 +44,8 @@ class StreamLogSession:
 
 class StreamLogService:
 
+    MAX_SAVED_SESSIONS_PER_CHANNEL = 10
+
     def __init__(self, bot, broadcaster_service, logs_path: str):
         self.bot = bot
         self.broadcasters = broadcaster_service
@@ -70,6 +73,7 @@ class StreamLogService:
             LOGGER.addHandler(self.log_handler)
 
         await self.start_live_sessions()
+        self.prune_all_channels()
 
         LOGGER.info(
             "[Stream Logs] Stream logging ready with %d active sessions.",
@@ -152,7 +156,8 @@ class StreamLogService:
             resumed_count
         )
 
-    async def start_session(self, broadcaster_id: str, stream_id: str, channel_name: str | None = None) -> StreamLogSession:
+    async def start_session(self, broadcaster_id: str, stream_id: str,
+                            channel_name: str | None = None) -> StreamLogSession:
         broadcaster_id = str(broadcaster_id)
         stream_id = str(stream_id)
         existing_session = self.active_sessions.get(broadcaster_id)
@@ -241,6 +246,8 @@ class StreamLogService:
             log_path
         )
 
+        self.prune_channel_logs(channel_directory)
+
         return session
 
     async def end_session(self, broadcaster_id: str) -> None:
@@ -307,6 +314,127 @@ class StreamLogService:
 
     def get_active_session(self, broadcaster_id: str) -> StreamLogSession | None:
         return self.active_sessions.get(str(broadcaster_id))
+
+    def prune_all_channels(self) -> int:
+        deleted_count = 0
+
+        try:
+            channel_directories = [path for path in self.logs_path.iterdir() if path.is_dir()]
+        except OSError:
+            LOGGER.exception("[Stream Logs] Failed to inspect log directory %s.", self.logs_path)
+            return 0
+
+        for channel_directory in channel_directories:
+            deleted_count += self.prune_channel_logs(channel_directory)
+
+        return deleted_count
+
+    def prune_channel_logs(self, channel_directory: Path) -> int:
+        channel_directory = channel_directory.resolve()
+
+        try:
+            channel_directory.relative_to(self.logs_path.resolve())
+            session_directories = [
+                path
+                for path in channel_directory.iterdir()
+                if path.is_dir() and (path / "log.txt").is_file()
+            ]
+            session_directories.sort(
+                key=lambda path: (path / "log.txt").stat().st_mtime,
+                reverse=True
+            )
+        except (OSError, ValueError):
+            LOGGER.exception(
+                "[Stream Logs] Failed to inspect channel log directory %s",
+                channel_directory
+            )
+            return 0
+
+        active_directories = {
+            session.log_path.parent.resolve()
+            for session in self.active_sessions.values()
+        }
+
+        retained_directories = {
+            path.resolve()
+            for path in session_directories
+            if path.resolve() in active_directories
+        }
+
+        for session_directory in session_directories:
+            if len(retained_directories) >= self.MAX_SAVED_SESSIONS_PER_CHANNEL:
+                break
+
+            retained_directories.add(session_directory.resolve())
+
+        deleted_count = 0
+
+        for session_directory in session_directories:
+            if session_directory.resolve() in retained_directories:
+                continue
+
+            if self.delete_session_directory(session_directory):
+                deleted_count += 1
+
+        if deleted_count:
+            LOGGER.info(
+                "[Stream Logs] Removed %d expired stream logs from %s.",
+                deleted_count,
+                channel_directory.name
+            )
+
+        return deleted_count
+
+    def delete_log(self, log_path: Path):
+        resolved_log_path = log_path.resolve()
+        active_log_paths = {
+            session.log_path.resolve()
+            for session in self.active_sessions.values()
+        }
+
+        if resolved_log_path in active_log_paths:
+            return False, "Active stream logs cannot be deleted."
+
+        if not resolved_log_path.is_file() or resolved_log_path.name != "log.txt":
+            return False, "That stream log does not exist"
+
+        if not self.delete_session_directory(resolved_log_path.parent):
+            return False, "The stream log could not be deleted."
+
+        LOGGER.info(
+            "[Stream Logs] Manually deleted stream log %s",
+            resolved_log_path
+        )
+
+        return True, "Stream log deleted."
+
+    def delete_session_directory(self, session_directory: Path) -> bool:
+        resolved_directory = session_directory.resolve()
+
+        try:
+            relative_path = resolved_directory.relative_to(self.logs_path.resolve())
+        except ValueError:
+            LOGGER.warning(
+                "[Stream Logs] Refused to delete log directory outside %s: %s",
+                self.logs_path,
+                resolved_directory
+            )
+            return False
+
+        if len(relative_path.parts) != 2 or not (resolved_directory / "log.txt").is_file():
+            LOGGER.warning(
+                "[Stream Logs] refused to delete invalid session directory: %s",
+                resolved_directory
+            )
+            return False
+
+        try:
+            shutil.rmtree(resolved_directory)
+        except OSError:
+            LOGGER.exception(
+                "[Stream logs] Failed to delete stream log directory %s.",
+                resolved_directory
+            )
 
     @staticmethod
     def get_stream_id(stream) -> str | None:
