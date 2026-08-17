@@ -86,7 +86,7 @@ MILKY_GALAXYVT_REDEEMS = RedeemConfig(
             duration_seconds=86400,
             success_message="@{target_username} has been slimed and timed out for {hours} hours!",
             failure_message="Twitch could not unleash the slime on @{target_username}.",
-            reason="Slime Mason channel point redemption."
+            reason="You've been slimed out."
         ),
     )
 )
