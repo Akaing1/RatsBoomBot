@@ -227,6 +227,8 @@ class TargetTimeoutRedeemConfig:
     success_message: str = "@{target_username} has been timed out for {minutes} minutes!"
     failure_message: str = "Twitch could not time out @{target_username}."
     reason: str = "Targeted channel point redemption."
+    counter_name: str | None = None
+    counter_message: str | None = None
 
 
 @dataclass(frozen=True)
