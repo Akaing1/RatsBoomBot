@@ -24,7 +24,7 @@ MILKY_GALAXYVT_FIRST_CHAT_SHOUTOUTS = (
 
 
 MILKY_GALAXYVT_TIMER_MESSAGES = (
-    "Join us in The Milky Way https://discord.gg/bsRcYhnRC3 (its scuffed rn)"
+    "Join us in The Milky Way https://discord.gg/bsRcYhnRC3 (its scuffed rn)",
 )
 
 
