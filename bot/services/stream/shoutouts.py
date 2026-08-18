@@ -94,7 +94,8 @@ class ShoutoutService:
             username,
             user_id,
             broadcaster_id,
-            position
+            position,
+            extra={"broadcaster_id": broadcaster_id}
         )
 
         return True, f"@{username} was added to the shoutout queue at position {position}.", position
@@ -106,7 +107,7 @@ class ShoutoutService:
             target = await self.bot.fetch_user(login=username)
             channel_info = await target.fetch_channel_info() if target is not None else None
         except Exception:
-            LOGGER.exception("[Shoutouts] Failed to fetch channel information for %s.", username)
+            LOGGER.exception("[Shoutouts] Failed to fetch channel information for %s.", username, extra={"broadcaster_id": broadcaster_id})
             channel_info = None
 
         game_name = getattr(channel_info, "game_name", None) or ""
@@ -121,17 +122,17 @@ class ShoutoutService:
         )
 
         if not message:
-            LOGGER.warning("[Shoutouts] Shoutout message was empty or invalid for broadcaster %s.", broadcaster_id)
+            LOGGER.warning("[Shoutouts] Shoutout message was empty or invalid for broadcaster %s.", broadcaster_id, extra={"broadcaster_id": broadcaster_id})
             return False
 
         try:
             channel = self.bot.create_partialuser(broadcaster_id)
             await channel.send_message(sender=self.bot.user, message=message)
         except Exception:
-            LOGGER.exception("[Shoutouts] Failed to send shoutout message for %s in broadcaster %s.", username, broadcaster_id)
+            LOGGER.exception("[Shoutouts] Failed to send shoutout message for %s in broadcaster %s.", username, broadcaster_id, extra={"broadcaster_id": broadcaster_id})
             return False
 
-        LOGGER.info("[Shoutouts] Sent shoutout message for %s in broadcaster %s.", username, broadcaster_id)
+        LOGGER.info("[Shoutouts] Sent shoutout message for %s in broadcaster %s.", username, broadcaster_id, extra={"broadcaster_id": broadcaster_id})
         return True
 
     async def run_worker(self) -> None:
@@ -172,7 +173,8 @@ class ShoutoutService:
                 "[Shoutouts] Removed %s (%s) from broadcaster %s queue because the target cooldown became active.",
                 queued_shoutout.username,
                 queued_shoutout.user_id,
-                broadcaster_id
+                broadcaster_id,
+                extra={"broadcaster_id": broadcaster_id}
             )
             return
 
@@ -197,7 +199,8 @@ class ShoutoutService:
                     self.MAX_ATTEMPTS,
                     queued_shoutout.username,
                     queued_shoutout.user_id,
-                    broadcaster_id
+                    broadcaster_id,
+                    extra={"broadcaster_id": broadcaster_id}
                 )
                 return
 
@@ -209,7 +212,8 @@ class ShoutoutService:
                 queued_shoutout.username,
                 queued_shoutout.user_id,
                 broadcaster_id,
-                attempts
+                attempts,
+                extra={"broadcaster_id": broadcaster_id}
             )
             return
 
@@ -221,7 +225,8 @@ class ShoutoutService:
                 "[Shoutouts] Removed %s (%s) from broadcaster %s queue because Twitch reported an active target cooldown.",
                 queued_shoutout.username,
                 queued_shoutout.user_id,
-                broadcaster_id
+                broadcaster_id,
+                extra={"broadcaster_id": broadcaster_id}
             )
             return
 
@@ -233,7 +238,8 @@ class ShoutoutService:
             "[Shoutouts] Completed queued shoutout for %s (%s) in broadcaster %s.",
             queued_shoutout.username,
             queued_shoutout.user_id,
-            broadcaster_id
+            broadcaster_id,
+            extra={"broadcaster_id": broadcaster_id}
         )
 
     async def send_native_shoutout(self, broadcaster_id: str, target_id: str, username: str) -> str:
@@ -253,7 +259,8 @@ class ShoutoutService:
                     "[Shoutouts] Twitch reported that %s (%s) is already under the target cooldown in broadcaster %s.",
                     username,
                     target_id,
-                    broadcaster_id
+                    broadcaster_id,
+                    extra={"broadcaster_id": broadcaster_id}
                 )
 
                 return "target_cooldown"
@@ -263,7 +270,8 @@ class ShoutoutService:
 
                 LOGGER.info(
                     "[Shoutouts] Twitch reported that broadcaster %s is under the global shoutout cooldown.",
-                    broadcaster_id
+                    broadcaster_id,
+                    extra={"broadcaster_id": broadcaster_id}
                 )
 
                 return "global_cooldown"
@@ -272,7 +280,8 @@ class ShoutoutService:
                 "[Shoutouts] Failed to send native Twitch shoutout for %s (%s) in broadcaster %s.",
                 username,
                 target_id,
-                broadcaster_id
+                broadcaster_id,
+                extra={"broadcaster_id": broadcaster_id}
             )
 
             return "failed"
@@ -281,7 +290,8 @@ class ShoutoutService:
                 "[Shoutouts] Failed to send native Twitch shoutout for %s (%s) in broadcaster %s.",
                 username,
                 target_id,
-                broadcaster_id
+                broadcaster_id,
+                extra={"broadcaster_id": broadcaster_id}
             )
 
             return "failed"
@@ -290,7 +300,8 @@ class ShoutoutService:
             "[Shoutouts] Sent native Twitch shoutout for %s (%s) in broadcaster %s.",
             username,
             target_id,
-            broadcaster_id
+            broadcaster_id,
+            extra={"broadcaster_id": broadcaster_id}
         )
 
         return "success"

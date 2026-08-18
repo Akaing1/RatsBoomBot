@@ -19,17 +19,21 @@ class StreamSessionLogHandler(logging.Handler):
         if self.handling_record:
             return
 
+        broadcaster_id = getattr(record, "broadcaster_id", None)
+
+        if broadcaster_id is None:
+            return
+
+        broadcaster_id = str(broadcaster_id)
+
+        if broadcaster_id not in self.stream_log_service.active_sessions:
+            return
+
         self.handling_record = True
 
         try:
             message = self.format(record)
-
-            for broadcaster_id in list(self.stream_log_service.active_sessions):
-                self.stream_log_service.write(
-                    broadcaster_id,
-                    record.levelname,
-                    message
-                )
+            self.stream_log_service.write(broadcaster_id, record.levelname, message)
         finally:
             self.handling_record = False
 

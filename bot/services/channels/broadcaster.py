@@ -193,7 +193,8 @@ class BroadcasterService:
             except Exception:
                 LOGGER.exception(
                     "[Broadcasters] Failed to check live status for broadcaster %s.",
-                    broadcaster_id
+                    broadcaster_id,
+                    extra={"broadcaster_id": broadcaster_id}
                 )
                 broadcaster.is_live = False
                 continue
