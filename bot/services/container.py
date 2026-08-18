@@ -28,7 +28,7 @@ class ServiceContainer:
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
         self.viewer_queue = ViewerQueueService(bot)
-        self.redeems = RedeemService(bot, db, self.points)
+        self.redeems = RedeemService(bot, db, self.points, self.counters)
         self.overwatch = OverwatchService(bot, db)
         self.moderation = ModerationService(bot, db)
         self.shoutouts = ShoutoutService(bot)

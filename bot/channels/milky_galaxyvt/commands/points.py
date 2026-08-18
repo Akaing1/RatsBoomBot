@@ -12,58 +12,58 @@ class MilkyGalaxyPointsCommands(ChannelComponent):
         super().__init__(bot, profile, broadcaster_id)
         self.handler = PointsCommandHandler(bot)
 
-    @commands.group(name="shards", invoke_fallback=True)
-    async def shards(self, ctx: commands.Context, target: User = None) -> None:
+    @commands.group(name="dust", invoke_fallback=True)
+    async def dust(self, ctx: commands.Context, target: User = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
-        await self.handler.show_balance(ctx, target, "shards")
+        await self.handler.show_balance(ctx, target, "dust")
 
-    @shards.command(name="leaderboard")
-    async def shards_leaderboard(self, ctx: commands.Context) -> None:
+    @dust.command(name="leaderboard")
+    async def dust_leaderboard(self, ctx: commands.Context) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
-        await self.handler.show_leaderboard(ctx, "shards")
+        await self.handler.show_leaderboard(ctx, "dust")
 
-    @shards.command(name="reset")
-    async def shards_reset(self, ctx: commands.Context) -> None:
+    @dust.command(name="reset")
+    async def dust_reset(self, ctx: commands.Context) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
-        await self.handler.reset_points(ctx, "shards")
+        await self.handler.reset_points(ctx, "dust")
 
-    @shards.command(name="add")
-    async def shards_add(self, ctx: commands.Context, target: User, amount: int) -> None:
+    @dust.command(name="add")
+    async def dust_add(self, ctx: commands.Context, target: User, amount: int) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
-        await self.handler.add_points(ctx, target, amount, "shards")
+        await self.handler.add_points(ctx, target, amount, "dust")
 
-    @shards.command(name="gamble")
-    async def shards_gamble(self, ctx: commands.Context, amount: str) -> None:
+    @dust.command(name="gamble")
+    async def dust_gamble(self, ctx: commands.Context, amount: str) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
-        await self.handler.gamble(ctx, amount, "shards")
+        await self.handler.gamble(ctx, amount, "dust")
 
-    @shards.group(name="duel", invoke_fallback=True)
-    async def shards_duel(self, ctx: commands.Context, opponent: User = None, amount: str = None) -> None:
+    @dust.group(name="duel", invoke_fallback=True)
+    async def dust_duel(self, ctx: commands.Context, opponent: User = None, amount: str = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
-        await self.handler.create_duel(ctx, opponent, amount, "shards")
+        await self.handler.create_duel(ctx, opponent, amount, "dust")
 
-    @shards_duel.command(name="accept")
-    async def shards_duel_accept(self, ctx: commands.Context) -> None:
+    @dust_duel.command(name="accept")
+    async def dust_duel_accept(self, ctx: commands.Context) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
-        await self.handler.accept_duel(ctx, "shards")
+        await self.handler.accept_duel(ctx, "dust")
 
-    @shards_duel.command(name="decline")
-    async def shards_duel_decline(self, ctx: commands.Context) -> None:
+    @dust_duel.command(name="decline")
+    async def dust_duel_decline(self, ctx: commands.Context) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
 
-        await self.handler.decline_duel(ctx, "shards")
+        await self.handler.decline_duel(ctx, "dust")

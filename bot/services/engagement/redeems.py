@@ -20,10 +20,11 @@ class RedeemService:
     FIRST_REDEEM_TYPE = "first"
     SECOND_REDEEM_TYPE = "second"
 
-    def __init__(self, bot, db, points_service):
+    def __init__(self, bot, db, points_service, counter_service=None):
         self.bot = bot
         self.db = db
         self.points = points_service
+        self.counters = counter_service
 
     async def setup(self) -> None:
         LOGGER.info("[Redeems] Preparing redeem claim storage.")
@@ -608,6 +609,26 @@ class RedeemService:
             hours=hours,
             seconds=timeout.duration_seconds
         )
+
+        if timeout.counter_name and timeout.counter_message and self.counters is not None:
+            counter_key = f"target_timeout:{broadcaster_id}:{timeout.counter_name}"
+
+            try:
+                counter_value = await self.counters.increment_counter(counter_key)
+            except Exception:
+                LOGGER.exception("[Redeems] Failed to increment target-timeout counter %s for broadcaster %s.", timeout.counter_name, broadcaster_id)
+            else:
+                counter_message = render_profile_message(
+                    timeout.counter_message,
+                    username=redeemer_username,
+                    target_username=timeout.target_username,
+                    count=counter_value,
+                    count_word="time" if counter_value == 1 else "times"
+                )
+
+                if counter_message:
+                    message = f"{message or ''} {counter_message}".strip()
+
         return RedeemResult(handled=True, message=message)
 
     async def get_claim_count(self, *, broadcaster_id: str, user_id: str, redeem_type: str) -> int:

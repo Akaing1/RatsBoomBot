@@ -54,11 +54,11 @@ MILKY_GALAXYVT_RAID_MESSAGES = RaidMessages(
 
 MILKY_GALAXYVT_SHOUTOUT_MESSAGES = ShoutoutMessages(
     with_game=(
-        "Go check out @{username}! They were last playing {game_name}. "
-        "They are a cool rat: {channel_url}"
+        "Shout out @{username}! this beautiful soul just finished playing {game_name}. "
+        "over at {channel_url}"
     ),
     without_game=(
-        "Go check out @{username}! They are a cool rat: {channel_url}"
+        "Shout out @{username}! Go check them out at {channel_url}!"
     )
 )
 
@@ -67,12 +67,19 @@ MILKY_GALAXYVT_REDEEMS = RedeemConfig(
     daily_title="Catch a Comet (daily)",
     first_title="First",
     second_title="Second",
-    daily_amount=0,
-    first_amount=0,
-    second_amount=0,
-    daily_double_chance=0,
+    daily_amount=100,
+    first_amount=250,
+    second_amount=150,
+    daily_double_chance=0.00,
     claim_milestones=(10, 25, 50, 100, 250, 500, 1000),
     messages=RedeemMessages(
+        stream_offline="@{username}, this redeem only works while the stream is live.",
+        daily_already_claimed="@{username}, you have already received your wish for today.",
+        daily_success=(
+            "@{username} has received their wish from the stars today "
+            "and received {amount} star dust! {username}, you've caught "
+            "{claim_count} comets!"
+        ),
         first_already_claimed_by="@{username}, First was already claimed by @{winner} this stream.",
         first_already_claimed="@{username}, First was already claimed this stream.",
         first_success="Welcome in @{username}, you have been first {claim_count} times!",
@@ -97,51 +104,53 @@ MILKY_GALAXYVT_REDEEMS = RedeemConfig(
             duration_seconds=86400,
             success_message="@{target_username} has been slimed out for {hours} hours!",
             failure_message="Twitch could not slime out @{target_username}.",
-            reason="You've been slimed out."
+            reason="You've been slimed out.",
+            counter_name="slime_mason",
+            counter_message="Mason has been slimed out {count} {count_word}!"
         ),
     )
 )
 
 
 MILKY_GALAXYVT_POINTS = PointsConfig(
-    command_name="shards",
+    command_name="dust",
     points_per_message=10,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,
     duel_expiration_seconds=60,
     messages=PointsMessages(
-        balance_self="{username}, you have {points} star shards!",
-        balance_other="{username} has {points} star shards!",
-        leaderboard_empty="No star shards have been collected yet.",
-        leaderboard_entry="{position}. {username}: {points} star shards",
+        balance_self="{username}, you have {points} star dust!",
+        balance_other="{username} has {points} star dust!",
+        leaderboard_empty="No star dust have been collected yet.",
+        leaderboard_entry="{position}. {username}: {points} star dust",
         leaderboard_title="Top star shard collectors: {leaderboard}",
-        reset_denied="Only the broadcaster can reset the star shards.",
-        reset_success="The galaxy's star shards have been reset.",
-        add_denied="Only moderators can give viewers star shards.",
+        reset_denied="Only the broadcaster can reset the star dust.",
+        reset_success="The galaxy's star dust have been reset.",
+        add_denied="Only moderators can give viewers star dust.",
         add_invalid="The star shard amount must be greater than 0.",
-        add_success="Added {amount} star shards to {username}.",
-        gamble_no_points="You do not have any star shards to gamble.",
+        add_success="Added {amount} star dust to {username}.",
+        gamble_no_points="You do not have any star dust to gamble.",
         gamble_usage="Use it like this: !{command} gamble 50 or !{command} gamble all",
         gamble_invalid="You need to gamble at least 1 star shard.",
-        gamble_insufficient="You only have {points} star shards.",
-        gamble_win="{username} found {amount} star shards and now has {new_balance}!",
-        gamble_all_win="{username} doubled their star shards and now has {new_balance}!",
-        gamble_loss="{username} lost {amount} star shards and now has {new_balance}.",
-        gamble_all_loss="{username} lost all their star shards in the void.",
+        gamble_insufficient="You only have {points} star dust.",
+        gamble_win="{username} found {amount} star dust and now has {new_balance}!",
+        gamble_all_win="{username} doubled their star dust and now has {new_balance}!",
+        gamble_loss="{username} lost {amount} star dust and now has {new_balance}.",
+        gamble_all_loss="{username} lost all their star dust in the void.",
         duel_usage="Use it like this: !{command} duel @user 100",
         duel_amount_invalid="The duel amount must be a number or 'all'.",
         duel_self="You cannot challenge yourself to a star shard duel.",
         duel_invalid="The duel amount must be greater than 0.",
-        duel_challenger_insufficient="You only have {points} star shards.",
-        duel_opponent_insufficient="{username} only has {points} star shards.",
+        duel_challenger_insufficient="You only have {points} star dust.",
+        duel_opponent_insufficient="{username} only has {points} star dust.",
         duel_challenge=(
             "@{opponent}, @{challenger} challenged you to a duel for {amount} "
-            "star shards! Type !{command} duel accept or !{command} duel decline. "
+            "star dust! Type !{command} duel accept or !{command} duel decline. "
             "This duel expires in {expiration} seconds."
         ),
         duel_missing="You do not have a pending star shard duel, or it expired.",
-        duel_cancelled="The duel was cancelled because someone no longer has enough star shards.",
-        duel_result="@{winner} defeated @{loser} and won {amount} star shards.",
+        duel_cancelled="The duel was cancelled because someone no longer has enough star dust.",
+        duel_result="@{winner} defeated @{loser} and won {amount} star dust.",
         duel_declined="{username} declined the star shard duel."
     )
 )
