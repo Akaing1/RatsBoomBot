@@ -67,12 +67,19 @@ MILKY_GALAXYVT_REDEEMS = RedeemConfig(
     daily_title="Catch a Comet (daily)",
     first_title="First",
     second_title="Second",
-    daily_amount=0,
-    first_amount=0,
-    second_amount=0,
-    daily_double_chance=0,
+    daily_amount=100,
+    first_amount=250,
+    second_amount=150,
+    daily_double_chance=0.00,
     claim_milestones=(10, 25, 50, 100, 250, 500, 1000),
     messages=RedeemMessages(
+        stream_offline="@{username}, this redeem only works while the stream is live.",
+        daily_already_claimed="@{username}, you have already received your wish for today.",
+        daily_success=(
+            "@{username} has received their wish from the stars today "
+            "and received {amount} star dust! {username}, you've caught "
+            "{claim_count} comets!"
+        ),
         first_already_claimed_by="@{username}, First was already claimed by @{winner} this stream.",
         first_already_claimed="@{username}, First was already claimed this stream.",
         first_success="Welcome in @{username}, you have been first {claim_count} times!",
