@@ -54,11 +54,11 @@ MILKY_GALAXYVT_RAID_MESSAGES = RaidMessages(
 
 MILKY_GALAXYVT_SHOUTOUT_MESSAGES = ShoutoutMessages(
     with_game=(
-        "Go check out @{username}! They were last playing {game_name}. "
-        "They are a cool rat: {channel_url}"
+        "Shout out @{username}! this beautiful soul just finished playing {game_name}. "
+        "over at {channel_url}"
     ),
     without_game=(
-        "Go check out @{username}! They are a cool rat: {channel_url}"
+        "Shout out @{username}! Go check them out at {channel_url}!"
     )
 )
 
