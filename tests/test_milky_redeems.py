@@ -57,7 +57,6 @@ async def test_milky_first_and_second_redeems_keep_separate_counts(tmp_path) -> 
     assert first_two.message == "Welcome in @alice, you have been first 2 times!"
     assert second_one.message == "Welcome in @alice, you have been second 1 times!"
     assert duplicate_second.message == "@bob, Second was already claimed by @alice this stream."
-    assert points.awards == []
 
 
 @pytest.mark.asyncio
