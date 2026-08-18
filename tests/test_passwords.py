@@ -1,4 +1,4 @@
-from web.passwords import hash_password, password_needs_rehash, verify_password
+from web.shared.passwords import hash_password, password_needs_rehash, verify_password
 
 
 def test_hash_password_does_not_store_plaintext():

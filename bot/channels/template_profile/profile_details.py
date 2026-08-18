@@ -1,10 +1,37 @@
 from bot.profiles import (
+    ClipConfig,
+    ClipMessages,
     CommunityMessages,
+    FirstChatShoutout,
     PointsConfig,
     PointsMessages,
     RaidMessages,
     RedeemConfig,
-    RedeemMessages
+    RedeemMessages,
+    ShoutoutMessages
+)
+
+
+TEMPLATE_FIRST_CHAT_SHOUTOUTS = (
+    FirstChatShoutout(
+        user_id="TWITCH_USER_ID",
+        username="twitch_username",
+        message="Welcome in @{username}! Go show them some love: {channel_url}",
+        native_shoutout=True
+    ),
+)
+
+
+TEMPLATE_CLIPS = ClipConfig(
+    duration=60,
+    short_duration=30,
+    cooldown_seconds=120,
+    processing_timeout_seconds=15,
+    title="{channel_name} clipped by {username}",
+    messages=ClipMessages(
+        processing="Creating a {duration}-second clip for @{username}...",
+        success="@{username} caught that! {clip_url}"
+    )
 )
 
 
@@ -23,6 +50,19 @@ TEMPLATE_COMMUNITY_MESSAGES = CommunityMessages(
 TEMPLATE_RAID_MESSAGES = RaidMessages(
     incoming=(
         "@{raider_name} raided with {viewer_count} {viewer_word}!"
+    ),
+    outgoing="We're raiding @{target_name}!",
+    outgoing_subscriber="Subscriber raid message for @{target_name}!"
+)
+
+
+TEMPLATE_SHOUTOUT_MESSAGES = ShoutoutMessages(
+    with_game=(
+        "Go check out @{username}! They were last playing {game_name}. "
+        "They are a cool rat: {channel_url}"
+    ),
+    without_game=(
+        "Go check out @{username}! They are a cool rat: {channel_url}"
     )
 )
 
@@ -50,4 +90,3 @@ TEMPLATE_POINTS = PointsConfig(
 
     )
 )
-

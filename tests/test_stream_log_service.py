@@ -1,8 +1,10 @@
+import logging
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import pytest
 
-from bot.services.stream_log_service import StreamLogService
+from bot.services.stream.stream_logs import StreamLogService
 
 
 @dataclass
@@ -127,3 +129,31 @@ def test_sanitize_and_clean_message(tmp_path) -> None:
 
     assert service.sanitize_path_part(" Test Channel! ") == "test_channel"
     assert service.clean_message("one\ntwo\r\nthree") == "one two three"
+
+
+def test_log_handler_only_writes_to_matching_broadcaster(tmp_path) -> None:
+    service = StreamLogService(bot=FakeBot(), broadcaster_service=FakeBroadcasterService(), logs_path=str(tmp_path))
+    first_log = tmp_path / "first" / "session" / "log.txt"
+    second_log = tmp_path / "second" / "session" / "log.txt"
+    first_log.parent.mkdir(parents=True)
+    second_log.parent.mkdir(parents=True)
+    service.active_sessions["123"] = SimpleNamespace(log_path=first_log)
+    service.active_sessions["456"] = SimpleNamespace(log_path=second_log)
+    record = logging.LogRecord("RatBoomBot", logging.INFO, "", 0, "Channel event", (), None)
+    record.broadcaster_id = "123"
+
+    service.log_handler.emit(record)
+
+    assert "Channel event" in first_log.read_text(encoding="utf-8")
+    assert not second_log.exists()
+
+
+def test_log_handler_ignores_records_without_broadcaster(tmp_path) -> None:
+    service = StreamLogService(bot=FakeBot(), broadcaster_service=FakeBroadcasterService(), logs_path=str(tmp_path))
+    log_file = tmp_path / "channel" / "session" / "log.txt"
+    service.active_sessions["123"] = SimpleNamespace(log_path=log_file)
+    record = logging.LogRecord("RatBoomBot", logging.ERROR, "", 0, "Application error", (), None)
+
+    service.log_handler.emit(record)
+
+    assert not log_file.exists()

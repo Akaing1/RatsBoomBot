@@ -1,0 +1,86 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Runtime Logs | RatsBoomBot Admin{% endblock %}
+
+{% block content %}
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Live application output</p>
+            <h2>Runtime Logs</h2>
+            <p class="page-description">
+                Live INFO, WARNING, ERROR, and CRITICAL records from the current RatsBoomBot process.
+            </p>
+        </div>
+
+        <div class="header-actions">
+            <span id="logs-status" class="live-status">Connecting</span>
+            <button id="clear-logs" class="button secondary" type="button">Clear View</button>
+        </div>
+    </section>
+
+    <section class="panel runtime-log-panel">
+        <div id="runtime-log-viewer" class="runtime-log-viewer" aria-live="polite"></div>
+    </section>
+
+    <script>
+        const viewer = document.getElementById("runtime-log-viewer");
+        const status = document.getElementById("logs-status");
+        let lastEntryId = 0;
+        let polling = false;
+
+        const appendEntry = (entry) => {
+            const shouldFollow = viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight < 80;
+            const row = document.createElement("div");
+            row.className = `runtime-log-entry level-${entry.level.toLowerCase()}`;
+
+            const timestamp = document.createElement("span");
+            timestamp.className = "runtime-log-time";
+            timestamp.textContent = new Date(entry.timestamp).toLocaleTimeString();
+
+            const level = document.createElement("span");
+            level.className = "runtime-log-level";
+            level.textContent = entry.level;
+
+            const message = document.createElement("span");
+            message.className = "runtime-log-message";
+            message.textContent = entry.message;
+
+            row.append(timestamp, level, message);
+            viewer.appendChild(row);
+
+            while (viewer.children.length > 1000) viewer.firstElementChild.remove();
+            if (shouldFollow) viewer.scrollTop = viewer.scrollHeight;
+        };
+
+        const pollLogs = async () => {
+            if (polling) return;
+            polling = true;
+
+            try {
+                const response = await fetch(`/admin/runtime-logs/data?after=${lastEntryId}`, {cache: "no-store"});
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const payload = await response.json();
+
+                for (const entry of payload.entries) {
+                    appendEntry(entry);
+                    lastEntryId = Math.max(lastEntryId, entry.id);
+                }
+
+                status.textContent = "Live";
+                status.classList.add("connected");
+            } catch (error) {
+                status.textContent = "Disconnected";
+                status.classList.remove("connected");
+            } finally {
+                polling = false;
+            }
+        };
+
+        document.getElementById("clear-logs").addEventListener("click", () => {
+            viewer.replaceChildren();
+        });
+
+        pollLogs();
+        window.setInterval(pollLogs, 1000);
+    </script>
+{% endblock %}

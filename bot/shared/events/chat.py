@@ -126,6 +126,15 @@ class ChatEvents(commands.Component):
         services.timers.track_message(payload)
 
         try:
+            await services.first_chat_shoutouts.handle_message(
+                broadcaster_id=broadcaster_id,
+                user_id=chatter_id,
+                username=chatter_name
+            )
+        except Exception:
+            LOGGER.exception("[First Chat Shoutouts] Failed to process %s in %s.", chatter_name, broadcaster_name)
+
+        try:
             await services.points.track_message(payload)
         except Exception:
             LOGGER.exception(

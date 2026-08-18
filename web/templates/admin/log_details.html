@@ -1,0 +1,70 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{{ channel_name }} Log | RatsBoomBot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Stream log</p>
+
+        <div class="log-title-row">
+            <h2>{{ channel_name }}</h2>
+
+            {% if is_active %}
+                <span class="log-active-badge">
+                    Active
+                </span>
+            {% endif %}
+        </div>
+
+        <p class="page-description">
+            {{ started_at }} · Stream ID: {{ stream_id }} · {{ file_size }}
+        </p>
+    </div>
+
+    <div class="header-actions">
+        <a
+            class="button secondary"
+            href="/admin/logs"
+        >
+            Back to Logs
+        </a>
+
+        <a
+            class="button primary"
+            href="/admin/logs/{{ channel_name }}/{{ session_name }}/download"
+        >
+            Download Log
+        </a>
+
+        {% if not is_active %}
+            <form
+                method="post"
+                action="/admin/logs/{{ channel_name }}/{{ session_name }}/delete"
+                onsubmit="return confirm('Delete this stream log permanently?');"
+            >
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token }}"
+                >
+
+                <button class="button danger" type="submit">
+                    Delete Log
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</header>
+
+<section class="panel log-viewer-panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Recorded events</p>
+            <h3>log.txt</h3>
+        </div>
+    </div>
+
+    <pre class="log-viewer">{{ log_content }}</pre>
+</section>
+{% endblock %}

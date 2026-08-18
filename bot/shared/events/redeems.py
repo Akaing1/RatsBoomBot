@@ -42,6 +42,11 @@ class RedeemEvents(commands.Component):
         username = get_nested_attr(payload, "user", "name")
         reward_title = get_nested_attr(payload, "reward", "title")
         redemption_id = getattr(payload, "id", None)
+        user_input = getattr(payload, "user_input", None)
+        redeemed_at = getattr(payload, "redeemed_at", None)
+
+        if user_input is None:
+            user_input = getattr(payload, "input", None)
 
         if broadcaster_id is None:
             broadcaster_id = getattr(payload, "broadcaster_id", None)
@@ -82,13 +87,38 @@ class RedeemEvents(commands.Component):
             f"{username} redeemed: {reward_title}"
         )
 
+        active_session = services.stream_logs.get_active_session(broadcaster_id)
+        stream_id = active_session.stream_id if active_session is not None else None
+
+        if stream_id is None:
+            stream_id = await services.redeems.get_current_stream_id(broadcaster_id)
+
+        try:
+            await services.redeems.record_activity(
+                redemption_id=redemption_id,
+                broadcaster_id=broadcaster_id,
+                user_id=user_id,
+                username=username,
+                reward_title=reward_title,
+                user_input=user_input,
+                stream_id=stream_id,
+                redeemed_at=redeemed_at
+            )
+        except Exception:
+            LOGGER.exception(
+                "[Events] Failed to save dashboard activity for redemption '%s' from %s.",
+                reward_title,
+                username
+            )
+
         try:
             result = await services.redeems.handle_redemption(
                 broadcaster_id=broadcaster_id,
                 user_id=user_id,
                 username=username,
                 reward_title=reward_title,
-                redemption_id=redemption_id
+                redemption_id=redemption_id,
+                stream_id=stream_id
             )
         except Exception:
             LOGGER.exception(

@@ -1,30 +1,29 @@
 # RatsBoomBot
 
-RatsBoomBot is a multi-channel Twitch chatbot built with Python, TwitchIO, FastAPI, and SQLite. It combines Twitch chat automation, channel-specific profiles, persistent viewer data, EventSub integrations, an administrator dashboard, and a self-service channel dashboard.
+RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with Python, TwitchIO, FastAPI, and SQLite. It provides shared Twitch automation while allowing each connected broadcaster to have their own commands, messages, loyalty currency, redeems, game integrations, and feature defaults.
 
-The project is currently intended for Ninjakaing and a small group of invited streamers. It is not yet a public, self-service bot platform.
+The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Latest release: **5.3.6**  
-Active development branch: **`feature/admin-dash`**
+Current version: **6.0.0**
 
-## Features
+## Highlights
 
-- Multi-channel Twitch chat through TwitchIO
-- Browser-based bot and broadcaster OAuth
-- SQLite-backed tokens, settings, counters, points, and redeem data
-- Channel-specific profiles, messages, point themes, commands, and game components
-- Per-channel feature, command-group, and command overrides
-- Passive loyalty points, leaderboards, gambling, and viewer duels
-- Viewer queues with moderator chat commands and dashboard removal controls
-- Channel-point daily and first redeems
-- Follow, subscription, raid, redeem, stream, and ad events
-- Social links and rotating timer announcements
-- Persistent counters and per-stream text logs
-- Password-based administrator accounts with owner-only account management
-- A protected administrator dashboard for runtime, channel, feature, queue, OAuth, and log management
-- A Twitch-authenticated channel dashboard for channel owners
-- CSRF protection, signed sessions, production cookie settings, and OAuth state validation
-- Health endpoint, structured logging, database migrations, and automated tests
+- Multi-channel Twitch chat and EventSub handling
+- Channel-specific profiles, commands, currencies, messages, and feature defaults
+- Twitch OAuth for the bot account and connected broadcasters
+- Persistent points, counters, redeem history, settings, and moderation data
+- Daily, first, second, self-timeout, and targeted-timeout redeems
+- Streamer.bot and Mix It Up redeem-history import tools
+- Viewer queues managed through chat or either dashboard
+- Native Twitch shoutout queue with cooldown and retry protection
+- Automatic first-chat shoutouts for selected profile users
+- Incoming and outgoing raid responses
+- Viewer-created 60-second and 30-second Twitch clips
+- Optional game integrations, including Overwatch session tracking
+- Channel-isolated stream logs with retention, downloads, and manual deletion
+- Real-time server performance and application logs
+- Administrator and Twitch-authenticated channel dashboards
+- SQLite migrations, deployment backups, health checks, and automated tests
 
 ## Tech Stack
 
@@ -32,92 +31,191 @@ Active development branch: **`feature/admin-dash`**
 - TwitchIO 3.2
 - FastAPI and Uvicorn
 - SQLite and asqlite
-- Jinja2
+- Jinja2 and Starlette signed sessions
 - HTTPX
 - Argon2 password hashing
-- Starlette signed sessions
 - Rich logging
 - pytest and pytest-asyncio
 
-## Architecture
+## Project Structure
 
 ```text
 RatsBoomBot
-├── app/                 Coordinated bot and web runtime
+├── app/                    Shared bot and web runtime
 ├── bot/
-│   ├── channels/        Broadcaster profiles and channel components
-│   ├── services/        Shared business logic and background services
-│   └── shared/          Reusable commands and EventSub handlers
-├── config/              Environment settings and application version
-├── storage/             SQLite repositories and versioned migrations
+│   ├── channels/           Broadcaster profiles, commands, and game modules
+│   ├── services/
+│   │   ├── channels/       Broadcaster state, settings, and feature overrides
+│   │   ├── engagement/     Points, redeems, clips, queues, and game services
+│   │   ├── stream/         Timers, ads, shoutouts, and stream logs
+│   │   └── support/        Help and moderation services
+│   └── shared/             Reusable commands and EventSub listeners
+├── config/                 Environment settings and application version
+├── deploy/                 Linux, systemd, backup, and Windows deployment tools
+├── docs/                   Project documentation and style guide
+├── scripts/                Administration and data-import utilities
+├── storage/                Database access and versioned migrations
+├── tests/                  Automated tests
 ├── web/
-│   ├── routers/         Admin, OAuth, channel, health, and log routes
-│   ├── templates/       Administrator and channel dashboard pages
-│   └── static/          Dashboard styles and assets
-├── tests/               Automated tests
-├── docs/                Project documentation and style guide
-└── main.py              Application entry point
+│   ├── admin/              Administrator authentication and routes
+│   ├── channel/            Broadcaster authentication and routes
+│   ├── shared/             Shared web helpers and health routes
+│   ├── templates/          Dashboard pages
+│   └── static/             Styles and assets
+└── main.py                 Application entry point
 ```
 
-Commands receive and validate chat input. Services own shared behavior and persistence. Profiles define channel-specific defaults. Storage owns SQLite access and migrations. Web routers expose the administrator, OAuth, and channel-owner workflows. The runtime starts and stops the Twitch bot and FastAPI server together.
+Commands validate chat input, services own shared behavior and persistence, and profiles define broadcaster-specific configuration. The runtime starts and stops the Twitch bot and FastAPI application together.
 
-## Channel Profiles and Feature Controls
+## Channel Profiles
 
-Each supported broadcaster has a profile under `bot/channels/<channel_name>/`. A profile can define:
+Profiles live under `bot/channels/<channel_name>/`. Each profile can configure:
 
-- Channel-specific components and messages
-- Feature defaults
-- Global command-group and individual command defaults
-- Timer messages
-- Point-system name, command, rewards, gambling, and duel behavior
-- Follow, subscription, raid, and redeem responses
+- Enabled components and protected Twitch users
+- Feature, command-group, and individual-command defaults
+- Timer, community, raid, shoutout, clip, point, and redeem messages
+- Loyalty currency, reward rate, gambling, and duels
+- Daily, first, second, self-timeout, and targeted-timeout rewards
+- Optional persistent counters attached to targeted redeems
+- Selected first-chat shoutout users
+- Profile-specific game integrations
 
-Dashboard overrides are stored separately from profile defaults. Administrators and authenticated channel owners can enable, disable, or reset:
+The repository includes a disabled `template_profile` and an enabled developer profile for integration testing. Dashboard overrides are stored separately from profile defaults; resetting an override returns the channel to its configured default.
 
-- Channel, timers, points, redeems, community events, and raid responses
-- Points, viewer queue, shoutout, social, and settings command groups
-- Independent utility, counter, and moderation commands
+## Engagement Features
 
-Resetting an override returns the channel to its profile default.
+### Loyalty Points
 
-## Setup
+Each channel can name its currency and choose its command. The shared system supports passive chat rewards, balance checks, leaderboards, moderator grants, broadcaster resets, gambling, and viewer duels.
 
-### 1. Clone the Repository
+Points can remain disabled without disabling unrelated redeem tracking.
+
+### Redeems and Stream Activity
+
+The redeem service supports one daily claim per user per stream, first and second winners, historical totals, milestones, self-timeouts, reusable fixed-target timeouts, and optional targeted-redeem counters. Successful rewards and other channel-point activity appear on the dashboards.
+
+Redeems are matched by the exact Twitch reward title configured in the channel profile.
+
+### Viewer Queue
+
+Viewers can join and leave a per-channel queue through chat. Moderators and broadcasters can open, close, advance, remove, or clear it. Both dashboards update the queue automatically and allow direct removal.
+
+Viewer queues currently remain in memory and reset when the application restarts.
+
+### Shoutouts and Raids
+
+`!so` sends a profile-specific message and queues a native Twitch shoutout. The queue observes Twitch cooldowns, prevents duplicate targets, and retries temporary failures up to three times.
+
+Profiles can automatically shout out selected users when they send their first message of a live stream. Twitch stream IDs are persisted so restarting the bot does not trigger the shoutout again during the same stream.
+
+Incoming raids can trigger chat and shoutout behavior. Broadcasters can also start outgoing raids with subscriber and non-subscriber messages configured by profile.
+
+### Clips
+
+`!clip` or `!clips` creates a 60-second clip. Adding `short` requests a 30-second clip. Clip creation includes per-channel cooldowns, in-progress protection, live validation, and profile-specific responses.
+
+### Moderation
+
+Moderation support includes protected users, timeout actions, `!kamikaze`, and configurable bot-detection modes:
+
+- `learning` records observations without action.
+- `shadow` records what would have happened.
+- `active` applies moderation actions.
+
+### Game Integrations
+
+Game components live inside each profile's `games/` package. The current Overwatch integration provides profile and rank summaries plus manually tracked session wins and losses. Commands can be limited to streams where the broadcaster is live in an allowed category.
+
+Third-party game APIs may require public player profiles and do not expose every type of live match data.
+
+## Dashboards
+
+### Streamer Dashboard
+
+The root URL is the broadcaster-facing entry point. Twitch-authenticated connected broadcasters can view stream status, viewer queues, check-ins, other redeems, and social links; remove viewers; and manage supported feature and command overrides.
+
+Channel sessions are isolated by Twitch user ID and persist for the configured session lifetime.
+
+### Administrator Dashboard
+
+The administrator dashboard at `/admin` provides:
+
+- Runtime, database, and OAuth status
+- Broadcaster onboarding and removal
+- Per-channel feature and command controls
+- Viewer queue and redeem activity inspection
+- Real-time CPU, memory, disk, temperature, uptime, and process metrics
+- Real-time application logs
+- Stream-log browsing, downloads, and deletion
+- Owner-managed administrator accounts
+
+Forms use CSRF protection, and sessions are signed with `SESSION_SECRET`.
+
+## Stream Logs
+
+Per-stream logs are stored under:
+
+```text
+.data/logs/<channel>/<timestamp>_stream-<stream_id>/log.txt
+```
+
+Channel records are routed only to their matching broadcaster. General application records remain in the administrator log instead of being copied into every active stream.
+
+The service resumes the same Twitch stream after a bot restart. Each channel retains its ten newest sessions. Older inactive sessions are pruned automatically, while active sessions are protected from automatic and manual deletion.
+
+## Database and Migrations
+
+The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadcaster connections, administrator accounts, settings, overrides, points, counters, redeem history, dashboard activity, first-chat shoutouts, moderation data, and migration history.
+
+Migrations run automatically during startup:
+
+1. Initial application schema
+2. Redeem statistics
+3. Administrator accounts
+4. Imported redeem totals
+5. Redemption activity
+6. Second-redeem constraints
+7. First-chat shoutout history
+
+Use a new migration for schema changes instead of rebuilding the production database.
+
+## Historical Redeem Imports
+
+Two preview-first tools are included:
+
+- `scripts/import_streamerbot_redeems.py` imports Streamer.bot user-variable JSON.
+- `scripts/import_mixitup_redeems.py` imports Mix It Up tab-separated First, Second, and daily totals.
+
+Both require a broadcaster ID and only write when `--apply` is supplied. Imports replace the corresponding totals for that broadcaster, so create a backup first.
+
+## Local Setup
+
+### 1. Clone and create a virtual environment
 
 ```bash
 git clone https://github.com/Akaing1/RatsBoomBot.git
 cd RatsBoomBot
-git checkout release/5.3.6
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-Use `feature/admin-dash` only when testing the current in-development dashboard changes.
-
-### 2. Create a Virtual Environment
-
-Windows PowerShell:
+Windows PowerShell activation:
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-Linux or macOS:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### 3. Install Dependencies
+### 2. Install dependencies
 
 ```bash
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Configure the Environment
+### 3. Configure the environment
 
-Copy `.env.example` to `.env`, then fill in the Twitch credentials, IDs, OAuth callbacks, session secret, and scopes.
+Copy `.env.example` to `.env` and configure the Twitch application, account IDs, callbacks, session secret, and scopes.
 
 ```env
 CLIENT_ID=
@@ -125,10 +223,8 @@ CLIENT_SECRET=
 BOT_ID=
 OWNER_ID=
 
-PREFIX=!
 DATABASE_PATH=.data/tokens.db
 STREAM_LOGS_PATH=.data/logs
-IGNORED_USERS=
 
 ADMIN_HOST=127.0.0.1
 ADMIN_PORT=4345
@@ -139,160 +235,95 @@ ENVIRONMENT=local
 SESSION_HTTPS_ONLY=false
 TRUST_PROXY_HEADERS=false
 
-BOT_REDIRECT_URI=http://127.0.0.1:4345/oauth/bot
-CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel
+BOT_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/bot
+CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/channel
 PUBLIC_CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel/connect
-
-BOT_SCOPES=user:read:chat user:write:chat user:bot
-CHANNEL_SCOPES=channel:bot moderator:manage:banned_users moderator:read:followers moderator:read:blocked_terms moderator:read:chat_settings moderator:read:unban_requests moderator:read:chat_messages moderator:read:warnings moderator:read:moderators moderator:read:vips channel:read:redemptions channel:read:subscriptions channel:read:ads channel:manage:moderators moderator:manage:shoutouts
-
-SERYBOT_USER_ID=402337290
-BOT_DETECTION_MODE=learning
-LOG_LEVEL=INFO
 ```
 
-Generate a long random value for `SESSION_SECRET`. The application refuses to start without it.
+Keep `SESSION_SECRET` stable across deployments or existing browser sessions will become invalid. Administrator sessions default to eight hours; broadcaster sessions default to 30 days.
 
-`BOT_DETECTION_MODE` accepts `learning`, `shadow`, or `active`. `ENVIRONMENT` accepts `local` or `production`.
+Register each callback exactly in the Twitch developer application. Changing scopes requires the affected account to reconnect.
 
-## Twitch Application Configuration
-
-Create a Twitch developer application and register every OAuth callback exactly as configured in `.env`.
-
-Local callbacks:
-
-```text
-http://127.0.0.1:4345/oauth/bot
-http://127.0.0.1:4345/oauth/channel
-http://127.0.0.1:4345/oauth/channel/connect
-```
-
-The bot callback authorizes the bot account. The administrator channel callback connects broadcasters from the admin dashboard. The public channel callback signs a broadcaster into their channel dashboard.
-
-Changing a scope does not update existing tokens. Reauthorize the affected account after changing `BOT_SCOPES` or `CHANNEL_SCOPES`.
-
-## Running Locally
+### 4. Run
 
 ```bash
 python main.py
 ```
 
-The bot runtime and web dashboard start together. The default local dashboard is:
-
 ```text
-http://127.0.0.1:4345
+Streamer dashboard: http://127.0.0.1:4345/
+Admin dashboard:    http://127.0.0.1:4345/admin
+Health endpoint:    http://127.0.0.1:4345/health
 ```
 
-The health endpoint is available at `/health` and returns the application name, version, environment, and health state.
-
-## First Administrator Account
-
-Administrator authentication uses database-backed accounts and Argon2 password hashes. The original owner account must be created before the admin dashboard can be used. Additional administrator accounts can then be created, disabled, re-enabled, or assigned a new password from the owner-only **Admin Users** page.
-
-Administrator passwords must contain at least 12 characters. The owner account is protected from dashboard disabling and password replacement by another administrator.
-
-## Dashboards
-
-### Administrator Dashboard
-
-The administrator dashboard provides:
-
-- Runtime and database status
-- Bot OAuth authorization
-- Broadcaster connection and removal
-- Connected-channel status and details
-- Feature, command-group, and command overrides
-- Viewer-queue inspection and direct viewer removal
-- Stream-log browsing
-- Administrator account management
-
-### Channel Dashboard
-
-Broadcasters can connect with Twitch at `/connect`. After Twitch identity and connected-channel verification, a channel owner can:
-
-- View their channel and live status
-- Inspect their viewer queue and remove viewers
-- View channel settings
-- Enable, disable, or reset their own feature and command overrides
-
-Channel sessions are isolated by the authenticated Twitch broadcaster ID. Dashboard forms use CSRF tokens.
-
-## Production Deployment
-
-The current production instance is deployed to a Raspberry Pi and updated over SSH. A production deployment should also provide:
-
-- HTTPS through a reverse proxy
-- `ENVIRONMENT=production`
-- `SESSION_HTTPS_ONLY=true`
-- `TRUST_PROXY_HEADERS=true` when proxy headers come from a trusted local proxy
-- Public HTTPS values for `ADMIN_BASE_URL` and all OAuth redirect URIs
-- A process manager such as systemd
-- Restricted `.env` and database permissions
-- Backups for `.data/tokens.db` and `.data/logs`
-- Health monitoring against `/health`
-
-The repository does not yet include a universal installation script or committed production service configuration. The existing Raspberry Pi setup is operator-managed and should not be treated as a turnkey public deployment.
-
-## Data and Migrations
-
-The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, EventSub subscription state, authorized broadcasters, administrator accounts, channel settings, feature overrides, points, counters, redeems, and migration history.
-
-Migrations run automatically at startup in version order. Current migrations cover:
-
-1. Initial application schema
-2. Redeem statistics
-3. Administrator accounts
-
-Add a new migration for schema changes instead of manually recreating the database.
-
-Viewer queues are currently held in memory and reset when the application restarts.
+Create the first owner account with the administration script before opening the admin dashboard. Administrator passwords must contain at least 12 characters.
 
 ## Commands
 
-The default prefix is `!`. Available commands depend on the active profile and dashboard overrides.
+The default prefix is `!`. Availability depends on the profile and dashboard overrides.
 
 | Group | Commands |
 | --- | --- |
 | Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!lurk`, `!help` |
-| Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!clear` |
+| Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube`, `!setdiscord`, `!setyoutube` |
 | Settings | `!timers`, `!timers on`, `!timers off` |
-| Counters | `!explode`, `!reklop`, `!randy`, `!car` |
+| Counters | `!explode`, `!reklop`, `!randy`, `!bark`, `!car` |
 | Shoutouts | `!so <username>` |
+| Clips | `!clip`, `!clip short` |
+| Raids | `!startraid <channel>` |
 | Moderation | `!kamikaze <username>` |
+| Overwatch | `!ow`, `!owrank`, `!owrecord`, `!owreset` |
 
-Queue administration, settings, shoutout, and moderation actions require broadcaster or moderator permissions where applicable.
+Point commands use the profile's currency command and provide `leaderboard`, `reset`, `add`, `gamble`, and `duel` subcommands. Permission-sensitive actions are restricted to moderators or the broadcaster where appropriate.
 
-Point commands use the active profile's configured command name. They support balance checks, leaderboards, broadcaster resets, moderator grants, gambling, and viewer duels.
+## Production Deployment
 
-## Stream Logs and Logging
+The production instance runs on a Raspberry Pi under systemd and HTTPS. Assets under `deploy/` include the service unit, Linux deployment with pre-deployment backup, scheduled SQLite backups with integrity checks and retention, a Windows PowerShell deployment wrapper, and Cloudflare tunnel support.
 
-Structured runtime logging covers startup, migrations, OAuth, profiles, commands, EventSub, services, moderation, and shutdown. Per-stream text logs are stored beneath `.data/logs/<channel>/` and can include chat, follows, subscriptions, raids, redeems, and lifecycle events.
+Production should configure:
 
-If the bot restarts during an active stream, the stream-log service attempts to resume that stream's existing session.
+```env
+ENVIRONMENT=production
+SESSION_HTTPS_ONLY=true
+TRUST_PROXY_HEADERS=true
+```
+
+Use public HTTPS callback URLs, restrict `.env` and database permissions, retain backups, and monitor `/health` after deployment.
 
 ## Testing
 
-Run the automated test suite with:
+Run the suite from the repository root:
 
 ```bash
 pytest
 ```
 
-New dashboard work should include tests for authentication, authorization, CSRF validation, channel isolation, and the affected service behavior.
+New behavior should include tests for the affected service and, when relevant, authentication, authorization, CSRF, persistence, and channel isolation.
+
+## Versioning
+
+RatsBoomBot uses a practical three-part version number:
+
+- Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes
+- Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement
+- Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
+
+Version **6.0.0** marks the checkpoint where RatsBoomBot became a structured multi-channel platform with profile-specific engagement, streamer dashboards, migration tools, clips, raids, first-chat shoutouts, and production-oriented stream logging.
 
 ## Current Limitations
 
-- Broadcaster onboarding is not invitation-gated; do not expose the connect URL publicly yet.
-- New channels still require a registered channel profile for complete behavior.
-- Viewer queues do not persist across restarts.
-- Raspberry Pi deployment is not yet reproducible solely from repository files.
-- Public production operation still requires backups, monitoring, hardened error handling, and deployment documentation.
+- Broadcaster onboarding is intended for invited channels and is not invitation-gated in the application.
+- New channels require a registered profile for complete behavior.
+- Viewer queues reset when the process restarts.
+- Some game data depends on third-party services and public player profiles.
+- Production deployment remains operator-managed rather than turnkey hosting.
+- Not every profile-specific message and redeem has a dashboard editor.
 
 ## Development Guidelines
 
-Follow `docs/styling_guide.md` for project formatting and organization. Keep changes consistent with nearby code, use existing service and profile patterns, and prefer compact function signatures and calls when they remain readable.
+Follow `docs/styling_guide.md`. Keep commands thin, put shared behavior in services, keep broadcaster customization in profiles, and use migrations for persistent schema changes.
 
 ## License
 
-RatsBoomBot is currently a personal project without a formal open-source license. Add a license before public distribution or outside contributions.
+RatsBoomBot is a personal project without a formal open-source license. Add a license before public distribution or accepting outside contributions.

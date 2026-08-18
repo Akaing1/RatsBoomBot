@@ -23,6 +23,7 @@ class GlobalCommandGroup(Enum):
     SHOUTOUTS = "shoutouts"
     SOCIALS = "socials"
     SETTINGS = "settings"
+    CLIPS = "clips"
 
 
 class GlobalCommandName(Enum):
@@ -69,6 +70,7 @@ class GlobalCommandDefaults:
     shoutouts: bool = True
     socials: bool = True
     settings: bool = True
+    clips: bool = True
 
     hi: bool = True
     choice: bool = True
@@ -113,6 +115,50 @@ class CommunityMessages:
 @dataclass(frozen=True)
 class RaidMessages:
     incoming: str | None = None
+    outgoing: str | None = None
+    outgoing_subscriber: str | None = None
+
+
+@dataclass(frozen=True)
+class ShoutoutMessages:
+    with_game: str = (
+        "Go check out @{username}! They were last playing {game_name}. "
+        "They are a cool rat: {channel_url}"
+    )
+    without_game: str = (
+        "Go check out @{username}! They are a cool rat: {channel_url}"
+    )
+
+
+@dataclass(frozen=True)
+class FirstChatShoutout:
+    user_id: str
+    username: str
+    message: str | None = None
+    native_shoutout: bool = True
+
+
+@dataclass(frozen=True)
+class ClipMessages:
+    processing: str = "Creating a {duration}-second clip for @{username}..."
+    success: str = "@{username} caught that! {clip_url}"
+    cooldown: str = "@{username}, clips are on cooldown for another {seconds} seconds."
+    in_progress: str = "@{username}, another clip is already being created."
+    offline: str = "@{username}, clips can only be created while the stream is live."
+    unavailable: str = "@{username}, clips are not available for this stream."
+    authorization_required: str = "The broadcaster needs to reconnect their Twitch account before clips can be created."
+    failed: str = "@{username}, Twitch could not create that clip. Please try again later."
+    usage: str = "Use !clip for 60 seconds or !clip short for 30 seconds."
+
+
+@dataclass(frozen=True)
+class ClipConfig:
+    duration: int = 60
+    short_duration: int = 30
+    cooldown_seconds: int = 120
+    processing_timeout_seconds: int = 15
+    title: str = "{channel_name} clipped by {username}"
+    messages: ClipMessages = ClipMessages()
 
 
 @dataclass(frozen=True)
@@ -147,17 +193,57 @@ class RedeemMessages:
         "Milestone! @{username} has claimed first "
         "{claim_count} times!"
     )
+    second_already_claimed_by: str = (
+        "@{username}, this stream's second redeem was already "
+        "claimed by @{winner}."
+    )
+    second_already_claimed: str = "@{username}, this stream's second redeem was already claimed."
+    second_success: str = (
+        "@{username} was second this stream and received "
+        "{amount} points! They have claimed second "
+        "{claim_count} times!"
+    )
+    second_milestone: str = (
+        "Milestone! @{username} has claimed second "
+        "{claim_count} times!"
+    )
+    timeout_success: str = "@{username} has timed themselves out for {minutes} minutes!"
+    timeout_failed: str = "@{username}, Twitch could not time you out."
+
+
+@dataclass(frozen=True)
+class TimeoutRedeemConfig:
+    title: str = ""
+    duration_seconds: int = 0
+    reason: str = "Bye bye."
+
+
+@dataclass(frozen=True)
+class TargetTimeoutRedeemConfig:
+    title: str
+    target_user_id: str
+    target_username: str
+    duration_seconds: int
+    success_message: str = "@{target_username} has been timed out for {minutes} minutes!"
+    failure_message: str = "Twitch could not time out @{target_username}."
+    reason: str = "Targeted channel point redemption."
+    counter_name: str | None = None
+    counter_message: str | None = None
 
 
 @dataclass(frozen=True)
 class RedeemConfig:
     daily_title: str = ""
     first_title: str = ""
+    second_title: str = ""
     daily_amount: int = 0
     first_amount: int = 0
+    second_amount: int = 0
     daily_double_chance: float = 0.05
     claim_milestones: tuple[int, ...] = (10, 25, 50, 100, 250, 500, 1000)
     messages: RedeemMessages = RedeemMessages()
+    timeout: TimeoutRedeemConfig = TimeoutRedeemConfig()
+    target_timeouts: tuple[TargetTimeoutRedeemConfig, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -208,6 +294,13 @@ class PointsConfig:
 
 
 @dataclass(frozen=True)
+class OverwatchConfig:
+    player_id: str = ""
+    platform: str = "pc"
+    allowed_games: tuple[str, ...] = ("Overwatch 2",)
+
+
+@dataclass(frozen=True)
 class ChannelProfile:
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
@@ -217,8 +310,12 @@ class ChannelProfile:
     timer_messages: tuple[str, ...] = ()
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
+    shoutout_messages: ShoutoutMessages = ShoutoutMessages()
+    first_chat_shoutouts: tuple[FirstChatShoutout, ...] = ()
+    clips: ClipConfig = ClipConfig()
     redeems: RedeemConfig = RedeemConfig()
     points: PointsConfig = PointsConfig()
+    overwatch: OverwatchConfig = OverwatchConfig()
 
     def is_user_protected(self, user_id: str) -> bool:
         return str(user_id) in self.protected_user_ids

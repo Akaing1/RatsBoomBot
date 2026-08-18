@@ -1,6 +1,6 @@
 from bot.channels.meinya_yozakura.commands.general import MeinyaCommands
 from bot.channels.meinya_yozakura.commands.points import MeinyaPointsCommands
-from bot.channels.meinya_yozakura.profile_details import MEINYA_COMMUNITY_MESSAGES, MEINYA_POINTS, MEINYA_RAID_MESSAGES, MEINYA_REDEEMS, MEINYA_TIMER_MESSAGES
+from bot.channels.meinya_yozakura.profile_details import MEINYA_COMMUNITY_MESSAGES, MEINYA_POINTS, MEINYA_RAID_MESSAGES, MEINYA_REDEEMS, MEINYA_TIMER_MESSAGES, MEINYA_SHOUTOUT_MESSAGES
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 MEINYA_PROFILE = ChannelProfile(
@@ -26,6 +26,7 @@ MEINYA_PROFILE = ChannelProfile(
         shoutouts=True,
         socials=True,
         settings=True,
+        clips=True,
         hi=False,
         choice=False,
         kaboom=False,
@@ -44,6 +45,7 @@ MEINYA_PROFILE = ChannelProfile(
     timer_messages=MEINYA_TIMER_MESSAGES,
     community_messages=MEINYA_COMMUNITY_MESSAGES,
     raid_messages=MEINYA_RAID_MESSAGES,
+    shoutout_messages=MEINYA_SHOUTOUT_MESSAGES,
     redeems=MEINYA_REDEEMS,
     points=MEINYA_POINTS
 )

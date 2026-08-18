@@ -1,7 +1,51 @@
 from bot.profiles import (
+    ClipConfig,
+    ClipMessages,
     CommunityMessages,
+    FirstChatShoutout,
     PointsConfig,
-    PointsMessages
+    PointsMessages,
+    RaidMessages,
+    RedeemConfig,
+    RedeemMessages,
+    ShoutoutMessages,
+    TargetTimeoutRedeemConfig,
+    TimeoutRedeemConfig
+)
+
+
+DEVELOPER_NINJAKAING_FIRST_CHAT_SHOUTOUTS = (
+    FirstChatShoutout(
+        user_id="1251948863",
+        username="ninjakaing",
+        message="The lead developer @{username} has entered the test environment! {channel_url}",
+        native_shoutout=True
+    ),
+    FirstChatShoutout(
+        user_id="1185298405",
+        username="randomuser1727",
+        # message="An explosive threat @{username} has entered the test environment! {channel_url}",
+        native_shoutout=True
+    ),
+    FirstChatShoutout(
+        user_id="230369508",
+        username="reklop",
+        # message="An explosive threat @{username} has entered the test environment! {channel_url}",
+        native_shoutout=True
+    )
+)
+
+
+DEVELOPER_NINJAKAING_CLIPS = ClipConfig(
+    duration=60,
+    short_duration=30,
+    cooldown_seconds=30,
+    processing_timeout_seconds=15,
+    title="Developer test clip created by {username}",
+    messages=ClipMessages(
+        processing="Compiling a {duration}-second clip for @{username}...",
+        success="@{username}, the clip build passed! {clip_url}"
+    )
 )
 
 
@@ -20,6 +64,61 @@ DEVELOPER_NINJAKAING_COMMUNITY_MESSAGES = CommunityMessages(
     ),
     resubscription=(
         "{username} has been here for {months} months!"
+    )
+)
+
+
+DEVELOPER_NINJAKAING_RAID_MESSAGES = RaidMessages(
+    incoming="@{raider_name} deployed {viewer_count} {viewer_word} into the developer environment!",
+    outgoing="Developer raid test for @{target_name}! {target_url}",
+    outgoing_subscriber="Subscriber developer raid test for @{target_name}! {target_url}"
+)
+
+
+DEVELOPER_NINJAKAING_SHOUTOUT_MESSAGES = ShoutoutMessages(
+    with_game=(
+        "Deploy some support to @{username}! They were last debugging "
+        "{game_name}: {channel_url}"
+    ),
+    without_game=(
+        "Deploy some support to @{username}: {channel_url}"
+    )
+)
+
+
+DEVELOPER_NINJAKAING_REDEEMS = RedeemConfig(
+    daily_title="Dev Daily",
+    first_title="Dev First",
+    second_title="Dev Second",
+    daily_amount=100,
+    first_amount=250,
+    second_amount=150,
+    daily_double_chance=0.50,
+    claim_milestones=(2, 5, 10),
+    messages=RedeemMessages(
+        daily_success="@{username} completed dev check-in #{claim_count} and received {amount} ores!",
+        daily_double="Double build! @{username} received {amount} ores on dev check-in #{claim_count}!",
+        daily_milestone="Dev milestone: @{username} has checked in {claim_count} times!",
+        first_success="@{username} won Dev First and received {amount} ores! Total wins: {claim_count}.",
+        second_success="@{username} won Dev Second and received {amount} ores! Total wins: {claim_count}.",
+        timeout_success="@{username} entered debug jail for {minutes} minutes!",
+        timeout_failed="@{username}, the debug timeout failed."
+    ),
+    timeout=TimeoutRedeemConfig(
+        title="Dev Self Timeout",
+        duration_seconds=60,
+        reason="Developer self-timeout test."
+    ),
+    target_timeouts=(
+        TargetTimeoutRedeemConfig(
+            title="Dev Target Timeout",
+            target_user_id="1251948863",
+            target_username="ninjakaing",
+            duration_seconds=60,
+            success_message="@{target_username} was sent to debug jail for {minutes} minute!",
+            failure_message="The targeted debug timeout for @{target_username} failed.",
+            reason="Developer targeted-timeout test."
+        ),
     )
 )
 

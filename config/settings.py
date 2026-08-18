@@ -24,13 +24,15 @@ class Settings:
     ADMIN_BASE_URL = os.getenv("ADMIN_BASE_URL", f"http://{ADMIN_HOST}:{ADMIN_PORT}")
 
     SESSION_SECRET = os.getenv("SESSION_SECRET")
+    ADMIN_SESSION_MAX_AGE_SECONDS = int(os.getenv("ADMIN_SESSION_MAX_AGE_SECONDS", str(60 * 60 * 8)))
+    CHANNEL_SESSION_MAX_AGE_SECONDS = int(os.getenv("CHANNEL_SESSION_MAX_AGE_SECONDS", str(60 * 60 * 24 * 30)))
 
     ENVIRONMENT = os.getenv("ENVIRONMENT", "local").strip().lower()
     SESSION_HTTPS_ONLY = os.getenv("SESSION_HTTPS_ONLY", "false").strip().lower() == "true"
     TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() == "true"
 
-    BOT_REDIRECT_URI = os.getenv("BOT_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/bot")
-    CHANNEL_REDIRECT_URI = os.getenv("CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/channel")
+    BOT_REDIRECT_URI = os.getenv("BOT_REDIRECT_URI", f"{ADMIN_BASE_URL}/admin/oauth/bot")
+    CHANNEL_REDIRECT_URI = os.getenv("CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/admin/oauth/channel")
     PUBLIC_CHANNEL_REDIRECT_URI = os.getenv("PUBLIC_CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/channel/connect")
 
     BOT_SCOPES = os.getenv("BOT_SCOPES", "user:read:chat user:write:chat user:bot")
@@ -50,6 +52,8 @@ class Settings:
         "channel:read:redemptions "
         "channel:read:subscriptions "
         "channel:read:ads "
+        "clips:edit "
+        "channel:manage:raids "
         "channel:manage:moderators "
         "moderator:manage:shoutouts"
     )
@@ -67,6 +71,12 @@ settings = Settings()
 
 if not settings.SESSION_SECRET:
     raise ValueError("SESSION_SECRET must be configured in .env.")
+
+if settings.ADMIN_SESSION_MAX_AGE_SECONDS <= 0:
+    raise ValueError("ADMIN_SESSION_MAX_AGE_SECONDS must be greater than zero.")
+
+if settings.CHANNEL_SESSION_MAX_AGE_SECONDS <= 0:
+    raise ValueError("CHANNEL_SESSION_MAX_AGE_SECONDS must be greater than zero.")
 
 if settings.BOT_DETECTION_MODE not in VALID_BOT_DETECTION_MODES:
     raise ValueError("BOT_DETECTION_MODE must be learning, shadow, or active.")

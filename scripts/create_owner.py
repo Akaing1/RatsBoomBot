@@ -7,7 +7,7 @@ import asqlite
 from config.settings import settings
 from storage.admin_repository import create_administrator, get_administrator_by_username, list_administrators
 from storage.migration_runner import run_migrations
-from web.passwords import hash_password
+from web.shared.passwords import hash_password
 
 
 MINIMUM_PASSWORD_LENGTH = 12
