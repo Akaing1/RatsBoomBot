@@ -55,6 +55,7 @@ class Settings:
         "clips:edit "
         "channel:manage:raids "
         "channel:manage:moderators "
+        "moderator:manage:announcements "
         "moderator:manage:shoutouts"
     )
 
