@@ -216,6 +216,7 @@ class TimeoutRedeemConfig:
     title: str = ""
     duration_seconds: int = 0
     reason: str = "Bye bye."
+    restore_moderator: bool = False
 
 
 @dataclass(frozen=True)

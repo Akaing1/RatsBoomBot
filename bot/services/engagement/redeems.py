@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import random
 import sqlite3
@@ -19,12 +20,14 @@ class RedeemService:
     DAILY_REDEEM_TYPE = "daily"
     FIRST_REDEEM_TYPE = "first"
     SECOND_REDEEM_TYPE = "second"
+    MODERATOR_RESTORE_BUFFER_SECONDS = 2
 
     def __init__(self, bot, db, points_service, counter_service=None):
         self.bot = bot
         self.db = db
         self.points = points_service
         self.counters = counter_service
+        self._moderator_restore_tasks: set[asyncio.Task] = set()
 
     async def setup(self) -> None:
         LOGGER.info("[Redeems] Preparing redeem claim storage.")
@@ -575,6 +578,10 @@ class RedeemService:
     async def timeout_redeemer(self, *, broadcaster_id: str, user_id: str, username: str, config: RedeemConfig) -> RedeemResult:
         timeout = config.timeout
         broadcaster = self.bot.create_partialuser(broadcaster_id)
+        was_moderator = False
+
+        if timeout.restore_moderator:
+            was_moderator = await self.is_moderator(broadcaster, broadcaster_id, user_id, username)
 
         try:
             await broadcaster.timeout_user(moderator=broadcaster_id, user=user_id, duration=timeout.duration_seconds, reason=timeout.reason)
@@ -583,10 +590,60 @@ class RedeemService:
             message = render_profile_message(config.messages.timeout_failed, username=username)
             return RedeemResult(handled=True, message=message)
 
+        if was_moderator:
+            self.schedule_moderator_restoration(
+                broadcaster=broadcaster,
+                broadcaster_id=broadcaster_id,
+                user_id=user_id,
+                username=username,
+                delay_seconds=timeout.duration_seconds + self.MODERATOR_RESTORE_BUFFER_SECONDS
+            )
+
         minutes = timeout.duration_seconds // 60
         LOGGER.info("[Redeems] Timed out user %s for %d seconds in broadcaster %s.", username, timeout.duration_seconds, broadcaster_id)
         message = render_profile_message(config.messages.timeout_success, username=username, minutes=minutes, seconds=timeout.duration_seconds)
         return RedeemResult(handled=True, message=message)
+
+    async def is_moderator(self, broadcaster, broadcaster_id: str, user_id: str, username: str) -> bool:
+        try:
+            moderators = broadcaster.fetch_moderators(user_ids=[user_id], max_results=1)
+
+            async for moderator in moderators:
+                if str(moderator.id) == str(user_id):
+                    return True
+        except Exception:
+            LOGGER.exception("[Redeems] Failed to check moderator status for %s in broadcaster %s.", username, broadcaster_id)
+
+        return False
+
+    async def restore_moderator(self, *, broadcaster, broadcaster_id: str, user_id: str, username: str, delay_seconds: int) -> None:
+        try:
+            await asyncio.sleep(delay_seconds)
+            await broadcaster.add_moderator(user=user_id)
+        except asyncio.CancelledError:
+            LOGGER.debug("[Redeems] Moderator restoration was cancelled for %s in broadcaster %s.", username, broadcaster_id)
+            raise
+        except Exception:
+            LOGGER.exception("[Redeems] Failed to restore moderator status for %s in broadcaster %s.", username, broadcaster_id)
+            return
+
+        LOGGER.info("[Redeems] Restored moderator status for %s in broadcaster %s.", username, broadcaster_id)
+
+    def schedule_moderator_restoration(self, *, broadcaster, broadcaster_id: str, user_id: str, username: str, delay_seconds: int) -> None:
+        task = asyncio.create_task(
+            self.restore_moderator(
+                broadcaster=broadcaster,
+                broadcaster_id=broadcaster_id,
+                user_id=user_id,
+                username=username,
+                delay_seconds=delay_seconds
+            ),
+            name=f"restore-redeem-moderator-{broadcaster_id}-{user_id}"
+        )
+        self._moderator_restore_tasks.add(task)
+        task.add_done_callback(self._moderator_restore_tasks.discard)
+
+        LOGGER.info("[Redeems] Scheduled moderator restoration for %s in broadcaster %s after %d seconds.", username, broadcaster_id, delay_seconds)
 
     async def timeout_target(self, *, broadcaster_id: str, redeemer_username: str, timeout: TargetTimeoutRedeemConfig) -> RedeemResult:
         broadcaster = self.bot.create_partialuser(broadcaster_id)
