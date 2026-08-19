@@ -31,7 +31,7 @@ MILKY_GALAXYVT_TIMER_MESSAGES = (
 
 MILKY_GALAXYVT_SOCIAL_MESSAGES = SocialMessages(
     overview="Explore more of the Milky Way: Discord: {discord_url} | YouTube: {youtube_url}",
-    discord="Join us in the Milky Way: {discord_url}",
+    discord="Join us in The Milky Way  {discord_url} (its scuffed rn)",
     youtube="Catch more adventures from the stars on YouTube: {youtube_url}"
 )
 
