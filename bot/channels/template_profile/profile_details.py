@@ -8,7 +8,15 @@ from bot.profiles import (
     RaidMessages,
     RedeemConfig,
     RedeemMessages,
-    ShoutoutMessages
+    ShoutoutMessages,
+    SocialMessages
+)
+
+
+TEMPLATE_SOCIAL_MESSAGES = SocialMessages(
+    overview="Follow the channel elsewhere: Discord: {discord_url} | YouTube: {youtube_url}",
+    discord="Join the channel community on Discord: {discord_url}",
+    youtube="Catch up with the channel on YouTube: {youtube_url}"
 )
 
 

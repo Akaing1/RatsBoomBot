@@ -8,6 +8,7 @@ from bot.profiles import (
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
+    SocialMessages,
     TargetTimeoutRedeemConfig,
     TimeoutRedeemConfig
 )
@@ -25,6 +26,13 @@ MILKY_GALAXYVT_FIRST_CHAT_SHOUTOUTS = (
 
 MILKY_GALAXYVT_TIMER_MESSAGES = (
     "Join us in The Milky Way https://discord.gg/bsRcYhnRC3 (its scuffed rn)",
+)
+
+
+MILKY_GALAXYVT_SOCIAL_MESSAGES = SocialMessages(
+    overview="Explore more of the Milky Way: Discord: {discord_url} | YouTube: {youtube_url}",
+    discord="Join us in The Milky Way  {discord_url} (its scuffed rn)",
+    youtube="Catch more adventures from the stars on YouTube: {youtube_url}"
 )
 
 

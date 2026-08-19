@@ -1,4 +1,3 @@
-import logging
 import asyncio
 import logging
 
@@ -35,6 +34,7 @@ class TwitchBot(commands.AutoBot):
             bot_id=settings.BOT_ID,
             owner_id=settings.OWNER_ID,
             prefix=settings.PREFIX,
+            case_insensitive=True,
             subscriptions=subs,
             force_subscribe=True
         )

@@ -5,12 +5,20 @@ from bot.profiles import (
     RaidMessages,
     RedeemConfig,
     RedeemMessages,
-    ShoutoutMessages
+    ShoutoutMessages,
+    SocialMessages
 )
 
 
 STEOHANYY_TIMER_MESSAGES = (
     "Timer Placeholder"
+)
+
+
+STEOHANYY_SOCIAL_MESSAGES = SocialMessages(
+    overview="Keep the drinks flowing: Discord: {discord_url} | YouTube: {youtube_url}",
+    discord="Pull up a seat and join the community: {discord_url}",
+    youtube="Grab a drink and catch up on YouTube: {youtube_url}"
 )
 
 

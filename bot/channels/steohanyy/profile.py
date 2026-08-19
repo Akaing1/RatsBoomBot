@@ -1,6 +1,6 @@
 from bot.channels.steohanyy.commands.general import SteohanyyCommands
 from bot.channels.steohanyy.commands.points import SteohanyyPointsCommands
-from bot.channels.steohanyy.profile_details import STEOHANYY_COMMUNITY_MESSAGES, STEOHANYY_POINTS, STEOHANYY_RAID_MESSAGES, STEOHANYY_REDEEMS, STEOHANYY_TIMER_MESSAGES, STEOHANYY_SHOUTOUT_MESSAGES
+from bot.channels.steohanyy.profile_details import STEOHANYY_COMMUNITY_MESSAGES, STEOHANYY_POINTS, STEOHANYY_RAID_MESSAGES, STEOHANYY_REDEEMS, STEOHANYY_SHOUTOUT_MESSAGES, STEOHANYY_SOCIAL_MESSAGES, STEOHANYY_TIMER_MESSAGES
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 STEOHANYY_PROFILE = ChannelProfile(
@@ -42,5 +42,6 @@ STEOHANYY_PROFILE = ChannelProfile(
     raid_messages=STEOHANYY_RAID_MESSAGES,
     redeems=STEOHANYY_REDEEMS,
     points=STEOHANYY_POINTS,
-    shoutout_messages=STEOHANYY_SHOUTOUT_MESSAGES
+    shoutout_messages=STEOHANYY_SHOUTOUT_MESSAGES,
+    social_messages=STEOHANYY_SOCIAL_MESSAGES
 )

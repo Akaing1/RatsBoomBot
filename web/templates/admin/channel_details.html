@@ -46,7 +46,7 @@
             {% endif %}
         </div>
 
-        <form class="toggle-actions" method="post" action="/admin/channels/{{ broadcaster_id }}/toggles">
+        <form class="toggle-actions" method="post" action="/admin/channels/{{ broadcaster_id }}/toggles" data-preserve-scroll>
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="toggle_type" value="{{ toggle_type }}">
             <input type="hidden" name="toggle_name" value="{{ toggle_name }}">
@@ -653,6 +653,26 @@
         refresh();
         window.setInterval(refresh, 2000);
         document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+    })();
+</script>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+    (() => {
+        const scrollKey = `ratsboombot-toggle-scroll:${window.location.pathname}`;
+        const savedScroll = window.sessionStorage.getItem(scrollKey);
+
+        if (savedScroll !== null) {
+            window.sessionStorage.removeItem(scrollKey);
+            window.requestAnimationFrame(() => window.scrollTo(0, Number(savedScroll)));
+        }
+
+        document.querySelectorAll("form[data-preserve-scroll]").forEach((form) => {
+            form.addEventListener("submit", () => {
+                window.sessionStorage.setItem(scrollKey, String(window.scrollY));
+            });
+        });
     })();
 </script>
 {% endblock %}
