@@ -5,6 +5,7 @@ from twitchio import User
 from twitchio.ext import commands
 
 from bot.profiles import FeatureName, GlobalCommandGroup, PointsConfig, get_active_profile, render_profile_message
+from bot.shared.commands.converters import LocalizedUser
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled, is_global_group_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -562,7 +563,7 @@ class PointsCommands(commands.Component):
         self.handler = PointsCommandHandler(bot)
 
     @commands.group(name="points", invoke_fallback=True)
-    async def points(self, ctx: commands.Context, target: User = None) -> None:
+    async def points(self, ctx: commands.Context, target: LocalizedUser = None) -> None:
         await self.handler.show_balance(ctx, target, "points")
 
     @points.command(name="leaderboard")
@@ -574,7 +575,7 @@ class PointsCommands(commands.Component):
         await self.handler.reset_points(ctx, "points")
 
     @points.command(name="add")
-    async def points_add(self, ctx: commands.Context, target: User, amount: int) -> None:
+    async def points_add(self, ctx: commands.Context, target: LocalizedUser, amount: int) -> None:
         await self.handler.add_points(ctx, target, amount, "points")
 
     @points.command(name="gamble")
@@ -582,7 +583,7 @@ class PointsCommands(commands.Component):
         await self.handler.gamble(ctx, amount, "points")
 
     @points.group(name="duel", invoke_fallback=True)
-    async def points_duel(self, ctx: commands.Context, opponent: User = None, amount: str = None) -> None:
+    async def points_duel(self, ctx: commands.Context, opponent: LocalizedUser = None, amount: str = None) -> None:
         await self.handler.create_duel(ctx, opponent, amount, "points")
 
     @points_duel.command(name="accept")

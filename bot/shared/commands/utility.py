@@ -1,10 +1,10 @@
 import logging
 import random
 
-import twitchio
 from twitchio.ext import commands
 
 from bot.profiles import GlobalCommandName
+from bot.shared.commands.converters import LocalizedUser
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_command_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -47,7 +47,7 @@ class UtilityCommands(commands.Component):
         return True
 
     @commands.command()
-    async def hi(self, ctx: commands.Context, user: twitchio.User = None) -> None:
+    async def hi(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
         self.log_command(ctx, "hi")
 
         if not self.command_enabled(ctx, GlobalCommandName.HI):
@@ -86,7 +86,7 @@ class UtilityCommands(commands.Component):
         await ctx.reply(f"Hmmmm... I choose: {selected_choice}!")
 
     @commands.command()
-    async def kaboom(self, ctx: commands.Context, user: twitchio.User = None) -> None:
+    async def kaboom(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
         self.log_command(ctx, "kaboom")
 
         if not self.command_enabled(ctx, GlobalCommandName.KABOOM):
@@ -99,7 +99,7 @@ class UtilityCommands(commands.Component):
         await ctx.send(f"{ctx.chatter.name} has blown {user} up! KABOOM!")
 
     @commands.command()
-    async def stinky(self, ctx: commands.Context, user: twitchio.User = None) -> None:
+    async def stinky(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
         self.log_command(ctx, "stinky")
 
         if not self.command_enabled(ctx, GlobalCommandName.STINKY):
@@ -150,7 +150,7 @@ class UtilityCommands(commands.Component):
         await ctx.reply(message)
 
     @commands.command()
-    async def lucky(self, ctx: commands.Context, user: twitchio.User = None) -> None:
+    async def lucky(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
         self.log_command(ctx, "lucky")
 
         if not self.command_enabled(ctx, GlobalCommandName.LUCKY):
@@ -201,7 +201,7 @@ class UtilityCommands(commands.Component):
         await ctx.reply(message)
 
     @commands.command()
-    async def smart(self, ctx: commands.Context, user: twitchio.User = None) -> None:
+    async def smart(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
         self.log_command(ctx, "smart")
 
         if not self.command_enabled(ctx, GlobalCommandName.SMART):
