@@ -35,6 +35,16 @@ class ChatEvents(commands.Component):
             return
 
         try:
+            await services.chatters.observe(broadcaster_id, payload.chatter)
+        except Exception:
+            LOGGER.exception(
+                "[Chatters] Failed to record identity for %s (%s) in %s.",
+                chatter_name,
+                chatter_id,
+                broadcaster_name
+            )
+
+        try:
             moderation_result = await services.moderation.evaluate_message(payload)
         except Exception:
             LOGGER.exception(

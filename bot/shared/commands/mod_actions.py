@@ -3,10 +3,10 @@ import logging
 import random
 import time
 
-from twitchio import User
 from twitchio.ext import commands
 
 from bot.profiles import GlobalCommandName, get_active_profile
+from bot.shared.commands.converters import LocalizedUser
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_command_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -188,7 +188,7 @@ class ModActionCommands(commands.Component):
         return True
 
     @commands.command(name="kamikaze")
-    async def kamikaze(self, ctx: commands.Context, target: User = None) -> None:
+    async def kamikaze(self, ctx: commands.Context, target: LocalizedUser = None) -> None:
         services = self.bot.services
 
         if services is None:
