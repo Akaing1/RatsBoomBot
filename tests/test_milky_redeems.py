@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 
 import asqlite
@@ -22,9 +23,19 @@ class FakeBroadcaster:
 
     def __init__(self):
         self.timeouts = []
+        self.moderator_ids = set()
+        self.added_moderators = []
 
     async def timeout_user(self, **values) -> None:
         self.timeouts.append(values)
+
+    async def fetch_moderators(self, user_ids, max_results):
+        for user_id in user_ids:
+            if str(user_id) in self.moderator_ids:
+                yield SimpleNamespace(id=str(user_id))
+
+    async def add_moderator(self, *, user) -> None:
+        self.added_moderators.append(str(user))
 
 
 class FakeBot:
@@ -60,9 +71,15 @@ async def test_milky_first_and_second_redeems_keep_separate_counts(tmp_path) -> 
 
 
 @pytest.mark.asyncio
-async def test_milky_timeout_redeem_times_out_the_redeemer(tmp_path) -> None:
+async def test_milky_timeout_redeem_times_out_and_restores_moderator(tmp_path, monkeypatch) -> None:
     database_path = tmp_path / "milky-timeout.db"
     bot = FakeBot()
+    bot.broadcaster.moderator_ids.add("user-1")
+
+    async def skip_sleep(delay_seconds: int) -> None:
+        return None
+
+    monkeypatch.setattr("bot.services.engagement.redeems.asyncio.sleep", skip_sleep)
 
     async with asqlite.create_pool(str(database_path)) as database:
         await run_migrations(database)
@@ -70,6 +87,8 @@ async def test_milky_timeout_redeem_times_out_the_redeemer(tmp_path) -> None:
         await service.setup()
         service.get_redeem_config = lambda broadcaster_id: MILKY_GALAXYVT_REDEEMS
         result = await service.handle_redemption(broadcaster_id="channel-1", user_id="user-1", username="alice", reward_title="3 Minute Timeout", stream_id="stream-1")
+        restore_tasks = tuple(service._moderator_restore_tasks)
+        await asyncio.gather(*restore_tasks)
 
     assert bot.broadcaster.timeouts == [{
         "moderator": "channel-1",
@@ -78,6 +97,7 @@ async def test_milky_timeout_redeem_times_out_the_redeemer(tmp_path) -> None:
         "reason": "Redeemed 3 Minute Timeout."
     }]
     assert result.message == "@alice has timed themselves out for 3 minutes!"
+    assert bot.broadcaster.added_moderators == ["user-1"]
 
 
 @pytest.mark.asyncio

@@ -94,7 +94,8 @@ MILKY_GALAXYVT_REDEEMS = RedeemConfig(
     timeout=TimeoutRedeemConfig(
         title="3 Minute Timeout",
         duration_seconds=180,
-        reason="Redeemed 3 Minute Timeout."
+        reason="Redeemed 3 Minute Timeout.",
+        restore_moderator=True
     ),
     target_timeouts=(
         TargetTimeoutRedeemConfig(
