@@ -7,7 +7,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 class AdAnnouncementService:
     CHECK_EVERY_SECONDS = 30
-    WARNING_SECONDS = 60
+    WARNING_SECONDS = 120
 
     def __init__(self, bot, broadcasters):
         self.bot = bot
@@ -141,19 +141,29 @@ class AdAnnouncementService:
             )
 
             try:
-                await broadcaster.send_message(sender=self.bot.user, message=message)
+                await broadcaster.send_announcement(moderator=broadcaster_id, message=message, color="purple")
             except Exception:
-                LOGGER.exception(
-                    "[Ads] Failed to send ad warning to %s (%s).",
+                LOGGER.warning(
+                    "[Ads] Could not send an announcement to %s (%s). Falling back to a chat message.",
                     broadcaster_name,
-                    broadcaster_id
+                    broadcaster_id,
+                    exc_info=True
                 )
-                continue
+
+                try:
+                    await broadcaster.send_message(sender=self.bot.user, message=message)
+                except Exception:
+                    LOGGER.exception(
+                        "[Ads] Failed to send fallback ad warning to %s (%s).",
+                        broadcaster_name,
+                        broadcaster_id
+                    )
+                    continue
 
             self.warned_ads.add(ad_key)
 
             LOGGER.info(
-                "[Ads] Sent ad warning to %s (%s) for an ad starting in %d seconds.",
+                "[Ads] Sent ad announcement to %s (%s) for an ad starting in %d seconds.",
                 broadcaster_name,
                 broadcaster_id,
                 seconds_until_ad
