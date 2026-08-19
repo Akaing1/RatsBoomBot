@@ -5,7 +5,8 @@ from bot.profiles import (
     RaidMessages,
     RedeemConfig,
     RedeemMessages,
-    ShoutoutMessages
+    ShoutoutMessages,
+    SocialMessages
 )
 
 
@@ -17,6 +18,13 @@ MEINYA_TIMER_MESSAGES = (
     "Stinky car is now a youtuber HYPERS ! For now we're only posting vods and some clips, but, maybe we'll do full videos in the future, who knows Shrug Go ahead and subscribe, it's greatly appreciated https://www.youtube.com/@MeinyaYozakura",
     "Join the Garden :3 <3 https://discord.gg/E7Q2yTmVp4"
 
+)
+
+
+MEINYA_SOCIAL_MESSAGES = SocialMessages(
+    overview="Find more from the Blood Sakura Garden: Discord: {discord_url} | YouTube: {youtube_url}",
+    discord="Join the Blood Sakura Garden: {discord_url}",
+    youtube="Visit Meinya's YouTube for VODs and clips: {youtube_url}"
 )
 
 

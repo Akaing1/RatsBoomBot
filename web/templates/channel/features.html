@@ -62,6 +62,7 @@
             class="toggle-actions"
             method="post"
             action="/channel/features/toggles"
+            data-preserve-scroll
         >
             <input
                 type="hidden"
@@ -117,6 +118,26 @@
 
 {% block title %}
     Features | {{ broadcaster.name or "Your Channel" }} | RatsBoomBot
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+    (() => {
+        const scrollKey = `ratsboombot-toggle-scroll:${window.location.pathname}`;
+        const savedScroll = window.sessionStorage.getItem(scrollKey);
+
+        if (savedScroll !== null) {
+            window.sessionStorage.removeItem(scrollKey);
+            window.requestAnimationFrame(() => window.scrollTo(0, Number(savedScroll)));
+        }
+
+        document.querySelectorAll("form[data-preserve-scroll]").forEach((form) => {
+            form.addEventListener("submit", () => {
+                window.sessionStorage.setItem(scrollKey, String(window.scrollY));
+            });
+        });
+    })();
+</script>
 {% endblock %}
 
 {% block content %}

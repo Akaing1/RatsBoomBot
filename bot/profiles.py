@@ -131,6 +131,15 @@ class ShoutoutMessages:
 
 
 @dataclass(frozen=True)
+class SocialMessages:
+    overview: str = "Discord: {discord_url} | YouTube: {youtube_url}"
+    discord: str = "Join the community on Discord: {discord_url}"
+    youtube: str = "Catch up on YouTube: {youtube_url}"
+    discord_unavailable: str = "No Discord link has been set for this channel yet."
+    youtube_unavailable: str = "No YouTube link has been set for this channel yet."
+
+
+@dataclass(frozen=True)
 class FirstChatShoutout:
     user_id: str
     username: str
@@ -312,6 +321,7 @@ class ChannelProfile:
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
     shoutout_messages: ShoutoutMessages = ShoutoutMessages()
+    social_messages: SocialMessages = SocialMessages()
     first_chat_shoutouts: tuple[FirstChatShoutout, ...] = ()
     clips: ClipConfig = ClipConfig()
     redeems: RedeemConfig = RedeemConfig()

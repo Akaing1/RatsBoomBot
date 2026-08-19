@@ -9,8 +9,16 @@ from bot.profiles import (
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
+    SocialMessages,
     TargetTimeoutRedeemConfig,
     TimeoutRedeemConfig
+)
+
+
+DEVELOPER_NINJAKAING_SOCIAL_MESSAGES = SocialMessages(
+    overview="Developer channel links: Discord: {discord_url} | YouTube: {youtube_url}",
+    discord="Join the developer test community: {discord_url}",
+    youtube="Watch developer channel uploads: {youtube_url}"
 )
 
 
