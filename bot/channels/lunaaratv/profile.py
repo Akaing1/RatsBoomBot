@@ -9,6 +9,7 @@ LUNAARATV_PROFILE = ChannelProfile(
     features=FeatureDefaults(
         channel=False,
         timers=False,
+        ad_announcements=False,
         points=False,
         redeems=False,
         community_events=False,
