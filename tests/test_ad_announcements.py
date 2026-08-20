@@ -12,8 +12,10 @@ class FakeBroadcaster:
         self.next_ad_at = next_ad_at
         self.announcements = []
         self.messages = []
+        self.schedule_fetches = 0
 
     async def fetch_ad_schedule(self):
+        self.schedule_fetches += 1
         return SimpleNamespace(next_ad_at=self.next_ad_at)
 
     async def send_announcement(self, *, moderator, message: str, color: str) -> None:
@@ -31,9 +33,13 @@ class FakeBroadcasterService:
 
 class FakeBot:
 
-    def __init__(self, broadcaster):
+    def __init__(self, broadcaster, ad_announcements_enabled=True):
         self.broadcaster = broadcaster
-        self.services = SimpleNamespace()
+        self.services = SimpleNamespace(
+            features=SimpleNamespace(
+                is_enabled=lambda broadcaster_id, feature: ad_announcements_enabled
+            )
+        )
         self.user = SimpleNamespace(id="bot-1")
 
     def create_partialuser(self, broadcaster_id: str):
@@ -51,6 +57,18 @@ async def test_ad_warning_is_sent_between_one_and_two_minutes_before_ad() -> Non
     assert broadcaster.announcements[0]["moderator"] == "channel-1"
     assert broadcaster.announcements[0]["color"] == "purple"
     assert "Ads starting in ~" in broadcaster.announcements[0]["message"]
+    assert broadcaster.messages == []
+
+
+@pytest.mark.asyncio
+async def test_ad_schedule_is_not_fetched_when_announcements_are_disabled() -> None:
+    broadcaster = FakeBroadcaster(datetime.now(UTC) + timedelta(seconds=110))
+    service = AdAnnouncementService(FakeBot(broadcaster, ad_announcements_enabled=False), FakeBroadcasterService())
+
+    await service.check_ad_schedules()
+
+    assert broadcaster.schedule_fetches == 0
+    assert broadcaster.announcements == []
     assert broadcaster.messages == []
 
 

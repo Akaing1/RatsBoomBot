@@ -9,6 +9,7 @@ STEOHANYY_PROFILE = ChannelProfile(
     features=FeatureDefaults(
         channel=True,
         timers=False,
+        ad_announcements=False,
         points=True,
         redeems=False,
         community_events=True,

@@ -2,6 +2,8 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
+from bot.profiles import FeatureName
+
 LOGGER = logging.getLogger("RatBoomBot")
 
 
@@ -95,6 +97,14 @@ class AdAnnouncementService:
         active_ad_keys: set[str] = set()
 
         for broadcaster_id, broadcaster_name in active_channels.items():
+            if not services.features.is_enabled(broadcaster_id, FeatureName.AD_ANNOUNCEMENTS):
+                LOGGER.debug(
+                    "[Ads] Skipping ad schedule check because ad announcements are disabled for %s (%s).",
+                    broadcaster_name,
+                    broadcaster_id
+                )
+                continue
+
             try:
                 broadcaster = self.bot.create_partialuser(broadcaster_id)
                 schedule = await broadcaster.fetch_ad_schedule()
