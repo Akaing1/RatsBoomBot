@@ -44,7 +44,7 @@ BARBATOS2UPUSR3X_CLIPS = ClipConfig(
 
 
 BARBATOS2UPUSR3X_TIMER_MESSAGES = (
-    "Timer Placeholder"
+    "Timer Placeholder",
 )
 
 
@@ -89,7 +89,7 @@ BARBATOS2UPUSR3X_REDEEMS = RedeemConfig(
 
 
 BARBATOS2UPUSR3X_POINTS = PointsConfig(
-    command_name="points",
+    command_name="barbatos2upusr3x_placeholder_points",
     points_per_message=10,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,

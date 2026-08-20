@@ -44,7 +44,7 @@ ONEDAYBREAD_CLIPS = ClipConfig(
 
 
 ONEDAYBREAD_TIMER_MESSAGES = (
-    "Timer Placeholder"
+    "Timer Placeholder",
 )
 
 
@@ -89,7 +89,7 @@ ONEDAYBREAD_REDEEMS = RedeemConfig(
 
 
 ONEDAYBREAD_POINTS = PointsConfig(
-    command_name="points",
+    command_name="onedaybread_placeholder_points",
     points_per_message=10,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,

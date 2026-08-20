@@ -44,7 +44,7 @@ XXEMARES_CLIPS = ClipConfig(
 
 
 XXEMARES_TIMER_MESSAGES = (
-    "Timer Placeholder"
+    "Timer Placeholder",
 )
 
 
@@ -89,7 +89,7 @@ XXEMARES_REDEEMS = RedeemConfig(
 
 
 XXEMARES_POINTS = PointsConfig(
-    command_name="points",
+    command_name="xxemares_placeholder_points",
     points_per_message=10,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,
