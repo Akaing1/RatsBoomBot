@@ -96,6 +96,30 @@
     </article>
 </section>
 
+{% if administrator and administrator.role == "owner" %}
+<section class="panel danger-zone">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow danger-eyebrow">Runtime control</p>
+            <h3>Restart RatsBoomBot</h3>
+        </div>
+    </div>
+
+    <p class="page-description">
+        Gracefully close the Twitch bot and dashboard. Systemd will start a fresh
+        process automatically, which normally takes several seconds.
+    </p>
+
+    <form method="post" action="/admin/runtime/restart" onsubmit="return confirm('Restart RatsBoomBot now?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <button class="button danger" type="submit">
+            Restart Bot
+        </button>
+    </form>
+</section>
+{% endif %}
+
 <section class="panel">
     <div class="panel-header">
         <div>

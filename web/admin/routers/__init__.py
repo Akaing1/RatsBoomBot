@@ -8,6 +8,7 @@ from web.admin.routers.dashboard import dashboard, router as dashboard_router
 from web.admin.routers.logs import router as logs_router
 from web.admin.routers.oauth import router as oauth_router
 from web.admin.routers.performance import router as performance_router
+from web.admin.routers.runtime_control import router as runtime_control_router
 from web.admin.routers.runtime_logs import router as runtime_logs_router
 
 router = APIRouter(prefix="/admin")
@@ -18,6 +19,7 @@ router.include_router(channels_router)
 router.include_router(logs_router)
 router.include_router(performance_router)
 router.include_router(runtime_logs_router)
+router.include_router(runtime_control_router)
 router.include_router(administrators_router)
 
 
@@ -34,5 +36,6 @@ __all__ = (
     "logs_router",
     "oauth_router",
     "performance_router",
+    "runtime_control_router",
     "runtime_logs_router"
 )
