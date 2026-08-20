@@ -44,7 +44,7 @@ OKKAYAY_CLIPS = ClipConfig(
 
 
 OKKAYAY_TIMER_MESSAGES = (
-    "Timer Placeholder"
+    "Timer Placeholder",
 )
 
 
@@ -89,7 +89,7 @@ OKKAYAY_REDEEMS = RedeemConfig(
 
 
 OKKAYAY_POINTS = PointsConfig(
-    command_name="points",
+    command_name="okkayay_placeholder_points",
     points_per_message=10,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,

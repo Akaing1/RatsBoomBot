@@ -44,7 +44,7 @@ TEMPLATE_CLIPS = ClipConfig(
 
 
 TEMPLATE_TIMER_MESSAGES = (
-    "Timer Placeholder"
+    "Timer Placeholder",
 )
 
 
@@ -89,7 +89,7 @@ TEMPLATE_REDEEMS = RedeemConfig(
 
 
 TEMPLATE_POINTS = PointsConfig(
-    command_name="points",
+    command_name="placeholder_points",
     points_per_message=10,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,
