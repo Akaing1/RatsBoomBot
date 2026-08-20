@@ -13,7 +13,6 @@ from bot.channels.developer_ninjakaing.profile_details import (
 )
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
-
 DEVELOPER_NINJAKAING_PROFILE = ChannelProfile(
     channel_name="developer_ninjakaing",
     components=(DeveloperNinjakaingCommands, DeveloperPointsCommands),
@@ -21,6 +20,7 @@ DEVELOPER_NINJAKAING_PROFILE = ChannelProfile(
     features=FeatureDefaults(
         channel=True,
         timers=True,
+        ad_announcements=False,
         points=True,
         redeems=True,
         community_events=True,

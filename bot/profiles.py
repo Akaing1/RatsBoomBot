@@ -10,6 +10,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 class FeatureName(Enum):
     CHANNEL = "channel"
     TIMERS = "timers"
+    AD_ANNOUNCEMENTS = "ad_announcements"
     POINTS = "points"
     REDEEMS = "redeems"
     COMMUNITY_EVENTS = "community_events"
@@ -49,6 +50,7 @@ class GlobalCommandName(Enum):
 class FeatureDefaults:
     channel: bool = True
     timers: bool = True
+    ad_announcements: bool = False
     points: bool = True
     redeems: bool = True
     community_events: bool = True

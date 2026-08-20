@@ -20,6 +20,7 @@ MILKY_GALAXYVT_PROFILE = ChannelProfile(
     features=FeatureDefaults(
         channel=True,
         timers=True,
+        ad_announcements=True,
         points=True,
         redeems=True,
         community_events=False,
