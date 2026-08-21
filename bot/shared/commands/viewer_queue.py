@@ -38,9 +38,34 @@ def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
 
 
 class ViewerQueueCommands(commands.Component):
+    QUEUE_MESSAGE_MAX_LENGTH = 450
 
     def __init__(self, bot):
         self.bot = bot
+
+    @classmethod
+    def format_queue_messages(cls, queue: list[str]) -> list[str]:
+        entries = [f"{index}. {name}" for index, name in enumerate(queue, start=1)]
+        messages = []
+        prefix = "Current queue: "
+        current_message = prefix
+
+        for entry in entries:
+            separator = "" if current_message == prefix else ", "
+            candidate = f"{current_message}{separator}{entry}"
+
+            if len(candidate) <= cls.QUEUE_MESSAGE_MAX_LENGTH:
+                current_message = candidate
+                continue
+
+            messages.append(current_message)
+            prefix = "Queue continued: "
+            current_message = f"{prefix}{entry}"
+
+        if current_message != prefix:
+            messages.append(current_message)
+
+        return messages
 
     def get_context(self, ctx: commands.Context, command_name: str) -> tuple[str, "ServiceContainer"] | None:
         services = self.bot.services
@@ -175,13 +200,8 @@ class ViewerQueueCommands(commands.Component):
             await ctx.send("The viewer queue is currently empty.")
             return
 
-        preview = queue[:5]
-        queue_text = ", ".join(f"{index + 1}. {name}" for index, name in enumerate(preview))
-
-        if len(queue) > 5:
-            queue_text += f" ... and {len(queue) - 5} more"
-
-        await ctx.send(f"Current queue: {queue_text}")
+        for message in self.format_queue_messages(queue):
+            await ctx.send(message)
 
     @commands.command(name="next")
     async def next_viewers(self, ctx: commands.Context, count: int = 1) -> None:
