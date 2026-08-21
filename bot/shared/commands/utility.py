@@ -252,6 +252,52 @@ class UtilityCommands(commands.Component):
         await ctx.reply(message)
 
     @commands.command()
+    async def height(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
+        self.log_command(ctx, "height")
+
+        if not self.command_enabled(ctx, GlobalCommandName.HEIGHT):
+            return
+
+        total_inches = random.randint(12, 96)
+        feet, inches = divmod(total_inches, 12)
+        height = f"{feet}' {inches}\""
+
+        if user is None:
+            message = f"{ctx.chatter.name} is {height} tall!"
+        else:
+            message = f"{ctx.chatter.name} measured {user} at {height} tall!"
+
+        LOGGER.debug(
+            "[Commands] !height generated %d inches for user %s.",
+            total_inches,
+            user or ctx.chatter.name
+        )
+
+        await ctx.reply(message)
+
+    @commands.command()
+    async def pp(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
+        self.log_command(ctx, "pp")
+
+        if not self.command_enabled(ctx, GlobalCommandName.PP):
+            return
+
+        inches = random.randint(-1, 20)
+
+        if user is None:
+            message = f"{ctx.chatter.name}'s pp is {inches}in!"
+        else:
+            message = f"{ctx.chatter.name} measured {user}'s pp at {inches}in!"
+
+        LOGGER.debug(
+            "[Commands] !pp generated %d inches for user %s.",
+            inches,
+            user or ctx.chatter.name
+        )
+
+        await ctx.reply(message)
+
+    @commands.command()
     async def lurk(self, ctx: commands.Context) -> None:
         self.log_command(ctx, "lurk")
 
