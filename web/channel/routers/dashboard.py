@@ -3,9 +3,10 @@ from urllib.parse import quote_plus
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName
+from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, get_active_profile
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
+from web.channel.command_help import build_command_help_groups
 from web.shared.common import templates
 from web.state import get_bot
 
@@ -95,6 +96,7 @@ async def channel_dashboard(request: Request):
             request=request,
             name="channel/dashboard.html",
             context={
+                "active_page": "overview",
                 "broadcaster": None,
                 "runtime_unavailable": True,
                 "csrf_token": get_csrf_token(request)
@@ -120,6 +122,7 @@ async def channel_dashboard(request: Request):
         request=request,
         name="channel/dashboard.html",
         context={
+            "active_page": "overview",
             "broadcaster": broadcaster,
             "runtime_unavailable": False,
             "channel_settings": channel_settings,
@@ -129,6 +132,44 @@ async def channel_dashboard(request: Request):
             "redemption_activity": redemption_activity,
             "queue_result": request.query_params.get("queue_result"),
             "queue_message": request.query_params.get("queue_message"),
+            "csrf_token": get_csrf_token(request)
+        }
+    )
+
+
+@router.get("/channel/help", response_class=HTMLResponse)
+async def channel_help_page(request: Request):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+
+    if not broadcaster_id:
+        return RedirectResponse(url="/connect", status_code=303)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return RedirectResponse(url="/channel", status_code=303)
+
+    services = runtime_bot.services
+    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+    profile = get_active_profile(broadcaster_id)
+
+    if broadcaster is None or profile is None:
+        logout_channel_user(request)
+        return RedirectResponse(url="/connect", status_code=303)
+
+    command_groups = build_command_help_groups(services.features, broadcaster_id, profile)
+    command_count = sum(len(group.commands) for group in command_groups)
+    enabled_command_count = sum(group.enabled_count for group in command_groups)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="channel/help.html",
+        context={
+            "active_page": "help",
+            "broadcaster": broadcaster,
+            "command_groups": command_groups,
+            "command_count": command_count,
+            "enabled_command_count": enabled_command_count,
             "csrf_token": get_csrf_token(request)
         }
     )

@@ -16,7 +16,7 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', path='/css/style.css') }}?v=7"
+        href="{{ url_for('static', path='/css/style.css') }}?v=8"
     >
 </head>
 
@@ -49,6 +49,13 @@
                     href="/channel/features"
                 >
                     Features
+                </a>
+
+                <a
+                    class="nav-link {% if active_page == 'help' %}active{% endif %}"
+                    href="/channel/help"
+                >
+                    Help
                 </a>
             </nav>
 
