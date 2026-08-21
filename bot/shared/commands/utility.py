@@ -287,7 +287,7 @@ class UtilityCommands(commands.Component):
         if user is None:
             message = f"{ctx.chatter.name}'s pp is {inches}in!"
         else:
-            message = f"{ctx.chatter.name} measured {user}'s pp at {inches}in!"
+            message = f"{ctx.chatter.name} saw {user}'s pp and its {inches}in!"
 
         LOGGER.debug(
             "[Commands] !pp generated %d inches for user %s.",
