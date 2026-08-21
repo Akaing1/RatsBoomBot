@@ -1,4 +1,5 @@
 from bot.services.engagement.viewer_queue import ViewerQueueService
+from bot.shared.commands.viewer_queue import ViewerQueueCommands
 
 
 def test_queue_starts_closed() -> None:
@@ -70,3 +71,28 @@ def test_remove_queue_discards_channel_state() -> None:
 
     assert service.is_queue_open("channel-1") is False
     assert service.list_queue("channel-1") == []
+
+
+def test_queue_messages_include_every_viewer() -> None:
+    queue = [f"viewer{index}" for index in range(1, 9)]
+
+    messages = ViewerQueueCommands.format_queue_messages(queue)
+
+    assert messages == [
+        "Current queue: 1. viewer1, 2. viewer2, 3. viewer3, 4. viewer4, "
+        "5. viewer5, 6. viewer6, 7. viewer7, 8. viewer8"
+    ]
+
+
+def test_large_queue_is_split_without_omitting_viewers(monkeypatch) -> None:
+    queue = [f"viewer{index}" for index in range(1, 9)]
+    monkeypatch.setattr(ViewerQueueCommands, "QUEUE_MESSAGE_MAX_LENGTH", 55)
+
+    messages = ViewerQueueCommands.format_queue_messages(queue)
+    combined_messages = " ".join(messages)
+
+    assert len(messages) > 1
+    assert all(len(message) <= ViewerQueueCommands.QUEUE_MESSAGE_MAX_LENGTH for message in messages)
+
+    for index, viewer in enumerate(queue, start=1):
+        assert f"{index}. {viewer}" in combined_messages
