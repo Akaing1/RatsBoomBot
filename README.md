@@ -264,7 +264,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 | Group | Commands |
 | --- | --- |
-| Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!lurk`, `!help` |
+| Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube`, `!setdiscord`, `!setyoutube` |
 | Settings | `!timers`, `!timers on`, `!timers off` |
@@ -273,6 +273,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 | Clips | `!clip`, `!clip short` |
 | Raids | `!startraid <channel>` |
 | Moderation | `!kamikaze <username>` |
+| Points | Profile currency command with `leaderboard`, `gamble`, `duel`, `add`, and `reset` subcommands |
 | Overwatch | `!ow`, `!owrank`, `!owrecord`, `!owreset` |
 
 Point commands use the profile's currency command and provide `leaderboard`, `reset`, `add`, `gamble`, and `duel` subcommands. Permission-sensitive actions are restricted to moderators or the broadcaster where appropriate.

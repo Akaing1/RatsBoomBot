@@ -32,3 +32,11 @@ def test_channel_oauth_session_cookie_is_persistent() -> None:
     assert "ratsboombot_session=" in cookie
     assert "max-age=2592000" in cookie
     assert "httponly" in cookie
+
+
+def test_channel_help_requires_channel_authentication() -> None:
+    with TestClient(app) as client:
+        response = client.get("/channel/help", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/connect"

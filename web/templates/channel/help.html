@@ -1,0 +1,91 @@
+{% extends "channel/layout.html" %}
+
+{% block title %}
+    Command Help | {{ broadcaster.name or "Your Channel" }} | RatsBoomBot
+{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div class="channel-heading">
+        {% if broadcaster.profile_image_url %}
+            <img class="channel-heading-image" src="{{ broadcaster.profile_image_url }}" alt="{{ broadcaster.name or broadcaster.id }}">
+        {% else %}
+            <div class="channel-heading-placeholder">
+                {{ (broadcaster.name or broadcaster.id)[0] | upper }}
+            </div>
+        {% endif %}
+
+        <div>
+            <p class="eyebrow">Command reference</p>
+            <h2>Help</h2>
+            <p class="page-description">
+                Browse the commands configured for {{ broadcaster.name or "your channel" }}.
+                Select a category to see syntax, permissions, and details.
+            </p>
+        </div>
+    </div>
+</header>
+
+<section class="status-grid command-help-summary-grid">
+    <article class="status-card">
+        <p class="card-label">Command categories</p>
+        <div class="metric">{{ command_groups | length }}</div>
+        <p class="card-detail">Expandable groups in this reference.</p>
+    </article>
+
+    <article class="status-card">
+        <p class="card-label">Commands documented</p>
+        <div class="metric">{{ command_count }}</div>
+        <p class="card-detail">Commands and subcommands available to this profile.</p>
+    </article>
+
+    <article class="status-card">
+        <p class="card-label">Currently enabled</p>
+        <div class="metric">{{ enabled_command_count }}</div>
+        <p class="card-detail">Based on the profile and current dashboard toggles.</p>
+    </article>
+</section>
+
+<section class="command-help-list" aria-label="Channel command reference">
+    {% for group in command_groups %}
+        <details class="command-help-group">
+            <summary class="command-help-group-summary">
+                <div class="command-help-group-heading">
+                    <div>
+                        <p class="eyebrow">{{ group.enabled_count }} of {{ group.commands | length }} enabled</p>
+                        <h3>{{ group.name }}</h3>
+                        <p>{{ group.description }}</p>
+                    </div>
+
+                    <span class="command-help-chevron" aria-hidden="true">&#8964;</span>
+                </div>
+
+                <div class="command-help-chip-list" aria-hidden="true">
+                    {% for command in group.commands %}
+                        <code class="command-help-chip {% if command.enabled %}enabled{% else %}disabled{% endif %}">{{ command.syntax }}</code>
+                    {% endfor %}
+                </div>
+            </summary>
+
+            <div class="command-help-details">
+                {% for command in group.commands %}
+                    <article class="command-help-command">
+                        <div class="command-help-command-syntax">
+                            <code>{{ command.syntax }}</code>
+
+                            <span class="toggle-status {% if command.enabled %}enabled{% else %}disabled{% endif %}">
+                                {% if command.enabled %}Enabled{% else %}Disabled{% endif %}
+                            </span>
+                        </div>
+
+                        <div class="command-help-command-description">
+                            <p>{{ command.description }}</p>
+                            <span>{{ command.permission }}</span>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        </details>
+    {% endfor %}
+</section>
+{% endblock %}
