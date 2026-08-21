@@ -34,6 +34,8 @@ class GlobalCommandName(Enum):
     STINKY = "stinky"
     LUCKY = "lucky"
     SMART = "smart"
+    HEIGHT = "height"
+    PP = "pp"
     LURK = "lurk"
     HELP = "help"
 
@@ -80,6 +82,8 @@ class GlobalCommandDefaults:
     stinky: bool = True
     lucky: bool = True
     smart: bool = True
+    height: bool = True
+    pp: bool = True
     lurk: bool = True
     help: bool = True
 
