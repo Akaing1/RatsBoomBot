@@ -59,18 +59,19 @@ ONEDAYBREAD_RAID_MESSAGES = RaidMessages(
     incoming=(
         "@{raider_name} raided with {viewer_count} {viewer_word}!"
     ),
-    outgoing="We're raiding @{target_name}!",
-    outgoing_subscriber="Subscriber raid message for @{target_name}!"
+    outgoing=" GivePLZ GivePLZ GivePLZ DELICIOUS BUNS",
+    outgoing_subscriber="oneday12Flowybunn oneday12Pompom BREAD RAID oneday12Pompom DELIVERING FRESH, "
+                        "DAY OLD BUNBUNS TO YOUR PORCH oneday12Flowybunn!"
 )
 
 
 ONEDAYBREAD_SHOUTOUT_MESSAGES = ShoutoutMessages(
     with_game=(
-        "Go check out @{username}! They were last playing {game_name}. "
-        "They are a cool rat: {channel_url}"
+        "Showing appreciation to @{username} ❤️ "
+        "Do check them out at {channel_url}"
     ),
     without_game=(
-        "Go check out @{username}! They are a cool rat: {channel_url}"
+        "Showing appreciation to @{username} ❤️ Do check them out at {channel_url}"
     )
 )
 
@@ -89,7 +90,7 @@ ONEDAYBREAD_REDEEMS = RedeemConfig(
 
 
 ONEDAYBREAD_POINTS = PointsConfig(
-    command_name="onedaybread_placeholder_points",
+    command_name="mews",
     points_per_message=10,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,
