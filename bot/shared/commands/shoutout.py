@@ -4,6 +4,7 @@ import re
 from twitchio.ext import commands
 
 from bot.profiles import GlobalCommandGroup
+from bot.shared.commands.converters import LocalizedUser
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -49,7 +50,7 @@ class ShoutoutCommands(commands.Component):
         self.bot = bot
 
     @commands.command(name="so", aliases=["shoutout"])
-    async def shoutout(self, ctx: commands.Context, username: str | None = None) -> None:
+    async def shoutout(self, ctx: commands.Context, target: LocalizedUser = None) -> None:
         services = self.bot.services
 
         if services is None:
@@ -73,7 +74,7 @@ class ShoutoutCommands(commands.Component):
             "[Commands] User %s invoked !so in broadcaster %s with target %s.",
             caller_name,
             broadcaster_id,
-            username or "missing"
+            getattr(target, "display_name", None) or getattr(target, "name", "missing")
         )
 
         if not is_global_group_enabled(self.bot, ctx, GlobalCommandGroup.SHOUTOUTS):
@@ -93,36 +94,12 @@ class ShoutoutCommands(commands.Component):
             await ctx.reply("Only the broadcaster or mods can use !so.")
             return
 
-        if not username:
-            await ctx.reply("Use it like this: !so username")
-            return
-
-        cleaned_username = clean_username(username)
-
-        if not cleaned_username:
-            await ctx.reply("Use it like this: !so username")
-            return
-
-        broadcaster = getattr(ctx, "broadcaster", None)
-        broadcaster_name = getattr(broadcaster, "name", "")
-
-        if cleaned_username.lower() == broadcaster_name.lower():
-            await ctx.reply("You cannot shoutout the broadcaster.")
-            return
-
-        try:
-            target = await self.bot.fetch_user(login=cleaned_username)
-        except Exception:
-            LOGGER.exception(
-                "[Shoutouts] Failed to resolve Twitch user %s.",
-                cleaned_username
-            )
-
-            await ctx.reply("I could not look up that Twitch user.")
-            return
-
         if target is None:
-            await ctx.reply(f"I could not find a Twitch user named {cleaned_username}.")
+            await ctx.reply("Use it like this: !so username")
+            return
+
+        if str(target.id) == broadcaster_id:
+            await ctx.reply("You cannot shoutout the broadcaster.")
             return
 
         queued, response, position = services.shoutouts.enqueue(
