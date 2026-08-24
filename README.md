@@ -280,7 +280,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 | Moderation | `!kamikaze <username>` |
 | Points | Profile currency command with `leaderboard`, `gamble`, `duel`, `add`, and `reset` subcommands |
 | Overwatch | `!ow`, `!owrank`, `!owrecord`, `!owreset` |
-| League of Legends | `!champs`, `!champs <champion>` |
+| League of Legends | `!champs`, `!champs <champion>`, `!register <Riot ID> [region]`, `!unregister`, `!rank [chatter]`, `!ladder` |
 
 Point commands use the profile's currency command and provide `leaderboard`, `reset`, `add`, `gamble`, and `duel` subcommands. Permission-sensitive actions are restricted to moderators or the broadcaster where appropriate.
 

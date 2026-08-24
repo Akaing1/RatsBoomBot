@@ -61,7 +61,14 @@ def test_command_help_includes_league_commands_for_enabled_profiles() -> None:
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
     league = get_group(groups, "League of Legends")
 
-    assert [command.syntax for command in league.commands] == ["!champs", "!champs <champion>"]
+    assert [command.syntax for command in league.commands] == [
+        "!champs",
+        "!champs <champion>",
+        "!register <Riot ID> [region]",
+        "!unregister",
+        "!rank [chatter]",
+        "!ladder"
+    ]
 
 
 def test_command_help_marks_commands_disabled_when_channel_profile_is_off() -> None:
@@ -88,4 +95,5 @@ def test_command_help_catalog_covers_every_shared_top_level_command() -> None:
         if isinstance(command, commands.Command) and command.parent is None
     }
 
-    assert shared_command_names - {"points"} <= catalog_names
+    profile_specific_commands = {"points", "champs", "register", "unregister", "rank", "ladder"}
+    assert shared_command_names - profile_specific_commands <= catalog_names

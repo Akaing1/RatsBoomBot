@@ -194,10 +194,14 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
     if profile.league.enabled:
         groups.append(CommandGroupDefinition(
             name="League of Legends",
-            description="Recent ranked champion statistics and broadcaster-specific core builds.",
+            description="Ranked champion statistics, broadcaster builds, and the channel's community League ladder.",
             commands=(
                 CommandDefinition("!champs", "Show the broadcaster's five most-played ranked champions this season.", feature=FeatureName.CHANNEL),
-                CommandDefinition("!champs <champion>", "Show the broadcaster's common three-item core from ranked games in the last 14 days.", feature=FeatureName.CHANNEL)
+                CommandDefinition("!champs <champion>", "Show the broadcaster's common three-item core from ranked games in the last 14 days.", feature=FeatureName.CHANNEL),
+                CommandDefinition("!register <Riot ID> [region]", "Register your Riot ID and join this channel's League ladder.", feature=FeatureName.CHANNEL),
+                CommandDefinition("!unregister", "Remove your League registration and saved rank history from this channel.", feature=FeatureName.CHANNEL),
+                CommandDefinition("!rank [chatter]", "Show your rank or another registered chatter's rank.", feature=FeatureName.CHANNEL),
+                CommandDefinition("!ladder", "Show the channel's Solo/Duo community leaderboard.", feature=FeatureName.CHANNEL)
             )
         ))
 
