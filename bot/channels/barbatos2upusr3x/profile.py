@@ -1,11 +1,12 @@
 from bot.channels.barbatos2upusr3x.commands.general import Barbatos2upusr3xCommands
 from bot.channels.barbatos2upusr3x.commands.points import Barbatos2upusr3xPointsCommands
-from bot.channels.barbatos2upusr3x.profile_details import BARBATOS2UPUSR3X_CLIPS, BARBATOS2UPUSR3X_COMMUNITY_MESSAGES, BARBATOS2UPUSR3X_FIRST_CHAT_SHOUTOUTS, BARBATOS2UPUSR3X_POINTS, BARBATOS2UPUSR3X_RAID_MESSAGES, BARBATOS2UPUSR3X_REDEEMS, BARBATOS2UPUSR3X_SHOUTOUT_MESSAGES, BARBATOS2UPUSR3X_SOCIAL_MESSAGES, BARBATOS2UPUSR3X_TIMER_MESSAGES
+from bot.channels.barbatos2upusr3x.games.league import Barbatos2upusr3xLeagueCommands
+from bot.channels.barbatos2upusr3x.profile_details import BARBATOS2UPUSR3X_CLIPS, BARBATOS2UPUSR3X_COMMUNITY_MESSAGES, BARBATOS2UPUSR3X_FIRST_CHAT_SHOUTOUTS, BARBATOS2UPUSR3X_LEAGUE, BARBATOS2UPUSR3X_POINTS, BARBATOS2UPUSR3X_RAID_MESSAGES, BARBATOS2UPUSR3X_REDEEMS, BARBATOS2UPUSR3X_SHOUTOUT_MESSAGES, BARBATOS2UPUSR3X_SOCIAL_MESSAGES, BARBATOS2UPUSR3X_TIMER_MESSAGES
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 BARBATOS2UPUSR3X_PROFILE = ChannelProfile(
     channel_name="barbatos2upusr3x",
-    components=(Barbatos2upusr3xCommands, Barbatos2upusr3xPointsCommands),
+    components=(Barbatos2upusr3xCommands, Barbatos2upusr3xPointsCommands, Barbatos2upusr3xLeagueCommands),
     features=FeatureDefaults(
         channel=False,
         timers=False,
@@ -49,4 +50,5 @@ BARBATOS2UPUSR3X_PROFILE = ChannelProfile(
     social_messages=BARBATOS2UPUSR3X_SOCIAL_MESSAGES,
     first_chat_shoutouts=BARBATOS2UPUSR3X_FIRST_CHAT_SHOUTOUTS,
     clips=BARBATOS2UPUSR3X_CLIPS,
+    league=BARBATOS2UPUSR3X_LEAGUE
 )
