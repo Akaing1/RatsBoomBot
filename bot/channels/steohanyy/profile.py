@@ -1,12 +1,11 @@
 from bot.channels.steohanyy.commands.general import SteohanyyCommands
 from bot.channels.steohanyy.commands.points import SteohanyyPointsCommands
-from bot.channels.steohanyy.games.league import SteohanyyLeagueCommands
 from bot.channels.steohanyy.profile_details import STEOHANYY_COMMUNITY_MESSAGES, STEOHANYY_LEAGUE, STEOHANYY_POINTS, STEOHANYY_RAID_MESSAGES, STEOHANYY_REDEEMS, STEOHANYY_SHOUTOUT_MESSAGES, STEOHANYY_SOCIAL_MESSAGES, STEOHANYY_TIMER_MESSAGES
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 STEOHANYY_PROFILE = ChannelProfile(
     channel_name="steohanyy",
-    components=(SteohanyyCommands, SteohanyyPointsCommands, SteohanyyLeagueCommands),
+    components=(SteohanyyCommands, SteohanyyPointsCommands),
     features=FeatureDefaults(
         channel=True,
         timers=False,
