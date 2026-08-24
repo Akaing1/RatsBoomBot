@@ -60,19 +60,22 @@ async def run_services(bot: TwitchBot, admin_server: uvicorn.Server) -> None:
 async def run_runtime() -> None:
     startup_started_at = perf_counter()
     database_path = Path(settings.DATABASE_PATH)
+    league_database_path = Path(settings.LEAGUE_DATABASE_PATH)
     database_path.parent.mkdir(parents=True, exist_ok=True)
+    league_database_path.parent.mkdir(parents=True, exist_ok=True)
 
     LOGGER.info(SEPARATOR)
     LOGGER.info("[Startup] %s v%s starting.", APP_NAME, APP_VERSION)
     LOGGER.info("[Startup] Python %s", sys.version.split()[0])
     LOGGER.info("[Startup] Database path: %s", database_path)
+    LOGGER.info("[Startup] League database path: %s", league_database_path)
     LOGGER.info("[Startup] Admin dashboard: %s", settings.ADMIN_BASE_URL)
     LOGGER.info(SEPARATOR)
 
     LOGGER.info("[Database] Opening SQLite connection pool.")
 
     try:
-        async with asqlite.create_pool(str(database_path)) as database:
+        async with asqlite.create_pool(str(database_path)) as database, asqlite.create_pool(str(league_database_path)) as league_database:
             LOGGER.info("[Database] SQLite connection pool opened.")
 
             setup_started_at = perf_counter()
@@ -89,7 +92,7 @@ async def run_runtime() -> None:
 
             LOGGER.info("[Runtime] Creating Twitch bot instance.")
 
-            async with TwitchBot(token_database=database, subs=subscriptions, broadcaster_ids=broadcaster_ids) as bot:
+            async with TwitchBot(token_database=database, league_database=league_database, subs=subscriptions, broadcaster_ids=broadcaster_ids) as bot:
                 LOGGER.info("[OAuth] Loading %d stored OAuth tokens.", len(tokens))
 
                 for token, refresh_token in tokens:

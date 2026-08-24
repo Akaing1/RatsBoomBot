@@ -19,7 +19,7 @@ Current version: **6.0.0**
 - Automatic first-chat shoutouts for selected profile users
 - Incoming and outgoing raid responses
 - Viewer-created 60-second and 30-second Twitch clips
-- Optional game integrations, including Overwatch session tracking
+- Optional game integrations, including Overwatch session tracking and League champion statistics
 - Channel-isolated stream logs with retention, downloads, and manual deletion
 - Real-time server performance and application logs
 - Administrator and Twitch-authenticated channel dashboards
@@ -124,7 +124,9 @@ Moderation support includes protected users, timeout actions, `!kamikaze`, and c
 
 ### Game Integrations
 
-Game components live inside each profile's `games/` package. The current Overwatch integration provides profile and rank summaries plus manually tracked session wins and losses. Commands can be limited to streams where the broadcaster is live in an allowed category.
+Game components live inside each profile's `games/` package. The Overwatch integration provides profile and rank summaries plus manually tracked session wins and losses. Commands can be limited to streams where the broadcaster is live in an allowed category.
+
+The League integration uses OP.GG's official MCP service to show a broadcaster's five most-played ranked champions for the current season. It collects recent ranked matches every four hours and calculates common three-item cores from a rolling 14-day window. Seasonal summaries refresh every 12 hours, and collected data persists in `.data/league.db` across restarts.
 
 Third-party game APIs may require public player profiles and do not expose every type of live match data.
 
@@ -166,6 +168,8 @@ The service resumes the same Twitch stream after a bot restart. Each channel ret
 ## Database and Migrations
 
 The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadcaster connections, administrator accounts, settings, overrides, points, counters, redeem history, dashboard activity, first-chat shoutouts, moderation data, and migration history.
+
+League statistics are stored separately in `.data/league.db`. This database contains replaceable external cache data, including seasonal champion summaries, recent ranked matches, and item metadata.
 
 Migrations run automatically during startup:
 
@@ -224,6 +228,7 @@ BOT_ID=
 OWNER_ID=
 
 DATABASE_PATH=.data/tokens.db
+LEAGUE_DATABASE_PATH=.data/league.db
 STREAM_LOGS_PATH=.data/logs
 
 ADMIN_HOST=127.0.0.1
@@ -275,6 +280,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 | Moderation | `!kamikaze <username>` |
 | Points | Profile currency command with `leaderboard`, `gamble`, `duel`, `add`, and `reset` subcommands |
 | Overwatch | `!ow`, `!owrank`, `!owrecord`, `!owreset` |
+| League of Legends | `!champs`, `!champs <champion>` |
 
 Point commands use the profile's currency command and provide `leaderboard`, `reset`, `add`, `gamble`, and `duel` subcommands. Permission-sensitive actions are restricted to moderators or the broadcaster where appropriate.
 

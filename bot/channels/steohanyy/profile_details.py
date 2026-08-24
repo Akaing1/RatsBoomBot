@@ -1,5 +1,6 @@
 from bot.profiles import (
     CommunityMessages,
+    LeagueConfig,
     PointsConfig,
     PointsMessages,
     RaidMessages,
@@ -7,6 +8,16 @@ from bot.profiles import (
     RedeemMessages,
     ShoutoutMessages,
     SocialMessages
+)
+
+
+STEOHANYY_LEAGUE = LeagueConfig(
+    enabled=True,
+    provider="opgg",
+    game_name="steohany",
+    tag_line="ant",
+    region="NA",
+    display_name="Steohany"
 )
 
 

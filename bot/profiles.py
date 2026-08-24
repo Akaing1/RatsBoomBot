@@ -317,6 +317,24 @@ class OverwatchConfig:
 
 
 @dataclass(frozen=True)
+class LeagueConfig:
+    enabled: bool = False
+    provider: str = "opgg"
+    game_name: str = ""
+    tag_line: str = ""
+    region: str = "NA"
+    display_name: str = "Streamer"
+    champion_aliases: tuple[tuple[str, str], ...] = (
+        ("asol", "Aurelion Sol"),
+        ("cho", "Cho'Gath"),
+        ("j4", "Jarvan IV"),
+        ("ksante", "K'Sante"),
+        ("lb", "LeBlanc"),
+        ("mf", "Miss Fortune")
+    )
+
+
+@dataclass(frozen=True)
 class ChannelProfile:
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
@@ -333,6 +351,7 @@ class ChannelProfile:
     redeems: RedeemConfig = RedeemConfig()
     points: PointsConfig = PointsConfig()
     overwatch: OverwatchConfig = OverwatchConfig()
+    league: LeagueConfig = LeagueConfig()
 
     def is_user_protected(self, user_id: str) -> bool:
         return str(user_id) in self.protected_user_ids

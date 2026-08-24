@@ -3,7 +3,7 @@ import logging
 from config.settings import settings
 
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatterIdentityService, FeatureToggleService
-from bot.services.engagement import ClipService, CounterService, OverwatchService, PointsService, RedeemService, ViewerQueueService
+from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PointsService, RedeemService, ViewerQueueService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
 
@@ -12,7 +12,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 class ServiceContainer:
 
-    def __init__(self, bot, db, broadcaster_ids):
+    def __init__(self, bot, db, broadcaster_ids, league_db=None):
         self.bot = bot
         self.db = db
 
@@ -31,6 +31,7 @@ class ServiceContainer:
         self.viewer_queue = ViewerQueueService(bot)
         self.redeems = RedeemService(bot, db, self.points, self.counters)
         self.overwatch = OverwatchService(bot, db)
+        self.league = LeagueService(bot, league_db or db)
         self.moderation = ModerationService(bot, db)
         self.shoutouts = ShoutoutService(bot)
         self.first_chat_shoutouts = FirstChatShoutoutService(bot, db, self.shoutouts, self.stream_logs)
@@ -50,6 +51,7 @@ class ServiceContainer:
             ("CounterService", self.counters),
             ("RedeemService", self.redeems),
             ("OverwatchService", self.overwatch),
+            ("LeagueService", self.league),
             ("ModerationService", self.moderation),
             ("FirstChatShoutoutService", self.first_chat_shoutouts),
             ("StreamLogService", self.stream_logs)
@@ -74,7 +76,8 @@ class ServiceContainer:
         services = (
             ("TimerService", self.timers),
             ("AdAnnouncementService", self.ads),
-            ("ShoutoutService", self.shoutouts)
+            ("ShoutoutService", self.shoutouts),
+            ("LeagueService", self.league)
         )
 
         for name, service in services:
@@ -97,6 +100,7 @@ class ServiceContainer:
             ("TimerService", self.timers),
             ("AdAnnouncementService", self.ads),
             ("ShoutoutService", self.shoutouts),
+            ("LeagueService", self.league),
             ("StreamLogService", self.stream_logs)
         )
 
