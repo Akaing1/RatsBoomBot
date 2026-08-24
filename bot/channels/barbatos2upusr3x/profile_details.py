@@ -3,6 +3,7 @@ from bot.profiles import (
     ClipMessages,
     CommunityMessages,
     FirstChatShoutout,
+    LeagueConfig,
     PointsConfig,
     PointsMessages,
     RaidMessages,
@@ -10,6 +11,16 @@ from bot.profiles import (
     RedeemMessages,
     ShoutoutMessages,
     SocialMessages
+)
+
+
+BARBATOS2UPUSR3X_LEAGUE = LeagueConfig(
+    enabled=True,
+    provider="opgg",
+    game_name="Barbatos2upusRex",
+    tag_line="1314",
+    region="NA",
+    display_name="Barbatos"
 )
 
 
