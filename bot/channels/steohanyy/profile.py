@@ -1,11 +1,12 @@
 from bot.channels.steohanyy.commands.general import SteohanyyCommands
 from bot.channels.steohanyy.commands.points import SteohanyyPointsCommands
-from bot.channels.steohanyy.profile_details import STEOHANYY_COMMUNITY_MESSAGES, STEOHANYY_POINTS, STEOHANYY_RAID_MESSAGES, STEOHANYY_REDEEMS, STEOHANYY_SHOUTOUT_MESSAGES, STEOHANYY_SOCIAL_MESSAGES, STEOHANYY_TIMER_MESSAGES
+from bot.channels.steohanyy.games.league import SteohanyyLeagueCommands
+from bot.channels.steohanyy.profile_details import STEOHANYY_COMMUNITY_MESSAGES, STEOHANYY_LEAGUE, STEOHANYY_POINTS, STEOHANYY_RAID_MESSAGES, STEOHANYY_REDEEMS, STEOHANYY_SHOUTOUT_MESSAGES, STEOHANYY_SOCIAL_MESSAGES, STEOHANYY_TIMER_MESSAGES
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 STEOHANYY_PROFILE = ChannelProfile(
     channel_name="steohanyy",
-    components=(SteohanyyCommands, SteohanyyPointsCommands),
+    components=(SteohanyyCommands, SteohanyyPointsCommands, SteohanyyLeagueCommands),
     features=FeatureDefaults(
         channel=True,
         timers=False,
@@ -46,5 +47,6 @@ STEOHANYY_PROFILE = ChannelProfile(
     redeems=STEOHANYY_REDEEMS,
     points=STEOHANYY_POINTS,
     shoutout_messages=STEOHANYY_SHOUTOUT_MESSAGES,
-    social_messages=STEOHANYY_SOCIAL_MESSAGES
+    social_messages=STEOHANYY_SOCIAL_MESSAGES,
+    league=STEOHANYY_LEAGUE
 )

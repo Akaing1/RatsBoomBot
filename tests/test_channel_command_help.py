@@ -2,7 +2,7 @@ import pytest
 from twitchio.ext import commands
 
 from bot.component_loader import GLOBAL_COMPONENTS
-from bot.profiles import ChannelProfile, FeatureName, GlobalCommandDefaults, PointsConfig, activate_profile, clear_profiles
+from bot.profiles import ChannelProfile, FeatureName, GlobalCommandDefaults, LeagueConfig, PointsConfig, activate_profile, clear_profiles
 from bot.services.channels.feature_toggle import FeatureToggleService
 from web.channel.command_help import build_command_help_groups
 
@@ -52,6 +52,16 @@ def test_command_help_includes_profile_specific_groups(channel_name: str, expect
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
 
     assert expected_group in {group.name for group in groups}
+
+
+def test_command_help_includes_league_commands_for_enabled_profiles() -> None:
+    broadcaster_id = "channel-1"
+    profile = ChannelProfile(channel_name="channel", league=LeagueConfig(enabled=True))
+    activate_profile(broadcaster_id, profile)
+    groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
+    league = get_group(groups, "League of Legends")
+
+    assert [command.syntax for command in league.commands] == ["!champs", "!champs <champion>"]
 
 
 def test_command_help_marks_commands_disabled_when_channel_profile_is_off() -> None:

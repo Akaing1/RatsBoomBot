@@ -13,8 +13,9 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 class TwitchBot(commands.AutoBot):
 
-    def __init__(self, *, token_database, subs, broadcaster_ids):
+    def __init__(self, *, token_database, subs, broadcaster_ids, league_database=None):
         self.token_database = token_database
+        self.league_database = league_database
         self.broadcaster_ids = [str(broadcaster_id) for broadcaster_id in broadcaster_ids]
         self.services: ServiceContainer | None = None
 
@@ -42,7 +43,7 @@ class TwitchBot(commands.AutoBot):
     async def setup_hook(self) -> None:
         LOGGER.info("[Startup] Running Twitch bot setup hook.")
 
-        self.services = ServiceContainer(self, self.token_database, self.broadcaster_ids)
+        self.services = ServiceContainer(self, self.token_database, self.broadcaster_ids, self.league_database)
 
         LOGGER.info("[Services] Initializing service container.")
         await self.services.setup()

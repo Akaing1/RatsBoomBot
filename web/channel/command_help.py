@@ -191,6 +191,16 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
             )
         ))
 
+    if profile.league.enabled:
+        groups.append(CommandGroupDefinition(
+            name="League of Legends",
+            description="Recent ranked champion statistics and broadcaster-specific core builds.",
+            commands=(
+                CommandDefinition("!champs", "Show the broadcaster's five most-played ranked champions this season.", feature=FeatureName.CHANNEL),
+                CommandDefinition("!champs <champion>", "Show the broadcaster's common three-item core from ranked games in the last 14 days.", feature=FeatureName.CHANNEL)
+            )
+        ))
+
     return tuple(groups)
 
 

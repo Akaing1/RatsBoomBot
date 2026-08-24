@@ -17,6 +17,7 @@ class Settings:
 
     PREFIX = os.getenv("PREFIX", "!")
     DATABASE_PATH = os.getenv("DATABASE_PATH", ".data/tokens.db")
+    LEAGUE_DATABASE_PATH = os.getenv("LEAGUE_DATABASE_PATH", ".data/league.db")
     STREAM_LOGS_PATH = os.getenv("STREAM_LOGS_PATH", ".data/logs")
 
     ADMIN_HOST = os.getenv("ADMIN_HOST", "127.0.0.1")
