@@ -1,14 +1,16 @@
 from fastapi.testclient import TestClient
 
-from web.app import app
+from config.settings import settings
+from web.app import app, create_app
 
 
-def test_root_is_the_streamer_entry_point() -> None:
+def test_root_is_the_public_landing_page() -> None:
     with TestClient(app) as client:
-        response = client.get("/", follow_redirects=False)
+        response = client.get("/")
 
-    assert response.status_code == 303
-    assert response.headers["location"] == "/connect"
+    assert response.status_code == 200
+    assert "Built around your stream" in response.text
+    assert f'{settings.DASHBOARD_BASE_URL}/connect/twitch' in response.text
 
 
 def test_admin_dashboard_uses_admin_prefix() -> None:
@@ -32,6 +34,16 @@ def test_channel_oauth_session_cookie_is_persistent() -> None:
     assert "ratsboombot_session=" in cookie
     assert "max-age=2592000" in cookie
     assert "httponly" in cookie
+
+
+def test_session_cookie_can_be_shared_across_ratsboombot_subdomains(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "SESSION_COOKIE_DOMAIN", ".ratsboombot.com")
+    application = create_app()
+
+    with TestClient(application, base_url="https://ratsboombot.com") as client:
+        response = client.get("/connect/twitch", follow_redirects=False)
+
+    assert "domain=.ratsboombot.com" in response.headers["set-cookie"].lower()
 
 
 def test_channel_help_requires_channel_authentication() -> None:

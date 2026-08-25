@@ -23,10 +23,13 @@ class Settings:
     ADMIN_HOST = os.getenv("ADMIN_HOST", "127.0.0.1")
     ADMIN_PORT = int(os.getenv("ADMIN_PORT", "4345"))
     ADMIN_BASE_URL = os.getenv("ADMIN_BASE_URL", f"http://{ADMIN_HOST}:{ADMIN_PORT}")
+    PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", ADMIN_BASE_URL)
+    DASHBOARD_BASE_URL = os.getenv("DASHBOARD_BASE_URL", ADMIN_BASE_URL)
 
     SESSION_SECRET = os.getenv("SESSION_SECRET")
     ADMIN_SESSION_MAX_AGE_SECONDS = int(os.getenv("ADMIN_SESSION_MAX_AGE_SECONDS", str(60 * 60 * 8)))
     CHANNEL_SESSION_MAX_AGE_SECONDS = int(os.getenv("CHANNEL_SESSION_MAX_AGE_SECONDS", str(60 * 60 * 24 * 30)))
+    SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN") or None
 
     ENVIRONMENT = os.getenv("ENVIRONMENT", "local").strip().lower()
     SESSION_HTTPS_ONLY = os.getenv("SESSION_HTTPS_ONLY", "false").strip().lower() == "true"
