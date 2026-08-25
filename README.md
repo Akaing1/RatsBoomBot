@@ -234,8 +234,11 @@ STREAM_LOGS_PATH=.data/logs
 ADMIN_HOST=127.0.0.1
 ADMIN_PORT=4345
 ADMIN_BASE_URL=http://127.0.0.1:4345
+PUBLIC_BASE_URL=http://127.0.0.1:4345
+DASHBOARD_BASE_URL=http://127.0.0.1:4345
 
 SESSION_SECRET=
+SESSION_COOKIE_DOMAIN=
 ENVIRONMENT=local
 SESSION_HTTPS_ONLY=false
 TRUST_PROXY_HEADERS=false
@@ -245,7 +248,7 @@ CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/channel
 PUBLIC_CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel/connect
 ```
 
-Keep `SESSION_SECRET` stable across deployments or existing browser sessions will become invalid. Administrator sessions default to eight hours; broadcaster sessions default to 30 days.
+Keep `SESSION_SECRET` stable across deployments or existing browser sessions will become invalid. Administrator sessions default to eight hours; broadcaster sessions default to 30 days. In production, set `SESSION_COOKIE_DOMAIN=.ratsboombot.com` so an authenticated session is available to both the public site and dashboard subdomain.
 
 Register each callback exactly in the Twitch developer application. Changing scopes requires the affected account to reconnect.
 
@@ -256,7 +259,8 @@ python main.py
 ```
 
 ```text
-Streamer dashboard: http://127.0.0.1:4345/
+Public landing page: http://127.0.0.1:4345/
+Streamer dashboard:  http://127.0.0.1:4345/channel
 Admin dashboard:    http://127.0.0.1:4345/admin
 Health endpoint:    http://127.0.0.1:4345/health
 ```

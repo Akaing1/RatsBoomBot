@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="RatsBoomBot gives Twitch communities custom chat commands, loyalty tools, stream dashboards, viewer games, and personalized automation.">
+
+    <title>RatsBoomBot | Built for Your Twitch Community</title>
+
+    <link rel="canonical" href="{{ public_base_url }}/">
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v=8">
+</head>
+
+<body class="landing-page">
+    <header class="landing-navigation">
+        <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
+            <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
+
+            <span>
+                <strong>RatsBoomBot</strong>
+                <small>Made for stream communities</small>
+            </span>
+        </a>
+
+        <nav aria-label="Primary navigation">
+            <a href="#features">Features</a>
+            <a href="#how-it-works">How it works</a>
+            <a class="button secondary" href="{{ dashboard_url }}">
+                {% if is_authenticated %}Open Dashboard{% else %}Sign in with Twitch{% endif %}
+            </a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="landing-hero">
+            <div class="hero-copy">
+                <p class="eyebrow">A Twitch bot with personality</p>
+
+                <h1>Built around your stream—not around a generic template.</h1>
+
+                <p class="hero-description">
+                    RatsBoomBot combines custom chat interactions, loyalty systems,
+                    viewer activities, moderation tools, game integrations, and a
+                    live channel dashboard in one personalized bot.
+                </p>
+
+                <div class="hero-actions">
+                    <a class="button primary landing-primary-action" href="{{ dashboard_url }}">
+                        {% if is_authenticated %}Open Your Dashboard{% else %}Sign in with Twitch{% endif %}
+                    </a>
+
+                    <a class="button secondary" href="#features">Explore Features</a>
+                </div>
+
+                <p class="hero-note">Currently available to invited channels. Twitch authentication keeps access simple and secure.</p>
+            </div>
+
+            <div class="hero-preview" aria-label="RatsBoomBot feature preview">
+                <div class="preview-window">
+                    <div class="preview-toolbar">
+                        <span></span><span></span><span></span>
+                        <p>Channel overview</p>
+                    </div>
+
+                    <div class="preview-profile">
+                        <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="">
+
+                        <div>
+                            <small>RAT'S BOOM BOT</small>
+                            <strong>Your community dashboard</strong>
+                            <p>Live status, viewer activities, redeems, and commands.</p>
+                        </div>
+                    </div>
+
+                    <div class="preview-stat-grid">
+                        <article>
+                            <span class="preview-dot online"></span>
+                            <small>Stream tools</small>
+                            <strong>Connected</strong>
+                        </article>
+
+                        <article>
+                            <span class="preview-dot accent"></span>
+                            <small>Community</small>
+                            <strong>Interactive</strong>
+                        </article>
+
+                        <article>
+                            <span class="preview-dot success"></span>
+                            <small>Dashboard</small>
+                            <strong>Live updates</strong>
+                        </article>
+                    </div>
+
+                    <div class="preview-command">
+                        <code>!register PlayerName#TAG</code>
+                        <p>Join the channel's League community ladder.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="landing-section" id="features">
+            <div class="landing-section-heading">
+                <p class="eyebrow">Everything in one place</p>
+                <h2>Tools viewers enjoy and streamers can actually use.</h2>
+                <p>Every channel profile can have its own commands, messages, currency, redeems, and enabled features.</p>
+            </div>
+
+            <div class="landing-feature-grid">
+                <article class="landing-feature-card">
+                    <span class="feature-number">01</span>
+                    <h3>Personalized chat</h3>
+                    <p>Custom commands, timers, social links, shoutouts, raid responses, and community messages written for each channel.</p>
+                </article>
+
+                <article class="landing-feature-card">
+                    <span class="feature-number">02</span>
+                    <h3>Loyalty and redeems</h3>
+                    <p>Channel-specific currencies, viewer balances, games, daily check-ins, redeem history, and persistent counters.</p>
+                </article>
+
+                <article class="landing-feature-card">
+                    <span class="feature-number">03</span>
+                    <h3>Viewer activities</h3>
+                    <p>Viewer queues, clips, playful chat commands, community leaderboards, and interactions designed around the stream.</p>
+                </article>
+
+                <article class="landing-feature-card">
+                    <span class="feature-number">04</span>
+                    <h3>Game integrations</h3>
+                    <p>Profile-aware game commands such as League champion builds, ranked statistics, registration, and community ladders.</p>
+                </article>
+
+                <article class="landing-feature-card">
+                    <span class="feature-number">05</span>
+                    <h3>Streamer dashboard</h3>
+                    <p>See stream status, check-ins, channel-point activity, social links, viewer queues, enabled features, and command help.</p>
+                </article>
+
+                <article class="landing-feature-card">
+                    <span class="feature-number">06</span>
+                    <h3>Responsible moderation</h3>
+                    <p>Protected users, permission-aware commands, moderation utilities, cooldowns, and detailed per-stream event logs.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="landing-section landing-process" id="how-it-works">
+            <div class="landing-section-heading">
+                <p class="eyebrow">Simple streamer access</p>
+                <h2>From Twitch sign-in to your own dashboard.</h2>
+            </div>
+
+            <div class="landing-step-grid">
+                <article>
+                    <span>1</span>
+                    <h3>Sign in with Twitch</h3>
+                    <p>Use Twitch authentication—there is no separate dashboard password to remember.</p>
+                </article>
+
+                <article>
+                    <span>2</span>
+                    <h3>Open your channel</h3>
+                    <p>Authorized broadcasters are matched to their private RatsBoomBot channel profile.</p>
+                </article>
+
+                <article>
+                    <span>3</span>
+                    <h3>Run the stream</h3>
+                    <p>View live activity, discover commands, and control available features from one place.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="landing-cta">
+            <div>
+                <p class="eyebrow">Ready when you are</p>
+                <h2>{% if is_authenticated %}Your dashboard is waiting.{% else %}Bring your community into the fun.{% endif %}</h2>
+                <p>RatsBoomBot is currently being introduced one channel at a time.</p>
+            </div>
+
+            <a class="button primary landing-primary-action" href="{{ dashboard_url }}">
+                {% if is_authenticated %}Open Dashboard{% else %}Continue with Twitch{% endif %}
+            </a>
+        </section>
+    </main>
+
+    <footer class="landing-footer">
+        <a class="landing-brand" href="/">
+            <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="">
+            <span><strong>RatsBoomBot</strong><small>Community-first Twitch automation</small></span>
+        </a>
+
+        <p>Not affiliated with Twitch. Twitch is a trademark of Twitch Interactive, Inc.</p>
+    </footer>
+</body>
+</html>

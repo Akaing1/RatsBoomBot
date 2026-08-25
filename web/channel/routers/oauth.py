@@ -11,14 +11,6 @@ from web.state import get_bot, get_db
 router = APIRouter()
 
 
-@router.get("/", include_in_schema=False)
-async def channel_entry_point(request: Request):
-    if request.session.get(CHANNEL_USER_ID_KEY):
-        return RedirectResponse(url="/channel", status_code=303)
-
-    return RedirectResponse(url="/connect", status_code=303)
-
-
 @router.get("/connect", response_class=HTMLResponse)
 async def public_connect_page(request: Request):
     return templates.TemplateResponse(
