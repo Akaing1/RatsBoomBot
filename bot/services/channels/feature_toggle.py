@@ -126,12 +126,11 @@ class FeatureToggleService:
                     elif legacy_name == "kamikaze":
                         keys = [self.global_command_key(GlobalCommandName.KAMIKAZE)]
                     elif legacy_name == "counters":
-                        keys = [
-                            self.global_command_key(GlobalCommandName.EXPLODE),
-                            self.global_command_key(GlobalCommandName.REKLOP),
-                            self.global_command_key(GlobalCommandName.RANDY),
-                            self.global_command_key(GlobalCommandName.CAR)
-                        ]
+                        LOGGER.info(
+                            "[Features] Ignoring retired dashboard counter toggle for broadcaster %s.",
+                            broadcaster_id
+                        )
+                        continue
                     else:
                         LOGGER.warning(
                             "[Features] Leaving unknown legacy toggle %s unchanged for broadcaster %s.",

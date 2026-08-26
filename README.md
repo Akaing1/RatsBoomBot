@@ -277,7 +277,6 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube`, `!setdiscord`, `!setyoutube` |
 | Settings | `!timers`, `!timers on`, `!timers off` |
-| Counters | `!explode`, `!reklop`, `!randy`, `!bark`, `!car` |
 | Shoutouts | `!so <username>` |
 | Clips | `!clip`, `!clip short` |
 | Raids | `!startraid <channel>` |

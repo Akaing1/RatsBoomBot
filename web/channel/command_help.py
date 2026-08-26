@@ -91,18 +91,6 @@ SETTINGS_COMMANDS = CommandGroupDefinition(
     )
 )
 
-COUNTER_COMMANDS = CommandGroupDefinition(
-    name="Counters",
-    description="Increment the channel's persistent community counters.",
-    commands=(
-        CommandDefinition("!explode", "Add one explosion to the channel counter.", global_command=GlobalCommandName.EXPLODE),
-        CommandDefinition("!reklop", "Add one Reklop to the channel counter.", global_command=GlobalCommandName.REKLOP),
-        CommandDefinition("!randy", "Add one Randy to the channel counter.", global_command=GlobalCommandName.RANDY),
-        CommandDefinition("!bark", "Add one bark to the channel counter.", global_command=GlobalCommandName.BARK),
-        CommandDefinition("!car", "Add one car to the channel counter.", global_command=GlobalCommandName.CAR)
-    )
-)
-
 SHOUTOUT_COMMANDS = CommandGroupDefinition(
     name="Shoutouts",
     description="Promote another Twitch broadcaster in chat.",
@@ -141,7 +129,6 @@ BASE_COMMAND_GROUPS = (
     VIEWER_QUEUE_COMMANDS,
     SOCIAL_COMMANDS,
     SETTINGS_COMMANDS,
-    COUNTER_COMMANDS,
     SHOUTOUT_COMMANDS,
     CLIP_COMMANDS,
     RAID_COMMANDS,

@@ -33,11 +33,6 @@ ONEDAYBREAD_PROFILE = ChannelProfile(
         pp=False,
         lurk=False,
         help=False,
-        explode=False,
-        reklop=False,
-        randy=False,
-        bark=False,
-        car=False,
         kamikaze=False
     ),
     timer_messages=ONEDAYBREAD_TIMER_MESSAGES,
