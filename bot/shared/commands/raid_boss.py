@@ -89,6 +89,9 @@ class RaidBossCommands(commands.Component):
         if result.potion_used:
             bonuses.append("power potion")
 
+        if result.critical_hit:
+            bonuses.append("critical hit")
+
         bonus_text = f" using {' + '.join(bonuses)}" if bonuses else ""
 
         if result.defeated:

@@ -340,13 +340,15 @@ class RaidBossConfig:
     duration_streams: int = 7
     reward_pool: int = 100000
     final_hit_reward: int = 2500
-    base_damage_min: int = 750
-    base_damage_max: int = 1250
+    base_damage_min: int = 50
+    base_damage_max: int = 150
     weapon_cost: int = 5000
     potion_cost: int = 7500
     weapon_multiplier: float = 2.0
     potion_multiplier: float = 5.0
     potion_attacks: int = 3
+    critical_chance: float = 0.05
+    critical_multiplier: float = 1.5
 
 
 @dataclass(frozen=True)
