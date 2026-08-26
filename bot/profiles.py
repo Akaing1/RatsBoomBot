@@ -15,6 +15,7 @@ class FeatureName(Enum):
     REDEEMS = "redeems"
     COMMUNITY_EVENTS = "community_events"
     RAID_RESPONSES = "raid_responses"
+    RAID_BOSSES = "raid_bosses"
 
 
 class GlobalCommandGroup(Enum):
@@ -51,6 +52,7 @@ class FeatureDefaults:
     redeems: bool = True
     community_events: bool = True
     raid_responses: bool = True
+    raid_bosses: bool = False
 
     def is_enabled(self, feature: FeatureName) -> bool:
         return bool(getattr(self, feature.value))
@@ -323,6 +325,30 @@ class LeagueConfig:
 
 
 @dataclass(frozen=True)
+class RaidBossNames:
+    melee: str = "Ironclad Brute"
+    ranged: str = "Storm Archer"
+    magic: str = "Arcane Tyrant"
+
+
+@dataclass(frozen=True)
+class RaidBossConfig:
+    enabled: bool = False
+    names: RaidBossNames = RaidBossNames()
+    max_hp: int = 100000
+    duration_streams: int = 7
+    reward_pool: int = 100000
+    final_hit_reward: int = 2500
+    base_damage_min: int = 750
+    base_damage_max: int = 1250
+    weapon_cost: int = 5000
+    potion_cost: int = 7500
+    weapon_multiplier: float = 2.0
+    potion_multiplier: float = 5.0
+    potion_attacks: int = 3
+
+
+@dataclass(frozen=True)
 class ChannelProfile:
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
@@ -341,6 +367,7 @@ class ChannelProfile:
     points: PointsConfig = PointsConfig()
     overwatch: OverwatchConfig = OverwatchConfig()
     league: LeagueConfig = LeagueConfig()
+    raid_bosses: RaidBossConfig = RaidBossConfig()
 
     def is_user_protected(self, user_id: str) -> bool:
         return str(user_id) in self.protected_user_ids

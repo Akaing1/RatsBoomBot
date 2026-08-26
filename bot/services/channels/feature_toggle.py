@@ -92,7 +92,8 @@ class FeatureToggleService:
             FeatureName.POINTS.value,
             FeatureName.REDEEMS.value,
             FeatureName.COMMUNITY_EVENTS.value,
-            FeatureName.RAID_RESPONSES.value
+            FeatureName.RAID_RESPONSES.value,
+            FeatureName.RAID_BOSSES.value
         }
 
         group_names = {
@@ -498,7 +499,13 @@ class FeatureToggleService:
         return profile.globals.is_group_enabled(GlobalCommandGroup.GLOBALS)
 
     def get_channel_features(self, broadcaster_id: str) -> dict[FeatureName, FeatureState]:
-        return {feature: self.get_feature_state(broadcaster_id, feature) for feature in FeatureName}
+        profile = get_active_profile(str(broadcaster_id))
+        features = {feature: self.get_feature_state(broadcaster_id, feature) for feature in FeatureName}
+
+        if profile is None or not profile.raid_bosses.enabled:
+            features.pop(FeatureName.RAID_BOSSES, None)
+
+        return features
 
     def get_global_groups(self, broadcaster_id: str) -> dict[GlobalCommandGroup, GlobalGroupState]:
         return {group: self.get_global_group_state(broadcaster_id, group) for group in GlobalCommandGroup}

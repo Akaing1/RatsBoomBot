@@ -5,6 +5,7 @@ from bot.channels.developer_ninjakaing.profile_details import (
     DEVELOPER_NINJAKAING_COMMUNITY_MESSAGES,
     DEVELOPER_NINJAKAING_FIRST_CHAT_SHOUTOUTS,
     DEVELOPER_NINJAKAING_POINTS,
+    DEVELOPER_NINJAKAING_RAID_BOSSES,
     DEVELOPER_NINJAKAING_RAID_MESSAGES,
     DEVELOPER_NINJAKAING_REDEEMS,
     DEVELOPER_NINJAKAING_SHOUTOUT_MESSAGES,
@@ -25,7 +26,8 @@ DEVELOPER_NINJAKAING_PROFILE = ChannelProfile(
         points=True,
         redeems=True,
         community_events=True,
-        raid_responses=True
+        raid_responses=True,
+        raid_bosses=True
     ),
     globals=GlobalCommandDefaults(
         enabled=True,
@@ -55,5 +57,6 @@ DEVELOPER_NINJAKAING_PROFILE = ChannelProfile(
     first_chat_shoutouts=DEVELOPER_NINJAKAING_FIRST_CHAT_SHOUTOUTS,
     clips=DEVELOPER_NINJAKAING_CLIPS,
     redeems=DEVELOPER_NINJAKAING_REDEEMS,
-    points=DEVELOPER_NINJAKAING_POINTS
+    points=DEVELOPER_NINJAKAING_POINTS,
+    raid_bosses=DEVELOPER_NINJAKAING_RAID_BOSSES
 )

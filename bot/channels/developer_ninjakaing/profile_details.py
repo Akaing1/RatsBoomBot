@@ -6,12 +6,30 @@ from bot.profiles import (
     PointsConfig,
     PointsMessages,
     RaidMessages,
+    RaidBossConfig,
+    RaidBossNames,
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
     SocialMessages,
     TargetTimeoutRedeemConfig,
     TimeoutRedeemConfig
+)
+
+
+DEVELOPER_NINJAKAING_RAID_BOSSES = RaidBossConfig(
+    enabled=True,
+    names=RaidBossNames(
+        melee="Training Golem",
+        ranged="Target Drone",
+        magic="Debug Lich"
+    ),
+    max_hp=10000,
+    reward_pool=10000,
+    final_hit_reward=500,
+    duration_streams=3,
+    weapon_cost=100,
+    potion_cost=100
 )
 
 

@@ -307,6 +307,8 @@
                     {% set description = "Controls follow, subscription, and resubscription response messages." %}
                 {% elif feature.value == "raid_responses" %}
                     {% set description = "Controls incoming raid responses, automatic raider shoutouts, and the broadcaster-only !startraid command." %}
+                {% elif feature.value == "raid_bosses" %}
+                    {% set description = "Controls the profile-themed loyalty raid boss, equipment shop, attacks, and contribution rewards. Requires points." %}
                 {% else %}
                     {% set description = none %}
                 {% endif %}

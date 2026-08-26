@@ -10,6 +10,7 @@ from bot.shared.commands.league import LeagueCommands
 from bot.shared.commands.clips import ClipCommands
 from bot.shared.commands.mod_actions import ModActionCommands
 from bot.shared.commands.points import PointsCommands
+from bot.shared.commands.raid_boss import RaidBossCommands
 from bot.shared.commands.raids import RaidCommands
 from bot.shared.commands.settings import SettingsCommands
 from bot.shared.commands.shoutout import ShoutoutCommands
@@ -29,6 +30,7 @@ GLOBAL_COMPONENTS: tuple[type[commands.Component], ...] = (
     ClipCommands,
     SocialCommands,
     PointsCommands,
+    RaidBossCommands,
     RaidCommands,
     ModActionCommands,
     CounterCommands,
