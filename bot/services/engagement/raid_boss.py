@@ -37,6 +37,7 @@ class RaidAttackResult:
     defeated: bool
     reward: int = 0
     error: str | None = None
+    critical_hit: bool = False
 
 
 class RaidBossService:
@@ -189,6 +190,11 @@ class RaidBossService:
         if potion_used:
             damage = round(damage * config.potion_multiplier)
 
+        critical_hit = random.random() < config.critical_chance
+
+        if critical_hit:
+            damage = round(damage * config.critical_multiplier)
+
         damage = min(damage, event.current_hp)
         now = datetime.now(UTC).isoformat()
 
@@ -239,7 +245,7 @@ class RaidBossService:
             reward = await self.resolve(broadcaster_id, defeated=True, final_hitter_id=user_id, final_hitter_name=username)
 
         LOGGER.info("[Raid Bosses] %s dealt %d damage to %s in broadcaster %s.", username, damage, event.boss_name, broadcaster_id)
-        return RaidAttackResult(damage, current_hp, event.boss_name, weapon, potion_used, current_hp == 0, reward)
+        return RaidAttackResult(damage, current_hp, event.boss_name, weapon, potion_used, current_hp == 0, reward, critical_hit=critical_hit)
 
     async def register_stream(self, broadcaster_id: str, stream_id: str) -> tuple[RaidBossEvent | None, int]:
         event = await self.get_active_event(broadcaster_id)

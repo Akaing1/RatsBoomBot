@@ -6,6 +6,11 @@ from bot.services.engagement.points import PointsService
 from bot.services.engagement.raid_boss import RaidBossService
 
 
+@pytest.fixture(autouse=True)
+def disable_random_critical_hits(monkeypatch):
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: 1.0)
+
+
 def build_config(**overrides) -> RaidBossConfig:
     values = {
         "enabled": True,
@@ -20,6 +25,31 @@ def build_config(**overrides) -> RaidBossConfig:
     }
     values.update(overrides)
     return RaidBossConfig(**values)
+
+
+def test_default_damage_is_balanced_for_larger_chats() -> None:
+    config = RaidBossConfig()
+
+    assert config.base_damage_min == 50
+    assert config.base_damage_max == 150
+    assert config.critical_chance == 0.05
+    assert config.critical_multiplier == 1.5
+
+
+@pytest.mark.asyncio
+async def test_critical_hit_adds_fifty_percent_damage(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: 0.0)
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await service.setup()
+        config = build_config(max_hp=1000)
+        await service.spawn("channel-1", "melee", config)
+
+        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+
+        assert result.damage == 150
+        assert result.critical_hit is True
 
 
 @pytest.mark.asyncio
