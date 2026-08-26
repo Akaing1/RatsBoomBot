@@ -49,6 +49,7 @@ class StreamEvents(commands.Component):
         )
 
         await services.stream_logs.start_session(broadcaster_id=broadcaster_id, stream_id=stream_id, channel_name=channel_name)
+        await services.raid_bosses.register_stream(broadcaster_id, stream_id)
 
     @commands.Component.listener()
     async def event_stream_offline(self, payload) -> None:

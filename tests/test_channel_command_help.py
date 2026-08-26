@@ -2,7 +2,7 @@ import pytest
 from twitchio.ext import commands
 
 from bot.component_loader import GLOBAL_COMPONENTS
-from bot.profiles import ChannelProfile, FeatureName, GlobalCommandDefaults, LeagueConfig, PointsConfig, activate_profile, clear_profiles
+from bot.profiles import ChannelProfile, FeatureName, GlobalCommandDefaults, LeagueConfig, PointsConfig, RaidBossConfig, activate_profile, clear_profiles
 from bot.services.channels.feature_toggle import FeatureToggleService
 from web.channel.command_help import build_command_help_groups
 
@@ -71,6 +71,35 @@ def test_command_help_includes_league_commands_for_enabled_profiles() -> None:
     ]
 
 
+def test_command_help_includes_raid_boss_commands_for_enabled_profiles() -> None:
+    broadcaster_id = "channel-1"
+    profile = ChannelProfile(channel_name="channel", raid_bosses=RaidBossConfig(enabled=True))
+    activate_profile(broadcaster_id, profile)
+    groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
+    raid_bosses = get_group(groups, "Raid bosses")
+
+    assert [command.syntax for command in raid_bosses.commands] == [
+        "!boss",
+        "!attack",
+        "!raidshop",
+        "!buy <item>",
+        "!equip <weapon>",
+        "!inventory",
+        "!raiders",
+        "!spawnboss <type|random>",
+        "!endboss"
+    ]
+
+
+def test_raid_boss_toggle_is_hidden_for_unconfigured_profiles() -> None:
+    broadcaster_id = "channel-1"
+    profile = ChannelProfile(channel_name="channel")
+    activate_profile(broadcaster_id, profile)
+    features = FeatureToggleService(db=None).get_channel_features(broadcaster_id)
+
+    assert FeatureName.RAID_BOSSES not in features
+
+
 def test_command_help_marks_commands_disabled_when_channel_profile_is_off() -> None:
     broadcaster_id = "channel-1"
     profile = ChannelProfile(channel_name="channel")
@@ -95,5 +124,9 @@ def test_command_help_catalog_covers_every_shared_top_level_command() -> None:
         if isinstance(command, commands.Command) and command.parent is None
     }
 
-    profile_specific_commands = {"points", "champs", "register", "unregister", "rank", "ladder"}
+    profile_specific_commands = {
+        "points", "champs", "register", "unregister", "rank", "ladder",
+        "explode", "reklop", "randy", "bark", "car",
+        "boss", "attack", "raidshop", "buy", "equip", "inventory", "raiders", "spawnboss", "endboss"
+    }
     assert shared_command_names - profile_specific_commands <= catalog_names

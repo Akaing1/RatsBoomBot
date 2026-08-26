@@ -3,7 +3,7 @@ import logging
 from config.settings import settings
 
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatterIdentityService, FeatureToggleService
-from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PointsService, RedeemService, ViewerQueueService
+from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PointsService, RaidBossService, RedeemService, ViewerQueueService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
 
@@ -26,6 +26,7 @@ class ServiceContainer:
         self.help = HelpService(bot)
         self.timers = TimerService(bot, self.broadcasters, self.broadcaster_settings)
         self.points = PointsService(bot, db)
+        self.raid_bosses = RaidBossService(bot, db)
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
         self.viewer_queue = ViewerQueueService(bot)
@@ -48,6 +49,7 @@ class ServiceContainer:
             ("ChatterIdentityService", self.chatters),
             ("FeatureToggleService", self.features),
             ("PointsService", self.points),
+            ("RaidBossService", self.raid_bosses),
             ("CounterService", self.counters),
             ("RedeemService", self.redeems),
             ("OverwatchService", self.overwatch),
@@ -67,6 +69,9 @@ class ServiceContainer:
                 raise
 
             LOGGER.info("[Services] %s setup complete.", name)
+
+        for session in self.stream_logs.active_sessions.values():
+            await self.raid_bosses.register_stream(session.broadcaster_id, session.stream_id)
 
         LOGGER.info("[Services] Service setup completed.")
 
