@@ -7,6 +7,7 @@ from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 NINJAKAING_PROFILE = ChannelProfile(
     channel_name="ninjakaing",
     components=(NinjakaingCommands, NinjakaingPointsCommands),
+    shared_counters_enabled=True,
     features=FeatureDefaults(
         channel=True,
         timers=True,
@@ -34,11 +35,6 @@ NINJAKAING_PROFILE = ChannelProfile(
         pp=True,
         lurk=True,
         help=False,
-        explode=True,
-        reklop=True,
-        randy=True,
-        bark=True,
-        car=True,
         kamikaze=True
     ),
     timer_messages=NINJAKAING_TIMER_MESSAGES,

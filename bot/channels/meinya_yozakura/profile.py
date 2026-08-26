@@ -11,6 +11,7 @@ MEINYA_PROFILE = ChannelProfile(
         "486983829",  # WxlfiiX
         "104646528"  # Brlp39
     ),
+    shared_counters_enabled=True,
     features=FeatureDefaults(
         channel=True,
         timers=True,
@@ -38,11 +39,6 @@ MEINYA_PROFILE = ChannelProfile(
         pp=False,
         lurk=False,
         help=False,
-        explode=False,
-        reklop=False,
-        randy=False,
-        bark=False,
-        car=False,
         kamikaze=True
     ),
     timer_messages=MEINYA_TIMER_MESSAGES,

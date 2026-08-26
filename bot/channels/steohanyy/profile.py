@@ -33,11 +33,6 @@ STEOHANYY_PROFILE = ChannelProfile(
         pp=False,
         lurk=False,
         help=False,
-        explode=True,
-        reklop=True,
-        randy=True,
-        bark=False,
-        car=True,
         kamikaze=True
     ),
     timer_messages=STEOHANYY_TIMER_MESSAGES,

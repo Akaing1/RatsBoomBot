@@ -380,7 +380,7 @@
                 <h4>Independent Global Commands</h4>
 
                 <p>
-                    Utility, counter, and recreational commands that can be configured individually.
+                    Public utility and recreational commands that can be configured individually.
                 </p>
             </div>
         </div>
@@ -405,16 +405,6 @@
                     {% set description = "Posts the channel lurk response." %}
                 {% elif command.value == "help" %}
                     {% set description = "Displays the bot command list." %}
-                {% elif command.value == "explode" %}
-                    {% set description = "Increments the explode counter. Also controls the !rat alias." %}
-                {% elif command.value == "reklop" %}
-                    {% set description = "Increments and displays the Reklop counter." %}
-                {% elif command.value == "randy" %}
-                    {% set description = "Increments and displays the Randy counter." %}
-                {% elif command.value == "bark" %}
-                    {% set description = "Increments and displays the Bark counter." %}
-                {% elif command.value == "car" %}
-                    {% set description = "Increments and displays the car counter." %}
                 {% elif command.value == "kamikaze" %}
                     {% set description = "Controls the recreational timeout command." %}
                 {% else %}

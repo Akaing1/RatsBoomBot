@@ -39,12 +39,6 @@ class GlobalCommandName(Enum):
     LURK = "lurk"
     HELP = "help"
 
-    EXPLODE = "explode"
-    REKLOP = "reklop"
-    RANDY = "randy"
-    BARK = "bark"
-    CAR = "car"
-
     KAMIKAZE = "kamikaze"
 
 
@@ -86,12 +80,6 @@ class GlobalCommandDefaults:
     pp: bool = True
     lurk: bool = True
     help: bool = True
-
-    explode: bool = True
-    reklop: bool = True
-    randy: bool = True
-    bark: bool = True
-    car: bool = True
 
     kamikaze: bool = True
 
@@ -339,6 +327,7 @@ class ChannelProfile:
     channel_name: str
     components: tuple[type[commands.Component], ...] = ()
     protected_user_ids: tuple[str, ...] = ()
+    shared_counters_enabled: bool = False
     features: FeatureDefaults = FeatureDefaults()
     globals: GlobalCommandDefaults = GlobalCommandDefaults()
     timer_messages: tuple[str, ...] = ()
