@@ -19,6 +19,7 @@ from bot.profiles import (
 
 DEVELOPER_NINJAKAING_RAID_BOSSES = RaidBossConfig(
     enabled=True,
+    offline_testing_enabled=True,
     names=RaidBossNames(
         melee="Training Golem",
         ranged="Target Drone",

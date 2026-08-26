@@ -334,6 +334,7 @@ class RaidBossNames:
 @dataclass(frozen=True)
 class RaidBossConfig:
     enabled: bool = False
+    offline_testing_enabled: bool = False
     names: RaidBossNames = RaidBossNames()
     max_hp: int = 100000
     duration_streams: int = 7
