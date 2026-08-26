@@ -9,7 +9,7 @@
 
     <link rel="canonical" href="{{ public_base_url }}/">
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v=8">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v=9">
 </head>
 
 <body class="landing-page">
@@ -37,7 +37,7 @@
             <div class="hero-copy">
                 <p class="eyebrow">A Twitch bot with personality</p>
 
-                <h1>Built around your stream—not around a generic template.</h1>
+                <h1>An all-in-one bot tailored to your needs—make the bot your own.</h1>
 
                 <p class="hero-description">
                     RatsBoomBot combines custom chat interactions, loyalty systems,
@@ -53,7 +53,7 @@
                     <a class="button secondary" href="#features">Explore Features</a>
                 </div>
 
-                <p class="hero-note">Currently available to invited channels. Twitch authentication keeps access simple and secure.</p>
+                <p class="hero-note">Work in progress: new channel profiles are currently created by hand. Please contact the owner for enrollment details.</p>
             </div>
 
             <div class="hero-preview" aria-label="RatsBoomBot feature preview">
@@ -105,71 +105,155 @@
             <div class="landing-section-heading">
                 <p class="eyebrow">Everything in one place</p>
                 <h2>Tools viewers enjoy and streamers can actually use.</h2>
-                <p>Every channel profile can have its own commands, messages, currency, redeems, and enabled features.</p>
+                <p>Every channel profile can have its own commands, messages, currency, redeems, and enabled features. Select a panel to explore its command catalog.</p>
             </div>
 
             <div class="landing-feature-grid">
-                <article class="landing-feature-card">
-                    <span class="feature-number">01</span>
-                    <h3>Personalized chat</h3>
-                    <p>Custom commands, timers, social links, shoutouts, raid responses, and community messages written for each channel.</p>
-                </article>
+                <details class="landing-feature-card">
+                    <summary>
+                        <span class="feature-number">01</span>
+                        <span class="feature-heading">
+                            <h3>Personalized chat</h3>
+                            <p>Custom interactions, social links, timers, counters, and community messages written for each channel.</p>
+                        </span>
+                        <span class="feature-toggle" aria-hidden="true"></span>
+                    </summary>
+                    <div class="feature-command-panel">
+                        <p class="feature-command-label">Available commands</p>
+                        <div class="feature-command-list">
+                            <code>!hi [username]</code><code>!choice &lt;options&gt;</code><code>!kaboom [username]</code>
+                            <code>!stinky [username]</code><code>!lucky [username]</code><code>!smart [username]</code>
+                            <code>!height [username]</code><code>!pp [username]</code><code>!lurk</code><code>!help</code>
+                            <code>!socials</code><code>!socials discord</code><code>!socials youtube</code>
+                            <code>!setdiscord &lt;url&gt;</code><code>!setyoutube &lt;url&gt;</code><code>!timers [on|off]</code>
+                            <code>!explode</code><code>!reklop</code><code>!randy</code><code>!bark</code><code>!car</code>
+                        </div>
+                    </div>
+                </details>
 
-                <article class="landing-feature-card">
-                    <span class="feature-number">02</span>
-                    <h3>Loyalty and redeems</h3>
-                    <p>Channel-specific currencies, viewer balances, games, daily check-ins, redeem history, and persistent counters.</p>
-                </article>
+                <details class="landing-feature-card">
+                    <summary>
+                        <span class="feature-number">02</span>
+                        <span class="feature-heading">
+                            <h3>Loyalty and redeems</h3>
+                            <p>Channel-specific currencies, viewer balances, games, daily check-ins, redeem history, and persistent counters.</p>
+                        </span>
+                        <span class="feature-toggle" aria-hidden="true"></span>
+                    </summary>
+                    <div class="feature-command-panel">
+                        <p class="feature-command-label">Currency command</p>
+                        <div class="feature-command-list">
+                            <code>!currency [username]</code><code>!currency leaderboard</code>
+                            <code>!currency gamble &lt;amount|all&gt;</code><code>!currency duel &lt;username&gt; &lt;amount&gt;</code>
+                            <code>!currency duel accept</code><code>!currency duel decline</code>
+                            <code>!currency add &lt;username&gt; &lt;amount&gt;</code><code>!currency reset</code>
+                        </div>
+                        <p class="feature-command-note">“Currency” is replaced by the channel's configured command, such as <code>!shards</code> or <code>!mews</code>. Check-ins and other redeems are activated through Twitch channel points.</p>
+                    </div>
+                </details>
 
-                <article class="landing-feature-card">
-                    <span class="feature-number">03</span>
-                    <h3>Viewer activities</h3>
-                    <p>Viewer queues, clips, playful chat commands, community leaderboards, and interactions designed around the stream.</p>
-                </article>
+                <details class="landing-feature-card">
+                    <summary>
+                        <span class="feature-number">03</span>
+                        <span class="feature-heading">
+                            <h3>Viewer activities</h3>
+                            <p>Viewer queues, clips, raid tools, community leaderboards, and interactions designed around the stream.</p>
+                        </span>
+                        <span class="feature-toggle" aria-hidden="true"></span>
+                    </summary>
+                    <div class="feature-command-panel">
+                        <p class="feature-command-label">Available commands</p>
+                        <div class="feature-command-list">
+                            <code>!open</code><code>!close</code><code>!join</code><code>!leave</code><code>!queue</code>
+                            <code>!next</code><code>!remove &lt;position&gt;</code><code>!clear</code>
+                            <code>!clip</code><code>!clip short</code><code>!startraid &lt;channel&gt;</code>
+                        </div>
+                    </div>
+                </details>
 
-                <article class="landing-feature-card">
-                    <span class="feature-number">04</span>
-                    <h3>Game integrations</h3>
-                    <p>Profile-aware game commands such as League champion builds, ranked statistics, registration, and community ladders.</p>
-                </article>
+                <details class="landing-feature-card">
+                    <summary>
+                        <span class="feature-number">04</span>
+                        <span class="feature-heading">
+                            <h3>Game integrations</h3>
+                            <p>Profile-aware League and Overwatch commands for builds, ranked statistics, registration, and community ladders.</p>
+                        </span>
+                        <span class="feature-toggle" aria-hidden="true"></span>
+                    </summary>
+                    <div class="feature-command-panel">
+                        <p class="feature-command-label">League of Legends</p>
+                        <div class="feature-command-list">
+                            <code>!champs</code><code>!champs &lt;champion&gt;</code><code>!register &lt;Riot ID&gt; [region]</code>
+                            <code>!unregister</code><code>!rank [chatter]</code><code>!ladder</code>
+                        </div>
+                        <p class="feature-command-label">Overwatch</p>
+                        <div class="feature-command-list">
+                            <code>!ow</code><code>!owrank</code><code>!owrecord &lt;win|loss&gt;</code><code>!owreset</code>
+                        </div>
+                    </div>
+                </details>
 
-                <article class="landing-feature-card">
-                    <span class="feature-number">05</span>
-                    <h3>Streamer dashboard</h3>
-                    <p>See stream status, check-ins, channel-point activity, social links, viewer queues, enabled features, and command help.</p>
-                </article>
+                <details class="landing-feature-card">
+                    <summary>
+                        <span class="feature-number">05</span>
+                        <span class="feature-heading">
+                            <h3>Streamer dashboard</h3>
+                            <p>See stream status, check-ins, channel-point activity, social links, viewer queues, enabled features, and command help.</p>
+                        </span>
+                        <span class="feature-toggle" aria-hidden="true"></span>
+                    </summary>
+                    <div class="feature-command-panel">
+                        <p class="feature-command-label">Dashboard tools</p>
+                        <p class="feature-command-note">No chat command is required. Broadcasters sign in with Twitch to view live activity, manage enabled features, and browse their channel's exact command list.</p>
+                    </div>
+                </details>
 
-                <article class="landing-feature-card">
-                    <span class="feature-number">06</span>
-                    <h3>Responsible moderation</h3>
-                    <p>Protected users, permission-aware commands, moderation utilities, cooldowns, and detailed per-stream event logs.</p>
-                </article>
+                <details class="landing-feature-card">
+                    <summary>
+                        <span class="feature-number">06</span>
+                        <span class="feature-heading">
+                            <h3>Responsible moderation</h3>
+                            <p>Protected users, permission-aware commands, cooldowns, shoutouts, and detailed per-stream event logs.</p>
+                        </span>
+                        <span class="feature-toggle" aria-hidden="true"></span>
+                    </summary>
+                    <div class="feature-command-panel">
+                        <p class="feature-command-label">Available commands</p>
+                        <div class="feature-command-list">
+                            <code>!so &lt;username&gt;</code><code>!kamikaze &lt;username&gt;</code>
+                        </div>
+                        <p class="feature-command-note">Permission-sensitive actions are restricted to moderators or the broadcaster when appropriate.</p>
+                    </div>
+                </details>
             </div>
+
+            <p class="feature-availability-note">The catalog shows what RatsBoomBot supports. Each channel receives its own configured subset, currency name, and channel-specific commands.</p>
         </section>
 
         <section class="landing-section landing-process" id="how-it-works">
             <div class="landing-section-heading">
-                <p class="eyebrow">Simple streamer access</p>
-                <h2>From Twitch sign-in to your own dashboard.</h2>
+                <p class="eyebrow">Manual enrollment while we grow</p>
+                <h2>A tailored profile comes before Twitch sign-in.</h2>
+                <p class="enrollment-notice"><strong>Work in progress:</strong> please contact the owner for details about enrolling for RatsBoomBot services.</p>
             </div>
 
             <div class="landing-step-grid">
                 <article>
                     <span>1</span>
-                    <h3>Sign in with Twitch</h3>
-                    <p>Use Twitch authentication—there is no separate dashboard password to remember.</p>
+                    <h3>Contact the owner</h3>
+                    <p>Discuss your channel, community, and the features you want enabled before setup begins.</p>
                 </article>
 
                 <article>
                     <span>2</span>
-                    <h3>Open your channel</h3>
-                    <p>Authorized broadcasters are matched to their private RatsBoomBot channel profile.</p>
+                    <h3>Build your profile</h3>
+                    <p>Your messages, currency, redeems, commands, integrations, and permissions are configured manually.</p>
                 </article>
 
                 <article>
                     <span>3</span>
-                    <h3>Run the stream</h3>
-                    <p>View live activity, discover commands, and control available features from one place.</p>
+                    <h3>Authorize and go live</h3>
+                    <p>Once your profile is ready, sign in with Twitch and use your private dashboard—no extra password required.</p>
                 </article>
             </div>
         </section>
@@ -178,7 +262,7 @@
             <div>
                 <p class="eyebrow">Ready when you are</p>
                 <h2>{% if is_authenticated %}Your dashboard is waiting.{% else %}Bring your community into the fun.{% endif %}</h2>
-                <p>RatsBoomBot is currently being introduced one channel at a time.</p>
+                <p>Work in progress: channels are enrolled and configured manually. Please contact the owner before authorizing a new channel.</p>
             </div>
 
             <a class="button primary landing-primary-action" href="{{ dashboard_url }}">
