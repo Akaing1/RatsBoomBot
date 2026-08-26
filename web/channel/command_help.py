@@ -193,6 +193,7 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
         ))
 
     if profile.raid_bosses.enabled:
+        test_commands = (CommandDefinition("!nextraidstream", "Advance to the next simulated stream while offline.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),) if profile.raid_bosses.offline_testing_enabled else ()
         groups.append(CommandGroupDefinition(
             name="Raid bosses",
             description="Attack the active boss, prepare equipment, and compete for contribution rewards.",
@@ -205,7 +206,8 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
                 CommandDefinition("!inventory", "Show owned weapons, equipped weapon, and potion attacks.", feature=FeatureName.RAID_BOSSES),
                 CommandDefinition("!raiders", "Show the current contribution leaderboard.", feature=FeatureName.RAID_BOSSES),
                 CommandDefinition("!spawnboss <type|random>", "Spawn a test raid boss.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!endboss", "End the raid as a failed subjugation and distribute reduced rewards.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES)
+                CommandDefinition("!endboss", "End the raid as a failed subjugation and distribute reduced rewards.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
+                *test_commands
             )
         ))
 

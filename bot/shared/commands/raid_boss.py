@@ -62,7 +62,7 @@ class RaidBossCommands(commands.Component):
             return
 
         broadcaster_id, config = context
-        stream_id = await self.get_stream_id(broadcaster_id)
+        stream_id = await self.get_stream_id(broadcaster_id, config)
 
         if stream_id is None:
             await ctx.reply("You can only attack while the stream is live.")
@@ -198,12 +198,38 @@ class RaidBossCommands(commands.Component):
             await ctx.reply("A raid boss is already active.")
             return
 
-        stream_id = await self.get_stream_id(context[0])
+        stream_id = await self.get_stream_id(context[0], context[1])
 
         if stream_id is not None:
             event, _ = await self.bot.services.raid_bosses.register_stream(context[0], stream_id)
 
         await ctx.send(f"{event.boss_name} [{event.boss_type.title()}] has appeared with {event.max_hp:,} HP for {event.stream_limit} streams! Everyone gets one !attack per stream.")
+
+    @commands.command(name="nextraidstream")
+    async def next_raid_stream(self, ctx: commands.Context) -> None:
+        context = self.get_context(ctx)
+
+        if context is None or not context[1].offline_testing_enabled or not can_manage_raid(ctx):
+            return
+
+        if await self.get_live_stream_id(context[0]) is not None:
+            await ctx.reply("Offline raid-stream simulation is unavailable while the channel is live.")
+            return
+
+        event = await self.bot.services.raid_bosses.get_active_event(context[0])
+
+        if event is None:
+            await ctx.reply("There is no active raid boss. Use !spawnboss <type|random> first.")
+            return
+
+        stream_id = self.get_offline_stream_id(event.id, event.streams_used + 1)
+        event, failed_reward = await self.bot.services.raid_bosses.register_stream(context[0], stream_id)
+
+        if event is None:
+            await ctx.send(f"The simulated stream limit was reached. Raiders received a reduced {failed_reward:,}-point pool based on contribution.")
+            return
+
+        await ctx.send(f"Offline raid testing advanced to simulated stream {event.streams_used}. Everyone can use !attack again.")
 
     @commands.command(name="endboss")
     async def end_boss(self, ctx: commands.Context) -> None:
@@ -223,7 +249,20 @@ class RaidBossCommands(commands.Component):
         fraction = "half" if remaining_ratio <= 0.25 else "one quarter of"
         await ctx.send(f"The subjugation of {event.boss_name} failed. Raiders earned {fraction} the reward pool ({reward:,} points) based on contribution.")
 
-    async def get_stream_id(self, broadcaster_id: str) -> str | None:
+    async def get_stream_id(self, broadcaster_id: str, config: RaidBossConfig) -> str | None:
+        stream_id = await self.get_live_stream_id(broadcaster_id)
+
+        if stream_id is not None or not config.offline_testing_enabled:
+            return stream_id
+
+        event = await self.bot.services.raid_bosses.get_active_event(broadcaster_id)
+
+        if event is None:
+            return None
+
+        return self.get_offline_stream_id(event.id, max(event.streams_used, 1))
+
+    async def get_live_stream_id(self, broadcaster_id: str) -> str | None:
         active_session = self.bot.services.stream_logs.active_sessions.get(str(broadcaster_id))
 
         if active_session is not None:
@@ -238,3 +277,7 @@ class RaidBossCommands(commands.Component):
 
         stream_id = getattr(stream, "id", None) or getattr(stream, "stream_id", None)
         return str(stream_id) if stream_id is not None else None
+
+    @staticmethod
+    def get_offline_stream_id(event_id: int, stream_number: int) -> str:
+        return f"offline-test:{event_id}:{stream_number}"

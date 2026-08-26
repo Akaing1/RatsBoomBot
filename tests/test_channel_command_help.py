@@ -100,6 +100,16 @@ def test_raid_boss_toggle_is_hidden_for_unconfigured_profiles() -> None:
     assert FeatureName.RAID_BOSSES not in features
 
 
+def test_command_help_includes_offline_control_only_when_configured() -> None:
+    broadcaster_id = "channel-1"
+    profile = ChannelProfile(channel_name="channel", raid_bosses=RaidBossConfig(enabled=True, offline_testing_enabled=True))
+    activate_profile(broadcaster_id, profile)
+    groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
+    raid_bosses = get_group(groups, "Raid bosses")
+
+    assert get_command(raid_bosses, "!nextraidstream").permission == "Broadcaster/mod"
+
+
 def test_command_help_marks_commands_disabled_when_channel_profile_is_off() -> None:
     broadcaster_id = "channel-1"
     profile = ChannelProfile(channel_name="channel")
@@ -127,6 +137,6 @@ def test_command_help_catalog_covers_every_shared_top_level_command() -> None:
     profile_specific_commands = {
         "points", "champs", "register", "unregister", "rank", "ladder",
         "explode", "reklop", "randy", "bark", "car",
-        "boss", "attack", "raidshop", "buy", "equip", "inventory", "raiders", "spawnboss", "endboss"
+        "boss", "attack", "raidshop", "buy", "equip", "inventory", "raiders", "spawnboss", "endboss", "nextraidstream"
     }
     assert shared_command_names - profile_specific_commands <= catalog_names
