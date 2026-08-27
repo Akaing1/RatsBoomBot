@@ -18,3 +18,12 @@ def test_streamer_channel_toggles_preserve_scroll_position() -> None:
     assert "data-preserve-scroll" in template
     assert "window.sessionStorage.setItem(scrollKey" in template
     assert "window.scrollTo(0, Number(savedScroll))" in template
+
+
+def test_streamer_feature_page_lists_unique_profile_integrations() -> None:
+    template = (PROJECT_ROOT / "web/templates/channel/features.html").read_text(encoding="utf-8")
+
+    assert "Unique Features" in template
+    assert '"profile_feature"' in template
+    assert "League of Legends" in template
+    assert "Overwatch" in template

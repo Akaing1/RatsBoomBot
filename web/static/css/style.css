@@ -773,6 +773,9 @@ body.landing-page {
     line-height: 1.5;
 }
 
+.toggle-command-summary { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.toggle-command-summary strong { color: var(--text); }
+
 .toggle-status {
     display: inline-flex;
     flex: 0 0 auto;

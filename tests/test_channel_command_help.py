@@ -2,7 +2,7 @@ import pytest
 from twitchio.ext import commands
 
 from bot.component_loader import GLOBAL_COMPONENTS
-from bot.profiles import ChannelProfile, FeatureName, GlobalCommandDefaults, LeagueConfig, PointsConfig, RaidBossConfig, activate_profile, clear_profiles
+from bot.profiles import ChannelProfile, FeatureName, GlobalCommandDefaults, LeagueConfig, OverwatchConfig, PointsConfig, ProfileFeatureName, RaidBossConfig, activate_profile, clear_profiles
 from bot.services.channels.feature_toggle import FeatureToggleService
 from web.channel.command_help import build_command_help_groups
 
@@ -41,10 +41,7 @@ def test_command_help_uses_profile_currency_and_effective_toggle_states() -> Non
     assert len(points.commands) == 8
 
 
-@pytest.mark.parametrize(("channel_name", "expected_group"), [
-    ("MeinyaYozakura", "Channel-specific"),
-    ("Milky_GalaxyVT", "Overwatch")
-])
+@pytest.mark.parametrize(("channel_name", "expected_group"), [("MeinyaYozakura", "Channel-specific")])
 def test_command_help_includes_profile_specific_groups(channel_name: str, expected_group: str) -> None:
     broadcaster_id = "channel-1"
     profile = ChannelProfile(channel_name=channel_name)
@@ -52,6 +49,16 @@ def test_command_help_includes_profile_specific_groups(channel_name: str, expect
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
 
     assert expected_group in {group.name for group in groups}
+
+
+def test_command_help_includes_configured_overwatch_commands() -> None:
+    broadcaster_id = "channel-1"
+    profile = ChannelProfile(channel_name="Milky_GalaxyVT", overwatch=OverwatchConfig(player_id="Milky#123"))
+    activate_profile(broadcaster_id, profile)
+    groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
+    overwatch = get_group(groups, "Overwatch")
+
+    assert [command.syntax for command in overwatch.commands] == ["!ow", "!owrank", "!owrecord <win|loss>", "!owreset"]
 
 
 def test_command_help_includes_league_commands_for_enabled_profiles() -> None:
@@ -69,6 +76,17 @@ def test_command_help_includes_league_commands_for_enabled_profiles() -> None:
         "!rank [chatter]",
         "!ladder"
     ]
+
+
+def test_profile_feature_toggle_disables_integration_command_help() -> None:
+    broadcaster_id = "channel-1"
+    profile = ChannelProfile(channel_name="channel", league=LeagueConfig(enabled=True))
+    activate_profile(broadcaster_id, profile)
+    features = FeatureToggleService(db=None)
+    features.overrides[broadcaster_id] = {features.profile_feature_key(ProfileFeatureName.LEAGUE): False}
+    league = get_group(build_command_help_groups(features, broadcaster_id, profile), "League of Legends")
+
+    assert all(not command.enabled for command in league.commands)
 
 
 def test_command_help_includes_raid_boss_commands_for_enabled_profiles() -> None:

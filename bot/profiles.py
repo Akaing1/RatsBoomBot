@@ -18,6 +18,11 @@ class FeatureName(Enum):
     RAID_BOSSES = "raid_bosses"
 
 
+class ProfileFeatureName(Enum):
+    LEAGUE = "league"
+    OVERWATCH = "overwatch"
+
+
 class GlobalCommandGroup(Enum):
     GLOBALS = "globals"
     POINTS = "points"

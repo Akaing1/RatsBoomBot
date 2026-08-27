@@ -3,7 +3,7 @@ from urllib.parse import quote_plus
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, get_active_profile
+from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.channel.command_help import build_command_help_groups
@@ -201,6 +201,7 @@ async def channel_features_page(request: Request):
             "active_page": "features",
             "broadcaster": broadcaster,
             "channel_features": services.features.get_channel_features(broadcaster_id),
+            "profile_features": services.features.get_profile_features(broadcaster_id),
             "global_groups": services.features.get_global_groups(broadcaster_id),
             "global_commands": services.features.get_global_commands(broadcaster_id),
             "toggle_result": request.query_params.get("toggle_result"),
@@ -211,8 +212,7 @@ async def channel_features_page(request: Request):
 
 
 @router.post("/channel/features/toggles")
-async def update_channel_feature(request: Request, toggle_type: str = Form(...), toggle_name: str = Form(...),
-                                 action: str = Form(...), csrf_token: str = Form(...)):
+async def update_channel_feature(request: Request, toggle_type: str = Form(...), toggle_name: str = Form(...), action: str = Form(...), csrf_token: str = Form(...)):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
 
     if not broadcaster_id:
@@ -223,8 +223,7 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
     runtime_bot = get_bot()
 
     if runtime_bot is None or runtime_bot.services is None:
-        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Runtime+unavailable.",
-                                status_code=303)
+        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Runtime+unavailable.", status_code=303)
 
     services = runtime_bot.services
     broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
@@ -234,8 +233,7 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
         return RedirectResponse(url="/connect", status_code=303)
 
     if action not in {"enable", "disable", "reset"}:
-        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Unknown+toggle+action.",
-                                status_code=303)
+        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Unknown+toggle+action.", status_code=303)
 
     enabled = action == "enable"
     updated_by = f"streamer:{broadcaster_id}"
@@ -250,6 +248,16 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
                 state = await services.features.set_enabled(broadcaster_id, toggle, enabled, updated_by)
 
             display_name = toggle.value.replace("_", " ").title()
+
+        elif toggle_type == "profile_feature":
+            toggle = ProfileFeatureName(toggle_name)
+
+            if action == "reset":
+                state = await services.features.clear_profile_feature_override(broadcaster_id, toggle, updated_by)
+            else:
+                state = await services.features.set_profile_feature_enabled(broadcaster_id, toggle, enabled, updated_by)
+
+            display_name = "League of Legends" if toggle is ProfileFeatureName.LEAGUE else "Overwatch"
 
         elif toggle_type == "global_group":
             toggle = GlobalCommandGroup(toggle_name)
@@ -272,16 +280,12 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
             display_name = f"!{toggle.value}"
 
         else:
-            return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Unknown+toggle+type.",
-                                    status_code=303)
+            return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Unknown+toggle+type.", status_code=303)
 
     except ValueError:
-        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Unknown+toggle.",
-                                status_code=303)
+        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Unknown+toggle.", status_code=303)
     except Exception:
-        return RedirectResponse(
-            url="/channel/features?toggle_result=error&toggle_message=The+toggle+could+not+be+updated.",
-            status_code=303)
+        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=The+toggle+could+not+be+updated.", status_code=303)
 
     if action == "reset":
         message = f"{display_name} was reset to its profile default."
@@ -289,8 +293,7 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
         effective_state = "enabled" if state.effective_enabled else "disabled"
         message = f"{display_name} is now {effective_state}."
 
-    return RedirectResponse(
-        url=f"/channel/features?toggle_result=success&toggle_message={quote_plus(message)}", status_code=303)
+    return RedirectResponse(url=f"/channel/features?toggle_result=success&toggle_message={quote_plus(message)}", status_code=303)
 
 
 @router.post("/channel/viewer-queue/remove")

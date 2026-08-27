@@ -2,7 +2,7 @@ from typing import Any
 
 from twitchio.ext import commands
 
-from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName
+from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName
 
 
 def get_context_broadcaster_id(ctx: Any) -> str | None:
@@ -46,6 +46,16 @@ def is_global_group_enabled(bot, ctx: commands.Context, group: GlobalCommandGrou
         return False
 
     return services.features.is_global_group_enabled(broadcaster_id, group)
+
+
+def is_profile_feature_enabled(bot, ctx: commands.Context, feature: ProfileFeatureName) -> bool:
+    broadcaster_id = get_context_broadcaster_id(ctx)
+    services = bot.services
+
+    if broadcaster_id is None or services is None:
+        return False
+
+    return services.features.is_profile_feature_enabled(broadcaster_id, feature)
 
 
 def is_global_command_enabled(bot, ctx: commands.Context, command: GlobalCommandName) -> bool:
