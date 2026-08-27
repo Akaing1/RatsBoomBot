@@ -37,8 +37,8 @@ class RaidBossCommands(commands.Component):
 
         return broadcaster_id, profile.raid_bosses
 
-    @commands.command(name="boss")
-    async def boss(self, ctx: commands.Context) -> None:
+    @commands.group(name="raid", invoke_fallback=True)
+    async def raid(self, ctx: commands.Context) -> None:
         context = self.get_context(ctx)
 
         if context is None:
@@ -52,9 +52,9 @@ class RaidBossCommands(commands.Component):
 
         percent = event.current_hp / event.max_hp * 100
         streams_remaining = event.stream_limit - event.streams_used + 1
-        await ctx.send(f"{event.boss_name} [{event.boss_type.title()}] — {event.current_hp:,}/{event.max_hp:,} HP ({percent:.1f}%). {streams_remaining} raid stream(s) remain. Use !attack once this stream!")
+        await ctx.send(f"{event.boss_name} [{event.boss_type.title()}] — {event.current_hp:,}/{event.max_hp:,} HP ({percent:.1f}%). {streams_remaining} raid stream(s) remain. Use !raid attack once this stream!")
 
-    @commands.command(name="attack")
+    @raid.command(name="attack")
     async def attack(self, ctx: commands.Context) -> None:
         context = self.get_context(ctx)
 
@@ -100,17 +100,17 @@ class RaidBossCommands(commands.Component):
 
         await ctx.send(f"@{chatter.name} dealt {result.damage:,} damage to {result.boss_name}{bonus_text}! {result.current_hp:,} HP remains.")
 
-    @commands.command(name="raidshop")
-    async def raid_shop(self, ctx: commands.Context) -> None:
+    @raid.command(name="shop")
+    async def shop(self, ctx: commands.Context) -> None:
         context = self.get_context(ctx)
 
         if context is None:
             return
 
         config = context[1]
-        await ctx.send(f"Raid shop: sword (melee), bow (ranged), or spellbook (magic) — {config.weapon_cost:,} points each. Power potion — {config.potion_cost:,} points for {config.potion_attacks} attacks at {config.potion_multiplier:g}x damage. Use !buy <item>.")
+        await ctx.send(f"Raid shop: sword (melee), bow (ranged), or spellbook (magic) — {config.weapon_cost:,} points each with +{config.weapon_attack} attack. Matching weapons double their attack stat. Power potion — {config.potion_cost:,} points for {config.potion_attacks} attacks at {config.potion_multiplier:g}x damage. Use !raid buy <item>.")
 
-    @commands.command(name="buy")
+    @raid.command(name="buy")
     async def buy(self, ctx: commands.Context, item: str | None = None) -> None:
         context = self.get_context(ctx)
 
@@ -118,22 +118,22 @@ class RaidBossCommands(commands.Component):
             return
 
         if not item:
-            await ctx.reply("Use !raidshop to see items, then !buy <item>.")
+            await ctx.reply("Use !raid shop to see items, then !raid buy <item>.")
             return
 
         chatter = ctx.chatter
         result = await self.bot.services.raid_bosses.buy(context[0], str(chatter.id), chatter.name, item, context[1])
 
         if result is None:
-            await ctx.reply("That item is not in the raid shop. Use !raidshop to see the available items.")
+            await ctx.reply("That item is not in the raid shop. Use !raid shop to see the available items.")
         elif result == "insufficient":
             await ctx.reply("You do not have enough loyalty points for that item.")
         elif result == "owned":
-            await ctx.reply("You already own that weapon. Use !equip to select it.")
+            await ctx.reply("You already own that weapon. Use !raid equip to select it.")
         else:
-            await ctx.reply(f"You purchased {item.lower()}! Use !equip {item.lower()} if it is a weapon.")
+            await ctx.reply(f"You purchased {item.lower()}! Use !raid equip {item.lower()} if it is a weapon.")
 
-    @commands.command(name="equip")
+    @raid.command(name="equip")
     async def equip(self, ctx: commands.Context, weapon: str | None = None) -> None:
         context = self.get_context(ctx)
 
@@ -141,19 +141,19 @@ class RaidBossCommands(commands.Component):
             return
 
         if not weapon:
-            await ctx.reply("Use !equip sword, !equip bow, or !equip spellbook.")
+            await ctx.reply("Use !raid equip sword, !raid equip bow, or !raid equip spellbook.")
             return
 
         chatter = ctx.chatter
         equipped = await self.bot.services.raid_bosses.equip(context[0], str(chatter.id), chatter.name, weapon)
 
         if not equipped:
-            await ctx.reply("You do not own that weapon. Use !raidshop to see the available equipment.")
+            await ctx.reply("You do not own that weapon. Use !raid shop to see the available equipment.")
             return
 
         await ctx.reply(f"You equipped your {weapon.lower()}.")
 
-    @commands.command(name="inventory")
+    @raid.command(name="inventory")
     async def inventory(self, ctx: commands.Context) -> None:
         context = self.get_context(ctx)
 
@@ -165,8 +165,8 @@ class RaidBossCommands(commands.Component):
         weapon_text = ", ".join(weapons) if weapons else "none"
         await ctx.reply(f"Weapons: {weapon_text}. Equipped: {equipped or 'none'}. Power-potion attacks: {potion_attacks}.")
 
-    @commands.command(name="raiders")
-    async def raiders(self, ctx: commands.Context) -> None:
+    @raid.command(name="leaderboard")
+    async def leaderboard(self, ctx: commands.Context) -> None:
         context = self.get_context(ctx)
 
         if context is None:
@@ -181,7 +181,7 @@ class RaidBossCommands(commands.Component):
         leaderboard = " | ".join(f"{position}. {username}: {damage:,}" for position, (username, damage) in enumerate(entries, start=1))
         await ctx.send(f"Top raiders: {leaderboard}")
 
-    @commands.command(name="spawnboss")
+    @raid.command(name="spawn")
     async def spawn_boss(self, ctx: commands.Context, boss_type: str | None = None) -> None:
         context = self.get_context(ctx)
 
@@ -192,7 +192,7 @@ class RaidBossCommands(commands.Component):
             boss_type = random.choice(("melee", "ranged", "magic"))
 
         if boss_type not in {"melee", "ranged", "magic"}:
-            await ctx.reply("Use !spawnboss melee, !spawnboss ranged, !spawnboss magic, or !spawnboss random.")
+            await ctx.reply("Use !raid spawn melee, !raid spawn ranged, !raid spawn magic, or !raid spawn random.")
             return
 
         event = await self.bot.services.raid_bosses.spawn(context[0], boss_type, context[1])
@@ -206,9 +206,9 @@ class RaidBossCommands(commands.Component):
         if stream_id is not None:
             event, _ = await self.bot.services.raid_bosses.register_stream(context[0], stream_id)
 
-        await ctx.send(f"{event.boss_name} [{event.boss_type.title()}] has appeared with {event.max_hp:,} HP for {event.stream_limit} streams! Everyone gets one !attack per stream.")
+        await ctx.send(f"{event.boss_name} [{event.boss_type.title()}] has appeared with {event.max_hp:,} HP for {event.stream_limit} streams! Everyone gets one !raid attack per stream.")
 
-    @commands.command(name="nextraidstream")
+    @raid.command(name="nextstream")
     async def next_raid_stream(self, ctx: commands.Context) -> None:
         context = self.get_context(ctx)
 
@@ -222,7 +222,7 @@ class RaidBossCommands(commands.Component):
         event = await self.bot.services.raid_bosses.get_active_event(context[0])
 
         if event is None:
-            await ctx.reply("There is no active raid boss. Use !spawnboss <type|random> first.")
+            await ctx.reply("There is no active raid boss. Use !raid spawn <type|random> first.")
             return
 
         stream_id = self.get_offline_stream_id(event.id, event.streams_used + 1)
@@ -232,9 +232,9 @@ class RaidBossCommands(commands.Component):
             await ctx.send(f"The simulated stream limit was reached. Raiders received a reduced {failed_reward:,}-point pool based on contribution.")
             return
 
-        await ctx.send(f"Offline raid testing advanced to simulated stream {event.streams_used}. Everyone can use !attack again.")
+        await ctx.send(f"Offline raid testing advanced to simulated stream {event.streams_used}. Everyone can use !raid attack again.")
 
-    @commands.command(name="endboss")
+    @raid.command(name="end")
     async def end_boss(self, ctx: commands.Context) -> None:
         context = self.get_context(ctx)
 

@@ -182,8 +182,13 @@ class RaidBossService:
         potion_attacks = int(player["potion_attacks_remaining"]) if player else 0
         damage = random.randint(config.base_damage_min, config.base_damage_max)
 
-        if weapon and WEAPON_TYPES.get(weapon) == event.boss_type:
-            damage = round(damage * config.weapon_multiplier)
+        if weapon:
+            weapon_attack = config.weapon_attack
+
+            if WEAPON_TYPES.get(weapon) == event.boss_type:
+                weapon_attack = round(weapon_attack * config.weapon_multiplier)
+
+            damage += weapon_attack
 
         potion_used = potion_attacks > 0
 

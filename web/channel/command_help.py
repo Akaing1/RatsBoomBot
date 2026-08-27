@@ -193,20 +193,20 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
         ))
 
     if profile.raid_bosses.enabled:
-        test_commands = (CommandDefinition("!nextraidstream", "Advance to the next simulated stream while offline.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),) if profile.raid_bosses.offline_testing_enabled else ()
+        test_commands = (CommandDefinition("!raid nextstream", "Advance to the next simulated stream while offline.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),) if profile.raid_bosses.offline_testing_enabled else ()
         groups.append(CommandGroupDefinition(
             name="Raid bosses",
             description="Attack the active boss, prepare equipment, and compete for contribution rewards.",
             commands=(
-                CommandDefinition("!boss", "Show the active boss, type, and remaining HP.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!attack", "Attack once during each Twitch stream.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raidshop", "Show the raid equipment shop.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!buy <item>", "Buy a weapon or power potion with loyalty points.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!equip <weapon>", "Equip an owned sword, bow, or spellbook.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!inventory", "Show owned weapons, equipped weapon, and potion attacks.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raiders", "Show the current contribution leaderboard.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!spawnboss <type|random>", "Spawn a test raid boss.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!endboss", "End the raid as a failed subjugation and distribute reduced rewards.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!raid", "Show the active boss, type, and remaining HP.", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!raid attack", "Attack once during each Twitch stream.", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!raid shop", "Show the raid equipment shop.", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!raid buy <item>", "Buy a weapon or power potion with loyalty points.", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!raid equip <weapon>", "Equip an owned sword, bow, or spellbook.", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!raid inventory", "Show owned weapons, equipped weapon, and potion attacks.", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!raid leaderboard", "Show the current contribution leaderboard.", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!raid spawn <type|random>", "Spawn a test raid boss.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!raid end", "End the raid as a failed subjugation and distribute reduced rewards.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
                 *test_commands
             )
         ))

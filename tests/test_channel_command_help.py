@@ -79,15 +79,15 @@ def test_command_help_includes_raid_boss_commands_for_enabled_profiles() -> None
     raid_bosses = get_group(groups, "Raid bosses")
 
     assert [command.syntax for command in raid_bosses.commands] == [
-        "!boss",
-        "!attack",
-        "!raidshop",
-        "!buy <item>",
-        "!equip <weapon>",
-        "!inventory",
-        "!raiders",
-        "!spawnboss <type|random>",
-        "!endboss"
+        "!raid",
+        "!raid attack",
+        "!raid shop",
+        "!raid buy <item>",
+        "!raid equip <weapon>",
+        "!raid inventory",
+        "!raid leaderboard",
+        "!raid spawn <type|random>",
+        "!raid end"
     ]
 
 
@@ -107,7 +107,7 @@ def test_command_help_includes_offline_control_only_when_configured() -> None:
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
     raid_bosses = get_group(groups, "Raid bosses")
 
-    assert get_command(raid_bosses, "!nextraidstream").permission == "Broadcaster/mod"
+    assert get_command(raid_bosses, "!raid nextstream").permission == "Broadcaster/mod"
 
 
 def test_command_help_marks_commands_disabled_when_channel_profile_is_off() -> None:
@@ -137,6 +137,6 @@ def test_command_help_catalog_covers_every_shared_top_level_command() -> None:
     profile_specific_commands = {
         "points", "champs", "register", "unregister", "rank", "ladder",
         "explode", "reklop", "randy", "bark", "car",
-        "boss", "attack", "raidshop", "buy", "equip", "inventory", "raiders", "spawnboss", "endboss", "nextraidstream"
+        "raid"
     }
     assert shared_command_names - profile_specific_commands <= catalog_names

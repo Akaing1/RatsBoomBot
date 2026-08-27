@@ -30,10 +30,24 @@ def build_config(**overrides) -> RaidBossConfig:
 def test_default_damage_is_balanced_for_larger_chats() -> None:
     config = RaidBossConfig()
 
-    assert config.base_damage_min == 50
-    assert config.base_damage_max == 150
+    assert config.max_hp == 150000
+    assert config.duration_streams == 5
+    assert config.base_damage_min == 390
+    assert config.base_damage_max == 430
+    assert config.weapon_attack == 40
+    assert config.weapon_cost == 25000
+    assert config.potion_cost == 20000
+    assert config.potion_multiplier == 2.0
     assert config.critical_chance == 0.05
     assert config.critical_multiplier == 1.5
+
+
+def test_common_matching_weapon_supports_three_stream_mini_boss_clear() -> None:
+    config = RaidBossConfig()
+    minimum_matching_damage = config.base_damage_min + round(config.weapon_attack * config.weapon_multiplier)
+
+    assert minimum_matching_damage * 25 * 3 >= 35000
+    assert (config.base_damage_max + round(config.weapon_attack * config.weapon_multiplier)) * 50 * config.duration_streams < config.max_hp
 
 
 @pytest.mark.asyncio
@@ -89,7 +103,7 @@ async def test_matching_weapon_and_power_potion_stack(tmp_path) -> None:
         result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
         weapons, equipped, potion_attacks = await service.get_inventory("channel-1", "user-1")
 
-        assert result.damage == 1000
+        assert result.damage == 360
         assert result.weapon == "sword"
         assert result.potion_used is True
         assert weapons == ["sword"]
