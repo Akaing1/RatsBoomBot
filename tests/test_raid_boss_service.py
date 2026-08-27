@@ -36,7 +36,7 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
     assert config.base_damage_max == 430
     assert config.weapon_attack == 40
     assert config.weapon_cost == 25000
-    assert config.potion_cost == 20000
+    assert config.potion_cost == 10000
     assert config.potion_multiplier == 2.0
     assert config.critical_chance == 0.05
     assert config.critical_multiplier == 1.5

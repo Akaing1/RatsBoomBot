@@ -343,7 +343,7 @@ class RaidBossConfig:
     base_damage_min: int = 390
     base_damage_max: int = 430
     weapon_cost: int = 25000
-    potion_cost: int = 20000
+    potion_cost: int = 10000
     weapon_attack: int = 40
     weapon_multiplier: float = 2.0
     potion_multiplier: float = 2.0
