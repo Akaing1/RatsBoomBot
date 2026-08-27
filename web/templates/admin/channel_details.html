@@ -163,6 +163,39 @@
     </div>
 {% endif %}
 
+{% if raid_configured %}
+    <section class="panel raid-monitor-panel">
+        <div class="panel-header">
+            <div><p class="eyebrow">Pilot metrics</p><h3>Raid encounter monitor</h3></div>
+            <span id="raid-monitor-status" class="channel-state {% if raid_metrics and raid_metrics.status == 'active' %}live{% endif %}">{% if raid_metrics %}{{ raid_metrics.status | title }}{% else %}Waiting{% endif %}</span>
+        </div>
+
+        <div id="raid-monitor-empty" class="compact-empty-state" {% if raid_metrics %}hidden{% endif %}>
+            <h4>No raid encounter recorded</h4><p>Spawn a mini or main boss to begin collecting pilot data.</p>
+        </div>
+
+        <div id="raid-monitor-details" {% if not raid_metrics %}hidden{% endif %}>
+            <div class="raid-monitor-heading">
+                <div><strong id="raid-boss-name">{% if raid_metrics %}{{ raid_metrics.boss_name }}{% endif %}</strong><p id="raid-boss-meta">{% if raid_metrics %}{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; {{ raid_metrics.streams_used }}/{{ raid_metrics.stream_limit }} streams{% endif %}</p></div>
+                <strong id="raid-hp-label">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.current_hp) }}/{{ "{:,}".format(raid_metrics.max_hp) }} HP{% endif %}</strong>
+            </div>
+
+            <div class="progress-track raid-hp-track"><span id="raid-hp-progress" style="width: {% if raid_metrics %}{{ raid_metrics.hp_percent }}{% else %}0{% endif %}%"></span></div>
+
+            <div class="raid-metric-grid">
+                <article><span>Unique attackers</span><strong id="raid-unique-attackers">{% if raid_metrics %}{{ raid_metrics.unique_attackers }}{% else %}0{% endif %}</strong></article>
+                <article><span>Total attacks</span><strong id="raid-total-attacks">{% if raid_metrics %}{{ raid_metrics.total_attacks }}{% else %}0{% endif %}</strong></article>
+                <article><span>Average damage</span><strong id="raid-average-damage">{% if raid_metrics %}{{ raid_metrics.average_damage }}{% else %}0{% endif %}</strong></article>
+                <article><span>Total damage</span><strong id="raid-total-damage">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.total_damage) }}{% else %}0{% endif %}</strong></article>
+                <article><span>Weapon attacks</span><strong id="raid-weapon-attacks">{% if raid_metrics %}{{ raid_metrics.weapon_attacks }}{% else %}0{% endif %}</strong></article>
+                <article><span>Potion attacks</span><strong id="raid-potion-attacks">{% if raid_metrics %}{{ raid_metrics.potion_attacks }}{% else %}0{% endif %}</strong></article>
+                <article><span>Critical hits</span><strong id="raid-critical-hits">{% if raid_metrics %}{{ raid_metrics.critical_hits }}{% else %}0{% endif %}</strong></article>
+                <article><span>Reward pool</span><strong id="raid-reward-pool">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.reward_pool) }}{% else %}0{% endif %}</strong></article>
+            </div>
+        </div>
+    </section>
+{% endif %}
+
 <div class="channel-dashboard-grid">
     <div class="redemption-panel-grid">
         <section class="panel activity-panel">
@@ -468,6 +501,9 @@
         const checkinContent = document.getElementById("checkin-activity-content");
         const redemptionContent = document.getElementById("redemption-activity-content");
         const streamLabels = document.querySelectorAll(".activity-stream-label");
+        const raidStatus = document.getElementById("raid-monitor-status");
+        const raidEmpty = document.getElementById("raid-monitor-empty");
+        const raidDetails = document.getElementById("raid-monitor-details");
         let requestInProgress = false;
         let lastSignature = null;
 
@@ -608,6 +644,29 @@
             redemptionContent.appendChild(list);
         }
 
+        function renderRaid(raid) {
+            if (!raidStatus || !raidEmpty || !raidDetails) return;
+            const hasRaid = Boolean(raid);
+            raidEmpty.hidden = hasRaid;
+            raidDetails.hidden = !hasRaid;
+            raidStatus.textContent = hasRaid ? raid.status.charAt(0).toUpperCase() + raid.status.slice(1) : "Waiting";
+            raidStatus.classList.toggle("live", hasRaid && raid.status === "active");
+            if (!hasRaid) return;
+
+            document.getElementById("raid-boss-name").textContent = raid.boss_name;
+            document.getElementById("raid-boss-meta").textContent = `${raid.boss_tier.charAt(0).toUpperCase() + raid.boss_tier.slice(1)} Boss · ${raid.boss_type.charAt(0).toUpperCase() + raid.boss_type.slice(1)} · ${raid.streams_used}/${raid.stream_limit} streams`;
+            document.getElementById("raid-hp-label").textContent = `${raid.current_hp.toLocaleString()}/${raid.max_hp.toLocaleString()} HP`;
+            document.getElementById("raid-hp-progress").style.width = `${Math.max(0, Math.min(100, raid.hp_percent))}%`;
+            document.getElementById("raid-unique-attackers").textContent = raid.unique_attackers.toLocaleString();
+            document.getElementById("raid-total-attacks").textContent = raid.total_attacks.toLocaleString();
+            document.getElementById("raid-average-damage").textContent = Number(raid.average_damage).toFixed(1);
+            document.getElementById("raid-total-damage").textContent = raid.total_damage.toLocaleString();
+            document.getElementById("raid-weapon-attacks").textContent = raid.weapon_attacks.toLocaleString();
+            document.getElementById("raid-potion-attacks").textContent = raid.potion_attacks.toLocaleString();
+            document.getElementById("raid-critical-hits").textContent = raid.critical_hits.toLocaleString();
+            document.getElementById("raid-reward-pool").textContent = raid.reward_pool.toLocaleString();
+        }
+
         function render(data) {
             const redemptions = data.redemptions || {};
             const signature = JSON.stringify(data);
@@ -616,6 +675,7 @@
             renderQueue(data.queue || {});
             renderCheckins(Array.isArray(redemptions.checkins) ? redemptions.checkins : []);
             renderRedemptions(Array.isArray(redemptions.redemptions) ? redemptions.redemptions : []);
+            renderRaid(data.raid || null);
             const streamLabel = !redemptions.stream_id
                 ? "Waiting"
                 : redemptions.using_previous_stream ? "Previous" : "Current";
