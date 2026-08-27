@@ -1,18 +1,29 @@
 import logging
 from dataclasses import dataclass
 
-from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, get_active_profile
+from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
 
 LOGGER = logging.getLogger("RatBoomBot")
 
 FEATURE_PREFIX = "feature:"
 GLOBAL_GROUP_PREFIX = "global_group:"
 GLOBAL_COMMAND_PREFIX = "global_command:"
+PROFILE_FEATURE_PREFIX = "profile_feature:"
 
 
 @dataclass(frozen=True)
 class FeatureState:
     feature: FeatureName
+    default_enabled: bool
+    override_enabled: bool | None
+    effective_enabled: bool
+    profile_enabled: bool
+    blocked_by_profile: bool
+
+
+@dataclass(frozen=True)
+class ProfileFeatureState:
+    feature: ProfileFeatureName
     default_enabled: bool
     override_enabled: bool | None
     effective_enabled: bool
@@ -106,6 +117,7 @@ class FeatureToggleService:
         SELECT broadcaster_id, feature_name, enabled, updated_by
         FROM channel_feature_overrides
         WHERE feature_name NOT LIKE 'feature:%'
+          AND feature_name NOT LIKE 'profile_feature:%'
           AND feature_name NOT LIKE 'global_group:%'
           AND feature_name NOT LIKE 'global_command:%'
         """
@@ -239,6 +251,11 @@ class FeatureToggleService:
 
         return self.get_global_group_state(broadcaster_id, group)
 
+    async def set_profile_feature_enabled(self, broadcaster_id: str, feature: ProfileFeatureName, enabled: bool, updated_by: str) -> ProfileFeatureState:
+        broadcaster_id = str(broadcaster_id)
+        await self.set_override(broadcaster_id, self.profile_feature_key(feature), enabled, updated_by)
+        return self.get_profile_feature_state(broadcaster_id, feature)
+
     async def set_global_command_enabled(self, broadcaster_id: str, command: GlobalCommandName, enabled: bool, updated_by: str) -> GlobalCommandState:
         broadcaster_id = str(broadcaster_id)
         key = self.global_command_key(command)
@@ -260,6 +277,11 @@ class FeatureToggleService:
         await self.clear_stored_override(broadcaster_id, self.global_group_key(group), updated_by)
 
         return self.get_global_group_state(broadcaster_id, group)
+
+    async def clear_profile_feature_override(self, broadcaster_id: str, feature: ProfileFeatureName, updated_by: str) -> ProfileFeatureState:
+        broadcaster_id = str(broadcaster_id)
+        await self.clear_stored_override(broadcaster_id, self.profile_feature_key(feature), updated_by)
+        return self.get_profile_feature_state(broadcaster_id, feature)
 
     async def clear_global_command_override(self, broadcaster_id: str, command: GlobalCommandName, updated_by: str) -> GlobalCommandState:
         broadcaster_id = str(broadcaster_id)
@@ -349,6 +371,9 @@ class FeatureToggleService:
     def is_global_group_enabled(self, broadcaster_id: str, group: GlobalCommandGroup) -> bool:
         return self.get_global_group_state(broadcaster_id, group).effective_enabled
 
+    def is_profile_feature_enabled(self, broadcaster_id: str, feature: ProfileFeatureName) -> bool:
+        return self.get_profile_feature_state(broadcaster_id, feature).effective_enabled
+
     def is_global_command_enabled(self, broadcaster_id: str, command: GlobalCommandName) -> bool:
         return self.get_global_command_state(broadcaster_id, command).effective_enabled
 
@@ -432,6 +457,25 @@ class FeatureToggleService:
             blocked_by_globals=blocked_by_globals
         )
 
+    def get_profile_feature_state(self, broadcaster_id: str, feature: ProfileFeatureName) -> ProfileFeatureState:
+        broadcaster_id = str(broadcaster_id)
+        profile = get_active_profile(broadcaster_id)
+
+        if profile is None:
+            return ProfileFeatureState(feature, False, None, False, False, False)
+
+        if feature is ProfileFeatureName.LEAGUE:
+            default_enabled = profile.league.enabled
+        else:
+            default_enabled = bool(profile.overwatch.player_id)
+
+        override_enabled = self.get_override(broadcaster_id, self.profile_feature_key(feature))
+        configured_enabled = override_enabled if override_enabled is not None else default_enabled
+        profile_enabled = self.get_profile_enabled(broadcaster_id)
+        effective_enabled = default_enabled and configured_enabled and profile_enabled
+        blocked_by_profile = default_enabled and configured_enabled and not profile_enabled
+        return ProfileFeatureState(feature, default_enabled, override_enabled, effective_enabled, profile_enabled, blocked_by_profile)
+
     def get_global_command_state(self, broadcaster_id: str, command: GlobalCommandName) -> GlobalCommandState:
         broadcaster_id = str(broadcaster_id)
         profile = get_active_profile(broadcaster_id)
@@ -507,6 +551,10 @@ class FeatureToggleService:
 
         return features
 
+    def get_profile_features(self, broadcaster_id: str) -> dict[ProfileFeatureName, ProfileFeatureState]:
+        states = {feature: self.get_profile_feature_state(broadcaster_id, feature) for feature in ProfileFeatureName}
+        return {feature: state for feature, state in states.items() if state.default_enabled}
+
     def get_global_groups(self, broadcaster_id: str) -> dict[GlobalCommandGroup, GlobalGroupState]:
         return {group: self.get_global_group_state(broadcaster_id, group) for group in GlobalCommandGroup}
 
@@ -530,6 +578,10 @@ class FeatureToggleService:
         return f"{GLOBAL_COMMAND_PREFIX}{command.value}"
 
     @staticmethod
+    def profile_feature_key(feature: ProfileFeatureName) -> str:
+        return f"{PROFILE_FEATURE_PREFIX}{feature.value}"
+
+    @staticmethod
     def is_valid_key(key: str) -> bool:
         try:
             if key.startswith(FEATURE_PREFIX):
@@ -542,6 +594,10 @@ class FeatureToggleService:
 
             if key.startswith(GLOBAL_COMMAND_PREFIX):
                 GlobalCommandName(key.removeprefix(GLOBAL_COMMAND_PREFIX))
+                return True
+
+            if key.startswith(PROFILE_FEATURE_PREFIX):
+                ProfileFeatureName(key.removeprefix(PROFILE_FEATURE_PREFIX))
                 return True
         except ValueError:
             return False

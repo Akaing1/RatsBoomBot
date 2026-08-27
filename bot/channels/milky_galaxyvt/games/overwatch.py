@@ -4,7 +4,7 @@ import httpx
 from twitchio.ext import commands
 
 from bot.channels.component import ChannelComponent
-from bot.profiles import ChannelProfile
+from bot.profiles import ChannelProfile, ProfileFeatureName
 from bot.services.engagement.overwatch import OverwatchNotConfiguredError
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -16,7 +16,7 @@ class MilkyGalaxyOverwatchCommands(ChannelComponent):
         super().__init__(bot, profile, broadcaster_id)
 
     async def require_overwatch(self, ctx: commands.Context) -> bool:
-        if not await self.require_profile_channel(ctx):
+        if not await self.require_profile_feature(ctx, ProfileFeatureName.OVERWATCH):
             return False
 
         if await self.bot.services.overwatch.is_allowed_game(self.broadcaster_id, self.profile.overwatch):

@@ -3,10 +3,10 @@ import logging
 from twitchio import User
 from twitchio.ext import commands
 
-from bot.profiles import FeatureName, LeagueConfig, get_active_profile
+from bot.profiles import LeagueConfig, ProfileFeatureName, get_active_profile
 from bot.services.engagement.league import CommunityRank, LeagueProviderError, RankEntry
 from bot.shared.commands.converters import LocalizedUser
-from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+from bot.shared.commands.helpers import get_context_broadcaster_id, is_profile_feature_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -20,7 +20,7 @@ class LeagueCommands(commands.Component):
     def get_context(self, ctx: commands.Context) -> tuple[str, LeagueConfig] | None:
         broadcaster_id = get_context_broadcaster_id(ctx)
 
-        if broadcaster_id is None or not is_feature_enabled(self.bot, ctx, FeatureName.CHANNEL):
+        if broadcaster_id is None or not is_profile_feature_enabled(self.bot, ctx, ProfileFeatureName.LEAGUE):
             return None
 
         profile = get_active_profile(broadcaster_id)

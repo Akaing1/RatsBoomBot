@@ -176,7 +176,7 @@ class FakeLeagueService:
 class FakeFeatures:
 
     @staticmethod
-    def is_enabled(broadcaster_id, feature) -> bool:
+    def is_profile_feature_enabled(broadcaster_id, feature) -> bool:
         return True
 
 

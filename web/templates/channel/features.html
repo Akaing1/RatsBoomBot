@@ -1,11 +1,13 @@
 {% extends "channel/layout.html" %}
 
-{% macro toggle_card(toggle_type, toggle_name, display_name, state) %}
+{% macro toggle_card(toggle_type, toggle_name, display_name, state, description=None, commands=None) %}
     <article class="toggle-card {% if state.effective_enabled %}enabled{% else %}disabled{% endif %}">
         <div class="toggle-card-content">
             <div class="toggle-card-heading">
                 <div>
                     <h4>{{ display_name }}</h4>
+
+                    {% if description %}<p>{{ description }}</p>{% endif %}
                 </div>
 
                 <span class="toggle-status {% if state.effective_enabled %}enabled{% else %}disabled{% endif %}">
@@ -16,6 +18,8 @@
                     {% endif %}
                 </span>
             </div>
+
+            {% if commands %}<p class="toggle-command-summary"><strong>Commands:</strong> {{ commands }}</p>{% endif %}
 
             <div class="toggle-meta">
                 <span>
@@ -204,6 +208,43 @@
             </p>
         </div>
     </div>
+
+    {% if profile_features %}
+        <div class="toggle-section">
+            <div class="toggle-section-heading">
+                <div>
+                    <h4>Unique Features</h4>
+
+                    <p>
+                        Integrations configured specifically for your channel profile.
+                    </p>
+                </div>
+            </div>
+
+            <div class="toggle-grid">
+                {% for feature, state in profile_features.items() %}
+                    {% if feature.value == "league" %}
+                        {% set display_name = "League of Legends" %}
+                        {% set description = "Ranked champion data and your channel's community League ladder." %}
+                        {% set commands = "!champs, !register, !unregister, !rank, !ladder" %}
+                    {% elif feature.value == "overwatch" %}
+                        {% set display_name = "Overwatch" %}
+                        {% set description = "Live rank lookups and competitive session tracking." %}
+                        {% set commands = "!ow, !owrank, !owrecord, !owreset" %}
+                    {% endif %}
+
+                    {{ toggle_card(
+                        "profile_feature",
+                        feature.value,
+                        display_name,
+                        state,
+                        description,
+                        commands
+                    ) }}
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
 
     <div class="toggle-section">
         <div class="toggle-section-heading">

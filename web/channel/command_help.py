@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from bot.profiles import ChannelProfile, FeatureName, GlobalCommandGroup, GlobalCommandName
+from bot.profiles import ChannelProfile, FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName
 
 
 @dataclass(frozen=True)
@@ -11,6 +11,7 @@ class CommandDefinition:
     feature: FeatureName | None = None
     global_group: GlobalCommandGroup | None = None
     global_command: GlobalCommandName | None = None
+    profile_feature: ProfileFeatureName | None = None
 
 
 @dataclass(frozen=True)
@@ -166,15 +167,15 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
             commands=(CommandDefinition("!hbd", "Send Meinya a happy birthday message.", feature=FeatureName.CHANNEL),)
         ))
 
-    if channel_name == "milky_galaxyvt":
+    if profile.overwatch.player_id:
         groups.append(CommandGroupDefinition(
             name="Overwatch",
             description="Milky's live Overwatch rank and session tracking commands.",
             commands=(
-                CommandDefinition("!ow", "Show the current session record and available competitive ranks.", feature=FeatureName.CHANNEL),
-                CommandDefinition("!owrank", "Show available competitive ranks.", feature=FeatureName.CHANNEL),
-                CommandDefinition("!owrecord <win|loss>", "Record a match result for the current session.", "Broadcaster/mod", feature=FeatureName.CHANNEL),
-                CommandDefinition("!owreset", "Reset the current session record to 0W-0L.", "Broadcaster/mod", feature=FeatureName.CHANNEL)
+                CommandDefinition("!ow", "Show the current session record and available competitive ranks.", profile_feature=ProfileFeatureName.OVERWATCH),
+                CommandDefinition("!owrank", "Show available competitive ranks.", profile_feature=ProfileFeatureName.OVERWATCH),
+                CommandDefinition("!owrecord <win|loss>", "Record a match result for the current session.", "Broadcaster/mod", profile_feature=ProfileFeatureName.OVERWATCH),
+                CommandDefinition("!owreset", "Reset the current session record to 0W-0L.", "Broadcaster/mod", profile_feature=ProfileFeatureName.OVERWATCH)
             )
         ))
 
@@ -183,12 +184,12 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
             name="League of Legends",
             description="Ranked champion statistics, broadcaster builds, and the channel's community League ladder.",
             commands=(
-                CommandDefinition("!champs", "Show the broadcaster's five most-played ranked champions this season.", feature=FeatureName.CHANNEL),
-                CommandDefinition("!champs <champion>", "Show the broadcaster's common three-item core from ranked games in the last 14 days.", feature=FeatureName.CHANNEL),
-                CommandDefinition("!register <Riot ID> [region]", "Register your Riot ID and join this channel's League ladder.", feature=FeatureName.CHANNEL),
-                CommandDefinition("!unregister", "Remove your League registration and saved rank history from this channel.", feature=FeatureName.CHANNEL),
-                CommandDefinition("!rank [chatter]", "Show your rank or another registered chatter's rank.", feature=FeatureName.CHANNEL),
-                CommandDefinition("!ladder", "Show the channel's Solo/Duo community leaderboard.", feature=FeatureName.CHANNEL)
+                CommandDefinition("!champs", "Show the broadcaster's five most-played ranked champions this season.", profile_feature=ProfileFeatureName.LEAGUE),
+                CommandDefinition("!champs <champion>", "Show the broadcaster's common three-item core from ranked games in the last 14 days.", profile_feature=ProfileFeatureName.LEAGUE),
+                CommandDefinition("!register <Riot ID> [region]", "Register your Riot ID and join this channel's League ladder.", profile_feature=ProfileFeatureName.LEAGUE),
+                CommandDefinition("!unregister", "Remove your League registration and saved rank history from this channel.", profile_feature=ProfileFeatureName.LEAGUE),
+                CommandDefinition("!rank [chatter]", "Show your rank or another registered chatter's rank.", profile_feature=ProfileFeatureName.LEAGUE),
+                CommandDefinition("!ladder", "Show the channel's Solo/Duo community leaderboard.", profile_feature=ProfileFeatureName.LEAGUE)
             )
         ))
 
@@ -216,6 +217,9 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
 
 
 def command_is_enabled(features, broadcaster_id: str, command: CommandDefinition) -> bool:
+    if command.profile_feature is not None and not features.is_profile_feature_enabled(broadcaster_id, command.profile_feature):
+        return False
+
     if command.feature is not None and not features.is_enabled(broadcaster_id, command.feature):
         return False
 
