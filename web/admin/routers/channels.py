@@ -121,6 +121,8 @@ async def channel_details_page(request: Request, broadcaster_id: str):
     viewer_queue = services.viewer_queue
     redemption_activity = await get_redemption_dashboard_data(services, broadcaster_id)
     channel_features = services.features.get_channel_features(broadcaster_id)
+    raid_configured = FeatureName.RAID_BOSSES in channel_features
+    raid_metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_configured else None
     global_groups = services.features.get_global_groups(broadcaster_id)
     global_commands = services.features.get_global_commands(broadcaster_id)
 
@@ -136,6 +138,8 @@ async def channel_details_page(request: Request, broadcaster_id: str):
             queue_users=viewer_queue.list_queue(broadcaster_id),
             queue_size=viewer_queue.size(broadcaster_id),
             redemption_activity=redemption_activity,
+            raid_configured=raid_configured,
+            raid_metrics=raid_metrics,
             channel_features=channel_features,
             global_groups=global_groups,
             global_commands=global_commands,
@@ -168,13 +172,16 @@ async def channel_activity_state(request: Request, broadcaster_id: str):
     viewer_queue = services.viewer_queue
     queue_users = viewer_queue.list_queue(broadcaster_id)
 
+    channel_features = services.features.get_channel_features(broadcaster_id)
+    raid_configured = FeatureName.RAID_BOSSES in channel_features
     return JSONResponse({
         "queue": {
             "open": viewer_queue.is_queue_open(broadcaster_id),
             "size": len(queue_users),
             "users": queue_users
         },
-        "redemptions": await get_redemption_dashboard_data(services, broadcaster_id)
+        "redemptions": await get_redemption_dashboard_data(services, broadcaster_id),
+        "raid": await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_configured else None
     })
 
 

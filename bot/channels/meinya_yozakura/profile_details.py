@@ -3,10 +3,29 @@ from bot.profiles import (
     PointsConfig,
     PointsMessages,
     RaidMessages,
+    RaidBossConfig,
+    RaidBossNames,
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
     SocialMessages
+)
+
+
+MEINYA_RAID_BOSSES = RaidBossConfig(
+    enabled=True,
+    names=RaidBossNames(
+        melee="Ravana",
+        ranged="The Ultima Weapon",
+        magic="Bahamut Prime"
+    ),
+    mini_names=RaidBossNames(
+        melee="Behemoth",
+        ranged="Magitek Gunship",
+        magic="Ahriman"
+    ),
+    weapon_cost=5000,
+    potion_cost=2500
 )
 
 

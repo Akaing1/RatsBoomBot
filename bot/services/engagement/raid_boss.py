@@ -19,6 +19,7 @@ class RaidBossEvent:
     id: int
     boss_name: str
     boss_type: str
+    boss_tier: str
     max_hp: int
     current_hp: int
     reward_pool: int
@@ -38,6 +39,7 @@ class RaidAttackResult:
     reward: int = 0
     error: str | None = None
     critical_hit: bool = False
+    broken_weapon: str | None = None
 
 
 class RaidBossService:
@@ -56,6 +58,7 @@ class RaidBossService:
                 broadcaster_id TEXT NOT NULL,
                 boss_name TEXT NOT NULL,
                 boss_type TEXT NOT NULL,
+                boss_tier TEXT NOT NULL DEFAULT 'main',
                 max_hp INTEGER NOT NULL,
                 current_hp INTEGER NOT NULL,
                 reward_pool INTEGER NOT NULL,
@@ -89,6 +92,9 @@ class RaidBossService:
                 user_id TEXT NOT NULL,
                 username TEXT NOT NULL,
                 damage INTEGER NOT NULL,
+                weapon TEXT,
+                potion_used INTEGER NOT NULL DEFAULT 0,
+                critical_hit INTEGER NOT NULL DEFAULT 0,
                 attacked_at TEXT NOT NULL,
                 PRIMARY KEY (event_id, stream_id, user_id)
             )
@@ -109,6 +115,7 @@ class RaidBossService:
                 user_id TEXT NOT NULL,
                 item_id TEXT NOT NULL,
                 quantity INTEGER NOT NULL DEFAULT 0,
+                durability INTEGER NOT NULL DEFAULT 15,
                 PRIMARY KEY (broadcaster_id, user_id, item_id)
             )
             """
@@ -118,6 +125,28 @@ class RaidBossService:
             async with self.db.acquire() as connection:
                 for query in queries:
                     await connection.execute(query)
+
+                columns = await connection.fetchall("PRAGMA table_info(raid_boss_events)")
+
+                if "boss_tier" not in {str(column["name"]) for column in columns}:
+                    await connection.execute("ALTER TABLE raid_boss_events ADD COLUMN boss_tier TEXT NOT NULL DEFAULT 'main'")
+
+                attack_columns = await connection.fetchall("PRAGMA table_info(raid_boss_attacks)")
+                attack_column_names = {str(column["name"]) for column in attack_columns}
+
+                if "weapon" not in attack_column_names:
+                    await connection.execute("ALTER TABLE raid_boss_attacks ADD COLUMN weapon TEXT")
+
+                if "potion_used" not in attack_column_names:
+                    await connection.execute("ALTER TABLE raid_boss_attacks ADD COLUMN potion_used INTEGER NOT NULL DEFAULT 0")
+
+                if "critical_hit" not in attack_column_names:
+                    await connection.execute("ALTER TABLE raid_boss_attacks ADD COLUMN critical_hit INTEGER NOT NULL DEFAULT 0")
+
+                inventory_columns = await connection.fetchall("PRAGMA table_info(raid_boss_inventory)")
+
+                if "durability" not in {str(column["name"]) for column in inventory_columns}:
+                    await connection.execute("ALTER TABLE raid_boss_inventory ADD COLUMN durability INTEGER NOT NULL DEFAULT 15")
         except Exception:
             LOGGER.exception("[Raid Bosses] Failed to prepare raid boss storage.")
             raise
@@ -126,7 +155,7 @@ class RaidBossService:
 
     async def get_active_event(self, broadcaster_id: str) -> RaidBossEvent | None:
         query = """
-        SELECT id, boss_name, boss_type, max_hp, current_hp, reward_pool, status,
+        SELECT id, boss_name, boss_type, boss_tier, max_hp, current_hp, reward_pool, status,
                stream_limit,
                (SELECT COUNT(*) FROM raid_boss_streams WHERE event_id = raid_boss_events.id) AS streams_used
         FROM raid_boss_events
@@ -140,33 +169,46 @@ class RaidBossService:
 
         return self._event_from_row(row) if row else None
 
-    async def spawn(self, broadcaster_id: str, boss_type: str, config: RaidBossConfig) -> RaidBossEvent | None:
+    async def spawn(self, broadcaster_id: str, boss_type: str, config: RaidBossConfig, boss_tier: str = "main") -> RaidBossEvent | None:
         boss_type = boss_type.lower()
+        boss_tier = boss_tier.lower()
         active_event = await self.get_active_event(broadcaster_id)
 
-        if boss_type not in WEAPON_TYPES.values() or active_event is not None:
+        if boss_type not in WEAPON_TYPES.values() or boss_tier not in {"mini", "main"} or active_event is not None:
             return None
 
-        boss_name = getattr(config.names, boss_type)
+        if boss_tier == "mini":
+            boss_name = getattr(config.mini_names, boss_type)
+            max_hp = random.randrange(config.mini_hp_min, config.mini_hp_max + 1, config.mini_hp_step)
+            reward_pool = config.mini_reward_pool
+            final_hit_reward = config.mini_final_hit_reward
+            stream_limit = config.mini_duration_streams
+        else:
+            boss_name = getattr(config.names, boss_type)
+            max_hp = config.max_hp
+            reward_pool = config.reward_pool
+            final_hit_reward = config.final_hit_reward
+            stream_limit = config.duration_streams
+
         now = datetime.now(UTC)
         query = """
         INSERT INTO raid_boss_events (
-            broadcaster_id, boss_name, boss_type, max_hp, current_hp,
+            broadcaster_id, boss_name, boss_type, boss_tier, max_hp, current_hp,
             reward_pool, final_hit_reward, stream_limit, spawned_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        RETURNING id, boss_name, boss_type, max_hp, current_hp, reward_pool, status,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id, boss_name, boss_type, boss_tier, max_hp, current_hp, reward_pool, status,
                   stream_limit, 0 AS streams_used
         """
         values = (
-            str(broadcaster_id), boss_name, boss_type, config.max_hp, config.max_hp,
-            config.reward_pool, config.final_hit_reward, config.duration_streams, now.isoformat()
+            str(broadcaster_id), boss_name, boss_type, boss_tier, max_hp, max_hp,
+            reward_pool, final_hit_reward, stream_limit, now.isoformat()
         )
 
         async with self.db.acquire() as connection:
             row = await connection.fetchone(query, values)
 
-        LOGGER.info("[Raid Bosses] Spawned %s for broadcaster %s.", boss_name, broadcaster_id)
+        LOGGER.info("[Raid Bosses] Spawned %s %s for broadcaster %s.", boss_tier, boss_name, broadcaster_id)
         return self._event_from_row(row)
 
     async def attack(self, broadcaster_id: str, stream_id: str, user_id: str, username: str, config: RaidBossConfig) -> RaidAttackResult:
@@ -179,13 +221,15 @@ class RaidBossService:
 
         player = await self._get_player(broadcaster_id, user_id)
         weapon = player["equipped_weapon"] if player else None
+        weapon_durability = int(player["weapon_durability"]) if player else 0
+        weapon_used = weapon if weapon and weapon_durability > 0 else None
         potion_attacks = int(player["potion_attacks_remaining"]) if player else 0
         damage = random.randint(config.base_damage_min, config.base_damage_max)
 
-        if weapon:
+        if weapon_used:
             weapon_attack = config.weapon_attack
 
-            if WEAPON_TYPES.get(weapon) == event.boss_type:
+            if WEAPON_TYPES.get(weapon_used) == event.boss_type:
                 weapon_attack = round(weapon_attack * config.weapon_multiplier)
 
             damage += weapon_attack
@@ -207,13 +251,14 @@ class RaidBossService:
             attack_row = await connection.fetchone(
                 """
                 INSERT INTO raid_boss_attacks (
-                    event_id, broadcaster_id, stream_id, user_id, username, damage, attacked_at
+                    event_id, broadcaster_id, stream_id, user_id, username, damage,
+                    weapon, potion_used, critical_hit, attacked_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(event_id, stream_id, user_id) DO NOTHING
                 RETURNING event_id
                 """,
-                (event.id, broadcaster_id, str(stream_id), user_id, username, damage, now)
+                (event.id, broadcaster_id, str(stream_id), user_id, username, damage, weapon_used, int(potion_used), int(critical_hit), now)
             )
 
             if attack_row is None:
@@ -240,6 +285,12 @@ class RaidBossService:
                     (broadcaster_id, user_id)
                 )
 
+            if weapon_used:
+                await connection.execute(
+                    "UPDATE raid_boss_inventory SET durability = MAX(durability - 1, 0) WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?",
+                    (broadcaster_id, user_id, weapon_used)
+                )
+
         if row is None:
             return RaidAttackResult(0, 0, event.boss_name, weapon, potion_used, False, error="The raid ended before your attack landed.")
 
@@ -250,7 +301,8 @@ class RaidBossService:
             reward = await self.resolve(broadcaster_id, defeated=True, final_hitter_id=user_id, final_hitter_name=username)
 
         LOGGER.info("[Raid Bosses] %s dealt %d damage to %s in broadcaster %s.", username, damage, event.boss_name, broadcaster_id)
-        return RaidAttackResult(damage, current_hp, event.boss_name, weapon, potion_used, current_hp == 0, reward, critical_hit=critical_hit)
+        broken_weapon = weapon if weapon and not weapon_used else None
+        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon)
 
     async def register_stream(self, broadcaster_id: str, stream_id: str) -> tuple[RaidBossEvent | None, int]:
         event = await self.get_active_event(broadcaster_id)
@@ -331,11 +383,11 @@ class RaidBossService:
             else:
                 await connection.execute(
                     """
-                    INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity)
-                    VALUES (?, ?, ?, 1)
-                    ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET quantity = 1
+                    INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability)
+                    VALUES (?, ?, ?, 1, ?)
+                    ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET quantity = 1, durability = excluded.durability
                     """,
-                    (str(broadcaster_id), str(user_id), item_id)
+                    (str(broadcaster_id), str(user_id), item_id, config.weapon_durability)
                 )
 
         return "purchased"
@@ -363,10 +415,10 @@ class RaidBossService:
 
         return True
 
-    async def get_inventory(self, broadcaster_id: str, user_id: str) -> tuple[list[str], str | None, int]:
+    async def get_inventory(self, broadcaster_id: str, user_id: str) -> tuple[list[str], str | None, int, int]:
         async with self.db.acquire() as connection:
             rows = await connection.fetchall(
-                "SELECT item_id FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND quantity > 0 ORDER BY item_id",
+                "SELECT item_id, durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND quantity > 0 ORDER BY item_id",
                 (str(broadcaster_id), str(user_id))
             )
             player = await connection.fetchone(
@@ -376,8 +428,97 @@ class RaidBossService:
 
         weapons = [str(row["item_id"]) for row in rows]
         equipped = str(player["equipped_weapon"]) if player and player["equipped_weapon"] else None
+        equipped_durability = next((int(row["durability"]) for row in rows if str(row["item_id"]) == equipped), 0)
         potions = int(player["potion_attacks_remaining"]) if player else 0
-        return weapons, equipped, potions
+        return weapons, equipped, equipped_durability, potions
+
+    async def repair(self, broadcaster_id: str, user_id: str, weapon: str, config: RaidBossConfig) -> str:
+        weapon = weapon.lower()
+
+        if weapon not in WEAPON_TYPES:
+            return "invalid"
+
+        async with self.db.acquire() as connection:
+            owned = await connection.fetchone(
+                "SELECT durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ? AND quantity > 0",
+                (str(broadcaster_id), str(user_id), weapon)
+            )
+
+            if owned is None:
+                return "not_owned"
+
+            if int(owned["durability"]) >= config.weapon_durability:
+                return "full"
+
+            balance = await connection.fetchone(
+                "SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?",
+                (str(broadcaster_id), str(user_id))
+            )
+
+            if balance is None or int(balance["points"]) < config.repair_cost:
+                return "insufficient"
+
+            await connection.execute(
+                "UPDATE viewers SET points = points - ? WHERE broadcaster_id = ? AND user_id = ?",
+                (config.repair_cost, str(broadcaster_id), str(user_id))
+            )
+            await connection.execute(
+                "UPDATE raid_boss_inventory SET durability = ? WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?",
+                (config.weapon_durability, str(broadcaster_id), str(user_id), weapon)
+            )
+
+        return "repaired"
+
+    async def get_dashboard_metrics(self, broadcaster_id: str) -> dict[str, object] | None:
+        query = """
+        SELECT events.id, events.boss_name, events.boss_type, events.boss_tier,
+               events.max_hp, events.current_hp, events.reward_pool, events.status,
+               events.stream_limit,
+               (SELECT COUNT(*) FROM raid_boss_streams WHERE event_id = events.id) AS streams_used,
+               (SELECT COUNT(*) FROM raid_boss_attacks WHERE event_id = events.id) AS total_attacks,
+               (SELECT COUNT(DISTINCT user_id) FROM raid_boss_attacks WHERE event_id = events.id) AS unique_attackers,
+               (SELECT COALESCE(SUM(damage), 0) FROM raid_boss_attacks WHERE event_id = events.id) AS total_damage,
+               (SELECT COALESCE(AVG(damage), 0) FROM raid_boss_attacks WHERE event_id = events.id) AS average_damage,
+               (SELECT COUNT(*) FROM raid_boss_attacks WHERE event_id = events.id AND weapon IS NOT NULL) AS weapon_attacks,
+               (SELECT COALESCE(SUM(potion_used), 0) FROM raid_boss_attacks WHERE event_id = events.id) AS potion_attacks,
+               (SELECT COALESCE(SUM(critical_hit), 0) FROM raid_boss_attacks WHERE event_id = events.id) AS critical_hits
+        FROM raid_boss_events AS events
+        WHERE events.id = (
+            SELECT id FROM raid_boss_events
+            WHERE broadcaster_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+        )
+        """
+
+        async with self.db.acquire() as connection:
+            row = await connection.fetchone(query, (str(broadcaster_id),))
+
+        if row is None:
+            return None
+
+        max_hp = int(row["max_hp"])
+        current_hp = int(row["current_hp"])
+        return {
+            "event_id": int(row["id"]),
+            "boss_name": str(row["boss_name"]),
+            "boss_type": str(row["boss_type"]),
+            "boss_tier": str(row["boss_tier"]),
+            "max_hp": max_hp,
+            "current_hp": current_hp,
+            "hp_percent": round(current_hp / max_hp * 100, 1),
+            "reward_pool": int(row["reward_pool"]),
+            "status": str(row["status"]),
+            "stream_limit": int(row["stream_limit"]),
+            "streams_used": int(row["streams_used"]),
+            "total_attacks": int(row["total_attacks"]),
+            "unique_attackers": int(row["unique_attackers"]),
+            "total_damage": int(row["total_damage"]),
+            "average_damage": round(float(row["average_damage"]), 1),
+            "weapon_attacks": int(row["weapon_attacks"]),
+            "potion_attacks": int(row["potion_attacks"]),
+            "critical_hits": int(row["critical_hits"])
+        }
 
     async def get_leaderboard(self, broadcaster_id: str, limit: int = 5) -> list[tuple[str, int]]:
         event = await self.get_active_event(broadcaster_id)
@@ -444,7 +585,16 @@ class RaidBossService:
     async def _get_player(self, broadcaster_id: str, user_id: str):
         async with self.db.acquire() as connection:
             return await connection.fetchone(
-                "SELECT equipped_weapon, potion_attacks_remaining FROM raid_boss_players WHERE broadcaster_id = ? AND user_id = ?",
+                """
+                SELECT players.equipped_weapon, players.potion_attacks_remaining,
+                       COALESCE(inventory.durability, 0) AS weapon_durability
+                FROM raid_boss_players AS players
+                LEFT JOIN raid_boss_inventory AS inventory
+                  ON inventory.broadcaster_id = players.broadcaster_id
+                 AND inventory.user_id = players.user_id
+                 AND inventory.item_id = players.equipped_weapon
+                WHERE players.broadcaster_id = ? AND players.user_id = ?
+                """,
                 (str(broadcaster_id), str(user_id))
             )
 
@@ -479,6 +629,7 @@ class RaidBossService:
             id=int(row["id"]),
             boss_name=str(row["boss_name"]),
             boss_type=str(row["boss_type"]),
+            boss_tier=str(row["boss_tier"]),
             max_hp=int(row["max_hp"]),
             current_hp=int(row["current_hp"]),
             reward_pool=int(row["reward_pool"]),

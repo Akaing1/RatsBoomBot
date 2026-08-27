@@ -23,3 +23,20 @@ def test_social_messages_are_configured_per_profile() -> None:
         "Find more from the Blood Sakura Garden: "
         "Discord: https://discord.example | YouTube: https://youtube.example"
     )
+
+
+def test_meinya_uses_final_fantasy_fourteen_raid_pilot() -> None:
+    config = MEINYA_PROFILE.raid_bosses
+
+    assert config.enabled is True
+    assert MEINYA_PROFILE.features.raid_bosses is True
+    assert config.names.melee == "Ravana"
+    assert config.names.ranged == "The Ultima Weapon"
+    assert config.names.magic == "Bahamut Prime"
+    assert config.mini_names.melee == "Behemoth"
+    assert config.mini_names.ranged == "Magitek Gunship"
+    assert config.mini_names.magic == "Ahriman"
+    assert config.weapon_cost == 5000
+    assert config.potion_cost == 2500
+    assert config.weapon_durability == 15
+    assert config.repair_cost == 1500

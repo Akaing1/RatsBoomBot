@@ -176,6 +176,15 @@ button, input { font: inherit; }
 .social-link-row:first-child { border-top: 0; }
 .social-link-row p { max-width: 420px; margin: 6px 0 0; overflow: hidden; color: var(--muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .panel-note { margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; line-height: 1.5; }
+.raid-monitor-panel { margin-bottom: 24px; }
+.raid-monitor-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.raid-monitor-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.raid-hp-track { height: 11px; margin: 16px 0 20px; }
+.raid-hp-track span { background: var(--success); }
+.raid-metric-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.raid-metric-grid article { display: flex; min-width: 0; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised); }
+.raid-metric-grid span { color: var(--muted); font-size: 11px; }
+.raid-metric-grid strong { font-size: 18px; }
 
 .queue-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .queue-list li { display: flex; align-items: center; gap: 13px; padding: 13px 0; border-top: 1px solid var(--border); }
@@ -343,7 +352,7 @@ body.landing-page {
     .sidebar-logout { margin-top: 18px; }
     .main-content { padding: 28px 20px; }
     .page-header { flex-direction: column; }
-    .status-grid, .channel-summary, .channel-card-grid, .channel-status-grid, .channel-detail-grid, .channel-dashboard-grid, .redemption-panel-grid, .performance-grid { grid-template-columns: 1fr; }
+    .status-grid, .channel-summary, .channel-card-grid, .channel-status-grid, .channel-detail-grid, .channel-dashboard-grid, .redemption-panel-grid, .performance-grid, .raid-metric-grid { grid-template-columns: 1fr; }
     .channel-heading { align-items: flex-start; }
     .social-link-row { align-items: flex-start; flex-direction: column; }
     .social-link-row p { white-space: normal; }

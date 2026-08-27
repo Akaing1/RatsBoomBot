@@ -35,11 +35,24 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
     assert config.base_damage_min == 390
     assert config.base_damage_max == 430
     assert config.weapon_attack == 40
+    assert config.weapon_durability == 15
+    assert config.repair_cost == 1500
     assert config.weapon_cost == 25000
-    assert config.potion_cost == 20000
+    assert config.potion_cost == 10000
     assert config.potion_multiplier == 2.0
     assert config.critical_chance == 0.05
     assert config.critical_multiplier == 1.5
+
+
+def test_default_mini_boss_balance_is_separate_from_main_bosses() -> None:
+    config = RaidBossConfig()
+
+    assert config.mini_hp_min == 35000
+    assert config.mini_hp_max == 70000
+    assert config.mini_hp_step == 5000
+    assert config.mini_duration_streams == 3
+    assert config.mini_reward_pool == 25000
+    assert config.mini_final_hit_reward == 1000
 
 
 def test_common_matching_weapon_supports_three_stream_mini_boss_clear() -> None:
@@ -64,6 +77,49 @@ async def test_critical_hit_adds_fifty_percent_damage(tmp_path, monkeypatch) -> 
 
         assert result.damage == 150
         assert result.critical_hit is True
+
+
+@pytest.mark.asyncio
+async def test_mini_boss_uses_tier_specific_name_balance_and_persisted_tier(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.randrange", lambda start, stop, step: 55000)
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await service.setup()
+        config = build_config(
+            mini_names=RaidBossNames(melee="Behemoth", ranged="Magitek Gunship", magic="Ahriman"),
+            mini_hp_min=35000,
+            mini_hp_max=70000,
+            mini_duration_streams=3,
+            mini_reward_pool=25000,
+            mini_final_hit_reward=1000
+        )
+
+        event = await service.spawn("channel-1", "melee", config, "mini")
+
+        assert event is not None
+        assert event.boss_name == "Behemoth"
+        assert event.boss_tier == "mini"
+        assert event.max_hp == 55000
+        assert event.stream_limit == 3
+        assert event.reward_pool == 25000
+
+
+@pytest.mark.asyncio
+async def test_main_boss_remains_the_default_spawn_tier(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await service.setup()
+        config = build_config(max_hp=150000, duration_streams=5, reward_pool=100000)
+
+        event = await service.spawn("channel-1", "magic", config)
+
+        assert event is not None
+        assert event.boss_name == "Atakhan"
+        assert event.boss_tier == "main"
+        assert event.max_hp == 150000
+        assert event.stream_limit == 5
+        assert event.reward_pool == 100000
 
 
 @pytest.mark.asyncio
@@ -101,15 +157,84 @@ async def test_matching_weapon_and_power_potion_stack(tmp_path) -> None:
         assert await service.buy("channel-1", "user-1", "alice", "potion", config) == "purchased"
 
         result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
-        weapons, equipped, potion_attacks = await service.get_inventory("channel-1", "user-1")
+        weapons, equipped, durability, potion_attacks = await service.get_inventory("channel-1", "user-1")
+
+        async with database.acquire() as connection:
+            saved_attack = await connection.fetchone("SELECT weapon, potion_used, critical_hit FROM raid_boss_attacks WHERE user_id = ?", ("user-1",))
 
         assert result.damage == 360
         assert result.weapon == "sword"
         assert result.potion_used is True
         assert weapons == ["sword"]
         assert equipped == "sword"
+        assert durability == config.weapon_durability - 1
         assert potion_attacks == 2
+        assert saved_attack["weapon"] == "sword"
+        assert saved_attack["potion_used"] == 1
+        assert saved_attack["critical_hit"] == 0
         assert await points.get_points("channel-1", "user-1") == 500
+
+
+@pytest.mark.asyncio
+async def test_weapon_durability_disables_bonus_until_repaired(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(max_hp=5000, weapon_cost=200, weapon_durability=1, repair_cost=150)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "sword", config)
+        await service.equip("channel-1", "user-1", "alice", "sword")
+
+        armed = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        broken = await service.attack("channel-1", "stream-2", "user-1", "alice", config)
+        repair = await service.repair("channel-1", "user-1", "sword", config)
+        repaired = await service.attack("channel-1", "stream-3", "user-1", "alice", config)
+
+        assert armed.damage == 180
+        assert armed.weapon == "sword"
+        assert broken.damage == 100
+        assert broken.weapon is None
+        assert broken.broken_weapon == "sword"
+        assert repair == "repaired"
+        assert repaired.damage == 180
+        assert await points.get_points("channel-1", "user-1") == 650
+
+
+@pytest.mark.asyncio
+async def test_dashboard_metrics_summarize_latest_encounter(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: 0.0)
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(max_hp=5000, weapon_cost=200, potion_cost=300)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config, "main")
+        await service.register_stream("channel-1", "stream-1")
+        await service.buy("channel-1", "user-1", "alice", "sword", config)
+        await service.equip("channel-1", "user-1", "alice", "sword")
+        await service.buy("channel-1", "user-1", "alice", "potion", config)
+        await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+
+        metrics = await service.get_dashboard_metrics("channel-1")
+
+        assert metrics is not None
+        assert metrics["boss_name"] == "Baron Nashor"
+        assert metrics["boss_tier"] == "main"
+        assert metrics["streams_used"] == 1
+        assert metrics["unique_attackers"] == 2
+        assert metrics["total_attacks"] == 2
+        assert metrics["total_damage"] == 690
+        assert metrics["average_damage"] == 345.0
+        assert metrics["weapon_attacks"] == 1
+        assert metrics["potion_attacks"] == 1
+        assert metrics["critical_hits"] == 2
 
 
 @pytest.mark.asyncio
