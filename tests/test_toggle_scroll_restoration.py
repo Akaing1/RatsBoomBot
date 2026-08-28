@@ -27,3 +27,12 @@ def test_streamer_feature_page_lists_unique_profile_integrations() -> None:
     assert '"profile_feature"' in template
     assert "League of Legends" in template
     assert "Overwatch" in template
+
+
+def test_admin_feature_page_lists_unique_profile_integrations() -> None:
+    template = (PROJECT_ROOT / "web/templates/admin/channel_details.html").read_text(encoding="utf-8")
+
+    assert "Unique Features" in template
+    assert '"profile_feature"' in template
+    assert "League of Legends" in template
+    assert "Overwatch" in template
