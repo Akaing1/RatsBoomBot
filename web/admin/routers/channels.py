@@ -3,7 +3,7 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName
+from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName
 from config.settings import settings
 from storage.database import delete_token
 from web.admin.auth import require_admin, validate_csrf_token
@@ -121,6 +121,7 @@ async def channel_details_page(request: Request, broadcaster_id: str):
     viewer_queue = services.viewer_queue
     redemption_activity = await get_redemption_dashboard_data(services, broadcaster_id)
     channel_features = services.features.get_channel_features(broadcaster_id)
+    profile_features = services.features.get_profile_features(broadcaster_id)
     raid_configured = FeatureName.RAID_BOSSES in channel_features
     raid_metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_configured else None
     global_groups = services.features.get_global_groups(broadcaster_id)
@@ -141,6 +142,7 @@ async def channel_details_page(request: Request, broadcaster_id: str):
             raid_configured=raid_configured,
             raid_metrics=raid_metrics,
             channel_features=channel_features,
+            profile_features=profile_features,
             global_groups=global_groups,
             global_commands=global_commands,
             queue_result=request.query_params.get("queue_result"),
@@ -233,6 +235,16 @@ async def update_channel_toggle(
                 state = await services.features.set_enabled(broadcaster_id, toggle, enabled, updated_by)
 
             display_name = toggle.value.replace("_", " ").title()
+
+        elif toggle_type == "profile_feature":
+            toggle = ProfileFeatureName(toggle_name)
+
+            if action == "reset":
+                state = await services.features.clear_profile_feature_override(broadcaster_id, toggle, updated_by)
+            else:
+                state = await services.features.set_profile_feature_enabled(broadcaster_id, toggle, enabled, updated_by)
+
+            display_name = "League of Legends" if toggle is ProfileFeatureName.LEAGUE else "Overwatch"
 
         elif toggle_type == "global_group":
             toggle = GlobalCommandGroup(toggle_name)
