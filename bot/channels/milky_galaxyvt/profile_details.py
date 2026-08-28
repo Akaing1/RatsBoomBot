@@ -167,5 +167,6 @@ MILKY_GALAXYVT_POINTS = PointsConfig(
 
 MILKY_GALAXYVT_OVERWATCH = OverwatchConfig(
     player_id="Galaxy-17159",
-    platform="pc"
+    platform="pc",
+    display_name="Milky"
 )

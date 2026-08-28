@@ -36,3 +36,13 @@ def test_admin_feature_page_lists_unique_profile_integrations() -> None:
     assert '"profile_feature"' in template
     assert "League of Legends" in template
     assert "Overwatch" in template
+
+
+def test_streamer_dashboard_has_profile_customization_page() -> None:
+    layout = (PROJECT_ROOT / "web/templates/channel/layout.html").read_text(encoding="utf-8")
+    template = (PROJECT_ROOT / "web/templates/channel/customization.html").read_text(encoding="utf-8")
+
+    assert "/channel/customization" in layout
+    assert "Save Changes" in template
+    assert "Use Default" in template
+    assert "Social links" in template

@@ -121,7 +121,7 @@ async def channel_details_page(request: Request, broadcaster_id: str):
     viewer_queue = services.viewer_queue
     redemption_activity = await get_redemption_dashboard_data(services, broadcaster_id)
     channel_features = services.features.get_channel_features(broadcaster_id)
-    profile_features = services.features.get_profile_features(broadcaster_id)
+    profile_features = services.features.get_admin_profile_features(broadcaster_id)
     raid_configured = FeatureName.RAID_BOSSES in channel_features
     raid_metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_configured else None
     global_groups = services.features.get_global_groups(broadcaster_id)
@@ -236,6 +236,16 @@ async def update_channel_toggle(
 
             display_name = toggle.value.replace("_", " ").title()
 
+        elif toggle_type == "capability":
+            toggle = ProfileFeatureName(toggle_name)
+
+            if action == "reset":
+                state = await services.features.clear_profile_feature_availability(broadcaster_id, toggle, updated_by)
+            else:
+                state = await services.features.set_profile_feature_available(broadcaster_id, toggle, action == "enable", updated_by)
+
+            display_name = "League of Legends access" if toggle is ProfileFeatureName.LEAGUE else "Overwatch access"
+
         elif toggle_type == "profile_feature":
             toggle = ProfileFeatureName(toggle_name)
 
@@ -286,7 +296,11 @@ async def update_channel_toggle(
             toggle_message="The toggle could not be updated."
         )
 
-    if action == "reset":
+    if toggle_type == "capability" and action == "reset":
+        message = f"{display_name} was reset to its code-defined availability."
+    elif toggle_type == "capability":
+        message = f"{display_name} was {'granted' if state.available else 'revoked'}."
+    elif action == "reset":
         message = f"{display_name} was reset to its profile default."
     else:
         effective_state = "enabled" if state.effective_enabled else "disabled"

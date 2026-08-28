@@ -156,6 +156,6 @@ def test_command_help_catalog_covers_every_shared_top_level_command() -> None:
     profile_specific_commands = {
         "points", "champs", "register", "unregister", "rank", "ladder",
         "explode", "reklop", "randy", "bark", "car",
-        "raid"
+        "raid", "ow", "owrank", "owrecord", "owreset"
     }
     assert shared_command_names - profile_specific_commands <= catalog_names

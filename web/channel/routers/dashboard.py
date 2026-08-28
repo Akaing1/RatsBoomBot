@@ -211,6 +211,79 @@ async def channel_features_page(request: Request):
     )
 
 
+@router.get("/channel/customization", response_class=HTMLResponse)
+async def channel_customization_page(request: Request):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+
+    if not broadcaster_id:
+        return RedirectResponse(url="/connect", status_code=303)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return RedirectResponse(url="/channel", status_code=303)
+
+    services = runtime_bot.services
+    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+
+    if broadcaster is None or get_active_profile(broadcaster_id) is None:
+        logout_channel_user(request)
+        return RedirectResponse(url="/connect", status_code=303)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="channel/customization.html",
+        context={
+            "active_page": "customization",
+            "broadcaster": broadcaster,
+            "channel_settings": await services.broadcaster_settings.get_settings(broadcaster_id),
+            "setting_groups": services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)}),
+            "setting_result": request.query_params.get("setting_result"),
+            "setting_message": request.query_params.get("setting_message"),
+            "csrf_token": get_csrf_token(request)
+        }
+    )
+
+
+@router.post("/channel/customization")
+async def update_channel_customization(request: Request, setting_name: str = Form(...), value: str = Form(""), action: str = Form(...), csrf_token: str = Form(...)):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+
+    if not broadcaster_id:
+        return RedirectResponse(url="/connect", status_code=303)
+
+    validate_csrf_token(request, csrf_token)
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return RedirectResponse(url="/channel/customization?setting_result=error&setting_message=Runtime+unavailable.", status_code=303)
+
+    services = runtime_bot.services
+
+    try:
+        if setting_name == "social.discord_url":
+            await services.broadcaster_settings.set_discord_url(broadcaster_id, value.strip())
+            message = "Discord URL was updated."
+        elif setting_name == "social.youtube_url":
+            await services.broadcaster_settings.set_youtube_url(broadcaster_id, value.strip())
+            message = "YouTube URL was updated."
+        else:
+            definition = services.profile_settings.get_definition(setting_name)
+
+            if action == "save":
+                await services.profile_settings.set_override(broadcaster_id, setting_name, value, f"streamer:{broadcaster_id}")
+                message = f"{definition.label} was updated."
+            elif action == "reset":
+                await services.profile_settings.clear_override(broadcaster_id, setting_name, f"streamer:{broadcaster_id}")
+                message = f"{definition.label} was reset to its profile default."
+            else:
+                raise ValueError("Unknown customization action.")
+    except (TypeError, ValueError) as error:
+        return RedirectResponse(url=f"/channel/customization?setting_result=error&setting_message={quote_plus(str(error))}", status_code=303)
+
+    return RedirectResponse(url=f"/channel/customization?setting_result=success&setting_message={quote_plus(message)}", status_code=303)
+
+
 @router.post("/channel/features/toggles")
 async def update_channel_feature(request: Request, toggle_type: str = Form(...), toggle_name: str = Form(...), action: str = Form(...), csrf_token: str = Form(...)):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)

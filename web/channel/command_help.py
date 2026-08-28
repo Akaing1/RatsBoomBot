@@ -170,7 +170,7 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
     if profile.overwatch.player_id:
         groups.append(CommandGroupDefinition(
             name="Overwatch",
-            description="Milky's live Overwatch rank and session tracking commands.",
+            description="Live Overwatch rank and competitive session tracking commands.",
             commands=(
                 CommandDefinition("!ow", "Show the current session record and available competitive ranks.", profile_feature=ProfileFeatureName.OVERWATCH),
                 CommandDefinition("!owrank", "Show available competitive ranks.", profile_feature=ProfileFeatureName.OVERWATCH),
@@ -179,7 +179,7 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
             )
         ))
 
-    if profile.league.enabled:
+    if profile.league.enabled or profile.league.game_name or profile.league.tag_line:
         groups.append(CommandGroupDefinition(
             name="League of Legends",
             description="Ranked champion statistics, broadcaster builds, and the channel's community League ladder.",
