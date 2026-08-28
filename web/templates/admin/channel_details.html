@@ -313,6 +313,41 @@
         </div>
     </div>
 
+    {% if profile_features %}
+        <div class="toggle-section">
+            <div class="toggle-section-heading">
+                <div>
+                    <h4>Unique Features</h4>
+
+                    <p>
+                        Profile-specific game integrations configured for this channel.
+                    </p>
+                </div>
+            </div>
+
+            <div class="toggle-grid">
+                {% for feature, state in profile_features.items() %}
+                    {% if feature.value == "league" %}
+                        {% set display_name = "League of Legends" %}
+                        {% set description = "Controls !champs and the community ranking commands: !register, !unregister, !rank, and !ladder." %}
+                    {% elif feature.value == "overwatch" %}
+                        {% set display_name = "Overwatch" %}
+                        {% set description = "Controls !ow, !owrank, !owrecord, and !owreset." %}
+                    {% endif %}
+
+                    {{ toggle_card(
+                        broadcaster.id,
+                        "profile_feature",
+                        feature.value,
+                        display_name,
+                        state,
+                        description
+                    ) }}
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
     <div class="toggle-section">
         <div class="toggle-section-heading">
             <div>
