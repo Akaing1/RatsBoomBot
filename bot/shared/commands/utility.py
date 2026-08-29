@@ -3,7 +3,7 @@ import random
 
 from twitchio.ext import commands
 
-from bot.profiles import GlobalCommandName
+from bot.profiles import GlobalCommandName, get_active_profile, render_profile_message
 from bot.shared.commands.converters import LocalizedUser
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_command_enabled
 
@@ -304,10 +304,10 @@ class UtilityCommands(commands.Component):
         if not self.command_enabled(ctx, GlobalCommandName.LURK):
             return
 
-        await ctx.reply(
-            f"{ctx.chatter.name} has been spotted by a human and scattered! "
-            "See you soon!"
-        )
+        broadcaster_id = get_context_broadcaster_id(ctx)
+        profile = get_active_profile(broadcaster_id) if broadcaster_id else None
+        message = profile.lurk_message if profile else "{username} has been spotted by a human and scattered! See you soon!"
+        await ctx.reply(render_profile_message(message, username=ctx.chatter.name))
 
     @commands.command(name="help")
     async def help(self, ctx: commands.Context) -> None:

@@ -21,7 +21,9 @@ def build_config(**overrides) -> RaidBossConfig:
         "base_damage_min": 100,
         "base_damage_max": 100,
         "weapon_cost": 200,
-        "potion_cost": 300
+        "potion_cost": 300,
+        "tutorial_enabled": False,
+        "reward_points_per_hp": 1.0
     }
     values.update(overrides)
     return RaidBossConfig(**values)
@@ -47,9 +49,9 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
 def test_default_mini_boss_balance_is_separate_from_main_bosses() -> None:
     config = RaidBossConfig()
 
-    assert config.mini_hp_min == 35000
-    assert config.mini_hp_max == 70000
-    assert config.mini_hp_step == 5000
+    assert config.mini_hp_min == 20000
+    assert config.mini_hp_max == 50000
+    assert config.mini_hp_step == 15000
     assert config.mini_duration_streams == 3
     assert config.mini_reward_pool == 25000
     assert config.mini_final_hit_reward == 1000
@@ -59,7 +61,7 @@ def test_common_matching_weapon_supports_three_stream_mini_boss_clear() -> None:
     config = RaidBossConfig()
     minimum_matching_damage = config.base_damage_min + round(config.weapon_attack * config.weapon_multiplier)
 
-    assert minimum_matching_damage * 25 * 3 >= 35000
+    assert minimum_matching_damage * 20 * 3 >= 20000
     assert (config.base_damage_max + round(config.weapon_attack * config.weapon_multiplier)) * 50 * config.duration_streams < config.max_hp
 
 
@@ -102,7 +104,7 @@ async def test_mini_boss_uses_tier_specific_name_balance_and_persisted_tier(tmp_
         assert event.boss_tier == "mini"
         assert event.max_hp == 55000
         assert event.stream_limit == 3
-        assert event.reward_pool == 25000
+        assert event.reward_pool == 55000
 
 
 @pytest.mark.asyncio
@@ -119,7 +121,7 @@ async def test_main_boss_remains_the_default_spawn_tier(tmp_path) -> None:
         assert event.boss_tier == "main"
         assert event.max_hp == 150000
         assert event.stream_limit == 5
-        assert event.reward_pool == 100000
+        assert event.reward_pool == 150000
 
 
 @pytest.mark.asyncio
@@ -274,9 +276,89 @@ async def test_final_hit_distributes_full_pool_and_finisher_reward(tmp_path) -> 
         result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
 
         assert result.defeated is True
-        assert result.reward == 1000
-        assert await points.get_points("channel-1", "user-1") == 1100
+        assert result.reward == 100
+        assert await points.get_points("channel-1", "user-1") == 200
         assert await service.get_active_event("channel-1") is None
+
+
+@pytest.mark.asyncio
+async def test_first_encounter_gives_every_participant_a_random_starter_weapon(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(tutorial_enabled=True, tutorial_hp=10000, tutorial_duration_streams=2, base_damage_min=5000, base_damage_max=5000, reward_points_per_hp=0.5)
+
+        event = await service.spawn("channel-1", "melee", config, "mini")
+        await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        result = await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+        alice_weapons, _, _, _ = await service.get_inventory("channel-1", "user-1")
+        bob_weapons, _, _, _ = await service.get_inventory("channel-1", "user-2")
+
+        assert event is not None
+        assert event.boss_tier == "tutorial"
+        assert event.max_hp == 10000
+        assert event.stream_limit == 2
+        assert event.reward_pool == 5000
+        assert {username for username, _ in result.drops} == {"alice", "bob"}
+        assert len(alice_weapons) == 1
+        assert len(bob_weapons) == 1
+        assert set(alice_weapons + bob_weapons) <= {"sword", "bow", "spellbook"}
+
+
+@pytest.mark.asyncio
+async def test_defeated_boss_can_drop_type_matching_unique_weapon(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(max_hp=100, final_hit_unique_drop_chance=1.1)
+        await service.spawn("channel-1", "magic", config)
+
+        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        weapons, _, _, _ = await service.get_inventory("channel-1", "user-1")
+
+        assert result.drops == (("alice", "mythical_grimoire"),)
+        assert weapons == ["mythical_grimoire"]
+
+
+@pytest.mark.asyncio
+async def test_top_contributor_gets_separate_unique_drop_roll(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(max_hp=200, final_hit_unique_drop_chance=0.0, top_contributor_unique_drop_chance=1.1)
+        await service.spawn("channel-1", "ranged", config)
+        await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+
+        result = await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+        weapons, _, _, _ = await service.get_inventory("channel-1", "user-1")
+
+        assert result.drops == (("alice", "mythical_longbow"),)
+        assert weapons == ["mythical_longbow"]
+
+
+@pytest.mark.asyncio
+async def test_top_ten_percent_each_receive_an_independent_unique_drop_roll(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(max_hp=2000, final_hit_unique_drop_chance=0.0, top_contributor_unique_drop_chance=1.1, top_contributor_percent=0.10)
+        await service.spawn("channel-1", "melee", config)
+
+        result = None
+
+        for index in range(20):
+            result = await service.attack("channel-1", "stream-1", f"user-{index:02d}", f"viewer{index:02d}", config)
+
+        assert result is not None
+        assert result.drops == (("viewer00", "mythical_blade"), ("viewer01", "mythical_blade"))
 
 
 @pytest.mark.asyncio

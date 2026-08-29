@@ -1,4 +1,5 @@
 import logging
+import math
 import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -7,11 +8,17 @@ from bot.profiles import RaidBossConfig
 
 LOGGER = logging.getLogger("RatBoomBot")
 
-WEAPON_TYPES = {
+BASIC_WEAPON_TYPES = {
     "sword": "melee",
     "bow": "ranged",
     "spellbook": "magic"
 }
+UNIQUE_WEAPON_TYPES = {
+    "mythical_blade": "melee",
+    "mythical_longbow": "ranged",
+    "mythical_grimoire": "magic"
+}
+WEAPON_TYPES = BASIC_WEAPON_TYPES | UNIQUE_WEAPON_TYPES
 
 
 @dataclass(frozen=True)
@@ -40,6 +47,7 @@ class RaidAttackResult:
     error: str | None = None
     critical_hit: bool = False
     broken_weapon: str | None = None
+    drops: tuple[tuple[str, str], ...] = ()
 
 
 class RaidBossService:
@@ -174,21 +182,32 @@ class RaidBossService:
         boss_tier = boss_tier.lower()
         active_event = await self.get_active_event(broadcaster_id)
 
-        if boss_type not in WEAPON_TYPES.values() or boss_tier not in {"mini", "main"} or active_event is not None:
+        if boss_type not in WEAPON_TYPES.values() or boss_tier not in {"mini", "main", "tutorial"} or active_event is not None:
             return None
 
-        if boss_tier == "mini":
+        async with self.db.acquire() as connection:
+            previous_event = await connection.fetchone("SELECT id FROM raid_boss_events WHERE broadcaster_id = ? LIMIT 1", (str(broadcaster_id),))
+
+        if config.tutorial_enabled and previous_event is None:
+            boss_tier = "tutorial"
+
+        if boss_tier == "tutorial":
+            boss_name = getattr(config.mini_names, boss_type)
+            max_hp = config.tutorial_hp
+            final_hit_reward = config.mini_final_hit_reward
+            stream_limit = config.tutorial_duration_streams
+        elif boss_tier == "mini":
             boss_name = getattr(config.mini_names, boss_type)
             max_hp = random.randrange(config.mini_hp_min, config.mini_hp_max + 1, config.mini_hp_step)
-            reward_pool = config.mini_reward_pool
             final_hit_reward = config.mini_final_hit_reward
             stream_limit = config.mini_duration_streams
         else:
             boss_name = getattr(config.names, boss_type)
             max_hp = config.max_hp
-            reward_pool = config.reward_pool
             final_hit_reward = config.final_hit_reward
             stream_limit = config.duration_streams
+
+        reward_pool = round(max_hp * config.reward_points_per_hp)
 
         now = datetime.now(UTC)
         query = """
@@ -227,7 +246,7 @@ class RaidBossService:
         damage = random.randint(config.base_damage_min, config.base_damage_max)
 
         if weapon_used:
-            weapon_attack = config.weapon_attack
+            weapon_attack = config.unique_weapon_attack if weapon_used in UNIQUE_WEAPON_TYPES else config.weapon_attack
 
             if WEAPON_TYPES.get(weapon_used) == event.boss_type:
                 weapon_attack = round(weapon_attack * config.weapon_multiplier)
@@ -296,13 +315,17 @@ class RaidBossService:
 
         current_hp = int(row["current_hp"])
         reward = 0
+        drops: tuple[tuple[str, str], ...] = ()
 
         if current_hp == 0:
             reward = await self.resolve(broadcaster_id, defeated=True, final_hitter_id=user_id, final_hitter_name=username)
 
+            if reward > 0:
+                drops = await self._award_victory_drops(broadcaster_id, user_id, username, event, config)
+
         LOGGER.info("[Raid Bosses] %s dealt %d damage to %s in broadcaster %s.", username, damage, event.boss_name, broadcaster_id)
         broken_weapon = weapon if weapon and not weapon_used else None
-        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon)
+        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops)
 
     async def register_stream(self, broadcaster_id: str, stream_id: str) -> tuple[RaidBossEvent | None, int]:
         event = await self.get_active_event(broadcaster_id)
@@ -344,7 +367,7 @@ class RaidBossService:
         item_id = item_id.lower()
         cost = config.potion_cost if item_id == "potion" else config.weapon_cost
 
-        if item_id not in (*WEAPON_TYPES, "potion"):
+        if item_id not in (*BASIC_WEAPON_TYPES, "potion"):
             return None
 
         async with self.db.acquire() as connection:
@@ -581,6 +604,51 @@ class RaidBossService:
 
         LOGGER.info("[Raid Bosses] Resolved %s as %s with a %d-point pool.", event.boss_name, status, payout_pool)
         return payout_pool
+
+    async def _award_victory_drops(self, broadcaster_id: str, final_hitter_id: str, final_hitter_name: str, event: RaidBossEvent, config: RaidBossConfig) -> tuple[tuple[str, str], ...]:
+        async with self.db.acquire() as connection:
+            contributors = await connection.fetchall(
+                """
+                SELECT user_id, username, SUM(damage) AS total_damage
+                FROM raid_boss_attacks
+                WHERE event_id = ?
+                GROUP BY user_id, username
+                ORDER BY total_damage DESC, username COLLATE NOCASE
+                """,
+                (event.id,)
+            )
+
+            awards: list[tuple[str, str, str]] = []
+
+            if event.boss_tier == "tutorial":
+                starter_weapons = tuple(BASIC_WEAPON_TYPES)
+                awards = [(str(contributor["user_id"]), str(contributor["username"]), random.choice(starter_weapons)) for contributor in contributors]
+            else:
+                mythical_weapon = next(item_id for item_id, weapon_type in UNIQUE_WEAPON_TYPES.items() if weapon_type == event.boss_type)
+
+                if random.random() < config.final_hit_unique_drop_chance:
+                    awards.append((str(final_hitter_id), final_hitter_name, mythical_weapon))
+
+                contributor_count = len(contributors)
+                top_count = max(1, math.ceil(contributor_count * config.top_contributor_percent)) if contributor_count else 0
+
+                for contributor in contributors[:top_count]:
+                    if random.random() < config.top_contributor_unique_drop_chance:
+                        awards.append((str(contributor["user_id"]), str(contributor["username"]), mythical_weapon))
+
+            for recipient_id, recipient_name, item_id in awards:
+                await self._ensure_player(connection, broadcaster_id, recipient_id, recipient_name)
+                await connection.execute(
+                    """
+                    INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability)
+                    VALUES (?, ?, ?, 1, ?)
+                    ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET quantity = 1, durability = MAX(durability, excluded.durability)
+                    """,
+                    (str(broadcaster_id), recipient_id, item_id, config.weapon_durability)
+                )
+                LOGGER.info("[Raid Bosses] Awarded %s to %s for defeating %s.", item_id, recipient_name, event.boss_name)
+
+        return tuple((recipient_name, item_id) for _, recipient_name, item_id in awards)
 
     async def _get_player(self, broadcaster_id: str, user_id: str):
         async with self.db.acquire() as connection:

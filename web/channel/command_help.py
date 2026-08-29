@@ -68,6 +68,8 @@ VIEWER_QUEUE_COMMANDS = CommandGroupDefinition(
         CommandDefinition("!queue", "Display the current viewer queue.", global_group=GlobalCommandGroup.VIEWER_QUEUE),
         CommandDefinition("!next", "Remove and announce the next queued viewer.", "Broadcaster/mod", global_group=GlobalCommandGroup.VIEWER_QUEUE),
         CommandDefinition("!remove <position>", "Remove a viewer by their queue position.", "Broadcaster/mod", global_group=GlobalCommandGroup.VIEWER_QUEUE),
+        CommandDefinition("!swap <position> <position>", "Exchange two viewers' queue positions.", "Broadcaster/mod", global_group=GlobalCommandGroup.VIEWER_QUEUE),
+        CommandDefinition("!requeue <position> <new position>", "Move a queued viewer to another position.", "Broadcaster/mod", global_group=GlobalCommandGroup.VIEWER_QUEUE),
         CommandDefinition("!clear", "Remove everyone from the viewer queue.", "Broadcaster/mod", global_group=GlobalCommandGroup.VIEWER_QUEUE)
     )
 )

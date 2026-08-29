@@ -24,6 +24,9 @@ MEINYA_RAID_BOSSES = RaidBossConfig(
         ranged="Magitek Gunship",
         magic="Ahriman"
     ),
+    mini_hp_min=20000,
+    mini_hp_max=50000,
+    mini_hp_step=15000,
     weapon_cost=5000,
     potion_cost=2500
 )
@@ -116,7 +119,7 @@ MEINYA_POINTS = PointsConfig(
     command_name="petals",
     points_per_message=10,
     message_cooldown_seconds=60,
-    gamble_win_chance=0.45,
+    gamble_win_chance=0.5,
     duel_expiration_seconds=60,
     messages=PointsMessages(
         balance_self="{username}, you have {points} sakura petals!",
