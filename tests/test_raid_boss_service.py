@@ -290,7 +290,7 @@ async def test_first_encounter_gives_every_participant_a_random_starter_weapon(t
         await service.setup()
         config = build_config(tutorial_enabled=True, tutorial_hp=10000, tutorial_duration_streams=2, base_damage_min=5000, base_damage_max=5000, reward_points_per_hp=0.5)
 
-        event = await service.spawn("channel-1", "melee", config, "mini")
+        event = await service.spawn("channel-1", "melee", config, "tutorial")
         await service.attack("channel-1", "stream-1", "user-1", "alice", config)
         result = await service.attack("channel-1", "stream-1", "user-2", "bob", config)
         alice_weapons, _, _, _ = await service.get_inventory("channel-1", "user-1")
@@ -305,6 +305,26 @@ async def test_first_encounter_gives_every_participant_a_random_starter_weapon(t
         assert len(alice_weapons) == 1
         assert len(bob_weapons) == 1
         assert set(alice_weapons + bob_weapons) <= {"sword", "bow", "spellbook"}
+        assert await service.has_completed_tutorial("channel-1") is True
+        assert await service.spawn("channel-1", "melee", config, "tutorial") is None
+
+
+@pytest.mark.asyncio
+async def test_previous_pilot_does_not_prevent_manual_tutorial_spawn(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(tutorial_enabled=True)
+        await service.spawn("channel-1", "magic", config, "mini")
+        await service.resolve("channel-1", defeated=False)
+
+        tutorial = await service.spawn("channel-1", "magic", config, "tutorial")
+
+        assert tutorial is not None
+        assert tutorial.boss_tier == "tutorial"
+        assert tutorial.max_hp == config.tutorial_hp
 
 
 @pytest.mark.asyncio

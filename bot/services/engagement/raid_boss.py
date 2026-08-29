@@ -126,6 +126,12 @@ class RaidBossService:
                 durability INTEGER NOT NULL DEFAULT 15,
                 PRIMARY KEY (broadcaster_id, user_id, item_id)
             )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS raid_boss_channel_state (
+                broadcaster_id TEXT PRIMARY KEY,
+                tutorial_completed INTEGER NOT NULL DEFAULT 0
+            )
             """
         )
 
@@ -177,6 +183,12 @@ class RaidBossService:
 
         return self._event_from_row(row) if row else None
 
+    async def has_completed_tutorial(self, broadcaster_id: str) -> bool:
+        async with self.db.acquire() as connection:
+            row = await connection.fetchone("SELECT tutorial_completed FROM raid_boss_channel_state WHERE broadcaster_id = ?", (str(broadcaster_id),))
+
+        return bool(row and row["tutorial_completed"])
+
     async def spawn(self, broadcaster_id: str, boss_type: str, config: RaidBossConfig, boss_tier: str = "main") -> RaidBossEvent | None:
         boss_type = boss_type.lower()
         boss_tier = boss_tier.lower()
@@ -185,11 +197,8 @@ class RaidBossService:
         if boss_type not in WEAPON_TYPES.values() or boss_tier not in {"mini", "main", "tutorial"} or active_event is not None:
             return None
 
-        async with self.db.acquire() as connection:
-            previous_event = await connection.fetchone("SELECT id FROM raid_boss_events WHERE broadcaster_id = ? LIMIT 1", (str(broadcaster_id),))
-
-        if config.tutorial_enabled and previous_event is None:
-            boss_tier = "tutorial"
+        if boss_tier == "tutorial" and (not config.tutorial_enabled or await self.has_completed_tutorial(broadcaster_id)):
+            return None
 
         if boss_tier == "tutorial":
             boss_name = getattr(config.mini_names, boss_type)
@@ -601,6 +610,16 @@ class RaidBossService:
 
             if defeated and final_hitter_id and final_hitter_name:
                 await self._add_points(connection, broadcaster_id, final_hitter_id, final_hitter_name, int(resolution["final_hit_reward"]))
+
+            if defeated and event.boss_tier == "tutorial":
+                await connection.execute(
+                    """
+                    INSERT INTO raid_boss_channel_state (broadcaster_id, tutorial_completed)
+                    VALUES (?, 1)
+                    ON CONFLICT(broadcaster_id) DO UPDATE SET tutorial_completed = 1
+                    """,
+                    (str(broadcaster_id),)
+                )
 
         LOGGER.info("[Raid Bosses] Resolved %s as %s with a %d-point pool.", event.boss_name, status, payout_pool)
         return payout_pool

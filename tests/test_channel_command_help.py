@@ -105,7 +105,7 @@ def test_command_help_includes_raid_boss_commands_for_enabled_profiles() -> None
         "!raid inventory",
         "!raid repair <weapon>",
         "!raid leaderboard",
-        "!raid spawn <mini|main> <type|random>",
+        "!raid spawn <tutorial|mini|main> <type|random>",
         "!raid end"
     ]
 
