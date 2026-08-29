@@ -245,6 +245,48 @@ class ViewerQueueCommands(commands.Component):
 
         await ctx.send(message)
 
+    @commands.command(name="swap")
+    async def swap_viewers(self, ctx: commands.Context, first_position: int | None = None, second_position: int | None = None) -> None:
+        self.log_command(ctx, "swap")
+        context = self.get_context(ctx, "swap")
+
+        if context is None:
+            return
+
+        broadcaster_id, services = context
+
+        if not self.has_permission(ctx, "swap"):
+            await ctx.send("Only the broadcaster or mods can use !swap.")
+            return
+
+        if first_position is None or second_position is None:
+            await ctx.send("Use it like this: !swap 2 5")
+            return
+
+        _, message = services.viewer_queue.swap(broadcaster_id, first_position, second_position)
+        await ctx.send(message)
+
+    @commands.command(name="requeue")
+    async def requeue_viewer(self, ctx: commands.Context, current_position: int | None = None, new_position: int | None = None) -> None:
+        self.log_command(ctx, "requeue")
+        context = self.get_context(ctx, "requeue")
+
+        if context is None:
+            return
+
+        broadcaster_id, services = context
+
+        if not self.has_permission(ctx, "requeue"):
+            await ctx.send("Only the broadcaster or mods can use !requeue.")
+            return
+
+        if current_position is None or new_position is None:
+            await ctx.send("Use it like this: !requeue 5 2")
+            return
+
+        _, message = services.viewer_queue.requeue(broadcaster_id, current_position, new_position)
+        await ctx.send(message)
+
     @commands.command(name="clear")
     async def clear_queue(self, ctx: commands.Context) -> None:
         self.log_command(ctx, "clear")

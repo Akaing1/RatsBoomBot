@@ -346,9 +346,9 @@ class RaidBossConfig:
     duration_streams: int = 5
     reward_pool: int = 100000
     final_hit_reward: int = 2500
-    mini_hp_min: int = 35000
-    mini_hp_max: int = 70000
-    mini_hp_step: int = 5000
+    mini_hp_min: int = 20000
+    mini_hp_max: int = 50000
+    mini_hp_step: int = 15000
     mini_duration_streams: int = 3
     mini_reward_pool: int = 25000
     mini_final_hit_reward: int = 1000
@@ -364,6 +364,14 @@ class RaidBossConfig:
     potion_attacks: int = 3
     critical_chance: float = 0.05
     critical_multiplier: float = 1.5
+    tutorial_hp: int = 10000
+    tutorial_duration_streams: int = 2
+    reward_points_per_hp: float = 0.5
+    final_hit_unique_drop_chance: float = 0.03
+    top_contributor_unique_drop_chance: float = 0.01
+    top_contributor_percent: float = 0.10
+    unique_weapon_attack: int = 100
+    tutorial_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -386,6 +394,7 @@ class ChannelProfile:
     overwatch: OverwatchConfig = OverwatchConfig()
     league: LeagueConfig = LeagueConfig()
     raid_bosses: RaidBossConfig = RaidBossConfig()
+    lurk_message: str = "{username} has been spotted by a human and scattered! See you soon!"
 
     def is_user_protected(self, user_id: str) -> bool:
         return str(user_id) in self.protected_user_ids

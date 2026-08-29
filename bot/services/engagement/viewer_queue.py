@@ -152,13 +152,6 @@ class ViewerQueueService:
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
-        if not state.is_open:
-            LOGGER.debug(
-                "[Viewer Queue] Next viewers requested for closed queue in broadcaster %s.",
-                broadcaster_id
-            )
-            return False, [], "The viewer queue is currently closed."
-
         if count < 1:
             LOGGER.debug(
                 "[Viewer Queue] Invalid next-viewer count %d requested in broadcaster %s.",
@@ -190,7 +183,7 @@ class ViewerQueueService:
             len(state.queue)
         )
 
-        viewers_text = ", ".join(f"@{username}" for username in selected_viewers)
+        viewers_text = ", ".join(selected_viewers)
 
         if selected_count == 1:
             message = f"Next up: {viewers_text}!"
@@ -198,6 +191,35 @@ class ViewerQueueService:
             message = f"Next group: {viewers_text}!"
 
         return True, selected_viewers, message
+
+    def swap(self, broadcaster_id: str, first_position: int, second_position: int) -> tuple[bool, str]:
+        broadcaster_id = str(broadcaster_id)
+        state = self._get_queue_state(broadcaster_id)
+        queue_size = len(state.queue)
+
+        if first_position < 1 or second_position < 1 or first_position > queue_size or second_position > queue_size:
+            return False, f"Choose two positions between 1 and {queue_size}." if queue_size else "The queue is empty."
+
+        queue_list = list(state.queue)
+        queue_list[first_position - 1], queue_list[second_position - 1] = queue_list[second_position - 1], queue_list[first_position - 1]
+        state.queue = deque(queue_list)
+        LOGGER.info("[Viewer Queue] Swapped positions %d and %d in broadcaster %s.", first_position, second_position, broadcaster_id)
+        return True, f"Swapped {queue_list[second_position - 1]} and {queue_list[first_position - 1]}."
+
+    def requeue(self, broadcaster_id: str, current_position: int, new_position: int) -> tuple[bool, str]:
+        broadcaster_id = str(broadcaster_id)
+        state = self._get_queue_state(broadcaster_id)
+        queue_size = len(state.queue)
+
+        if current_position < 1 or new_position < 1 or current_position > queue_size or new_position > queue_size:
+            return False, f"Choose positions between 1 and {queue_size}." if queue_size else "The queue is empty."
+
+        queue_list = list(state.queue)
+        username = queue_list.pop(current_position - 1)
+        queue_list.insert(new_position - 1, username)
+        state.queue = deque(queue_list)
+        LOGGER.info("[Viewer Queue] Moved %s from position %d to %d in broadcaster %s.", username, current_position, new_position, broadcaster_id)
+        return True, f"Moved {username} to position {new_position}."
 
     def remove_position(self, broadcaster_id: str, position: int) -> tuple[bool, str | None, str]:
         broadcaster_id = str(broadcaster_id)

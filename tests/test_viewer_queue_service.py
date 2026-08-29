@@ -25,7 +25,7 @@ def test_open_join_and_next_viewer() -> None:
 
     assert found is True
     assert viewers == ["rat"]
-    assert "@rat" in next_message
+    assert "Next up: rat!" == next_message
     assert service.size("channel-1") == 0
 
 
@@ -60,6 +60,28 @@ def test_queues_are_isolated_per_broadcaster() -> None:
     assert service.list_queue("channel-1") == ["alice"]
 
     assert service.list_queue("channel-2") == ["bob"]
+
+
+def test_queue_management_works_while_closed() -> None:
+    service = ViewerQueueService(bot=None)
+    service.open_queue("channel-1")
+
+    for username in ("alice", "bob", "carol"):
+        service.join("channel-1", username)
+
+    service.close_queue("channel-1")
+    swapped, _ = service.swap("channel-1", 1, 3)
+    moved, _ = service.requeue("channel-1", 3, 1)
+    found, viewers, _ = service.next_viewers("channel-1")
+    removed, username, _ = service.remove_position("channel-1", 1)
+
+    assert swapped is True
+    assert moved is True
+    assert found is True
+    assert viewers == ["alice"]
+    assert removed is True
+    assert username == "carol"
+    assert service.list_queue("channel-1") == ["bob"]
 
 
 def test_remove_queue_discards_channel_state() -> None:
