@@ -15,7 +15,7 @@ from bot.profiles import (
 MEINYA_RAID_BOSSES = RaidBossConfig(
     enabled=True,
     names=RaidBossNames(
-        melee="Ravana",
+        melee="Dragon-king Thordan",
         ranged="The Ultima Weapon",
         magic="Bahamut Prime"
     ),
