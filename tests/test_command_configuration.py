@@ -4,6 +4,7 @@ from bot.bot import TwitchBot
 from bot.channels.meinya_yozakura.profile import MEINYA_PROFILE
 from bot.channels.ninjakaing.profile import NINJAKAING_PROFILE
 from bot.profiles import render_profile_message
+from config.settings import settings
 
 
 def test_bot_commands_are_case_insensitive() -> None:
@@ -11,6 +12,10 @@ def test_bot_commands_are_case_insensitive() -> None:
         TwitchBot(token_database=None, subs=[], broadcaster_ids=[])
 
     assert initialize.call_args.kwargs["case_insensitive"] is True
+
+
+def test_bot_authorization_includes_announcement_scope() -> None:
+    assert "moderator:manage:announcements" in settings.BOT_SCOPES.split()
 
 
 def test_social_messages_are_configured_per_profile() -> None:
