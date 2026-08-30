@@ -58,10 +58,14 @@ class ModerationEvents(commands.Component):
         reason = getattr(ban, "reason", None)
 
         LOGGER.warning(
-            "[Moderation] Observed SeryBot banning %s (%s) in broadcaster %s.",
+            "[Moderation] Observed SeryBot banning %s (%s) in broadcaster %s | Moderator: %s (%s) | Reason: %s",
             username,
             user_id,
-            broadcaster_id
+            broadcaster_id,
+            moderator_name,
+            moderator_id,
+            reason or "No reason supplied",
+            extra={"broadcaster_id": broadcaster_id}
         )
 
         try:
@@ -76,13 +80,22 @@ class ModerationEvents(commands.Component):
             )
         except Exception:
             LOGGER.exception(
-                "[Moderation] Failed to process SeryBot ban of %s (%s).",
+                "[Moderation] Failed to process SeryBot ban of %s (%s) in broadcaster %s.",
                 username,
-                user_id
+                user_id,
+                broadcaster_id,
+                extra={"broadcaster_id": broadcaster_id}
             )
             return
 
         if not recorded:
+            LOGGER.info(
+                "[Moderation] SeryBot ban evidence for %s (%s) in broadcaster %s was already recorded.",
+                username,
+                user_id,
+                broadcaster_id,
+                extra={"broadcaster_id": broadcaster_id}
+            )
             return
 
         services.stream_logs.write(

@@ -100,7 +100,7 @@ Redeems are matched by the exact Twitch reward title configured in the channel p
 
 Viewers can join and leave a per-channel queue through chat. Moderators and broadcasters can open, close, advance, remove, or clear it. Both dashboards update the queue automatically and allow direct removal.
 
-Viewer queues currently remain in memory and reset when the application restarts.
+Viewer queue state and ordered members are stored in SQLite. Open and closed queues resume with the same members and positions after an application restart.
 
 ### Shoutouts and Raids
 
@@ -161,13 +161,13 @@ Per-stream logs are stored under:
 .data/logs/<channel>/<timestamp>_stream-<stream_id>/log.txt
 ```
 
-Channel records are routed only to their matching broadcaster. General application records remain in the administrator log instead of being copied into every active stream.
+Channel records are routed only to their matching broadcaster. The administrator runtime log is limited to application-health categories such as startup, database, services, EventSub, and shutdown. Channel activity such as viewer queue changes is written to the active channel's persistent stream log instead.
 
 The service resumes the same Twitch stream after a bot restart. Each channel retains its ten newest sessions. Older inactive sessions are pruned automatically, while active sessions are protected from automatic and manual deletion.
 
 ## Database and Migrations
 
-The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadcaster connections, administrator accounts, settings, overrides, points, counters, redeem history, dashboard activity, first-chat shoutouts, moderation data, and migration history.
+The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadcaster connections, administrator accounts, settings, overrides, points, counters, redeem history, dashboard activity, viewer queues, first-chat shoutouts, moderation data, and migration history.
 
 League statistics are stored separately in `.data/league.db`. This database contains replaceable external cache data, including seasonal champion summaries, recent ranked matches, and item metadata.
 
@@ -325,7 +325,6 @@ Version **6.0.0** marks the checkpoint where RatsBoomBot became a structured mul
 
 - Broadcaster onboarding is intended for invited channels and is not invitation-gated in the application.
 - New channels require a registered profile for complete behavior.
-- Viewer queues reset when the process restarts.
 - Some game data depends on third-party services and public player profiles.
 - Production deployment remains operator-managed rather than turnkey hosting.
 - Not every profile-specific message and redeem has a dashboard editor.

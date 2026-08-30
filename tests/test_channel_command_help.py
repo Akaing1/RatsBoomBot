@@ -38,7 +38,8 @@ def test_command_help_uses_profile_currency_and_effective_toggle_states() -> Non
     assert get_command(utility, "!height [username]").enabled is False
     assert get_command(utility, "!pp [username]").enabled is True
     assert get_command(points, "!shards [username]").enabled is True
-    assert len(points.commands) == 8
+    assert get_command(points, "!shards give <username> <amount>").enabled is True
+    assert len(points.commands) == 9
 
 
 @pytest.mark.parametrize(("channel_name", "expected_group"), [("MeinyaYozakura", "Channel-specific")])

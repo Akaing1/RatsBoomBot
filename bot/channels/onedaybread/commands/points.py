@@ -40,6 +40,13 @@ class OnedaybreadPointsCommands(ChannelComponent):
 
         await self.handler.add_points(ctx, target, amount, "mews")
 
+    @points.command(name="give")
+    async def points_give(self, ctx: commands.Context, target: LocalizedUser, amount: int) -> None:
+        if not await self.require_feature(ctx, FeatureName.POINTS):
+            return
+
+        await self.handler.give_points(ctx, target, amount, "mews")
+
     @points.command(name="gamble")
     async def points_gamble(self, ctx: commands.Context, amount: str) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):

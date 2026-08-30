@@ -349,7 +349,7 @@ async def delete_broadcaster(request: Request, broadcaster_id: str, csrf_token: 
     await delete_token(runtime_db, broadcaster_id)
 
     services.broadcasters.remove_broadcaster(broadcaster_id)
-    services.viewer_queue.remove_queue(broadcaster_id)
+    await services.viewer_queue.remove_queue(broadcaster_id)
 
     return RedirectResponse(url="/admin/channels?removed=1", status_code=303)
 
@@ -378,7 +378,7 @@ async def remove_viewer_from_queue(
     if broadcaster is None:
         return get_channel_error(request)
 
-    removed, _, message = runtime_bot.services.viewer_queue.remove_position(broadcaster_id, position)
+    removed, _, message = await runtime_bot.services.viewer_queue.remove_position(broadcaster_id, position)
     result = "removed" if removed else "remove_failed"
 
     return redirect_to_channel(
