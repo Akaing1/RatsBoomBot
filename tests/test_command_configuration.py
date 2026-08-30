@@ -30,7 +30,8 @@ def test_meinya_uses_final_fantasy_fourteen_raid_pilot() -> None:
 
     assert config.enabled is True
     assert MEINYA_PROFILE.features.raid_bosses is True
-    assert config.names.melee == "Ravana"
+    assert config.tutorial_name == "Striking Dummy"
+    assert config.names.melee == "Dragon-king Thordan"
     assert config.names.ranged == "The Ultima Weapon"
     assert config.names.magic == "Bahamut Prime"
     assert config.mini_names.melee == "Behemoth"
