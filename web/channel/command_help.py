@@ -204,6 +204,7 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
             commands=(
                 CommandDefinition("!raid", "Show the active boss, type, and remaining HP.", feature=FeatureName.RAID_BOSSES),
                 CommandDefinition("!raid attack", "Attack once during each Twitch stream.", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!loot", "Show your personal rewards from the latest completed raid.", feature=FeatureName.RAID_BOSSES),
                 CommandDefinition("!raid shop", "Show the raid equipment shop.", feature=FeatureName.RAID_BOSSES),
                 CommandDefinition("!raid buy <item>", "Buy a weapon or power potion with loyalty points.", feature=FeatureName.RAID_BOSSES),
                 CommandDefinition("!raid equip <weapon>", "Equip an owned sword, bow, or spellbook.", feature=FeatureName.RAID_BOSSES),
