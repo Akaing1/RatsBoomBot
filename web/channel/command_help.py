@@ -248,3 +248,16 @@ def build_command_help_groups(features, broadcaster_id: str, profile: ChannelPro
         groups.append(CommandHelpGroup(definition.name, definition.description, commands))
 
     return tuple(groups)
+
+
+def build_enabled_command_help_groups(features, broadcaster_id: str, profile: ChannelProfile) -> tuple[CommandHelpGroup, ...]:
+    groups = build_command_help_groups(features, broadcaster_id, profile)
+    enabled_groups = []
+
+    for group in groups:
+        commands = tuple(command for command in group.commands if command.enabled)
+
+        if commands:
+            enabled_groups.append(CommandHelpGroup(group.name, group.description, commands))
+
+    return tuple(enabled_groups)

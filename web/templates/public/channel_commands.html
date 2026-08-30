@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Active RatsBoomBot commands and raid information for {{ broadcaster.name or broadcaster.id }}.">
+
+    <title>Commands | {{ broadcaster.name or broadcaster.id }} | RatsBoomBot</title>
+
+    <link rel="canonical" href="{{ public_base_url }}/commands/{{ broadcaster.login or broadcaster.id }}">
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v=10">
+</head>
+
+<body class="public-command-page">
+    <header class="public-command-navigation">
+        <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
+            <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
+            <span><strong>RatsBoomBot</strong><small>Channel command reference</small></span>
+        </a>
+    </header>
+
+    <main class="public-command-content">
+        <header class="public-command-hero">
+            {% if broadcaster.profile_image_url %}
+                <img src="{{ broadcaster.profile_image_url }}" alt="{{ broadcaster.name or broadcaster.id }}">
+            {% else %}
+                <div class="public-command-avatar">{{ (broadcaster.name or broadcaster.id)[0] | upper }}</div>
+            {% endif %}
+
+            <div>
+                <p class="eyebrow">{{ command_count }} active commands</p>
+                <h1>{{ broadcaster.name or broadcaster.id }}</h1>
+                <p>Everything currently available in this channel. Disabled commands are automatically hidden.</p>
+            </div>
+
+            {% if broadcaster.login %}<a class="button primary" href="https://twitch.tv/{{ broadcaster.login }}">Watch on Twitch</a>{% endif %}
+        </header>
+
+        {% if raid_metrics %}
+            <section class="panel public-raid-panel">
+                <div class="panel-header">
+                    <div><p class="eyebrow">Raid encounter</p><h2>{{ raid_metrics.boss_name }}</h2></div>
+                    <span class="channel-state {% if raid_metrics.status == 'active' %}live{% endif %}">{{ raid_metrics.status | title }}</span>
+                </div>
+
+                <div class="raid-monitor-heading">
+                    <p>{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; Stream {{ raid_metrics.streams_used }} of {{ raid_metrics.stream_limit }}</p>
+                    <strong>{{ "{:,}".format(raid_metrics.current_hp) }}/{{ "{:,}".format(raid_metrics.max_hp) }} HP</strong>
+                </div>
+
+                <div class="progress-track raid-hp-track"><span style="width: {{ raid_metrics.hp_percent }}%"></span></div>
+
+                <div class="public-raid-stats">
+                    <article><span>Damage dealt</span><strong>{{ "{:,}".format(raid_metrics.total_damage) }}</strong></article>
+                    <article><span>Attackers</span><strong>{{ raid_metrics.unique_attackers }}</strong></article>
+                    <article><span>Total attacks</span><strong>{{ raid_metrics.total_attacks }}</strong></article>
+                    <article><span>Reward pool</span><strong>{{ "{:,}".format(raid_metrics.reward_pool) }}</strong></article>
+                </div>
+            </section>
+        {% endif %}
+
+        {% if command_groups %}
+            <section class="public-command-groups" aria-label="Active channel commands">
+                {% for group in command_groups %}
+                    <article class="panel public-command-group">
+                        <div class="public-command-group-header">
+                            <div><p class="eyebrow">{{ group.commands | length }} commands</p><h2>{{ group.name }}</h2></div>
+                            <p>{{ group.description }}</p>
+                        </div>
+
+                        <div class="public-command-list">
+                            {% for command in group.commands %}
+                                <div class="public-command-row">
+                                    <code>{{ command.syntax }}</code>
+                                    <div><p>{{ command.description }}</p><span>{{ command.permission }}</span></div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </article>
+                {% endfor %}
+            </section>
+        {% else %}
+            <section class="panel compact-empty-state"><h2>No commands are active</h2><p>This channel does not currently have any public commands enabled.</p></section>
+        {% endif %}
+    </main>
+</body>
+</html>
