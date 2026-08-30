@@ -20,6 +20,7 @@ from bot.shared.commands.utility import UtilityCommands
 from bot.shared.commands.viewer_queue import ViewerQueueCommands
 from bot.shared.events.chat import ChatEvents
 from bot.shared.events.community import CommunityEvents
+from bot.shared.events.moderation import ModerationEvents
 from bot.shared.events.raids import RaidEvents
 from bot.shared.events.redeems import RedeemEvents
 from bot.shared.events.streams import StreamEvents
@@ -42,6 +43,7 @@ GLOBAL_COMPONENTS: tuple[type[commands.Component], ...] = (
     SettingsCommands,
     ChatEvents,
     CommunityEvents,
+    ModerationEvents,
     RedeemEvents,
     RaidEvents,
     StreamEvents
