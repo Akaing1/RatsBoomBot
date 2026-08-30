@@ -226,7 +226,7 @@ class RaidBossService:
             if automatic:
                 await asyncio.sleep(self.AUTOMATIC_WARNING_SECONDS)
 
-            await self._send_message(broadcaster_id, "A raid boss is approaching! It will appear in 10 minutes. Get ready to use !raid attack!")
+            await self._send_message(broadcaster_id, "A dangerous prescence can be felt approaching... Get ready to use !raid attack!")
             await asyncio.sleep(self.PRE_SPAWN_SECONDS)
             event = await self.spawn_automatic(broadcaster_id, config) if automatic else await self.spawn(broadcaster_id, str(boss_type), config, str(boss_tier))
 
