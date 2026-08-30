@@ -14,6 +14,7 @@ class Settings:
 
     BOT_ID = os.getenv("BOT_ID")
     OWNER_ID = os.getenv("OWNER_ID")
+    SERYBOT_USER_ID = os.getenv("SERYBOT_USER_ID", "402337290")
 
     PREFIX = os.getenv("PREFIX", "!")
     DATABASE_PATH = os.getenv("DATABASE_PATH", ".data/tokens.db")

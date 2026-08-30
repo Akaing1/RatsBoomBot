@@ -1,6 +1,9 @@
 import logging
+from asyncio import Lock
 from collections import deque
 from dataclasses import dataclass, field
+
+import asqlite
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -14,9 +17,66 @@ class ViewerQueueState:
 
 class ViewerQueueService:
 
-    def __init__(self, bot):
+    def __init__(self, bot, db: asqlite.Pool):
         self.bot = bot
+        self.db = db
         self.queues: dict[str, ViewerQueueState] = {}
+        self.persistence_lock = Lock()
+
+    async def setup(self) -> None:
+        query = """
+        SELECT states.broadcaster_id, states.is_open, entries.username, entries.position
+        FROM viewer_queue_states AS states
+        LEFT JOIN viewer_queue_entries AS entries ON entries.broadcaster_id = states.broadcaster_id
+        ORDER BY states.broadcaster_id, entries.position
+        """
+
+        async with self.db.acquire() as connection:
+            rows = await connection.fetchall(query)
+
+        self.queues.clear()
+
+        for row in rows:
+            broadcaster_id = str(row["broadcaster_id"])
+            state = self.queues.setdefault(broadcaster_id, ViewerQueueState(is_open=bool(row["is_open"])))
+            username = row["username"]
+
+            if username is not None:
+                state.queue.append(username)
+                state.users.add(username)
+
+        LOGGER.info("[Viewer Queue] Restored %d queue(s) with %d total viewer(s).", len(self.queues), sum(len(state.queue) for state in self.queues.values()))
+
+    async def _persist(self, broadcaster_id: str, state: ViewerQueueState) -> None:
+        state_query = """
+        INSERT INTO viewer_queue_states (broadcaster_id, is_open, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(broadcaster_id)
+        DO UPDATE SET
+            is_open = excluded.is_open,
+            updated_at = CURRENT_TIMESTAMP
+        """
+        entry_query = """
+        INSERT INTO viewer_queue_entries (broadcaster_id, username, position)
+        VALUES (?, ?, ?)
+        """
+        entries = [(broadcaster_id, username, position) for position, username in enumerate(state.queue, start=1)]
+
+        async with self.persistence_lock:
+            async with self.db.acquire() as connection:
+                await connection.execute("BEGIN")
+
+                try:
+                    await connection.execute(state_query, (broadcaster_id, int(state.is_open)))
+                    await connection.execute("DELETE FROM viewer_queue_entries WHERE broadcaster_id = ?", (broadcaster_id,))
+
+                    if entries:
+                        await connection.executemany(entry_query, entries)
+
+                    await connection.commit()
+                except Exception:
+                    await connection.rollback()
+                    raise
 
     def _get_queue_state(self, broadcaster_id: str) -> ViewerQueueState:
         broadcaster_id = str(broadcaster_id)
@@ -33,7 +93,7 @@ class ViewerQueueService:
 
         return state
 
-    def open_queue(self, broadcaster_id: str) -> str:
+    async def open_queue(self, broadcaster_id: str) -> str:
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -45,15 +105,17 @@ class ViewerQueueService:
             return "The viewer queue is already open."
 
         state.is_open = True
+        await self._persist(broadcaster_id, state)
 
         LOGGER.info(
             "[Viewer Queue] Opened queue for broadcaster %s.",
-            broadcaster_id
+            broadcaster_id,
+            extra={"broadcaster_id": broadcaster_id}
         )
 
         return "Queue is now open! Viewers can join the queue using !join."
 
-    def close_queue(self, broadcaster_id: str) -> str:
+    async def close_queue(self, broadcaster_id: str) -> str:
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -65,11 +127,13 @@ class ViewerQueueService:
             return "The viewer queue is already closed."
 
         state.is_open = False
+        await self._persist(broadcaster_id, state)
 
         LOGGER.info(
             "[Viewer Queue] Closed queue for broadcaster %s with %d viewers remaining.",
             broadcaster_id,
-            len(state.queue)
+            len(state.queue),
+            extra={"broadcaster_id": broadcaster_id}
         )
 
         return "The viewer queue is now closed."
@@ -78,7 +142,7 @@ class ViewerQueueService:
         state = self._get_queue_state(str(broadcaster_id))
         return state.is_open
 
-    def join(self, broadcaster_id: str, username: str) -> tuple[bool, str]:
+    async def join(self, broadcaster_id: str, username: str) -> tuple[bool, str]:
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -102,6 +166,7 @@ class ViewerQueueService:
 
         state.queue.append(username)
         state.users.add(username)
+        await self._persist(broadcaster_id, state)
 
         position = len(state.queue)
 
@@ -109,12 +174,13 @@ class ViewerQueueService:
             "[Viewer Queue] User %s joined broadcaster %s at position %d.",
             username,
             broadcaster_id,
-            position
+            position,
+            extra={"broadcaster_id": broadcaster_id}
         )
 
         return True, f"@{username}, you joined the queue! Position: {position}"
 
-    def leave(self, broadcaster_id: str, username: str) -> tuple[bool, str]:
+    async def leave(self, broadcaster_id: str, username: str) -> tuple[bool, str]:
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -138,17 +204,19 @@ class ViewerQueueService:
 
         state.queue.remove(username)
         state.users.remove(username)
+        await self._persist(broadcaster_id, state)
 
         LOGGER.info(
             "[Viewer Queue] User %s left broadcaster %s. %d viewers remain.",
             username,
             broadcaster_id,
-            len(state.queue)
+            len(state.queue),
+            extra={"broadcaster_id": broadcaster_id}
         )
 
         return True, f"@{username}, you left the queue."
 
-    def next_viewers(self, broadcaster_id: str, count: int = 1) -> tuple[bool, list[str], str]:
+    async def next_viewers(self, broadcaster_id: str, count: int = 1) -> tuple[bool, list[str], str]:
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -175,12 +243,15 @@ class ViewerQueueService:
             state.users.remove(username)
             selected_viewers.append(username)
 
+        await self._persist(broadcaster_id, state)
+
         LOGGER.info(
             "[Viewer Queue] Selected %d viewer(s) for broadcaster %s: %s. %d viewers remain.",
             selected_count,
             broadcaster_id,
             ", ".join(selected_viewers),
-            len(state.queue)
+            len(state.queue),
+            extra={"broadcaster_id": broadcaster_id}
         )
 
         viewers_text = ", ".join(selected_viewers)
@@ -192,7 +263,7 @@ class ViewerQueueService:
 
         return True, selected_viewers, message
 
-    def swap(self, broadcaster_id: str, first_position: int, second_position: int) -> tuple[bool, str]:
+    async def swap(self, broadcaster_id: str, first_position: int, second_position: int) -> tuple[bool, str]:
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
         queue_size = len(state.queue)
@@ -203,10 +274,11 @@ class ViewerQueueService:
         queue_list = list(state.queue)
         queue_list[first_position - 1], queue_list[second_position - 1] = queue_list[second_position - 1], queue_list[first_position - 1]
         state.queue = deque(queue_list)
-        LOGGER.info("[Viewer Queue] Swapped positions %d and %d in broadcaster %s.", first_position, second_position, broadcaster_id)
+        await self._persist(broadcaster_id, state)
+        LOGGER.info("[Viewer Queue] Swapped positions %d and %d in broadcaster %s.", first_position, second_position, broadcaster_id, extra={"broadcaster_id": broadcaster_id})
         return True, f"Swapped {queue_list[second_position - 1]} and {queue_list[first_position - 1]}."
 
-    def requeue(self, broadcaster_id: str, current_position: int, new_position: int) -> tuple[bool, str]:
+    async def requeue(self, broadcaster_id: str, current_position: int, new_position: int) -> tuple[bool, str]:
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
         queue_size = len(state.queue)
@@ -218,10 +290,11 @@ class ViewerQueueService:
         username = queue_list.pop(current_position - 1)
         queue_list.insert(new_position - 1, username)
         state.queue = deque(queue_list)
-        LOGGER.info("[Viewer Queue] Moved %s from position %d to %d in broadcaster %s.", username, current_position, new_position, broadcaster_id)
+        await self._persist(broadcaster_id, state)
+        LOGGER.info("[Viewer Queue] Moved %s from position %d to %d in broadcaster %s.", username, current_position, new_position, broadcaster_id, extra={"broadcaster_id": broadcaster_id})
         return True, f"Moved {username} to position {new_position}."
 
-    def remove_position(self, broadcaster_id: str, position: int) -> tuple[bool, str | None, str]:
+    async def remove_position(self, broadcaster_id: str, position: int) -> tuple[bool, str | None, str]:
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
 
@@ -256,29 +329,33 @@ class ViewerQueueService:
 
         state.queue = deque(queue_list)
         state.users.remove(removed_username)
+        await self._persist(broadcaster_id, state)
 
         LOGGER.info(
             "[Viewer Queue] Removed user %s from position %d in broadcaster %s. %d viewers remain.",
             removed_username,
             position,
             broadcaster_id,
-            len(state.queue)
+            len(state.queue),
+            extra={"broadcaster_id": broadcaster_id}
         )
 
         return True, removed_username, f"Removed @{removed_username} from position {position}."
 
-    def clear(self, broadcaster_id: str) -> str:
+    async def clear(self, broadcaster_id: str) -> str:
         broadcaster_id = str(broadcaster_id)
         state = self._get_queue_state(broadcaster_id)
         removed_count = len(state.queue)
 
         state.queue.clear()
         state.users.clear()
+        await self._persist(broadcaster_id, state)
 
         LOGGER.info(
             "[Viewer Queue] Cleared %d viewers from broadcaster %s.",
             removed_count,
-            broadcaster_id
+            broadcaster_id,
+            extra={"broadcaster_id": broadcaster_id}
         )
 
         return "Viewer queue cleared."
@@ -299,9 +376,15 @@ class ViewerQueueService:
         state = self._get_queue_state(str(broadcaster_id))
         return len(state.queue)
 
-    def remove_queue(self, broadcaster_id: str) -> None:
+    async def remove_queue(self, broadcaster_id: str) -> None:
         broadcaster_id = str(broadcaster_id)
         state = self.queues.pop(broadcaster_id, None)
+
+        async with self.persistence_lock:
+            async with self.db.acquire() as connection:
+                await connection.execute("DELETE FROM viewer_queue_entries WHERE broadcaster_id = ?", (broadcaster_id,))
+                await connection.execute("DELETE FROM viewer_queue_states WHERE broadcaster_id = ?", (broadcaster_id,))
+                await connection.commit()
 
         if state is None:
             LOGGER.debug(
@@ -313,5 +396,6 @@ class ViewerQueueService:
         LOGGER.info(
             "[Viewer Queue] Removed queue state for broadcaster %s with %d viewers.",
             broadcaster_id,
-            len(state.queue)
+            len(state.queue),
+            extra={"broadcaster_id": broadcaster_id}
         )

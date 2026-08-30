@@ -391,7 +391,7 @@ async def remove_viewer_from_channel_queue(request: Request, position: int = For
         logout_channel_user(request)
         return RedirectResponse(url="/connect", status_code=303)
 
-    removed, _, message = services.viewer_queue.remove_position(broadcaster_id, position)
+    removed, _, message = await services.viewer_queue.remove_position(broadcaster_id, position)
 
     result = "removed" if removed else "remove_failed"
 

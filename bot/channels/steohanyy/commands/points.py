@@ -40,6 +40,13 @@ class SteohanyyPointsCommands(ChannelComponent):
 
         await self.handler.add_points(ctx, target, amount, "drinks")
 
+    @drinks.command(name="give")
+    async def drinks_give(self, ctx: commands.Context, target: LocalizedUser, amount: int) -> None:
+        if not await self.require_feature(ctx, FeatureName.POINTS):
+            return
+
+        await self.handler.give_points(ctx, target, amount, "drinks")
+
     @drinks.command(name="gamble")
     async def drinks_gamble(self, ctx: commands.Context, amount: str) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):

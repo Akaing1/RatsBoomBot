@@ -133,7 +133,7 @@ class ViewerQueueCommands(commands.Component):
             await ctx.send("Only the broadcaster or mods can open the queue.")
             return
 
-        message = services.viewer_queue.open_queue(broadcaster_id)
+        message = await services.viewer_queue.open_queue(broadcaster_id)
 
         await ctx.send(message)
 
@@ -152,7 +152,7 @@ class ViewerQueueCommands(commands.Component):
             await ctx.send("Only the broadcaster or mods can close the queue.")
             return
 
-        message = services.viewer_queue.close_queue(broadcaster_id)
+        message = await services.viewer_queue.close_queue(broadcaster_id)
 
         await ctx.send(message)
 
@@ -166,7 +166,7 @@ class ViewerQueueCommands(commands.Component):
             return
 
         broadcaster_id, services = context
-        _, message = services.viewer_queue.join(broadcaster_id, get_chatter_name(ctx))
+        _, message = await services.viewer_queue.join(broadcaster_id, get_chatter_name(ctx))
 
         await ctx.send(message)
 
@@ -180,7 +180,7 @@ class ViewerQueueCommands(commands.Component):
             return
 
         broadcaster_id, services = context
-        _, message = services.viewer_queue.leave(broadcaster_id, get_chatter_name(ctx))
+        _, message = await services.viewer_queue.leave(broadcaster_id, get_chatter_name(ctx))
 
         await ctx.send(message)
 
@@ -218,7 +218,7 @@ class ViewerQueueCommands(commands.Component):
             await ctx.send("Only the broadcaster or mods can use !next.")
             return
 
-        _, _, message = services.viewer_queue.next_viewers(broadcaster_id, count)
+        _, _, message = await services.viewer_queue.next_viewers(broadcaster_id, count)
 
         await ctx.send(message)
 
@@ -241,7 +241,7 @@ class ViewerQueueCommands(commands.Component):
             await ctx.send("Use it like this: !remove 3")
             return
 
-        _, _, message = services.viewer_queue.remove_position(broadcaster_id, position)
+        _, _, message = await services.viewer_queue.remove_position(broadcaster_id, position)
 
         await ctx.send(message)
 
@@ -263,7 +263,7 @@ class ViewerQueueCommands(commands.Component):
             await ctx.send("Use it like this: !swap 2 5")
             return
 
-        _, message = services.viewer_queue.swap(broadcaster_id, first_position, second_position)
+        _, message = await services.viewer_queue.swap(broadcaster_id, first_position, second_position)
         await ctx.send(message)
 
     @commands.command(name="requeue")
@@ -284,7 +284,7 @@ class ViewerQueueCommands(commands.Component):
             await ctx.send("Use it like this: !requeue 5 2")
             return
 
-        _, message = services.viewer_queue.requeue(broadcaster_id, current_position, new_position)
+        _, message = await services.viewer_queue.requeue(broadcaster_id, current_position, new_position)
         await ctx.send(message)
 
     @commands.command(name="clear")
@@ -302,6 +302,6 @@ class ViewerQueueCommands(commands.Component):
             await ctx.send("Only the broadcaster or mods can clear the queue.")
             return
 
-        message = services.viewer_queue.clear(broadcaster_id)
+        message = await services.viewer_queue.clear(broadcaster_id)
 
         await ctx.send(message)

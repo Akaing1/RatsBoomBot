@@ -250,7 +250,7 @@ class RaidBossService:
             return None
 
         if boss_tier == "tutorial":
-            boss_name = getattr(config.mini_names, boss_type)
+            boss_name = config.tutorial_name
             max_hp = config.tutorial_hp
             final_hit_reward = config.mini_final_hit_reward
             stream_limit = config.tutorial_duration_streams
@@ -690,7 +690,23 @@ class RaidBossService:
 
             if event.boss_tier == "tutorial":
                 starter_weapons = tuple(BASIC_WEAPON_TYPES)
-                awards = [(str(contributor["user_id"]), str(contributor["username"]), random.choice(starter_weapons)) for contributor in contributors]
+
+                for contributor in contributors:
+                    recipient_id = str(contributor["user_id"])
+                    recipient_name = str(contributor["username"])
+                    owned_rows = await connection.fetchall(
+                        "SELECT item_id FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND quantity > 0",
+                        (str(broadcaster_id), recipient_id)
+                    )
+                    owned_weapons = {str(row["item_id"]) for row in owned_rows}
+                    available_weapons = tuple(weapon for weapon in starter_weapons if weapon not in owned_weapons)
+
+                    if available_weapons:
+                        awards.append((recipient_id, recipient_name, random.choice(available_weapons)))
+                    else:
+                        await self._ensure_player(connection, broadcaster_id, recipient_id, recipient_name)
+                        await self._add_points(connection, broadcaster_id, recipient_id, recipient_name, config.tutorial_complete_collection_points)
+                        awards.append((recipient_id, recipient_name, f"{config.tutorial_complete_collection_points}_points"))
             else:
                 mythical_weapon = next(item_id for item_id, weapon_type in UNIQUE_WEAPON_TYPES.items() if weapon_type == event.boss_type)
 
@@ -705,6 +721,10 @@ class RaidBossService:
                         awards.append((str(contributor["user_id"]), str(contributor["username"]), mythical_weapon))
 
             for recipient_id, recipient_name, item_id in awards:
+                if item_id.endswith("_points"):
+                    LOGGER.info("[Raid Bosses] Awarded %s to %s for already owning every starter weapon.", item_id, recipient_name)
+                    continue
+
                 await self._ensure_player(connection, broadcaster_id, recipient_id, recipient_name)
                 await connection.execute(
                     """

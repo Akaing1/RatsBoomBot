@@ -332,7 +332,7 @@ async def test_first_encounter_gives_every_participant_a_random_starter_weapon(t
         service = RaidBossService(bot=None, db=database)
         await points.setup()
         await service.setup()
-        config = build_config(tutorial_enabled=True, tutorial_hp=10000, tutorial_duration_streams=2, base_damage_min=5000, base_damage_max=5000, reward_points_per_hp=0.5)
+        config = build_config(tutorial_enabled=True, tutorial_name="Striking Dummy", tutorial_hp=10000, tutorial_duration_streams=2, base_damage_min=5000, base_damage_max=5000, reward_points_per_hp=0.5)
 
         event = await service.spawn("channel-1", "melee", config, "tutorial")
         await service.attack("channel-1", "stream-1", "user-1", "alice", config)
@@ -342,6 +342,7 @@ async def test_first_encounter_gives_every_participant_a_random_starter_weapon(t
 
         assert event is not None
         assert event.boss_tier == "tutorial"
+        assert event.boss_name == "Striking Dummy"
         assert event.max_hp == 10000
         assert event.stream_limit == 2
         assert event.reward_pool == 5000
@@ -351,6 +352,46 @@ async def test_first_encounter_gives_every_participant_a_random_starter_weapon(t
         assert set(alice_weapons + bob_weapons) <= {"sword", "bow", "spellbook"}
         assert await service.has_completed_tutorial("channel-1") is True
         assert await service.spawn("channel-1", "melee", config, "tutorial") is None
+
+
+@pytest.mark.asyncio
+async def test_tutorial_reward_rerolls_an_owned_starter_weapon(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda choices: choices[0])
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(tutorial_enabled=True, tutorial_hp=100, base_damage_min=100, base_damage_max=100)
+        async with database.acquire() as connection:
+            await connection.execute("INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES (?, ?, ?, 1, 15)", ("channel-1", "user-1", "sword"))
+
+        await service.spawn("channel-1", "melee", config, "tutorial")
+        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        weapons, _, _, _ = await service.get_inventory("channel-1", "user-1")
+
+        assert result.drops == (("alice", "bow"),)
+        assert weapons == ["bow", "sword"]
+
+
+@pytest.mark.asyncio
+async def test_tutorial_rewards_five_thousand_points_when_all_starter_weapons_are_owned(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(tutorial_enabled=True, tutorial_hp=100, base_damage_min=100, base_damage_max=100, tutorial_complete_collection_points=5000)
+        async with database.acquire() as connection:
+            for weapon in ("sword", "bow", "spellbook"):
+                await connection.execute("INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES (?, ?, ?, 1, 15)", ("channel-1", "user-1", weapon))
+
+        await service.spawn("channel-1", "melee", config, "tutorial")
+        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+
+        assert result.drops == (("alice", "5000_points"),)
+        assert await points.get_points("channel-1", "user-1") == 6100
 
 
 @pytest.mark.asyncio

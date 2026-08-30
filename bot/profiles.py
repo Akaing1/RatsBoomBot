@@ -269,6 +269,10 @@ class PointsMessages:
     add_denied: str = "Only moderators can add points to viewers."
     add_invalid: str = "The points amount must be greater than 0."
     add_success: str = "Added {amount} points to {username}."
+    give_invalid: str = "You need to give at least 1 point."
+    give_self: str = "You cannot give points to yourself."
+    give_insufficient: str = "You only have {points} points."
+    give_success: str = "{sender} gave {amount} points to {username} and now has {points} points."
     gamble_no_points: str = "You do not have any points to gamble."
     gamble_usage: str = "Use it like this: !{command} gamble 50 or !{command} gamble all"
     gamble_invalid: str = "You need to gamble at least 1 point."
@@ -341,6 +345,7 @@ class RaidBossNames:
 class RaidBossConfig:
     enabled: bool = False
     offline_testing_enabled: bool = False
+    tutorial_name: str = "Training Dummy"
     names: RaidBossNames = RaidBossNames()
     mini_names: RaidBossNames = RaidBossNames()
     max_hp: int = 150000
@@ -367,6 +372,7 @@ class RaidBossConfig:
     critical_multiplier: float = 1.5
     tutorial_hp: int = 10000
     tutorial_duration_streams: int = 2
+    tutorial_complete_collection_points: int = 5000
     reward_points_per_hp: float = 0.5
     final_hit_unique_drop_chance: float = 0.03
     top_contributor_unique_drop_chance: float = 0.01

@@ -11,6 +11,7 @@ from storage.migrations.v006_second_redeem import migrate as migrate_second_rede
 from storage.migrations.v007_first_chat_shoutouts import migrate as migrate_first_chat_shoutouts
 from storage.migrations.v008_chatter_identities import migrate as migrate_chatter_identities
 from storage.migrations.v009_reklop_counter_700 import migrate as migrate_reklop_counter_700
+from storage.migrations.v010_viewer_queue_persistence import migrate as migrate_viewer_queue_persistence
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -31,5 +32,6 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=6, name="second_redeem", run=migrate_second_redeem),
     Migration(version=7, name="first_chat_shoutouts", run=migrate_first_chat_shoutouts),
     Migration(version=8, name="chatter_identities", run=migrate_chatter_identities),
-    Migration(version=9, name="reklop_counter_700", run=migrate_reklop_counter_700)
+    Migration(version=9, name="reklop_counter_700", run=migrate_reklop_counter_700),
+    Migration(version=10, name="viewer_queue_persistence", run=migrate_viewer_queue_persistence)
 )

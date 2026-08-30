@@ -14,6 +14,7 @@ from bot.profiles import (
 
 MEINYA_RAID_BOSSES = RaidBossConfig(
     enabled=True,
+    tutorial_name="Striking Dummy",
     names=RaidBossNames(
         melee="Dragon-king Thordan",
         ranged="The Ultima Weapon",

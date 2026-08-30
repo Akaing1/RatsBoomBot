@@ -4,6 +4,34 @@ from collections import deque
 from dataclasses import asdict, dataclass
 from datetime import datetime
 
+RUNTIME_HEALTH_CATEGORIES = frozenset({
+    "Broadcasters",
+    "Components",
+    "Dashboard",
+    "Database",
+    "EventSub",
+    "OAuth",
+    "Profiles",
+    "Runtime",
+    "Services",
+    "Shutdown",
+    "Startup",
+    "Stream Logs"
+})
+
+
+def is_runtime_health_record(record: logging.LogRecord) -> bool:
+    if getattr(record, "broadcaster_id", None) is not None:
+        return False
+
+    message = record.getMessage().lstrip()
+
+    if not message.startswith("["):
+        return True
+
+    category, separator, _ = message[1:].partition("]")
+    return bool(separator) and category in RUNTIME_HEALTH_CATEGORIES
+
 
 @dataclass(frozen=True)
 class RuntimeLogEntry:
@@ -23,6 +51,9 @@ class RuntimeLogBuffer(logging.Handler):
         self.setFormatter(logging.Formatter("%(message)s"))
 
     def emit(self, record: logging.LogRecord) -> None:
+        if not is_runtime_health_record(record):
+            return
+
         try:
             message = self.format(record)
             timestamp = datetime.fromtimestamp(record.created).astimezone().isoformat(timespec="seconds")
