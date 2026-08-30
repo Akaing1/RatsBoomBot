@@ -498,6 +498,57 @@ async def test_tutorial_reward_rerolls_an_owned_starter_weapon(tmp_path, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_latest_loot_persists_points_final_hit_bonus_and_items(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda choices: choices[0])
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(tutorial_enabled=True, tutorial_hp=100, base_damage_min=100, base_damage_max=100)
+        await service.spawn("channel-1", "melee", config, "tutorial")
+        await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+
+        restarted_service = RaidBossService(bot=None, db=database)
+        await restarted_service.setup()
+        loot = await restarted_service.get_latest_loot("channel-1", "user-1")
+
+        assert loot == {
+            "boss_name": "Training Dummy",
+            "contribution_points": 100,
+            "final_hit_points": 1000,
+            "bonus_points": 0,
+            "total_points": 1100,
+            "items": ("sword",)
+        }
+
+
+@pytest.mark.asyncio
+async def test_latest_loot_includes_tutorial_collection_points(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await service.setup()
+        config = build_config(tutorial_enabled=True, tutorial_hp=100, base_damage_min=100, base_damage_max=100, tutorial_complete_collection_points=5000)
+        async with database.acquire() as connection:
+            for weapon in ("sword", "bow", "spellbook"):
+                await connection.execute("INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES (?, ?, ?, 1, 15)", ("channel-1", "user-1", weapon))
+
+        await service.spawn("channel-1", "melee", config, "tutorial")
+        await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        loot = await service.get_latest_loot("channel-1", "user-1")
+
+        assert loot is not None
+        assert loot["contribution_points"] == 100
+        assert loot["final_hit_points"] == 1000
+        assert loot["bonus_points"] == 5000
+        assert loot["total_points"] == 6100
+        assert loot["items"] == ()
+
+
+@pytest.mark.asyncio
 async def test_tutorial_rewards_five_thousand_points_when_all_starter_weapons_are_owned(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)
