@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from bot.profiles import FeatureName
+from bot.profiles import DEFAULT_AD_ANNOUNCEMENT_MESSAGE, FeatureName, get_active_profile
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -145,10 +145,15 @@ class AdAnnouncementService:
             if ad_key in self.warned_ads:
                 continue
 
-            message = (
-                "Hide! The humans are coming! "
-                f"Ads starting in ~{seconds_until_ad} seconds!"
-            )
+            profile = get_active_profile(broadcaster_id)
+            template = profile.ad_announcement_message if profile is not None else DEFAULT_AD_ANNOUNCEMENT_MESSAGE
+            minutes, seconds = divmod(seconds_until_ad, 60)
+
+            try:
+                message = template.format(time=f"{minutes}:{seconds:02d}")
+            except (KeyError, ValueError):
+                LOGGER.warning("[Ads] Invalid ad announcement template for %s (%s). Using the default message.", broadcaster_name, broadcaster_id)
+                message = DEFAULT_AD_ANNOUNCEMENT_MESSAGE.format(time=f"{minutes}:{seconds:02d}")
 
             try:
                 await broadcaster.send_announcement(moderator=str(self.bot.user.id), message=message, color="purple")
