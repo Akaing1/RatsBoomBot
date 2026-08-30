@@ -46,3 +46,7 @@ def test_meinya_uses_final_fantasy_fourteen_raid_pilot() -> None:
     assert config.potion_cost == 2500
     assert config.weapon_durability == 15
     assert config.repair_cost == 1500
+
+
+def test_meinya_uses_custom_ad_announcement_message() -> None:
+    assert MEINYA_PROFILE.ad_announcement_message == "3 minutes of ads starting in {time}! We have to run 3 minutes of ads at the top of every hour to disable the prerolls, so please forgive me! See you soon!"
