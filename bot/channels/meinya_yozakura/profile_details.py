@@ -44,6 +44,9 @@ MEINYA_TIMER_MESSAGES = (
 )
 
 
+MEINYA_AD_ANNOUNCEMENT_MESSAGE = "3 minutes of ads starting in {time}! We have to run 3 minutes of ads at the top of every hour to disable the prerolls, so please forgive me! See you soon!"
+
+
 MEINYA_SOCIAL_MESSAGES = SocialMessages(
     overview="Find more from the Blood Sakura Garden: Discord: {discord_url} | YouTube: {youtube_url}",
     discord="Join the Blood Sakura Garden: {discord_url}",
