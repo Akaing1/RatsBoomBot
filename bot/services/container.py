@@ -75,6 +75,7 @@ class ServiceContainer:
 
         for session in self.stream_logs.active_sessions.values():
             await self.raid_bosses.register_stream(session.broadcaster_id, session.stream_id)
+            await self.raid_bosses.start_reminders(session.broadcaster_id)
 
         LOGGER.info("[Services] Service setup completed.")
 
@@ -109,6 +110,7 @@ class ServiceContainer:
             ("AdAnnouncementService", self.ads),
             ("ShoutoutService", self.shoutouts),
             ("LeagueService", self.league),
+            ("RaidBossService", self.raid_bosses),
             ("StreamLogService", self.stream_logs)
         )
 
