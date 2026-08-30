@@ -130,7 +130,8 @@ class RaidBossService:
             """
             CREATE TABLE IF NOT EXISTS raid_boss_channel_state (
                 broadcaster_id TEXT PRIMARY KEY,
-                tutorial_completed INTEGER NOT NULL DEFAULT 0
+                tutorial_completed INTEGER NOT NULL DEFAULT 0,
+                consecutive_mini_bosses INTEGER NOT NULL DEFAULT 0
             )
             """
         )
@@ -161,6 +162,11 @@ class RaidBossService:
 
                 if "durability" not in {str(column["name"]) for column in inventory_columns}:
                     await connection.execute("ALTER TABLE raid_boss_inventory ADD COLUMN durability INTEGER NOT NULL DEFAULT 15")
+
+                state_columns = await connection.fetchall("PRAGMA table_info(raid_boss_channel_state)")
+
+                if "consecutive_mini_bosses" not in {str(column["name"]) for column in state_columns}:
+                    await connection.execute("ALTER TABLE raid_boss_channel_state ADD COLUMN consecutive_mini_bosses INTEGER NOT NULL DEFAULT 0")
         except Exception:
             LOGGER.exception("[Raid Bosses] Failed to prepare raid boss storage.")
             raise
@@ -188,6 +194,49 @@ class RaidBossService:
             row = await connection.fetchone("SELECT tutorial_completed FROM raid_boss_channel_state WHERE broadcaster_id = ?", (str(broadcaster_id),))
 
         return bool(row and row["tutorial_completed"])
+
+    async def spawn_automatic(self, broadcaster_id: str, config: RaidBossConfig) -> RaidBossEvent | None:
+        if not config.automatic_spawning_enabled or not await self.has_completed_tutorial(broadcaster_id):
+            return None
+
+        if await self.get_active_event(broadcaster_id) is not None:
+            return None
+
+        async with self.db.acquire() as connection:
+            row = await connection.fetchone("SELECT consecutive_mini_bosses FROM raid_boss_channel_state WHERE broadcaster_id = ?", (str(broadcaster_id),))
+
+        consecutive_minis = int(row["consecutive_mini_bosses"]) if row else 0
+        main_chance = 0.0
+
+        main_boss_guaranteed = consecutive_minis >= config.main_boss_guaranteed_after_minis
+
+        if main_boss_guaranteed:
+            main_chance = 1.0
+        elif consecutive_minis == 4:
+            main_chance = config.main_boss_chance_after_four_minis
+        elif consecutive_minis == 3:
+            main_chance = config.main_boss_chance_after_three_minis
+
+        boss_tier = "main" if main_boss_guaranteed or random.random() < main_chance else "mini"
+        event = await self.spawn(broadcaster_id, random.choice(tuple(BASIC_WEAPON_TYPES.values())), config, boss_tier)
+
+        if event is None:
+            return None
+
+        next_mini_count = 0 if boss_tier == "main" else consecutive_minis + 1
+
+        async with self.db.acquire() as connection:
+            await connection.execute(
+                """
+                INSERT INTO raid_boss_channel_state (broadcaster_id, consecutive_mini_bosses)
+                VALUES (?, ?)
+                ON CONFLICT(broadcaster_id) DO UPDATE SET consecutive_mini_bosses = excluded.consecutive_mini_bosses
+                """,
+                (str(broadcaster_id), next_mini_count)
+            )
+
+        LOGGER.info("[Raid Bosses] Automatic cycle selected a %s boss for broadcaster %s after %d consecutive mini bosses.", boss_tier, broadcaster_id, consecutive_minis)
+        return event
 
     async def spawn(self, broadcaster_id: str, boss_type: str, config: RaidBossConfig, boss_tier: str = "main") -> RaidBossEvent | None:
         boss_type = boss_type.lower()

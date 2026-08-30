@@ -55,6 +55,50 @@ def test_default_mini_boss_balance_is_separate_from_main_bosses() -> None:
     assert config.mini_duration_streams == 3
     assert config.mini_reward_pool == 25000
     assert config.mini_final_hit_reward == 1000
+    assert config.main_boss_chance_after_three_minis == 0.25
+    assert config.main_boss_chance_after_four_minis == 0.50
+    assert config.main_boss_guaranteed_after_minis == 5
+
+
+@pytest.mark.asyncio
+async def test_automatic_cycle_waits_for_tutorial_completion(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await service.setup()
+
+        event = await service.spawn_automatic("channel-1", build_config())
+
+        assert event is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("consecutive_minis", "roll", "expected_tier", "next_count"), (
+    (0, 0.0, "mini", 1),
+    (2, 0.0, "mini", 3),
+    (3, 0.24, "main", 0),
+    (3, 0.25, "mini", 4),
+    (4, 0.49, "main", 0),
+    (4, 0.50, "mini", 5),
+    (5, 1.0, "main", 0)
+))
+async def test_automatic_cycle_uses_main_boss_pity_chances(tmp_path, monkeypatch, consecutive_minis, roll, expected_tier, next_count) -> None:
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: roll)
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: "melee")
+
+    async with asqlite.create_pool(str(tmp_path / f"raid-{consecutive_minis}-{roll}.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await service.setup()
+        async with database.acquire() as connection:
+            await connection.execute("INSERT INTO raid_boss_channel_state (broadcaster_id, tutorial_completed, consecutive_mini_bosses) VALUES (?, 1, ?)", ("channel-1", consecutive_minis))
+
+        event = await service.spawn_automatic("channel-1", build_config())
+
+        async with database.acquire() as connection:
+            state = await connection.fetchone("SELECT consecutive_mini_bosses FROM raid_boss_channel_state WHERE broadcaster_id = ?", ("channel-1",))
+
+        assert event is not None
+        assert event.boss_tier == expected_tier
+        assert state["consecutive_mini_bosses"] == next_count
 
 
 def test_common_matching_weapon_supports_three_stream_mini_boss_clear() -> None:

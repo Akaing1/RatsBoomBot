@@ -373,6 +373,10 @@ class RaidBossConfig:
     top_contributor_percent: float = 0.10
     unique_weapon_attack: int = 100
     tutorial_enabled: bool = True
+    automatic_spawning_enabled: bool = True
+    main_boss_chance_after_three_minis: float = 0.25
+    main_boss_chance_after_four_minis: float = 0.50
+    main_boss_guaranteed_after_minis: int = 5
 
 
 @dataclass(frozen=True)
