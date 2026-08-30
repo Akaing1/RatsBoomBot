@@ -54,14 +54,13 @@ class StreamEvents(commands.Component):
         active_event = await services.raid_bosses.get_active_event(broadcaster_id)
         await services.raid_bosses.register_stream(broadcaster_id, stream_id)
 
-        if active_event is None:
+        if active_event is not None:
+            await services.raid_bosses.start_reminders(broadcaster_id)
+        else:
             profile = get_active_profile(broadcaster_id)
 
             if profile is not None and profile.raid_bosses.enabled and services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES):
-                event = await services.raid_bosses.spawn_automatic(broadcaster_id, profile.raid_bosses)
-
-                if event is not None:
-                    await services.raid_bosses.register_stream(broadcaster_id, stream_id)
+                await services.raid_bosses.schedule_spawn(broadcaster_id, profile.raid_bosses)
 
     @commands.Component.listener()
     async def event_stream_offline(self, payload) -> None:
@@ -95,4 +94,5 @@ class StreamEvents(commands.Component):
             broadcaster_id
         )
 
+        await services.raid_bosses.cancel_announcements(broadcaster_id)
         await services.stream_logs.end_session(broadcaster_id)
