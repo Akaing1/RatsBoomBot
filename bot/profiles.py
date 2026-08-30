@@ -341,6 +341,7 @@ class RaidBossNames:
 class RaidBossConfig:
     enabled: bool = False
     offline_testing_enabled: bool = False
+    tutorial_name: str = "Training Dummy"
     names: RaidBossNames = RaidBossNames()
     mini_names: RaidBossNames = RaidBossNames()
     max_hp: int = 150000

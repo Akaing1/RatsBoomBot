@@ -250,7 +250,7 @@ class RaidBossService:
             return None
 
         if boss_tier == "tutorial":
-            boss_name = getattr(config.mini_names, boss_type)
+            boss_name = config.tutorial_name
             max_hp = config.tutorial_hp
             final_hit_reward = config.mini_final_hit_reward
             stream_limit = config.tutorial_duration_streams

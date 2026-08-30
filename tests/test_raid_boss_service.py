@@ -332,7 +332,7 @@ async def test_first_encounter_gives_every_participant_a_random_starter_weapon(t
         service = RaidBossService(bot=None, db=database)
         await points.setup()
         await service.setup()
-        config = build_config(tutorial_enabled=True, tutorial_hp=10000, tutorial_duration_streams=2, base_damage_min=5000, base_damage_max=5000, reward_points_per_hp=0.5)
+        config = build_config(tutorial_enabled=True, tutorial_name="Striking Dummy", tutorial_hp=10000, tutorial_duration_streams=2, base_damage_min=5000, base_damage_max=5000, reward_points_per_hp=0.5)
 
         event = await service.spawn("channel-1", "melee", config, "tutorial")
         await service.attack("channel-1", "stream-1", "user-1", "alice", config)
@@ -342,6 +342,7 @@ async def test_first_encounter_gives_every_participant_a_random_starter_weapon(t
 
         assert event is not None
         assert event.boss_tier == "tutorial"
+        assert event.boss_name == "Striking Dummy"
         assert event.max_hp == 10000
         assert event.stream_limit == 2
         assert event.reward_pool == 5000
