@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import math
 import random
@@ -52,9 +53,16 @@ class RaidAttackResult:
 
 class RaidBossService:
 
+    PRE_SPAWN_SECONDS = 10 * 60
+    AUTOMATIC_WARNING_SECONDS = 20 * 60
+    FIRST_REMINDER_SECONDS = 45 * 60
+    REPEAT_REMINDER_SECONDS = 60 * 60
+
     def __init__(self, bot, db):
         self.bot = bot
         self.db = db
+        self.spawn_tasks: dict[str, asyncio.Task] = {}
+        self.reminder_tasks: dict[str, asyncio.Task] = {}
 
     async def setup(self) -> None:
         LOGGER.info("[Raid Bosses] Preparing raid boss storage.")
@@ -172,6 +180,104 @@ class RaidBossService:
             raise
 
         LOGGER.info("[Raid Bosses] Raid boss storage ready.")
+
+    async def stop(self) -> None:
+        tasks = tuple(self.spawn_tasks.values()) + tuple(self.reminder_tasks.values())
+        self.spawn_tasks.clear()
+        self.reminder_tasks.clear()
+
+        for task in tasks:
+            task.cancel()
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def schedule_spawn(self, broadcaster_id: str, config: RaidBossConfig, boss_tier: str | None = None, boss_type: str | None = None) -> bool:
+        broadcaster_id = str(broadcaster_id)
+
+        if broadcaster_id in self.spawn_tasks or await self.get_active_event(broadcaster_id) is not None:
+            return False
+
+        automatic = boss_tier is None or boss_type is None
+        task = asyncio.create_task(self._spawn_after_warning(broadcaster_id, config, boss_tier, boss_type, automatic), name=f"raid-spawn-{broadcaster_id}")
+        self.spawn_tasks[broadcaster_id] = task
+        return True
+
+    async def cancel_announcements(self, broadcaster_id: str) -> None:
+        broadcaster_id = str(broadcaster_id)
+
+        for tasks in (self.spawn_tasks, self.reminder_tasks):
+            task = tasks.pop(broadcaster_id, None)
+
+            if task is not None:
+                task.cancel()
+
+    async def start_reminders(self, broadcaster_id: str) -> None:
+        broadcaster_id = str(broadcaster_id)
+        existing = self.reminder_tasks.pop(broadcaster_id, None)
+
+        if existing is not None:
+            existing.cancel()
+
+        self.reminder_tasks[broadcaster_id] = asyncio.create_task(self._reminder_loop(broadcaster_id), name=f"raid-reminders-{broadcaster_id}")
+
+    async def _spawn_after_warning(self, broadcaster_id: str, config: RaidBossConfig, boss_tier: str | None, boss_type: str | None, automatic: bool) -> None:
+        try:
+            if automatic:
+                await asyncio.sleep(self.AUTOMATIC_WARNING_SECONDS)
+
+            await self._send_message(broadcaster_id, "A raid boss is approaching! It will appear in 10 minutes. Get ready to use !raid attack!")
+            await asyncio.sleep(self.PRE_SPAWN_SECONDS)
+            event = await self.spawn_automatic(broadcaster_id, config) if automatic else await self.spawn(broadcaster_id, str(boss_type), config, str(boss_tier))
+
+            if event is None:
+                return
+
+            active_session = self.bot.services.stream_logs.active_sessions.get(broadcaster_id)
+
+            if active_session is not None:
+                await self.register_stream(broadcaster_id, str(active_session.stream_id))
+
+            await self._send_message(broadcaster_id, self._spawn_message(event))
+            await self.start_reminders(broadcaster_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            LOGGER.exception("[Raid Bosses] Scheduled spawn failed for broadcaster %s.", broadcaster_id)
+        finally:
+            self.spawn_tasks.pop(broadcaster_id, None)
+
+    async def _reminder_loop(self, broadcaster_id: str) -> None:
+        try:
+            await asyncio.sleep(self.FIRST_REMINDER_SECONDS)
+
+            while True:
+                event = await self.get_active_event(broadcaster_id)
+
+                if event is None:
+                    return
+
+                await self._send_message(broadcaster_id, self._reminder_message(event))
+                await asyncio.sleep(self.REPEAT_REMINDER_SECONDS)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            LOGGER.exception("[Raid Bosses] Reminder loop failed for broadcaster %s.", broadcaster_id)
+        finally:
+            self.reminder_tasks.pop(broadcaster_id, None)
+
+    async def _send_message(self, broadcaster_id: str, message: str) -> None:
+        channel = self.bot.create_partialuser(str(broadcaster_id))
+        await channel.send_message(sender=self.bot.user, message=message)
+
+    @staticmethod
+    def _spawn_message(event: RaidBossEvent) -> str:
+        return f"{event.boss_name} [{event.boss_tier.title()} Boss / {event.boss_type.title()}] has appeared with {event.max_hp:,} HP for {event.stream_limit} streams! Everyone gets one !raid attack per stream."
+
+    @staticmethod
+    def _reminder_message(event: RaidBossEvent) -> str:
+        percent = event.current_hp / event.max_hp * 100
+        return f"Raid reminder: {event.boss_name} has {event.current_hp:,}/{event.max_hp:,} HP remaining ({percent:.1f}%). Use !raid attack before the stream ends!"
 
     async def get_active_event(self, broadcaster_id: str) -> RaidBossEvent | None:
         query = """
@@ -671,6 +777,11 @@ class RaidBossService:
                 )
 
         LOGGER.info("[Raid Bosses] Resolved %s as %s with a %d-point pool.", event.boss_name, status, payout_pool)
+        reminder_task = self.reminder_tasks.pop(str(broadcaster_id), None)
+
+        if reminder_task is not None:
+            reminder_task.cancel()
+
         return payout_pool
 
     async def _award_victory_drops(self, broadcaster_id: str, final_hitter_id: str, final_hitter_name: str, event: RaidBossEvent, config: RaidBossConfig) -> tuple[tuple[str, str], ...]:

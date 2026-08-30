@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from bot.component_loader import GLOBAL_COMPONENTS
 from bot.shared.events.moderation import ModerationEvents
 from config.settings import settings
 
@@ -33,6 +34,10 @@ def create_ban_payload(moderator_id: str | None = None):
         ban=SimpleNamespace(user=SimpleNamespace(id="user-1", name="spammer"), reason="Spam Detected."),
         broadcaster=SimpleNamespace(id="channel-1")
     )
+
+
+def test_moderation_events_are_registered_globally() -> None:
+    assert ModerationEvents in GLOBAL_COMPONENTS
 
 
 @pytest.mark.asyncio
