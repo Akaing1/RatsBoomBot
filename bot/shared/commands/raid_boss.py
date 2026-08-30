@@ -98,7 +98,7 @@ class RaidBossCommands(commands.Component):
         bonus_text = f" using {' + '.join(bonuses)}" if bonuses else ""
 
         if result.defeated:
-            drop_text = " Loot: " + ", ".join(f"{username} found {item_id.replace('_', ' ')}" for username, item_id in result.drops) + "!" if result.drops else ""
+            drop_text = " Loot: " + ", ".join(f"{username} received {int(item_id.removesuffix('_points')):,} points" if item_id.endswith("_points") else f"{username} found {item_id.replace('_', ' ')}" for username, item_id in result.drops) + "!" if result.drops else ""
             await ctx.send(f"@{chatter.name} dealt the final {result.damage:,} damage{bonus_text} and defeated {result.boss_name}! The {result.reward:,}-point reward pool has been distributed by contribution!{drop_text}")
             return
 
