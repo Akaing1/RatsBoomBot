@@ -1,9 +1,32 @@
+import asyncio
+from types import SimpleNamespace
+
 import asqlite
 import pytest
 
 from bot.profiles import RaidBossConfig, RaidBossNames
 from bot.services.engagement.points import PointsService
 from bot.services.engagement.raid_boss import RaidBossService
+
+
+class FakeRaidChannel:
+
+    def __init__(self, messages):
+        self.messages = messages
+
+    async def send_message(self, *, sender, message):
+        self.messages.append(message)
+
+
+class FakeRaidBot:
+
+    def __init__(self):
+        self.messages = []
+        self.user = SimpleNamespace(id="bot-1")
+        self.services = SimpleNamespace(stream_logs=SimpleNamespace(active_sessions={}))
+
+    def create_partialuser(self, broadcaster_id):
+        return FakeRaidChannel(self.messages)
 
 
 @pytest.fixture(autouse=True)
@@ -58,6 +81,83 @@ def test_default_mini_boss_balance_is_separate_from_main_bosses() -> None:
     assert config.main_boss_chance_after_three_minis == 0.25
     assert config.main_boss_chance_after_four_minis == 0.50
     assert config.main_boss_guaranteed_after_minis == 5
+
+
+@pytest.mark.asyncio
+async def test_scheduled_tutorial_warns_then_spawns_and_starts_reminders(tmp_path, monkeypatch) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        bot = FakeRaidBot()
+        service = RaidBossService(bot=bot, db=database)
+        await service.setup()
+        monkeypatch.setattr(service, "PRE_SPAWN_SECONDS", 0)
+
+        scheduled = await service.schedule_spawn("channel-1", build_config(tutorial_enabled=True), "tutorial", "melee")
+        spawn_task = service.spawn_tasks["channel-1"]
+        await spawn_task
+        event = await service.get_active_event("channel-1")
+
+        assert scheduled is True
+        assert event is not None
+        assert event.boss_tier == "tutorial"
+        assert bot.messages[0] == "A raid boss is approaching! It will appear in 10 minutes. Get ready to use !raid attack!"
+        assert "has appeared" in bot.messages[1]
+        assert "channel-1" in service.reminder_tasks
+        await service.stop()
+
+
+@pytest.mark.asyncio
+async def test_automatic_boss_warns_at_20_minutes_and_spawns_at_30_minutes(tmp_path, monkeypatch) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        bot = FakeRaidBot()
+        service = RaidBossService(bot=bot, db=database)
+        await service.setup()
+        async with database.acquire() as connection:
+            await connection.execute("INSERT INTO raid_boss_channel_state (broadcaster_id, tutorial_completed) VALUES (?, 1)", ("channel-1",))
+
+        sleeps = []
+
+        async def capture_sleep(seconds):
+            sleeps.append(seconds)
+
+        async def skip_reminders(broadcaster_id):
+            return None
+
+        monkeypatch.setattr("bot.services.engagement.raid_boss.asyncio.sleep", capture_sleep)
+        monkeypatch.setattr(service, "start_reminders", skip_reminders)
+        scheduled = await service.schedule_spawn("channel-1", build_config())
+        spawn_task = service.spawn_tasks["channel-1"]
+        await spawn_task
+
+        assert scheduled is True
+        assert sleeps[:2] == [20 * 60, 10 * 60]
+        assert "10 minutes" in bot.messages[0]
+        assert "has appeared" in bot.messages[1]
+        await service.stop()
+
+
+@pytest.mark.asyncio
+async def test_active_raid_reminds_after_45_minutes_then_waits_60_minutes(tmp_path, monkeypatch) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        bot = FakeRaidBot()
+        service = RaidBossService(bot=bot, db=database)
+        await service.setup()
+        await service.spawn("channel-1", "melee", build_config())
+        sleeps = []
+
+        async def capture_sleep(seconds):
+            sleeps.append(seconds)
+
+            if len(sleeps) == 2:
+                raise asyncio.CancelledError
+
+        monkeypatch.setattr("bot.services.engagement.raid_boss.asyncio.sleep", capture_sleep)
+
+        with pytest.raises(asyncio.CancelledError):
+            await service._reminder_loop("channel-1")
+
+        assert sleeps == [45 * 60, 60 * 60]
+        assert len(bot.messages) == 1
+        assert bot.messages[0].startswith("Raid reminder:")
 
 
 @pytest.mark.asyncio
