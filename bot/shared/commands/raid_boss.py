@@ -218,8 +218,12 @@ class RaidBossCommands(commands.Component):
         if context is None or not can_manage_raid(ctx):
             return
 
-        if boss_tier not in {"mini", "main"} or boss_type not in {"melee", "ranged", "magic", "random"}:
-            await ctx.reply("Use !raid spawn <mini|main> <melee|ranged|magic|random>.")
+        if boss_tier not in {"tutorial", "mini", "main"} or boss_type not in {"melee", "ranged", "magic", "random"}:
+            await ctx.reply("Use !raid spawn <tutorial|mini|main> <melee|ranged|magic|random>.")
+            return
+
+        if boss_tier == "tutorial" and await self.bot.services.raid_bosses.has_completed_tutorial(context[0]):
+            await ctx.reply("This channel has already completed its tutorial raid.")
             return
 
         if boss_type == "random":
@@ -252,7 +256,7 @@ class RaidBossCommands(commands.Component):
         event = await self.bot.services.raid_bosses.get_active_event(context[0])
 
         if event is None:
-            await ctx.reply("There is no active raid boss. Use !raid spawn <mini|main> <type|random> first.")
+            await ctx.reply("There is no active raid boss. Use !raid spawn <tutorial|mini|main> <type|random> first.")
             return
 
         stream_id = self.get_offline_stream_id(event.id, event.streams_used + 1)

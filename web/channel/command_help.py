@@ -209,7 +209,7 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
                 CommandDefinition("!raid inventory", "Show owned weapons, equipped weapon, and potion attacks.", feature=FeatureName.RAID_BOSSES),
                 CommandDefinition("!raid repair <weapon>", "Restore an owned weapon to full durability.", feature=FeatureName.RAID_BOSSES),
                 CommandDefinition("!raid leaderboard", "Show the current contribution leaderboard.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raid spawn <mini|main> <type|random>", "Spawn a mini or main raid boss.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
+                CommandDefinition("!raid spawn <tutorial|mini|main> <type|random>", "Manually spawn a tutorial, mini, or main raid boss.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
                 CommandDefinition("!raid end", "End the raid as a failed subjugation and distribute reduced rewards.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
                 *test_commands
             )
