@@ -283,6 +283,66 @@ class PointsService:
             broadcaster_id
         )
 
+    async def transfer_points(self, broadcaster_id: str, sender_id: str, recipient_id: str, recipient_name: str, amount: int) -> int | None:
+        broadcaster_id = str(broadcaster_id)
+        sender_id = str(sender_id)
+        recipient_id = str(recipient_id)
+        debit_query = """
+        UPDATE viewers
+        SET points = points - ?
+        WHERE broadcaster_id = ?
+          AND user_id = ?
+          AND points >= ?
+        """
+        credit_query = """
+        INSERT INTO viewers (broadcaster_id, user_id, username, points, messages)
+        VALUES (?, ?, ?, ?, 0)
+        ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
+            username = excluded.username,
+            points = points + excluded.points
+        """
+
+        try:
+            async with self.db.acquire() as connection:
+                await connection.execute("BEGIN")
+
+                try:
+                    await connection.execute(debit_query, (amount, broadcaster_id, sender_id, amount))
+                    changed = await connection.fetchone("SELECT changes() AS count")
+
+                    if int(changed["count"]) == 0:
+                        await connection.rollback()
+                        return None
+
+                    await connection.execute(credit_query, (broadcaster_id, recipient_id, recipient_name, amount))
+                    balance = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?", (broadcaster_id, sender_id))
+                    await connection.commit()
+                except Exception:
+                    await connection.rollback()
+                    raise
+        except Exception:
+            LOGGER.exception(
+                "[Points] Failed to transfer %d points from user %s to %s for broadcaster %s.",
+                amount,
+                sender_id,
+                recipient_name,
+                broadcaster_id
+            )
+            raise
+
+        remaining_points = int(balance["points"])
+
+        LOGGER.info(
+            "[Points] Transferred %d points from user %s to %s for broadcaster %s. Remaining balance: %d.",
+            amount,
+            sender_id,
+            recipient_name,
+            broadcaster_id,
+            remaining_points
+        )
+
+        return remaining_points
+
     async def remove_points(self, broadcaster_id: str, user_id: str, amount: int) -> None:
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)

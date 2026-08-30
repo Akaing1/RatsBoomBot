@@ -249,6 +249,62 @@ class PointsCommandHandler:
 
         await self.send_message(ctx, config.messages.add_success, username=target.name, amount=amount, command=command_name)
 
+    async def give_points(self, ctx: commands.Context, target: User, amount: int, command_name: str) -> None:
+        self.log_command(ctx, f"!{command_name} give")
+
+        context = self.get_context(ctx, command_name)
+
+        if context is None:
+            return
+
+        broadcaster_id, config = context
+        services = self.bot.services
+        sender_id = str(ctx.chatter.id)
+        sender_name = ctx.chatter.name
+        recipient_id = str(target.id)
+
+        if sender_id == recipient_id:
+            await self.send_message(ctx, config.messages.give_self, command=command_name)
+            return
+
+        if amount <= 0:
+            await self.send_message(ctx, config.messages.give_invalid, command=command_name)
+            return
+
+        try:
+            remaining_points = await services.points.transfer_points(
+                broadcaster_id=broadcaster_id,
+                sender_id=sender_id,
+                recipient_id=recipient_id,
+                recipient_name=target.name,
+                amount=amount
+            )
+        except Exception:
+            LOGGER.exception(
+                "[Points] Failed to give %d points from %s to %s in broadcaster %s.",
+                amount,
+                sender_name,
+                target.name,
+                broadcaster_id
+            )
+            return
+
+        if remaining_points is None:
+            current_points = await services.points.get_points(broadcaster_id, sender_id)
+            await self.send_message(ctx, config.messages.give_insufficient, points=current_points, amount=amount, command=command_name)
+            return
+
+        LOGGER.info(
+            "[Points] User %s gave %d points to %s in broadcaster %s.",
+            sender_name,
+            amount,
+            target.name,
+            broadcaster_id,
+            extra={"broadcaster_id": broadcaster_id}
+        )
+
+        await self.send_message(ctx, config.messages.give_success, sender=sender_name, username=target.name, amount=amount, points=remaining_points, command=command_name)
+
     async def gamble(self, ctx: commands.Context, amount: str, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} gamble")
 
@@ -577,6 +633,10 @@ class PointsCommands(commands.Component):
     @points.command(name="add")
     async def points_add(self, ctx: commands.Context, target: LocalizedUser, amount: int) -> None:
         await self.handler.add_points(ctx, target, amount, "points")
+
+    @points.command(name="give")
+    async def points_give(self, ctx: commands.Context, target: LocalizedUser, amount: int) -> None:
+        await self.handler.give_points(ctx, target, amount, "points")
 
     @points.command(name="gamble")
     async def points_gamble(self, ctx: commands.Context, amount: str) -> None:

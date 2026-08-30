@@ -30,7 +30,7 @@ class ServiceContainer:
         self.raid_bosses = RaidBossService(bot, db)
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
-        self.viewer_queue = ViewerQueueService(bot)
+        self.viewer_queue = ViewerQueueService(bot, db)
         self.redeems = RedeemService(bot, db, self.points, self.counters)
         self.overwatch = OverwatchService(bot, db)
         self.league = LeagueService(bot, league_db or db)
@@ -53,6 +53,7 @@ class ServiceContainer:
             ("PointsService", self.points),
             ("RaidBossService", self.raid_bosses),
             ("CounterService", self.counters),
+            ("ViewerQueueService", self.viewer_queue),
             ("RedeemService", self.redeems),
             ("OverwatchService", self.overwatch),
             ("LeagueService", self.league),

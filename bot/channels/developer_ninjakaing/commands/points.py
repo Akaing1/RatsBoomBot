@@ -40,6 +40,13 @@ class DeveloperPointsCommands(ChannelComponent):
 
         await self.handler.add_points(ctx, target, amount, "ores")
 
+    @ores.command(name="give")
+    async def ores_give(self, ctx: commands.Context, target: LocalizedUser, amount: int) -> None:
+        if not await self.require_feature(ctx, FeatureName.POINTS):
+            return
+
+        await self.handler.give_points(ctx, target, amount, "ores")
+
     @ores.command(name="gamble")
     async def ores_gamble(self, ctx: commands.Context, amount: str) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
