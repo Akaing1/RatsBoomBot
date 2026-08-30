@@ -229,18 +229,11 @@ class RaidBossCommands(commands.Component):
         if boss_type == "random":
             boss_type = random.choice(("melee", "ranged", "magic"))
 
-        event = await self.bot.services.raid_bosses.spawn(context[0], boss_type, context[1], boss_tier)
+        scheduled = await self.bot.services.raid_bosses.schedule_spawn(context[0], context[1], boss_tier, boss_type)
 
-        if event is None:
-            await ctx.reply("A raid boss is already active.")
+        if not scheduled:
+            await ctx.reply("A raid boss is already active or approaching.")
             return
-
-        stream_id = await self.get_stream_id(context[0], context[1])
-
-        if stream_id is not None:
-            event, _ = await self.bot.services.raid_bosses.register_stream(context[0], stream_id)
-
-        await ctx.send(f"{event.boss_name} [{event.boss_tier.title()} Boss / {event.boss_type.title()}] has appeared with {event.max_hp:,} HP for {event.stream_limit} streams! Everyone gets one !raid attack per stream.")
 
     @raid.command(name="nextstream")
     async def next_raid_stream(self, ctx: commands.Context) -> None:
