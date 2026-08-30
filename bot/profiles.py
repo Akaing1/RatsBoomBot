@@ -6,6 +6,8 @@ from twitchio.ext import commands
 
 LOGGER = logging.getLogger("RatBoomBot")
 
+DEFAULT_AD_ANNOUNCEMENT_MESSAGE = "Hide! The humans are coming! Ads starting in ~{time}!"
+
 
 class FeatureName(Enum):
     CHANNEL = "channel"
@@ -393,6 +395,7 @@ class ChannelProfile:
     shared_counters_enabled: bool = False
     features: FeatureDefaults = FeatureDefaults()
     globals: GlobalCommandDefaults = GlobalCommandDefaults()
+    ad_announcement_message: str = DEFAULT_AD_ANNOUNCEMENT_MESSAGE
     timer_messages: tuple[str, ...] = ()
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
