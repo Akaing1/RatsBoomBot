@@ -259,7 +259,7 @@ class RaidBossService:
             if active_session is not None:
                 await self.register_stream(broadcaster_id, str(active_session.stream_id))
 
-            await self._send_announcement(broadcaster_id, self._spawn_message(event))
+            await self.send_announcement(broadcaster_id, self._spawn_message(event), "orange")
             await self.start_reminders(broadcaster_id)
         except asyncio.CancelledError:
             raise
@@ -291,11 +291,11 @@ class RaidBossService:
         channel = self.bot.create_partialuser(str(broadcaster_id))
         await channel.send_message(sender=self.bot.user, message=message)
 
-    async def _send_announcement(self, broadcaster_id: str, message: str) -> None:
+    async def send_announcement(self, broadcaster_id: str, message: str, color: str) -> None:
         channel = self.bot.create_partialuser(str(broadcaster_id))
 
         try:
-            await channel.send_announcement(moderator=str(self.bot.user.id), message=message, color="orange")
+            await channel.send_announcement(moderator=str(self.bot.user.id), message=message, color=color)
         except Exception:
             LOGGER.warning("[Raid Bosses] Could not send a raid announcement for broadcaster %s. Falling back to a chat message.", broadcaster_id, exc_info=True, extra={"broadcaster_id": str(broadcaster_id)})
             await channel.send_message(sender=self.bot.user, message=message)

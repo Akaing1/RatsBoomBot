@@ -132,7 +132,8 @@ class RaidBossCommands(commands.Component):
 
         if result.defeated:
             drop_text = " Loot: " + ", ".join(f"{username} received {int(item_id.removesuffix('_points')):,} points" if item_id.endswith("_points") else f"{username} found {item_id.replace('_', ' ')}" for username, item_id in result.drops) + "!" if result.drops else ""
-            await ctx.send(f"@{chatter.name} dealt the final {result.damage:,} damage{bonus_text} and defeated {result.boss_name}! The {result.reward:,}-point reward pool has been distributed by contribution!{drop_text}")
+            message = f"@{chatter.name} dealt the final {result.damage:,} damage{bonus_text} and defeated {result.boss_name}! The {result.reward:,}-point reward pool has been distributed by contribution!{drop_text}"
+            await self.bot.services.raid_bosses.send_announcement(broadcaster_id, message, "green")
             return
 
         await ctx.send(f"@{chatter.name} dealt {result.damage:,} damage to {result.boss_name}{bonus_text}! {result.current_hp:,} HP remains.")
