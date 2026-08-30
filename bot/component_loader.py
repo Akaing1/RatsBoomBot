@@ -4,11 +4,12 @@ from twitchio import User
 from twitchio.ext import commands
 
 from bot.channels import register_channel_profiles
-from bot.profiles import CHANNEL_PROFILES, activate_profile
+from bot.profiles import ACTIVE_CHANNEL_PROFILES, CHANNEL_PROFILES, activate_profile, create_generic_profile
 from bot.shared.commands.counters import CounterCommands
 from bot.shared.commands.league import LeagueCommands
 from bot.shared.commands.clips import ClipCommands
 from bot.shared.commands.mod_actions import ModActionCommands
+from bot.shared.commands.overwatch import OverwatchCommands
 from bot.shared.commands.points import PointsCommands
 from bot.shared.commands.raid_boss import RaidBossCommands
 from bot.shared.commands.raids import RaidCommands
@@ -33,6 +34,7 @@ GLOBAL_COMPONENTS: tuple[type[commands.Component], ...] = (
     RaidBossCommands,
     RaidCommands,
     ModActionCommands,
+    OverwatchCommands,
     CounterCommands,
     LeagueCommands,
     ViewerQueueCommands,
@@ -151,6 +153,11 @@ async def load_channel_components(bot) -> None:
             )
             continue
 
+        if channel_name == "developer_ninjakaing":
+            await bot.services.profile_settings.migrate_developer_profile(broadcaster_id, profile)
+
+        profile = bot.services.profile_settings.apply_overrides(broadcaster_id, profile)
+
         LOGGER.info(
             "[Profiles] Activating profile %s for broadcaster %s.",
             channel_name,
@@ -186,6 +193,14 @@ async def load_channel_components(bot) -> None:
             channel_name,
             len(profile.components)
         )
+
+    for broadcaster_id in sorted(active_broadcaster_ids - set(ACTIVE_CHANNEL_PROFILES)):
+        broadcaster = bot.services.broadcasters.get_broadcasters().get(broadcaster_id)
+        channel_name = broadcaster.login if broadcaster is not None and broadcaster.login else f"channel_{broadcaster_id}"
+        profile = bot.services.profile_settings.apply_overrides(broadcaster_id, create_generic_profile(channel_name))
+        activate_profile(broadcaster_id, profile)
+        activated_profiles += 1
+        LOGGER.info("[Profiles] Activated generic profile %s for broadcaster %s.", channel_name, broadcaster_id)
 
     LOGGER.info(
         "[Profiles] Activated %d channel profiles and loaded %d profile components.",

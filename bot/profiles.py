@@ -308,6 +308,7 @@ class PointsConfig:
 class OverwatchConfig:
     player_id: str = ""
     platform: str = "pc"
+    display_name: str = "Streamer"
     allowed_games: tuple[str, ...] = ("Overwatch 2",)
 
 
@@ -430,6 +431,42 @@ def activate_profile(broadcaster_id: str, profile: ChannelProfile) -> None:
         "[Profiles] Activated profile %s for broadcaster %s.",
         profile.channel_name,
         broadcaster_id
+    )
+
+
+def create_generic_profile(channel_name: str) -> ChannelProfile:
+    return ChannelProfile(
+        channel_name=channel_name,
+        features=FeatureDefaults(
+            channel=True,
+            timers=False,
+            ad_announcements=False,
+            points=False,
+            redeems=False,
+            community_events=False,
+            raid_responses=False,
+            raid_bosses=False
+        ),
+        globals=GlobalCommandDefaults(
+            enabled=True,
+            points=False,
+            viewer_queue=False,
+            shoutouts=False,
+            socials=False,
+            settings=False,
+            clips=False,
+            hi=False,
+            choice=False,
+            kaboom=False,
+            stinky=False,
+            lucky=False,
+            smart=False,
+            height=False,
+            pp=False,
+            lurk=False,
+            help=True,
+            kamikaze=False
+        )
     )
 
 

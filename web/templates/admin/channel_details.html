@@ -335,14 +335,43 @@
                         {% set description = "Controls !ow, !owrank, !owrecord, and !owreset." %}
                     {% endif %}
 
-                    {{ toggle_card(
-                        broadcaster.id,
-                        "profile_feature",
-                        feature.value,
-                        display_name,
-                        state,
-                        description
-                    ) }}
+                    <article class="toggle-card {% if state.available %}enabled{% else %}disabled{% endif %}">
+                        <div class="toggle-card-content">
+                            <div class="toggle-card-heading">
+                                <div><h4>{{ display_name }}</h4><p>{{ description }}</p></div>
+                                <span class="toggle-status {% if state.available %}enabled{% else %}disabled{% endif %}">{% if state.available %}Available{% else %}Not Available{% endif %}</span>
+                            </div>
+
+                            {% if state.available %}
+                                <div class="toggle-meta"><span>Streamer toggle: <strong>{% if state.effective_enabled %}On{% else %}Off{% endif %}</strong></span></div>
+                            {% endif %}
+                        </div>
+
+                        <form class="toggle-actions" method="post" action="/admin/channels/{{ broadcaster.id }}/toggles" data-preserve-scroll>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="toggle_type" value="capability">
+                            <input type="hidden" name="toggle_name" value="{{ feature.value }}">
+
+                            {% if state.available %}
+                                <button class="button toggle-disable-button" type="submit" name="action" value="disable">Revoke Access</button>
+                            {% else %}
+                                <button class="button primary" type="submit" name="action" value="enable">Grant Access</button>
+                            {% endif %}
+
+                            {% if state.availability_override is not none %}
+                                <button class="button secondary" type="submit" name="action" value="reset">Use Code Default</button>
+                            {% endif %}
+                        </form>
+
+                        {% if state.available %}
+                            <form class="toggle-actions" method="post" action="/admin/channels/{{ broadcaster.id }}/toggles" data-preserve-scroll>
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="toggle_type" value="profile_feature">
+                                <input type="hidden" name="toggle_name" value="{{ feature.value }}">
+                                <button class="button secondary" type="submit" name="action" value="{% if state.effective_enabled %}disable{% else %}enable{% endif %}">{% if state.effective_enabled %}Disable Feature{% else %}Enable Feature{% endif %}</button>
+                            </form>
+                        {% endif %}
+                    </article>
                 {% endfor %}
             </div>
         </div>

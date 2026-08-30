@@ -24,6 +24,8 @@ class FeatureState:
 @dataclass(frozen=True)
 class ProfileFeatureState:
     feature: ProfileFeatureName
+    available: bool
+    availability_override: bool | None
     default_enabled: bool
     override_enabled: bool | None
     effective_enabled: bool
@@ -57,9 +59,11 @@ class GlobalCommandState:
 
 class FeatureToggleService:
 
-    def __init__(self, db):
+    def __init__(self, db, profile_settings=None):
         self.db = db
+        self.profile_settings = profile_settings
         self.overrides: dict[str, dict[str, bool]] = {}
+        self.capability_overrides: dict[str, dict[ProfileFeatureName, bool]] = {}
 
     async def setup(self) -> None:
         LOGGER.info("[Features] Preparing channel toggle storage.")
@@ -77,16 +81,28 @@ class FeatureToggleService:
             )
         )
         """
+        capability_query = """
+        CREATE TABLE IF NOT EXISTS channel_capability_overrides (
+            broadcaster_id TEXT NOT NULL,
+            capability_name TEXT NOT NULL,
+            available INTEGER NOT NULL,
+            updated_by TEXT,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (broadcaster_id, capability_name)
+        )
+        """
 
         try:
             async with self.db.acquire() as connection:
                 await connection.execute(query)
+                await connection.execute(capability_query)
         except Exception:
             LOGGER.exception("[Features] Failed to prepare channel toggle storage.")
             raise
 
         await self.migrate_legacy_overrides()
         await self.load_overrides()
+        await self.load_capability_overrides()
 
         override_count = sum(len(channel_overrides) for channel_overrides in self.overrides.values())
 
@@ -95,6 +111,25 @@ class FeatureToggleService:
             override_count,
             len(self.overrides)
         )
+
+    async def load_capability_overrides(self) -> None:
+        query = "SELECT broadcaster_id, capability_name, available FROM channel_capability_overrides"
+
+        async with self.db.acquire() as connection:
+            rows = await connection.fetchall(query)
+
+        loaded: dict[str, dict[ProfileFeatureName, bool]] = {}
+
+        for row in rows:
+            try:
+                feature = ProfileFeatureName(row["capability_name"])
+            except ValueError:
+                LOGGER.warning("[Features] Ignored unknown capability %s for broadcaster %s.", row["capability_name"], row["broadcaster_id"])
+                continue
+
+            loaded.setdefault(str(row["broadcaster_id"]), {})[feature] = bool(row["available"])
+
+        self.capability_overrides = loaded
 
     async def migrate_legacy_overrides(self) -> None:
         feature_names = {
@@ -253,7 +288,45 @@ class FeatureToggleService:
 
     async def set_profile_feature_enabled(self, broadcaster_id: str, feature: ProfileFeatureName, enabled: bool, updated_by: str) -> ProfileFeatureState:
         broadcaster_id = str(broadcaster_id)
+
+        if enabled and not self.get_profile_feature_state(broadcaster_id, feature).available:
+            raise ValueError("This feature has not been granted to the channel.")
+
         await self.set_override(broadcaster_id, self.profile_feature_key(feature), enabled, updated_by)
+        return self.get_profile_feature_state(broadcaster_id, feature)
+
+    async def set_profile_feature_available(self, broadcaster_id: str, feature: ProfileFeatureName, available: bool, updated_by: str) -> ProfileFeatureState:
+        broadcaster_id = str(broadcaster_id)
+        was_available = self.get_profile_feature_state(broadcaster_id, feature).available
+        query = """
+        INSERT INTO channel_capability_overrides (broadcaster_id, capability_name, available, updated_by, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(broadcaster_id, capability_name) DO UPDATE SET
+            available = excluded.available,
+            updated_by = excluded.updated_by,
+            updated_at = CURRENT_TIMESTAMP
+        """
+
+        async with self.db.acquire() as connection:
+            await connection.execute(query, (broadcaster_id, feature.value, int(available), updated_by))
+
+        self.capability_overrides.setdefault(broadcaster_id, {})[feature] = available
+
+        if available and not was_available:
+            await self.set_override(broadcaster_id, self.profile_feature_key(feature), False, updated_by)
+
+        LOGGER.info("[Features] Capability %s was %s for broadcaster %s by %s.", feature.value, "granted" if available else "revoked", broadcaster_id, updated_by)
+        return self.get_profile_feature_state(broadcaster_id, feature)
+
+    async def clear_profile_feature_availability(self, broadcaster_id: str, feature: ProfileFeatureName, updated_by: str) -> ProfileFeatureState:
+        broadcaster_id = str(broadcaster_id)
+
+        async with self.db.acquire() as connection:
+            await connection.execute("DELETE FROM channel_capability_overrides WHERE broadcaster_id = ? AND capability_name = ?", (broadcaster_id, feature.value))
+
+        channel_capabilities = self.capability_overrides.get(broadcaster_id, {})
+        channel_capabilities.pop(feature, None)
+        LOGGER.info("[Features] Capability %s was reset for broadcaster %s by %s.", feature.value, broadcaster_id, updated_by)
         return self.get_profile_feature_state(broadcaster_id, feature)
 
     async def set_global_command_enabled(self, broadcaster_id: str, command: GlobalCommandName, enabled: bool, updated_by: str) -> GlobalCommandState:
@@ -462,19 +535,23 @@ class FeatureToggleService:
         profile = get_active_profile(broadcaster_id)
 
         if profile is None:
-            return ProfileFeatureState(feature, False, None, False, False, False)
+            return ProfileFeatureState(feature, False, None, False, None, False, False, False)
+
+        base_profile = self.profile_settings.base_profiles.get(broadcaster_id, profile) if self.profile_settings is not None else profile
 
         if feature is ProfileFeatureName.LEAGUE:
-            default_enabled = profile.league.enabled
+            default_enabled = base_profile.league.enabled
         else:
-            default_enabled = bool(profile.overwatch.player_id)
+            default_enabled = bool(base_profile.overwatch.player_id)
 
+        capability_override = self.capability_overrides.get(broadcaster_id, {}).get(feature)
+        available = capability_override if capability_override is not None else default_enabled
         override_enabled = self.get_override(broadcaster_id, self.profile_feature_key(feature))
         configured_enabled = override_enabled if override_enabled is not None else default_enabled
         profile_enabled = self.get_profile_enabled(broadcaster_id)
-        effective_enabled = default_enabled and configured_enabled and profile_enabled
-        blocked_by_profile = default_enabled and configured_enabled and not profile_enabled
-        return ProfileFeatureState(feature, default_enabled, override_enabled, effective_enabled, profile_enabled, blocked_by_profile)
+        effective_enabled = available and configured_enabled and profile_enabled
+        blocked_by_profile = available and configured_enabled and not profile_enabled
+        return ProfileFeatureState(feature, available, capability_override, default_enabled, override_enabled, effective_enabled, profile_enabled, blocked_by_profile)
 
     def get_global_command_state(self, broadcaster_id: str, command: GlobalCommandName) -> GlobalCommandState:
         broadcaster_id = str(broadcaster_id)
@@ -553,7 +630,10 @@ class FeatureToggleService:
 
     def get_profile_features(self, broadcaster_id: str) -> dict[ProfileFeatureName, ProfileFeatureState]:
         states = {feature: self.get_profile_feature_state(broadcaster_id, feature) for feature in ProfileFeatureName}
-        return {feature: state for feature, state in states.items() if state.default_enabled}
+        return {feature: state for feature, state in states.items() if state.available}
+
+    def get_admin_profile_features(self, broadcaster_id: str) -> dict[ProfileFeatureName, ProfileFeatureState]:
+        return {feature: self.get_profile_feature_state(broadcaster_id, feature) for feature in ProfileFeatureName}
 
     def get_global_groups(self, broadcaster_id: str) -> dict[GlobalCommandGroup, GlobalGroupState]:
         return {group: self.get_global_group_state(broadcaster_id, group) for group in GlobalCommandGroup}

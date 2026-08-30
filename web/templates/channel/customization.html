@@ -1,0 +1,91 @@
+{% extends "channel/layout.html" %}
+
+{% block title %}Customization | RatsBoomBot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Channel profile</p>
+        <h2>Customization</h2>
+        <p class="page-description">Change only the details you want. Every saved value overrides the profile default and can be reset at any time.</p>
+    </div>
+</header>
+
+{% if setting_message %}
+    <div class="toggle-feedback {% if setting_result == 'success' %}success{% else %}error{% endif %}" role="status">
+        <span class="toggle-feedback-icon">{% if setting_result == "success" %}&#10003;{% else %}!{% endif %}</span>
+        <span>{{ setting_message }}</span>
+    </div>
+{% endif %}
+
+<section class="panel toggle-management-panel profile-settings-panel">
+    <div class="panel-header"><div><p class="eyebrow">Editable profile details</p><h3>Social links</h3></div></div>
+    <div class="profile-settings-grid">
+        {% for key, label, description, current_value in [
+            ("social.discord_url", "Discord URL", "Used by the channel's Discord and social commands.", channel_settings.discord_url),
+            ("social.youtube_url", "YouTube URL", "Used by the channel's YouTube and social commands.", channel_settings.youtube_url)
+        ] %}
+            <article class="toggle-card profile-setting-card">
+                <form method="post" action="/channel/customization">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="setting_name" value="{{ key }}">
+                    <div class="toggle-card-heading"><div><h4>{{ label }}</h4><p>{{ description }}</p></div></div>
+                    <input class="profile-setting-input" type="url" name="value" value="{{ current_value or '' }}" placeholder="https://">
+                    <div class="toggle-actions profile-setting-actions"><button class="button primary" type="submit" name="action" value="save">Save Changes</button></div>
+                </form>
+            </article>
+        {% endfor %}
+    </div>
+</section>
+
+{% for group_name, settings in setting_groups.items() %}
+    <section class="panel toggle-management-panel profile-settings-panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Editable profile details</p>
+                <h3>{{ group_name }}</h3>
+            </div>
+        </div>
+
+        <div class="profile-settings-grid">
+            {% for setting in settings %}
+                <article class="toggle-card profile-setting-card">
+                    <form method="post" action="/channel/customization">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="setting_name" value="{{ setting.definition.key }}">
+
+                        <div class="toggle-card-heading">
+                            <div>
+                                <h4>{{ setting.definition.label }}</h4>
+                                <p>{{ setting.definition.description }}</p>
+                            </div>
+
+                            {% if setting.override_value is not none %}
+                                <span class="toggle-status enabled">Override</span>
+                            {% else %}
+                                <span class="toggle-status">Default</span>
+                            {% endif %}
+                        </div>
+
+                        {% if setting.definition.value_type == "integer" %}
+                            <input class="profile-setting-input" type="number" name="value" value="{{ setting.effective_value }}" min="{{ setting.definition.minimum }}" max="{{ setting.definition.maximum }}">
+                        {% else %}
+                            <textarea class="profile-setting-input" name="value" rows="{{ setting.definition.rows }}" maxlength="{{ setting.definition.maximum_length }}">{{ setting.effective_value }}</textarea>
+                        {% endif %}
+
+                        <p class="toggle-meta">Profile default: {{ setting.default_value if setting.default_value != "" else "Not configured" }}</p>
+
+                        <div class="toggle-actions profile-setting-actions">
+                            <button class="button primary" type="submit" name="action" value="save">Save Changes</button>
+
+                            {% if setting.override_value is not none %}
+                                <button class="button secondary" type="submit" name="action" value="reset">Use Default</button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+{% endfor %}
+{% endblock %}

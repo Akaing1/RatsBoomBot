@@ -4,6 +4,7 @@ import logging
 from twitchio.ext import commands
 
 from bot.component_loader import load_components
+from bot.profiles import CHANNEL_PROFILES, activate_profile, create_generic_profile, get_active_profile
 from bot.services.container import ServiceContainer
 from config.settings import settings
 from storage.database import create_broadcaster_subscriptions, save_token
@@ -202,13 +203,23 @@ class TwitchBot(commands.AutoBot):
             services.broadcasters.add_broadcaster(user_id)
 
             try:
-                await services.broadcasters.refresh_broadcaster(user_id)
+                broadcaster = await services.broadcasters.refresh_broadcaster(user_id)
             except Exception:
                 LOGGER.exception(
                     "[Broadcasters] Failed to refresh broadcaster %s after onboarding.",
                     user_id
                 )
                 raise
+
+            channel_name = broadcaster.login if broadcaster is not None and broadcaster.login else f"channel_{user_id}"
+            base_profile = CHANNEL_PROFILES.get(channel_name.lower(), create_generic_profile(channel_name))
+            profile = services.profile_settings.apply_overrides(user_id, base_profile)
+            was_active = get_active_profile(user_id) is not None
+            activate_profile(user_id, profile)
+
+            if not was_active:
+                for component_class in profile.components:
+                    await self.add_component(component_class(self, profile, user_id))
 
             LOGGER.info(
                 "[Broadcasters] Broadcaster %s added and refreshed.",
