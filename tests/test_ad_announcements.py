@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from bot.profiles import ChannelProfile, activate_profile, clear_profiles
 from bot.services.stream.ad_announcements import AdAnnouncementService
 
 
@@ -46,6 +47,13 @@ class FakeBot:
         return self.broadcaster
 
 
+@pytest.fixture(autouse=True)
+def reset_profiles():
+    clear_profiles()
+    yield
+    clear_profiles()
+
+
 @pytest.mark.asyncio
 async def test_ad_warning_is_sent_between_one_and_two_minutes_before_ad() -> None:
     broadcaster = FakeBroadcaster(datetime.now(UTC) + timedelta(seconds=110))
@@ -57,7 +65,20 @@ async def test_ad_warning_is_sent_between_one_and_two_minutes_before_ad() -> Non
     assert broadcaster.announcements[0]["moderator"] == "bot-1"
     assert broadcaster.announcements[0]["color"] == "purple"
     assert "Ads starting in ~" in broadcaster.announcements[0]["message"]
+    assert " seconds" not in broadcaster.announcements[0]["message"]
     assert broadcaster.messages == []
+
+
+@pytest.mark.asyncio
+async def test_ad_warning_uses_profile_message_with_minute_second_countdown() -> None:
+    broadcaster = FakeBroadcaster(datetime.now(UTC) + timedelta(seconds=110))
+    service = AdAnnouncementService(FakeBot(broadcaster), FakeBroadcasterService())
+    activate_profile("channel-1", ChannelProfile(channel_name="channel", ad_announcement_message="Custom ad starts in {time}!"))
+
+    await service.check_ad_schedules()
+
+    assert len(broadcaster.announcements) == 1
+    assert broadcaster.announcements[0]["message"].startswith("Custom ad starts in 1:")
 
 
 @pytest.mark.asyncio
