@@ -11,22 +11,27 @@ from bot.services.engagement.raid_boss import RaidBossService
 
 class FakeRaidChannel:
 
-    def __init__(self, messages):
+    def __init__(self, messages, announcements):
         self.messages = messages
+        self.announcements = announcements
 
     async def send_message(self, *, sender, message):
         self.messages.append(message)
+
+    async def send_announcement(self, *, moderator, message, color):
+        self.announcements.append({"moderator": moderator, "message": message, "color": color})
 
 
 class FakeRaidBot:
 
     def __init__(self):
         self.messages = []
+        self.announcements = []
         self.user = SimpleNamespace(id="bot-1")
         self.services = SimpleNamespace(stream_logs=SimpleNamespace(active_sessions={}))
 
     def create_partialuser(self, broadcaster_id):
-        return FakeRaidChannel(self.messages)
+        return FakeRaidChannel(self.messages, self.announcements)
 
 
 @pytest.fixture(autouse=True)
@@ -100,7 +105,9 @@ async def test_scheduled_tutorial_warns_then_spawns_and_starts_reminders(tmp_pat
         assert event is not None
         assert event.boss_tier == "tutorial"
         assert bot.messages[0] == "A raid boss is approaching! It will appear in 10 minutes. Get ready to use !raid attack!"
-        assert "has appeared" in bot.messages[1]
+        assert bot.announcements[0]["moderator"] == "bot-1"
+        assert bot.announcements[0]["color"] == "orange"
+        assert "has appeared" in bot.announcements[0]["message"]
         assert "channel-1" in service.reminder_tasks
         await service.stop()
 
@@ -131,7 +138,7 @@ async def test_automatic_boss_warns_at_20_minutes_and_spawns_at_30_minutes(tmp_p
         assert scheduled is True
         assert sleeps[:2] == [20 * 60, 10 * 60]
         assert "10 minutes" in bot.messages[0]
-        assert "has appeared" in bot.messages[1]
+        assert "has appeared" in bot.announcements[0]["message"]
         await service.stop()
 
 
@@ -158,6 +165,21 @@ async def test_active_raid_reminds_after_45_minutes_then_waits_60_minutes(tmp_pa
         assert sleeps == [45 * 60, 60 * 60]
         assert len(bot.messages) == 1
         assert bot.messages[0].startswith("Raid reminder:")
+
+
+@pytest.mark.asyncio
+async def test_raid_announcement_falls_back_to_bot_chat(monkeypatch) -> None:
+    bot = FakeRaidBot()
+    service = RaidBossService(bot=bot, db=None)
+
+    async def reject_announcement(self, **kwargs):
+        raise RuntimeError("Missing announcement authorization")
+
+    monkeypatch.setattr(FakeRaidChannel, "send_announcement", reject_announcement)
+    await service._send_announcement("channel-1", "A boss appeared!")
+
+    assert bot.announcements == []
+    assert bot.messages == ["A boss appeared!"]
 
 
 @pytest.mark.asyncio

@@ -151,7 +151,7 @@ class AdAnnouncementService:
             )
 
             try:
-                await broadcaster.send_announcement(moderator=broadcaster_id, message=message, color="purple")
+                await broadcaster.send_announcement(moderator=str(self.bot.user.id), message=message, color="purple")
             except Exception:
                 LOGGER.warning(
                     "[Ads] Could not send an announcement to %s (%s). Falling back to a chat message.",

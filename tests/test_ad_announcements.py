@@ -54,7 +54,7 @@ async def test_ad_warning_is_sent_between_one_and_two_minutes_before_ad() -> Non
     await service.check_ad_schedules()
 
     assert len(broadcaster.announcements) == 1
-    assert broadcaster.announcements[0]["moderator"] == "channel-1"
+    assert broadcaster.announcements[0]["moderator"] == "bot-1"
     assert broadcaster.announcements[0]["color"] == "purple"
     assert "Ads starting in ~" in broadcaster.announcements[0]["message"]
     assert broadcaster.messages == []
