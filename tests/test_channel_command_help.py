@@ -100,6 +100,7 @@ def test_command_help_includes_raid_boss_commands_for_enabled_profiles() -> None
     assert [command.syntax for command in raid_bosses.commands] == [
         "!raid",
         "!raid attack",
+        "!loot",
         "!raid shop",
         "!raid buy <item>",
         "!raid equip <weapon>",
@@ -170,6 +171,6 @@ def test_command_help_catalog_covers_every_shared_top_level_command() -> None:
     profile_specific_commands = {
         "points", "champs", "register", "unregister", "rank", "ladder",
         "explode", "reklop", "randy", "bark", "car",
-        "raid", "ow", "owrank", "owrecord", "owreset"
+        "raid", "loot", "ow", "owrank", "owrecord", "owreset"
     }
     assert shared_command_names - profile_specific_commands <= catalog_names
