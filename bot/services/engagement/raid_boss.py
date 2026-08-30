@@ -141,6 +141,27 @@ class RaidBossService:
                 tutorial_completed INTEGER NOT NULL DEFAULT 0,
                 consecutive_mini_bosses INTEGER NOT NULL DEFAULT 0
             )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS raid_boss_reward_summaries (
+                event_id INTEGER NOT NULL,
+                broadcaster_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                username TEXT NOT NULL,
+                contribution_points INTEGER NOT NULL DEFAULT 0,
+                final_hit_points INTEGER NOT NULL DEFAULT 0,
+                bonus_points INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (event_id, user_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS raid_boss_reward_items (
+                event_id INTEGER NOT NULL,
+                broadcaster_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                PRIMARY KEY (event_id, user_id, item_id)
+            )
             """
         )
 
@@ -226,7 +247,7 @@ class RaidBossService:
             if automatic:
                 await asyncio.sleep(self.AUTOMATIC_WARNING_SECONDS)
 
-            await self._send_message(broadcaster_id, "A dangerous prescence can be felt approaching... Get ready to use !raid attack!")
+            await self._send_message(broadcaster_id, "A raid boss is approaching! It will appear in 10 minutes. Get ready to use !raid attack!")
             await asyncio.sleep(self.PRE_SPAWN_SECONDS)
             event = await self.spawn_automatic(broadcaster_id, config) if automatic else await self.spawn(broadcaster_id, str(boss_type), config, str(boss_tier))
 
@@ -736,6 +757,42 @@ class RaidBossService:
 
         return [(str(row["username"]), int(row["total_damage"])) for row in rows]
 
+    async def get_latest_loot(self, broadcaster_id: str, user_id: str) -> dict[str, object] | None:
+        query = """
+        SELECT events.id, events.boss_name, summaries.contribution_points, summaries.final_hit_points, summaries.bonus_points
+        FROM raid_boss_events AS events
+        LEFT JOIN raid_boss_reward_summaries AS summaries
+          ON summaries.event_id = events.id
+         AND summaries.user_id = ?
+        WHERE events.broadcaster_id = ?
+          AND events.status IN ('defeated', 'failed')
+        ORDER BY events.id DESC
+        LIMIT 1
+        """
+
+        async with self.db.acquire() as connection:
+            row = await connection.fetchone(query, (str(user_id), str(broadcaster_id)))
+
+            if row is None:
+                return None
+
+            items = await connection.fetchall(
+                "SELECT item_id FROM raid_boss_reward_items WHERE event_id = ? AND user_id = ? ORDER BY item_id",
+                (int(row["id"]), str(user_id))
+            )
+
+        contribution_points = int(row["contribution_points"] or 0)
+        final_hit_points = int(row["final_hit_points"] or 0)
+        bonus_points = int(row["bonus_points"] or 0)
+        return {
+            "boss_name": str(row["boss_name"]),
+            "contribution_points": contribution_points,
+            "final_hit_points": final_hit_points,
+            "bonus_points": bonus_points,
+            "total_points": contribution_points + final_hit_points + bonus_points,
+            "items": tuple(str(item["item_id"]) for item in items)
+        }
+
     async def resolve(self, broadcaster_id: str, defeated: bool, final_hitter_id: str | None = None, final_hitter_name: str | None = None) -> int:
         event = await self.get_active_event(broadcaster_id)
 
@@ -771,9 +828,26 @@ class RaidBossService:
                 for contribution in contributions:
                     reward = payout_pool * int(contribution["damage"]) // damage_dealt
                     await self._add_points(connection, broadcaster_id, contribution["user_id"], contribution["username"], reward)
+                    await connection.execute(
+                        """
+                        INSERT INTO raid_boss_reward_summaries (event_id, broadcaster_id, user_id, username, contribution_points)
+                        VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT(event_id, user_id) DO UPDATE SET contribution_points = excluded.contribution_points, username = excluded.username
+                        """,
+                        (event.id, str(broadcaster_id), str(contribution["user_id"]), str(contribution["username"]), reward)
+                    )
 
             if defeated and final_hitter_id and final_hitter_name:
-                await self._add_points(connection, broadcaster_id, final_hitter_id, final_hitter_name, int(resolution["final_hit_reward"]))
+                final_hit_reward = int(resolution["final_hit_reward"])
+                await self._add_points(connection, broadcaster_id, final_hitter_id, final_hitter_name, final_hit_reward)
+                await connection.execute(
+                    """
+                    INSERT INTO raid_boss_reward_summaries (event_id, broadcaster_id, user_id, username, final_hit_points)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(event_id, user_id) DO UPDATE SET final_hit_points = excluded.final_hit_points, username = excluded.username
+                    """,
+                    (event.id, str(broadcaster_id), str(final_hitter_id), str(final_hitter_name), final_hit_reward)
+                )
 
             if defeated and event.boss_tier == "tutorial":
                 await connection.execute(
@@ -842,6 +916,15 @@ class RaidBossService:
 
             for recipient_id, recipient_name, item_id in awards:
                 if item_id.endswith("_points"):
+                    bonus_points = int(item_id.removesuffix("_points"))
+                    await connection.execute(
+                        """
+                        INSERT INTO raid_boss_reward_summaries (event_id, broadcaster_id, user_id, username, bonus_points)
+                        VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT(event_id, user_id) DO UPDATE SET bonus_points = bonus_points + excluded.bonus_points, username = excluded.username
+                        """,
+                        (event.id, str(broadcaster_id), recipient_id, recipient_name, bonus_points)
+                    )
                     LOGGER.info("[Raid Bosses] Awarded %s to %s for already owning every starter weapon.", item_id, recipient_name)
                     continue
 
@@ -853,6 +936,10 @@ class RaidBossService:
                     ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET quantity = 1, durability = MAX(durability, excluded.durability)
                     """,
                     (str(broadcaster_id), recipient_id, item_id, config.weapon_durability)
+                )
+                await connection.execute(
+                    "INSERT OR IGNORE INTO raid_boss_reward_items (event_id, broadcaster_id, user_id, item_id) VALUES (?, ?, ?, ?)",
+                    (event.id, str(broadcaster_id), recipient_id, item_id)
                 )
                 LOGGER.info("[Raid Bosses] Awarded %s to %s for defeating %s.", item_id, recipient_name, event.boss_name)
 

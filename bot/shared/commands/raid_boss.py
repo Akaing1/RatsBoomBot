@@ -37,6 +37,39 @@ class RaidBossCommands(commands.Component):
 
         return broadcaster_id, profile.raid_bosses
 
+    @commands.command(name="loot")
+    async def loot(self, ctx: commands.Context) -> None:
+        context = self.get_context(ctx)
+
+        if context is None:
+            return
+
+        loot = await self.bot.services.raid_bosses.get_latest_loot(context[0], str(ctx.chatter.id))
+
+        if loot is None:
+            await ctx.reply("No completed raid rewards are available yet.")
+            return
+
+        total_points = int(loot["total_points"])
+        items = tuple(loot["items"])
+
+        if total_points == 0 and not items:
+            await ctx.reply(f"You did not earn loot from the latest completed raid against {loot['boss_name']}.")
+            return
+
+        details = [f"{total_points:,} points"]
+
+        if int(loot["final_hit_points"]) > 0:
+            details.append(f"{int(loot['final_hit_points']):,} final-hit bonus")
+
+        if int(loot["bonus_points"]) > 0:
+            details.append(f"{int(loot['bonus_points']):,} bonus loot points")
+
+        if items:
+            details.append("items: " + ", ".join(str(item).replace("_", " ") for item in items))
+
+        await ctx.reply(f"Your loot from {loot['boss_name']}: {' | '.join(details)}.")
+
     @commands.group(name="raid", invoke_fallback=True)
     async def raid(self, ctx: commands.Context) -> None:
         context = self.get_context(ctx)
