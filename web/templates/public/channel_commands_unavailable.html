@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Channel Commands | RatsBoomBot</title>
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v=10">
+</head>
+
+<body class="public-command-page">
+    <main class="public-command-content">
+        <section class="message-card error-card">
+            <div class="message-icon">!</div>
+            {% if not_found %}
+                <h1>Channel not found</h1>
+                <p>RatsBoomBot does not have a command page for {{ channel_name }}.</p>
+            {% else %}
+                <h1>Commands temporarily unavailable</h1>
+                <p>The bot is restarting or offline. Please try this page again shortly.</p>
+            {% endif %}
+            <a class="button secondary" href="/">Back to RatsBoomBot</a>
+        </section>
+    </main>
+</body>
+</html>

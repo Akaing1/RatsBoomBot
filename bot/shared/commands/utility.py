@@ -324,4 +324,11 @@ class UtilityCommands(commands.Component):
             )
             return
 
-        await ctx.reply(services.help.format_help_message())
+        broadcaster_id = get_context_broadcaster_id(ctx)
+        profile = get_active_profile(broadcaster_id) if broadcaster_id else None
+
+        if profile is None:
+            LOGGER.warning("[Commands] !help could not resolve the active channel profile.")
+            return
+
+        await ctx.reply(services.help.format_help_message(profile.channel_name))

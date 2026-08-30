@@ -4,7 +4,7 @@ from twitchio.ext import commands
 from bot.component_loader import GLOBAL_COMPONENTS
 from bot.profiles import ChannelProfile, FeatureName, GlobalCommandDefaults, LeagueConfig, OverwatchConfig, PointsConfig, ProfileFeatureName, RaidBossConfig, activate_profile, clear_profiles
 from bot.services.channels.feature_toggle import FeatureToggleService
-from web.channel.command_help import build_command_help_groups
+from web.channel.command_help import build_command_help_groups, build_enabled_command_help_groups
 
 
 @pytest.fixture(autouse=True)
@@ -138,6 +138,19 @@ def test_command_help_marks_commands_disabled_when_channel_profile_is_off() -> N
     groups = build_command_help_groups(features, broadcaster_id, profile)
 
     assert all(not command.enabled for group in groups for command in group.commands)
+
+
+def test_enabled_command_help_omits_disabled_commands_and_empty_groups() -> None:
+    broadcaster_id = "channel-1"
+    profile = ChannelProfile(channel_name="channel", globals=GlobalCommandDefaults(height=False), league=LeagueConfig(enabled=True))
+    activate_profile(broadcaster_id, profile)
+    features = FeatureToggleService(db=None)
+    features.overrides[broadcaster_id] = {features.profile_feature_key(ProfileFeatureName.LEAGUE): False}
+    groups = build_enabled_command_help_groups(features, broadcaster_id, profile)
+
+    assert "!height [username]" not in {command.syntax for group in groups for command in group.commands}
+    assert "!pp [username]" in {command.syntax for group in groups for command in group.commands}
+    assert "League of Legends" not in {group.name for group in groups}
 
 
 def test_command_help_catalog_covers_every_shared_top_level_command() -> None:
