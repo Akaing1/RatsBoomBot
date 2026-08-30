@@ -2,6 +2,8 @@ import logging
 
 from twitchio.ext import commands
 
+from bot.profiles import FeatureName, get_active_profile
+
 LOGGER = logging.getLogger("RatBoomBot")
 
 
@@ -49,7 +51,17 @@ class StreamEvents(commands.Component):
         )
 
         await services.stream_logs.start_session(broadcaster_id=broadcaster_id, stream_id=stream_id, channel_name=channel_name)
+        active_event = await services.raid_bosses.get_active_event(broadcaster_id)
         await services.raid_bosses.register_stream(broadcaster_id, stream_id)
+
+        if active_event is None:
+            profile = get_active_profile(broadcaster_id)
+
+            if profile is not None and profile.raid_bosses.enabled and services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES):
+                event = await services.raid_bosses.spawn_automatic(broadcaster_id, profile.raid_bosses)
+
+                if event is not None:
+                    await services.raid_bosses.register_stream(broadcaster_id, stream_id)
 
     @commands.Component.listener()
     async def event_stream_offline(self, payload) -> None:
