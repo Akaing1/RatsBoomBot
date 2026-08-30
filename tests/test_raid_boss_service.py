@@ -176,7 +176,7 @@ async def test_raid_announcement_falls_back_to_bot_chat(monkeypatch) -> None:
         raise RuntimeError("Missing announcement authorization")
 
     monkeypatch.setattr(FakeRaidChannel, "send_announcement", reject_announcement)
-    await service._send_announcement("channel-1", "A boss appeared!")
+    await service.send_announcement("channel-1", "A boss appeared!", "orange")
 
     assert bot.announcements == []
     assert bot.messages == ["A boss appeared!"]
