@@ -30,8 +30,6 @@ class ProfileSettingState:
 
 PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("timer_messages", "Timers", "Timer messages", "One automated timer message per line.", value_type="lines", maximum_length=2000, rows=6),
-    ProfileSettingDefinition("points.points_per_message", "Points", "Points per message", "Points earned for an eligible chat message.", value_type="integer", minimum=0, maximum=10000, rows=1),
-    ProfileSettingDefinition("points.message_cooldown_seconds", "Points", "Earning cooldown", "Seconds before the same chatter can earn message points again.", value_type="integer", minimum=0, maximum=86400, rows=1),
     ProfileSettingDefinition("community_messages.follow", "Community messages", "Follow message", "Sent when a viewer follows. Leave empty to send nothing."),
     ProfileSettingDefinition("community_messages.subscription", "Community messages", "Subscription message", "Sent for a new subscription."),
     ProfileSettingDefinition("community_messages.resubscription", "Community messages", "Resubscription message", "Sent for a returning subscription."),
@@ -42,10 +40,8 @@ PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("shoutout_messages.without_game", "Shoutouts", "Shoutout without game", "Shoutout used when no game is available."),
     ProfileSettingDefinition("redeems.daily_title", "Redeems", "Daily redeem title", "Exact Twitch reward title used for the daily claim.", maximum_length=100, rows=1),
     ProfileSettingDefinition("redeems.first_title", "Redeems", "First redeem title", "Exact Twitch reward title used for first place.", maximum_length=100, rows=1),
-    ProfileSettingDefinition("redeems.second_title", "Redeems", "Second redeem title", "Exact Twitch reward title used for second place.", maximum_length=100, rows=1),
     ProfileSettingDefinition("redeems.daily_amount", "Redeems", "Daily point reward", "Points awarded for a daily claim.", value_type="integer", minimum=0, maximum=1000000, rows=1),
     ProfileSettingDefinition("redeems.first_amount", "Redeems", "First point reward", "Points awarded for first place.", value_type="integer", minimum=0, maximum=1000000, rows=1),
-    ProfileSettingDefinition("redeems.second_amount", "Redeems", "Second point reward", "Points awarded for second place.", value_type="integer", minimum=0, maximum=1000000, rows=1),
     ProfileSettingDefinition("league.game_name", "League of Legends", "Riot game name", "The game-name portion of the broadcaster's Riot ID.", maximum_length=100, rows=1),
     ProfileSettingDefinition("league.tag_line", "League of Legends", "Riot tag line", "The tag-line portion of the broadcaster's Riot ID.", maximum_length=20, rows=1),
     ProfileSettingDefinition("league.region", "League of Legends", "Region", "The OP.GG region code, such as NA or EUW.", maximum_length=12, rows=1),
