@@ -149,6 +149,8 @@ async def test_active_raid_reminds_after_45_minutes_then_waits_60_minutes(tmp_pa
         service = RaidBossService(bot=bot, db=database)
         await service.setup()
         await service.spawn("channel-1", "melee", build_config())
+        service.reminder_message_counts["channel-1"] = 20
+        service.reminder_activity_events["channel-1"] = asyncio.Event()
         sleeps = []
 
         async def capture_sleep(seconds):
@@ -165,6 +167,26 @@ async def test_active_raid_reminds_after_45_minutes_then_waits_60_minutes(tmp_pa
         assert sleeps == [45 * 60, 60 * 60]
         assert len(bot.messages) == 1
         assert bot.messages[0].startswith("Raid reminder:")
+
+
+@pytest.mark.asyncio
+async def test_raid_reminder_waits_for_twenty_chat_messages() -> None:
+    service = RaidBossService(bot=None, db=None)
+    service.reminder_tasks["channel-1"] = asyncio.current_task()
+    service.reminder_message_counts["channel-1"] = 0
+    service.reminder_activity_events["channel-1"] = asyncio.Event()
+    wait_task = asyncio.create_task(service._wait_for_reminder_activity("channel-1"))
+
+    for _ in range(19):
+        service.track_message(SimpleNamespace(broadcaster=SimpleNamespace(id="channel-1")))
+
+    await asyncio.sleep(0)
+    assert wait_task.done() is False
+
+    service.track_message(SimpleNamespace(broadcaster=SimpleNamespace(id="channel-1")))
+    await wait_task
+
+    assert service.reminder_message_counts["channel-1"] == 20
 
 
 @pytest.mark.asyncio
