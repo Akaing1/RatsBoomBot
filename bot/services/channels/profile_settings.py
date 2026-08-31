@@ -29,7 +29,7 @@ class ProfileSettingState:
 
 
 PROFILE_SETTING_DEFINITIONS = (
-    ProfileSettingDefinition("timer_messages", "Timers", "Timer messages", "One automated timer message per line.", value_type="lines", maximum_length=2000, rows=6),
+    ProfileSettingDefinition("timer_messages", "Timers", "Timer messages", "Add, edit, or remove the automated messages that rotate in chat.", value_type="lines", maximum_length=10000, rows=6),
     ProfileSettingDefinition("community_messages.follow", "Community messages", "Follow message", "Sent when a viewer follows. Leave empty to send nothing."),
     ProfileSettingDefinition("community_messages.subscription", "Community messages", "Subscription message", "Sent for a new subscription."),
     ProfileSettingDefinition("community_messages.resubscription", "Community messages", "Resubscription message", "Sent for a returning subscription."),
@@ -284,6 +284,14 @@ class ProfileSettingsService:
             return value
 
         value = raw_value.strip()
+
+        if definition.value_type == "lines":
+            messages = [line.strip() for line in value.splitlines() if line.strip()]
+
+            if any(len(message) > 500 for message in messages):
+                raise ValueError("Each timer message must be 500 characters or fewer.")
+
+            value = "\n".join(messages)
 
         if len(value) > definition.maximum_length:
             raise ValueError(f"{definition.label} must be {definition.maximum_length} characters or fewer.")

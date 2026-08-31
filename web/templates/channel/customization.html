@@ -67,7 +67,20 @@
                             {% endif %}
                         </div>
 
-                        {% if setting.definition.value_type == "integer" %}
+                        {% if setting.definition.key == "timer_messages" %}
+                            <div class="timer-message-editor" data-timer-editor>
+                                <input type="hidden" name="value" data-timer-value>
+                                <div class="timer-message-list" data-timer-list>
+                                    {% for message in setting.effective_value.split('\n') if message %}
+                                        <div class="timer-message-row">
+                                            <textarea class="profile-setting-input" rows="3" maxlength="500" data-timer-message aria-label="Timer message {{ loop.index }}">{{ message }}</textarea>
+                                            <button class="button danger timer-remove-button" type="button" data-remove-timer>Remove</button>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <button class="button secondary timer-add-button" type="button" data-add-timer>+ Add Timer</button>
+                            </div>
+                        {% elif setting.definition.value_type == "integer" %}
                             <input class="profile-setting-input" type="number" name="value" value="{{ setting.effective_value }}" min="{{ setting.definition.minimum }}" max="{{ setting.definition.maximum }}">
                         {% else %}
                             <textarea class="profile-setting-input" name="value" rows="{{ setting.definition.rows }}" maxlength="{{ setting.definition.maximum_length }}">{{ setting.effective_value }}</textarea>
@@ -98,4 +111,55 @@
         </div>
     </div>
 </section>
+
+<template id="timer-message-template">
+    <div class="timer-message-row">
+        <textarea class="profile-setting-input" rows="3" maxlength="500" data-timer-message aria-label="Timer message"></textarea>
+        <button class="button danger timer-remove-button" type="button" data-remove-timer>Remove</button>
+    </div>
+</template>
+
+<script>
+    (() => {
+        const editor = document.querySelector("[data-timer-editor]");
+        const template = document.getElementById("timer-message-template");
+
+        if (!editor || !template) return;
+
+        const list = editor.querySelector("[data-timer-list]");
+        const hiddenValue = editor.querySelector("[data-timer-value]");
+        const updateLabels = () => {
+            list.querySelectorAll("[data-timer-message]").forEach((input, index) => {
+                input.setAttribute("aria-label", `Timer message ${index + 1}`);
+            });
+        };
+        const addTimer = () => {
+            list.appendChild(template.content.cloneNode(true));
+            updateLabels();
+            list.lastElementChild.querySelector("[data-timer-message]").focus();
+        };
+
+        editor.querySelector("[data-add-timer]").addEventListener("click", addTimer);
+        list.addEventListener("input", (event) => {
+            if (event.target.matches("[data-timer-message]")) {
+                event.target.value = event.target.value.replace(/[\r\n]+/g, " ");
+            }
+        });
+        list.addEventListener("click", (event) => {
+            const removeButton = event.target.closest("[data-remove-timer]");
+
+            if (!removeButton) return;
+            removeButton.closest(".timer-message-row").remove();
+            updateLabels();
+        });
+        editor.closest("form").addEventListener("submit", () => {
+            hiddenValue.value = Array.from(list.querySelectorAll("[data-timer-message]"))
+                .map((input) => input.value.trim())
+                .filter(Boolean)
+                .join("\n");
+        });
+
+        if (!list.children.length) addTimer();
+    })();
+</script>
 {% endblock %}
