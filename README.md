@@ -167,7 +167,7 @@ The service resumes the same Twitch stream after a bot restart. Each channel ret
 
 ## Database and Migrations
 
-The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadcaster connections, administrator accounts, settings, overrides, points, counters, redeem history, dashboard activity, viewer queues, first-chat shoutouts, moderation data, and migration history.
+The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadcaster connections, administrator accounts, settings, overrides, points, counters, redeem history, dashboard activity, viewer queues, raid bosses and scheduler state, first-chat shoutouts, moderation data, and migration history.
 
 League statistics are stored separately in `.data/league.db`. This database contains replaceable external cache data, including seasonal champion summaries, recent ranked matches, and item metadata.
 
