@@ -49,7 +49,7 @@
 
         <div class="profile-settings-grid">
             {% for setting in settings %}
-                <article class="toggle-card profile-setting-card">
+                <article class="toggle-card profile-setting-card{% if setting.definition.key == 'timer_messages' %} full-width{% endif %}">
                     <form method="post" action="/channel/customization">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="setting_name" value="{{ setting.definition.key }}">
