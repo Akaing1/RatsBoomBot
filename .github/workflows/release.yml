@@ -1,0 +1,91 @@
+name: Version and release
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  validate-version:
+    name: Validate release version
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Require a newer application version
+        shell: bash
+        run: |
+          version="$(sed -nE 's/^APP_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' config/version.py)"
+
+          if [[ -z "$version" ]]; then
+            echo "config/version.py must define APP_VERSION using semantic versioning."
+            exit 1
+          fi
+
+          latest_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+
+          if [[ -z "$latest_tag" ]]; then
+            echo "No published release exists yet; v${version} is valid."
+            exit 0
+          fi
+
+          python - "$version" "${latest_tag#v}" <<'PY'
+          import sys
+
+          current = tuple(map(int, sys.argv[1].split(".")))
+          latest = tuple(map(int, sys.argv[2].split(".")))
+
+          if current <= latest:
+              raise SystemExit(f"APP_VERSION must be newer than the latest release ({sys.argv[2]}).")
+
+          print(f"Version {sys.argv[1]} is newer than {sys.argv[2]}.")
+          PY
+
+  publish-release:
+    name: Publish GitHub release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: publish-release
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Publish unreleased application version
+        shell: bash
+        run: |
+          version="$(sed -nE 's/^APP_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' config/version.py)"
+
+          if [[ -z "$version" ]]; then
+            echo "config/version.py must define APP_VERSION using semantic versioning."
+            exit 1
+          fi
+
+          tag="v${version}"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release ${tag} already exists; nothing to publish."
+            exit 0
+          fi
+
+          gh release create "$tag" \
+            --target "$GITHUB_SHA" \
+            --title "RatsBoomBot ${tag}" \
+            --generate-notes
