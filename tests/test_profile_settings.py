@@ -72,3 +72,12 @@ def test_streamer_editable_settings_protect_points_and_custom_redeems() -> None:
         "redeems.first_title",
         "redeems.first_amount"
     } <= PROFILE_SETTINGS_BY_KEY.keys()
+
+
+def test_timer_validation_normalizes_messages_and_enforces_twitch_limit() -> None:
+    definition = ProfileSettingsService.get_definition("timer_messages")
+
+    assert ProfileSettingsService.validate_value(definition, " First timer \n\n Second timer ") == "First timer\nSecond timer"
+
+    with pytest.raises(ValueError, match="Each timer message must be 500 characters or fewer"):
+        ProfileSettingsService.validate_value(definition, "x" * 501)
