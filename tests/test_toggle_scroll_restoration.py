@@ -49,3 +49,5 @@ def test_streamer_dashboard_has_profile_customization_page() -> None:
     assert "Channel default:" in template
     assert "Profile default:" not in template
     assert "Please contact the developer" in template
+    assert "data-add-timer" in template
+    assert "data-remove-timer" in template
