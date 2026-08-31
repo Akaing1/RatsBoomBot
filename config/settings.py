@@ -6,6 +6,26 @@ load_dotenv()
 
 VALID_BOT_DETECTION_MODES = {"learning", "shadow", "active"}
 VALID_ENVIRONMENTS = {"local", "production"}
+DEFAULT_CHANNEL_SCOPES = (
+    "channel:bot "
+    "moderator:manage:banned_users "
+    "moderator:read:followers "
+    "moderator:read:blocked_terms "
+    "moderator:read:chat_settings "
+    "moderator:read:unban_requests "
+    "moderator:read:chat_messages "
+    "moderator:read:warnings "
+    "moderator:read:moderators "
+    "moderator:read:vips "
+    "channel:read:redemptions "
+    "channel:read:subscriptions "
+    "channel:read:ads "
+    "clips:edit "
+    "channel:manage:raids "
+    "channel:manage:moderators "
+    "moderator:manage:announcements "
+    "moderator:manage:shoutouts"
+)
 
 
 class Settings:
@@ -42,27 +62,7 @@ class Settings:
 
     BOT_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('BOT_SCOPES', 'user:read:chat user:write:chat user:bot')} moderator:manage:announcements".split()))
 
-    CHANNEL_SCOPES = os.getenv(
-        "CHANNEL_SCOPES",
-        "channel:bot "
-        "moderator:manage:banned_users "
-        "moderator:read:followers "
-        "moderator:read:blocked_terms "
-        "moderator:read:chat_settings "
-        "moderator:read:unban_requests "
-        "moderator:read:chat_messages "
-        "moderator:read:warnings "
-        "moderator:read:moderators "
-        "moderator:read:vips "
-        "channel:read:redemptions "
-        "channel:read:subscriptions "
-        "channel:read:ads "
-        "clips:edit "
-        "channel:manage:raids "
-        "channel:manage:moderators "
-        "moderator:manage:announcements "
-        "moderator:manage:shoutouts"
-    )
+    CHANNEL_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('CHANNEL_SCOPES') or DEFAULT_CHANNEL_SCOPES} channel:manage:broadcast".split()))
 
     IGNORED_USERS = {
         user.strip().lower()

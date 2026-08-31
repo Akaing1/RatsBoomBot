@@ -96,6 +96,99 @@ class SettingsCommands(commands.Component):
 
         return False
 
+    @commands.group(name="set", invoke_fallback=True)
+    async def set_channel(self, ctx: commands.Context) -> None:
+        broadcaster_id = self.get_context(ctx, "set")
+
+        if broadcaster_id is None:
+            return
+
+        if not self.has_permission(ctx, "set"):
+            await ctx.reply("Only the broadcaster or mods can change the stream game or title.")
+            return
+
+        await ctx.reply("Use !set game <game name> or !set title <stream title>.")
+
+    @set_channel.command(name="game")
+    async def set_game(self, ctx: commands.Context, *, game_name: str | None = None) -> None:
+        broadcaster_id = self.get_context(ctx, "set game")
+
+        if broadcaster_id is None:
+            return
+
+        username = get_chatter_name(ctx)
+
+        if not self.has_permission(ctx, "set game"):
+            await ctx.reply("Only the broadcaster or mods can change the stream game.")
+            return
+
+        game_name = (game_name or "").strip()
+
+        if not game_name:
+            await ctx.reply("Use it like this: !set game <game name>")
+            return
+
+        try:
+            game = await self.bot.fetch_game(name=game_name)
+        except Exception:
+            LOGGER.exception("[Settings] Failed to find game %s for broadcaster %s.", game_name, broadcaster_id)
+            await ctx.reply("Twitch could not look up that game right now. Please try again later.")
+            return
+
+        if game is None:
+            await ctx.reply(f'I could not find a Twitch category named "{game_name}".')
+            return
+
+        try:
+            broadcaster = self.bot.create_partialuser(broadcaster_id)
+            await broadcaster.modify_channel(game_id=str(game.id))
+        except Exception as error:
+            LOGGER.exception("[Settings] Failed to update the game for broadcaster %s.", broadcaster_id)
+            await self._send_update_error(ctx, error, "game")
+            return
+
+        resolved_name = getattr(game, "name", game_name)
+        LOGGER.info("[Settings] User %s changed broadcaster %s's game to %s (%s).", username, broadcaster_id, resolved_name, game.id, extra={"broadcaster_id": broadcaster_id})
+        await ctx.reply(f'Stream game updated to "{resolved_name}".')
+
+    @set_channel.command(name="title")
+    async def set_title(self, ctx: commands.Context, *, title: str | None = None) -> None:
+        broadcaster_id = self.get_context(ctx, "set title")
+
+        if broadcaster_id is None:
+            return
+
+        username = get_chatter_name(ctx)
+
+        if not self.has_permission(ctx, "set title"):
+            await ctx.reply("Only the broadcaster or mods can change the stream title.")
+            return
+
+        title = (title or "").strip()
+
+        if not title:
+            await ctx.reply("Use it like this: !set title <stream title>")
+            return
+
+        try:
+            broadcaster = self.bot.create_partialuser(broadcaster_id)
+            await broadcaster.modify_channel(title=title)
+        except Exception as error:
+            LOGGER.exception("[Settings] Failed to update the title for broadcaster %s.", broadcaster_id)
+            await self._send_update_error(ctx, error, "title")
+            return
+
+        LOGGER.info("[Settings] User %s changed broadcaster %s's stream title to %s.", username, broadcaster_id, title, extra={"broadcaster_id": broadcaster_id})
+        await ctx.reply(f'Stream title updated to "{title}".')
+
+    @staticmethod
+    async def _send_update_error(ctx: commands.Context, error: Exception, field_name: str) -> None:
+        if getattr(error, "status", None) in {401, 403}:
+            await ctx.reply("The broadcaster needs to reconnect their Twitch account before I can update stream information.")
+            return
+
+        await ctx.reply(f"Twitch could not update the stream {field_name}. Please try again later.")
+
     @commands.command(name="setdiscord")
     async def set_discord(self, ctx: commands.Context, url: str | None = None) -> None:
         broadcaster_id = self.get_context(ctx, "setdiscord")

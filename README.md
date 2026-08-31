@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **6.0.0**
+Current version: **8.1.0**
 
 ## Highlights
 
@@ -276,7 +276,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 | Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube`, `!setdiscord`, `!setyoutube` |
-| Settings | `!timers`, `!timers on`, `!timers off` |
+| Settings | `!set game <game name>`, `!set title <stream title>`, `!timers`, `!timers on`, `!timers off` |
 | Shoutouts | `!so <username>` |
 | Clips | `!clip`, `!clip short` |
 | Raids | `!startraid <channel>` |
