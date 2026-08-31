@@ -275,7 +275,7 @@ async def update_channel_customization(request: Request, setting_name: str = For
                 message = f"{definition.label} was updated."
             elif action == "reset":
                 await services.profile_settings.clear_override(broadcaster_id, setting_name, f"streamer:{broadcaster_id}")
-                message = f"{definition.label} was reset to its profile default."
+                message = f"{definition.label} was reset to its channel default."
             else:
                 raise ValueError("Unknown customization action.")
     except (TypeError, ValueError) as error:
