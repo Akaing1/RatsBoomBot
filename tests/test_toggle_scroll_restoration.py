@@ -52,3 +52,19 @@ def test_streamer_dashboard_has_profile_customization_page() -> None:
     assert "data-add-timer" in template
     assert "data-remove-timer" in template
     assert "full-width" in template
+
+
+def test_stylesheets_use_deployment_stamp_for_cache_busting() -> None:
+    template_paths = (
+        "web/templates/admin/layout.html",
+        "web/templates/admin/login.html",
+        "web/templates/channel/connect.html",
+        "web/templates/channel/layout.html",
+        "web/templates/public/channel_commands.html",
+        "web/templates/public/channel_commands_unavailable.html",
+        "web/templates/public/home.html"
+    )
+
+    for template_path in template_paths:
+        template = (PROJECT_ROOT / template_path).read_text(encoding="utf-8")
+        assert "style.css') }}?v={{ deployment_stamp() }}" in template
