@@ -134,6 +134,7 @@ class ChatEvents(commands.Component):
             return
 
         services.timers.track_message(payload)
+        services.raid_bosses.track_message(payload)
 
         try:
             await services.first_chat_shoutouts.handle_message(
