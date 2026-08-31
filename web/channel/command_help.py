@@ -86,8 +86,10 @@ SOCIAL_COMMANDS = CommandGroupDefinition(
 
 SETTINGS_COMMANDS = CommandGroupDefinition(
     name="Settings",
-    description="Update channel links and control recurring timer messages.",
+    description="Update stream information, channel links, and recurring timer messages.",
     commands=(
+        CommandDefinition("!set game <game name>", "Change the stream's Twitch category.", "Broadcaster/mod", global_group=GlobalCommandGroup.SETTINGS),
+        CommandDefinition("!set title <stream title>", "Change the stream title.", "Broadcaster/mod", global_group=GlobalCommandGroup.SETTINGS),
         CommandDefinition("!setdiscord <url>", "Update the channel's Discord link.", "Broadcaster/mod", global_group=GlobalCommandGroup.SETTINGS),
         CommandDefinition("!setyoutube <url>", "Update the channel's YouTube link.", "Broadcaster/mod", global_group=GlobalCommandGroup.SETTINGS),
         CommandDefinition("!timers [on|off]", "View or change the recurring timer-message state.", "Broadcaster/mod", global_group=GlobalCommandGroup.SETTINGS)
