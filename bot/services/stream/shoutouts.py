@@ -127,7 +127,7 @@ class ShoutoutService:
 
         try:
             channel = self.bot.create_partialuser(broadcaster_id)
-            await channel.send_message(sender=self.bot.user, message=message)
+            await self.bot.services.chat_identity.send_message(channel, message)
         except Exception:
             LOGGER.exception("[Shoutouts] Failed to send shoutout message for %s in broadcaster %s.", username, broadcaster_id, extra={"broadcaster_id": broadcaster_id})
             return False

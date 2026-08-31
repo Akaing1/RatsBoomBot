@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName
 from config.settings import settings
 from storage.database import delete_token
-from web.admin.auth import require_admin, validate_csrf_token
+from web.admin.auth import require_admin, require_owner, validate_csrf_token
 from web.shared.common import build_admin_context, render_error, templates
 from web.state import get_bot, get_db
 
@@ -126,6 +126,7 @@ async def channel_details_page(request: Request, broadcaster_id: str):
     raid_metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_configured else None
     global_groups = services.features.get_global_groups(broadcaster_id)
     global_commands = services.features.get_global_commands(broadcaster_id)
+    chat_identity = services.chat_identity.get_state(broadcaster_id)
 
     return templates.TemplateResponse(
         request=request,
@@ -145,12 +146,64 @@ async def channel_details_page(request: Request, broadcaster_id: str):
             profile_features=profile_features,
             global_groups=global_groups,
             global_commands=global_commands,
+            chat_identity=chat_identity,
             queue_result=request.query_params.get("queue_result"),
             queue_message=request.query_params.get("queue_message"),
             toggle_result=request.query_params.get("toggle_result"),
-            toggle_message=request.query_params.get("toggle_message")
+            toggle_message=request.query_params.get("toggle_message"),
+            identity_result=request.query_params.get("identity_result"),
+            identity_message=request.query_params.get("identity_message")
         )
     )
+
+
+@router.post("/{broadcaster_id}/custom-bot/premium")
+async def update_custom_bot_premium(request: Request, broadcaster_id: str, action: str = Form(...), csrf_token: str = Form(...)):
+    owner_redirect = await require_owner(request)
+
+    if owner_redirect:
+        return owner_redirect
+
+    validate_csrf_token(request, csrf_token)
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return await get_runtime_error(request)
+
+    if get_broadcaster(runtime_bot, broadcaster_id) is None:
+        return get_channel_error(request)
+
+    if action not in {"enable", "disable"}:
+        return redirect_to_channel(broadcaster_id, identity_result="error", identity_message="Unknown premium identity action.")
+
+    await runtime_bot.services.chat_identity.set_premium_enabled(broadcaster_id, action == "enable")
+    message = "Premium custom identity access enabled." if action == "enable" else "Premium custom identity access disabled. RatsBoomBot will send messages for this channel."
+    return redirect_to_channel(broadcaster_id, identity_result="success", identity_message=message)
+
+
+@router.post("/{broadcaster_id}/custom-bot/disconnect")
+async def disconnect_custom_bot(request: Request, broadcaster_id: str, csrf_token: str = Form(...)):
+    owner_redirect = await require_owner(request)
+
+    if owner_redirect:
+        return owner_redirect
+
+    validate_csrf_token(request, csrf_token)
+    runtime_bot = get_bot()
+    runtime_db = get_db()
+
+    if runtime_bot is None or runtime_bot.services is None or runtime_db is None:
+        return await get_runtime_error(request)
+
+    if get_broadcaster(runtime_bot, broadcaster_id) is None:
+        return get_channel_error(request)
+
+    previous_user_id = await runtime_bot.services.chat_identity.disconnect(broadcaster_id)
+
+    if previous_user_id and not runtime_bot.services.chat_identity.is_custom_bot(previous_user_id):
+        await delete_token(runtime_db, previous_user_id)
+
+    return redirect_to_channel(broadcaster_id, identity_result="success", identity_message="Custom bot disconnected. RatsBoomBot is active for this channel again.")
 
 
 @router.get("/{broadcaster_id}/api/activity", response_class=JSONResponse)
@@ -345,6 +398,11 @@ async def delete_broadcaster(request: Request, broadcaster_id: str, csrf_token: 
 
     if services.stream_logs.is_active(broadcaster_id):
         await services.stream_logs.end_session(broadcaster_id)
+
+    custom_bot_user_id = await services.chat_identity.remove_channel(broadcaster_id)
+
+    if custom_bot_user_id and not services.chat_identity.is_custom_bot(custom_bot_user_id):
+        await delete_token(runtime_db, custom_bot_user_id)
 
     await delete_token(runtime_db, broadcaster_id)
 

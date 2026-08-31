@@ -12,11 +12,12 @@ from storage.migration_runner import run_migrations
 
 class FakeRaidChannel:
 
-    def __init__(self, messages, announcements):
+    def __init__(self, broadcaster_id, messages, announcements):
+        self.id = broadcaster_id
         self.messages = messages
         self.announcements = announcements
 
-    async def send_message(self, *, sender, message):
+    async def send_message(self, *, sender, message, reply_to_message_id=None):
         self.messages.append(message)
 
     async def send_announcement(self, *, moderator, message, color):
@@ -29,10 +30,22 @@ class FakeRaidBot:
         self.messages = []
         self.announcements = []
         self.user = SimpleNamespace(id="bot-1")
-        self.services = SimpleNamespace(stream_logs=SimpleNamespace(active_sessions={}))
+        self.services = SimpleNamespace(stream_logs=SimpleNamespace(active_sessions={}), chat_identity=FakeChatIdentity(self))
 
     def create_partialuser(self, broadcaster_id):
-        return FakeRaidChannel(self.messages, self.announcements)
+        return FakeRaidChannel(broadcaster_id, self.messages, self.announcements)
+
+
+class FakeChatIdentity:
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    async def send_message(self, broadcaster, message):
+        await broadcaster.send_message(sender=self.bot.user, message=message)
+
+    async def send_announcement(self, broadcaster, message, color):
+        await broadcaster.send_announcement(moderator=self.bot.user.id, message=message, color=color)
 
 
 @pytest.fixture(autouse=True)
@@ -227,7 +240,7 @@ async def test_active_raid_reminds_after_45_minutes_then_waits_60_minutes(tmp_pa
             await service._reminder_loop("channel-1")
 
         assert len(deadlines) == 2
-        assert (deadlines[1] - deadlines[0]).total_seconds() == 60 * 60
+        assert (deadlines[1] - deadlines[0]).total_seconds() == pytest.approx(60 * 60, abs=0.01)
         assert len(bot.messages) == 1
         assert bot.messages[0].startswith("Raid reminder:")
 

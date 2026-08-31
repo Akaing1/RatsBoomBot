@@ -26,11 +26,12 @@ class TwitchUser:
     display_name: str
 
 
-def build_bot_oauth_url(force_verify: bool = True) -> str:
+def build_bot_oauth_url(force_verify: bool = True, state: str | None = None) -> str:
     return _build_oauth_url(
         redirect_uri=settings.BOT_REDIRECT_URI,
         scopes=settings.BOT_SCOPES,
-        force_verify=force_verify
+        force_verify=force_verify,
+        state=state
     )
 
 

@@ -156,7 +156,7 @@ class AdAnnouncementService:
                 message = DEFAULT_AD_ANNOUNCEMENT_MESSAGE.format(time=f"{minutes}:{seconds:02d}")
 
             try:
-                await broadcaster.send_announcement(moderator=str(self.bot.user.id), message=message, color="purple")
+                await self.bot.services.chat_identity.send_announcement(broadcaster, message, "purple")
             except Exception:
                 LOGGER.warning(
                     "[Ads] Could not send an announcement to %s (%s). Falling back to a chat message.",
@@ -166,7 +166,7 @@ class AdAnnouncementService:
                 )
 
                 try:
-                    await broadcaster.send_message(sender=self.bot.user, message=message)
+                    await self.bot.services.chat_identity.send_message(broadcaster, message)
                 except Exception:
                     LOGGER.exception(
                         "[Ads] Failed to send fallback ad warning to %s (%s).",

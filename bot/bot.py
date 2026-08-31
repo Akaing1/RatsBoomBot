@@ -4,15 +4,19 @@ import logging
 from twitchio.ext import commands
 
 from bot.component_loader import load_components
+from bot.context import ChannelContext
 from bot.profiles import CHANNEL_PROFILES, activate_profile, create_generic_profile, get_active_profile
 from bot.services.container import ServiceContainer
 from config.settings import settings
-from storage.database import create_broadcaster_subscriptions, save_token
+from storage.database import create_broadcaster_subscriptions, delete_token, save_token
 
 LOGGER = logging.getLogger("RatBoomBot")
 
 
 class TwitchBot(commands.AutoBot):
+
+    def get_context(self, payload, *, cls=None):
+        return super().get_context(payload, cls=cls or ChannelContext)
 
     def __init__(self, *, token_database, subs, broadcaster_ids, league_database=None):
         self.token_database = token_database
@@ -148,6 +152,36 @@ class TwitchBot(commands.AutoBot):
             user_id
         )
 
+    async def onboard_custom_bot_account(self, broadcaster_id: str, token: str, user_id: str, refresh: str, login: str, display_name: str) -> None:
+        if self.services is None:
+            raise RuntimeError("Bot services are not available.")
+
+        broadcaster_id = str(broadcaster_id)
+        user_id = str(user_id)
+        identity_state = self.services.chat_identity.get_state(broadcaster_id)
+
+        if not identity_state.premium_enabled:
+            raise ValueError("Premium custom identity access is not enabled for this channel.")
+
+        if user_id in {broadcaster_id, str(self.bot_id)} or user_id in self.broadcaster_ids:
+            raise ValueError("Choose a dedicated Twitch bot account that is not connected as a broadcaster.")
+
+        previous_user_id = identity_state.bot_user_id
+        await self.add_token(token, refresh)
+
+        try:
+            await self.services.chat_identity.connect(broadcaster_id, user_id, login, display_name)
+        except Exception:
+            if previous_user_id != user_id:
+                await delete_token(self.token_database, user_id)
+
+            raise
+
+        if previous_user_id and previous_user_id != str(user_id) and not self.services.chat_identity.is_custom_bot(previous_user_id):
+            await delete_token(self.token_database, previous_user_id)
+
+        LOGGER.info("[OAuth] Custom bot account %s onboarded for broadcaster %s.", user_id, broadcaster_id)
+
     async def onboard_broadcaster(self, user_id: str, token: str, refresh: str) -> None:
         user_id = str(user_id)
 
@@ -245,6 +279,10 @@ class TwitchBot(commands.AutoBot):
             "[OAuth] Received authorization event for user %s.",
             payload.user_id
         )
+
+        if self.services is not None and self.services.chat_identity.is_custom_bot(payload.user_id):
+            LOGGER.info("[OAuth] Recognized managed custom bot account %s.", payload.user_id)
+            return
 
         if str(payload.user_id) == str(self.bot_id):
             await self.onboard_bot_account(user_id=payload.user_id, token=payload.access_token, refresh=payload.refresh_token)

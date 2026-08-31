@@ -36,6 +36,8 @@ def test_admin_feature_page_lists_unique_profile_integrations() -> None:
     assert '"profile_feature"' in template
     assert "League of Legends" in template
     assert "Overwatch" in template
+    assert "Premium feature" in template
+    assert "Connect Custom Bot" in template
 
 
 def test_streamer_dashboard_has_profile_customization_page() -> None:
