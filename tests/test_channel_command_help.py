@@ -112,6 +112,16 @@ def test_command_help_includes_raid_boss_commands_for_enabled_profiles() -> None
     ]
 
 
+def test_command_help_includes_stream_information_settings() -> None:
+    broadcaster_id = "channel-1"
+    profile = ChannelProfile(channel_name="channel")
+    activate_profile(broadcaster_id, profile)
+    settings_group = get_group(build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile), "Settings")
+
+    assert get_command(settings_group, "!set game <game name>").permission == "Broadcaster/mod"
+    assert get_command(settings_group, "!set title <stream title>").permission == "Broadcaster/mod"
+
+
 def test_raid_boss_toggle_is_hidden_for_unconfigured_profiles() -> None:
     broadcaster_id = "channel-1"
     profile = ChannelProfile(channel_name="channel")
