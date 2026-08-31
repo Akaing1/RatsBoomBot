@@ -7,7 +7,7 @@
     <div>
         <p class="eyebrow">Channel profile</p>
         <h2>Customization</h2>
-        <p class="page-description">Change only the details you want. Every saved value overrides the profile default and can be reset at any time.</p>
+        <p class="page-description">Change only the details you want. Every saved value overrides the channel default and can be reset at any time.</p>
     </div>
 </header>
 
@@ -73,7 +73,7 @@
                             <textarea class="profile-setting-input" name="value" rows="{{ setting.definition.rows }}" maxlength="{{ setting.definition.maximum_length }}">{{ setting.effective_value }}</textarea>
                         {% endif %}
 
-                        <p class="toggle-meta">Profile default: {{ setting.default_value if setting.default_value != "" else "Not configured" }}</p>
+                        <p class="toggle-meta">Channel default: {{ setting.default_value if setting.default_value != "" else "Not configured" }}</p>
 
                         <div class="toggle-actions profile-setting-actions">
                             <button class="button primary" type="submit" name="action" value="save">Save Changes</button>
@@ -88,4 +88,14 @@
         </div>
     </section>
 {% endfor %}
+
+<section class="panel toggle-management-panel profile-settings-panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Custom redeems</p>
+            <h3>Need another redeem?</h3>
+            <p>Daily and First are the recurring redeem types available for self-service customization. Please contact the developer to add or change other custom redeems for your channel.</p>
+        </div>
+    </div>
+</section>
 {% endblock %}
