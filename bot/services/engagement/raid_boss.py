@@ -3,7 +3,7 @@ import logging
 import math
 import random
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from bot.profiles import RaidBossConfig
 
@@ -68,142 +68,7 @@ class RaidBossService:
         self.reminder_activity_events: dict[str, asyncio.Event] = {}
 
     async def setup(self) -> None:
-        LOGGER.info("[Raid Bosses] Preparing raid boss storage.")
-
-        queries = (
-            """
-            CREATE TABLE IF NOT EXISTS raid_boss_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                broadcaster_id TEXT NOT NULL,
-                boss_name TEXT NOT NULL,
-                boss_type TEXT NOT NULL,
-                boss_tier TEXT NOT NULL DEFAULT 'main',
-                max_hp INTEGER NOT NULL,
-                current_hp INTEGER NOT NULL,
-                reward_pool INTEGER NOT NULL,
-                final_hit_reward INTEGER NOT NULL,
-                status TEXT NOT NULL DEFAULT 'active',
-                spawned_at TEXT NOT NULL,
-                stream_limit INTEGER NOT NULL,
-                final_hitter_id TEXT,
-                final_hitter_name TEXT,
-                rewards_paid INTEGER NOT NULL DEFAULT 0
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS raid_boss_streams (
-                event_id INTEGER NOT NULL,
-                stream_id TEXT NOT NULL,
-                started_at TEXT NOT NULL,
-                PRIMARY KEY (event_id, stream_id)
-            )
-            """,
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS raid_boss_one_active_event
-            ON raid_boss_events (broadcaster_id)
-            WHERE status = 'active'
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS raid_boss_attacks (
-                event_id INTEGER NOT NULL,
-                broadcaster_id TEXT NOT NULL,
-                stream_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                username TEXT NOT NULL,
-                damage INTEGER NOT NULL,
-                weapon TEXT,
-                potion_used INTEGER NOT NULL DEFAULT 0,
-                critical_hit INTEGER NOT NULL DEFAULT 0,
-                attacked_at TEXT NOT NULL,
-                PRIMARY KEY (event_id, stream_id, user_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS raid_boss_players (
-                broadcaster_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                username TEXT NOT NULL,
-                equipped_weapon TEXT,
-                potion_attacks_remaining INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (broadcaster_id, user_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS raid_boss_inventory (
-                broadcaster_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                item_id TEXT NOT NULL,
-                quantity INTEGER NOT NULL DEFAULT 0,
-                durability INTEGER NOT NULL DEFAULT 15,
-                PRIMARY KEY (broadcaster_id, user_id, item_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS raid_boss_channel_state (
-                broadcaster_id TEXT PRIMARY KEY,
-                tutorial_completed INTEGER NOT NULL DEFAULT 0,
-                consecutive_mini_bosses INTEGER NOT NULL DEFAULT 0
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS raid_boss_reward_summaries (
-                event_id INTEGER NOT NULL,
-                broadcaster_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                username TEXT NOT NULL,
-                contribution_points INTEGER NOT NULL DEFAULT 0,
-                final_hit_points INTEGER NOT NULL DEFAULT 0,
-                bonus_points INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (event_id, user_id)
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS raid_boss_reward_items (
-                event_id INTEGER NOT NULL,
-                broadcaster_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                item_id TEXT NOT NULL,
-                PRIMARY KEY (event_id, user_id, item_id)
-            )
-            """
-        )
-
-        try:
-            async with self.db.acquire() as connection:
-                for query in queries:
-                    await connection.execute(query)
-
-                columns = await connection.fetchall("PRAGMA table_info(raid_boss_events)")
-
-                if "boss_tier" not in {str(column["name"]) for column in columns}:
-                    await connection.execute("ALTER TABLE raid_boss_events ADD COLUMN boss_tier TEXT NOT NULL DEFAULT 'main'")
-
-                attack_columns = await connection.fetchall("PRAGMA table_info(raid_boss_attacks)")
-                attack_column_names = {str(column["name"]) for column in attack_columns}
-
-                if "weapon" not in attack_column_names:
-                    await connection.execute("ALTER TABLE raid_boss_attacks ADD COLUMN weapon TEXT")
-
-                if "potion_used" not in attack_column_names:
-                    await connection.execute("ALTER TABLE raid_boss_attacks ADD COLUMN potion_used INTEGER NOT NULL DEFAULT 0")
-
-                if "critical_hit" not in attack_column_names:
-                    await connection.execute("ALTER TABLE raid_boss_attacks ADD COLUMN critical_hit INTEGER NOT NULL DEFAULT 0")
-
-                inventory_columns = await connection.fetchall("PRAGMA table_info(raid_boss_inventory)")
-
-                if "durability" not in {str(column["name"]) for column in inventory_columns}:
-                    await connection.execute("ALTER TABLE raid_boss_inventory ADD COLUMN durability INTEGER NOT NULL DEFAULT 15")
-
-                state_columns = await connection.fetchall("PRAGMA table_info(raid_boss_channel_state)")
-
-                if "consecutive_mini_bosses" not in {str(column["name"]) for column in state_columns}:
-                    await connection.execute("ALTER TABLE raid_boss_channel_state ADD COLUMN consecutive_mini_bosses INTEGER NOT NULL DEFAULT 0")
-        except Exception:
-            LOGGER.exception("[Raid Bosses] Failed to prepare raid boss storage.")
-            raise
-
-        LOGGER.info("[Raid Bosses] Raid boss storage ready.")
+        LOGGER.info("[Raid Bosses] Raid boss storage is managed by database migrations.")
 
     async def stop(self) -> None:
         tasks = tuple(self.spawn_tasks.values()) + tuple(self.reminder_tasks.values())
@@ -218,16 +83,43 @@ class RaidBossService:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def schedule_spawn(self, broadcaster_id: str, config: RaidBossConfig, boss_tier: str | None = None, boss_type: str | None = None) -> bool:
+    async def schedule_spawn(self, broadcaster_id: str, config: RaidBossConfig, boss_tier: str | None = None, boss_type: str | None = None, stream_id: str | None = None) -> bool:
         broadcaster_id = str(broadcaster_id)
 
         if broadcaster_id in self.spawn_tasks or await self.get_active_event(broadcaster_id) is not None:
             return False
 
         automatic = boss_tier is None or boss_type is None
-        task = asyncio.create_task(self._spawn_after_warning(broadcaster_id, config, boss_tier, boss_type, automatic), name=f"raid-spawn-{broadcaster_id}")
+        stream_id = str(stream_id or self._active_stream_id(broadcaster_id) or "manual")
+        now = datetime.now(UTC)
+        warning_at = now + timedelta(seconds=self.AUTOMATIC_WARNING_SECONDS if automatic else 0)
+        spawn_at = warning_at + timedelta(seconds=self.PRE_SPAWN_SECONDS)
+        await self._save_spawn_schedule(broadcaster_id, stream_id, boss_tier, boss_type, warning_at, spawn_at)
+        task = asyncio.create_task(self._spawn_after_warning(broadcaster_id, config, boss_tier, boss_type, warning_at, spawn_at, False), name=f"raid-spawn-{broadcaster_id}")
         self.spawn_tasks[broadcaster_id] = task
         return True
+
+    async def restore_session(self, broadcaster_id: str, stream_id: str, config: RaidBossConfig) -> None:
+        broadcaster_id = str(broadcaster_id)
+        stream_id = str(stream_id)
+        active_event = await self.get_active_event(broadcaster_id)
+
+        if active_event is not None:
+            await self.register_stream(broadcaster_id, stream_id)
+            await self.start_reminders(broadcaster_id, stream_id)
+            return
+
+        schedule = await self._get_schedule(broadcaster_id)
+
+        if schedule is None or str(schedule["stream_id"]) != stream_id or schedule["spawn_at"] is None:
+            await self.schedule_spawn(broadcaster_id, config, stream_id=stream_id)
+            return
+
+        warning_at = datetime.fromisoformat(str(schedule["warning_at"]))
+        spawn_at = datetime.fromisoformat(str(schedule["spawn_at"]))
+        boss_tier = str(schedule["boss_tier"]) if schedule["boss_tier"] is not None else None
+        boss_type = str(schedule["boss_type"]) if schedule["boss_type"] is not None else None
+        self.spawn_tasks[broadcaster_id] = asyncio.create_task(self._spawn_after_warning(broadcaster_id, config, boss_tier, boss_type, warning_at, spawn_at, bool(schedule["warning_sent"])), name=f"raid-spawn-{broadcaster_id}")
 
     async def cancel_announcements(self, broadcaster_id: str) -> None:
         broadcaster_id = str(broadcaster_id)
@@ -240,25 +132,45 @@ class RaidBossService:
             if task is not None:
                 task.cancel()
 
-    async def start_reminders(self, broadcaster_id: str) -> None:
+        async with self.db.acquire() as connection:
+            await connection.execute("DELETE FROM raid_boss_schedules WHERE broadcaster_id = ?", (broadcaster_id,))
+
+    async def start_reminders(self, broadcaster_id: str, stream_id: str | None = None) -> None:
         broadcaster_id = str(broadcaster_id)
         existing = self.reminder_tasks.pop(broadcaster_id, None)
 
         if existing is not None:
             existing.cancel()
 
-        self.reminder_message_counts[broadcaster_id] = 0
+        schedule = await self._get_schedule(broadcaster_id)
+        message_count = int(schedule["reminder_message_count"]) if schedule is not None else 0
+        next_reminder_at = datetime.fromisoformat(str(schedule["next_reminder_at"])) if schedule is not None and schedule["next_reminder_at"] else datetime.now(UTC) + timedelta(seconds=self.FIRST_REMINDER_SECONDS)
+        stream_id = str(stream_id or (schedule["stream_id"] if schedule is not None else self._active_stream_id(broadcaster_id) or "unknown"))
+        await self._save_reminder_schedule(broadcaster_id, stream_id, next_reminder_at, message_count)
+        self.reminder_message_counts[broadcaster_id] = message_count
         self.reminder_activity_events[broadcaster_id] = asyncio.Event()
+
+        if message_count >= self.REQUIRED_REMINDER_MESSAGES:
+            self.reminder_activity_events[broadcaster_id].set()
+
         self.reminder_tasks[broadcaster_id] = asyncio.create_task(self._reminder_loop(broadcaster_id), name=f"raid-reminders-{broadcaster_id}")
 
-    def track_message(self, payload) -> None:
+    async def track_message(self, payload) -> None:
         broadcaster_id = str(payload.broadcaster.id)
 
         if broadcaster_id not in self.reminder_tasks:
             return
 
-        message_count = self.reminder_message_counts.get(broadcaster_id, 0) + 1
+        current_count = self.reminder_message_counts.get(broadcaster_id, 0)
+
+        if current_count >= self.REQUIRED_REMINDER_MESSAGES:
+            return
+
+        message_count = current_count + 1
         self.reminder_message_counts[broadcaster_id] = message_count
+
+        async with self.db.acquire() as connection:
+            await connection.execute("UPDATE raid_boss_schedules SET reminder_message_count = ? WHERE broadcaster_id = ?", (message_count, broadcaster_id))
 
         if message_count >= self.REQUIRED_REMINDER_MESSAGES:
             activity_event = self.reminder_activity_events.get(broadcaster_id)
@@ -266,13 +178,22 @@ class RaidBossService:
             if activity_event is not None:
                 activity_event.set()
 
-    async def _spawn_after_warning(self, broadcaster_id: str, config: RaidBossConfig, boss_tier: str | None, boss_type: str | None, automatic: bool) -> None:
+    async def _spawn_after_warning(self, broadcaster_id: str, config: RaidBossConfig, boss_tier: str | None, boss_type: str | None, warning_at: datetime, spawn_at: datetime, warning_sent: bool) -> None:
         try:
-            if automatic:
-                await asyncio.sleep(self.AUTOMATIC_WARNING_SECONDS)
+            warning_delay = max(0.0, (warning_at - datetime.now(UTC)).total_seconds())
 
-            await self._send_message(broadcaster_id, "A raid boss is approaching! It will appear in 10 minutes. Get ready to use !raid attack!")
-            await asyncio.sleep(self.PRE_SPAWN_SECONDS)
+            if warning_delay:
+                await self._sleep_until(warning_at)
+
+            if not warning_sent and datetime.now(UTC) < spawn_at:
+                await self._send_message(broadcaster_id, "A raid boss is approaching! It will appear in 10 minutes. Get ready to use !raid attack!")
+
+                async with self.db.acquire() as connection:
+                    await connection.execute("UPDATE raid_boss_schedules SET warning_sent = 1 WHERE broadcaster_id = ?", (broadcaster_id,))
+
+            await self._sleep_until(spawn_at)
+
+            automatic = boss_tier is None or boss_type is None
             event = await self.spawn_automatic(broadcaster_id, config) if automatic else await self.spawn(broadcaster_id, str(boss_type), config, str(boss_tier))
 
             if event is None:
@@ -283,38 +204,50 @@ class RaidBossService:
             if active_session is not None:
                 await self.register_stream(broadcaster_id, str(active_session.stream_id))
 
+            stream_id = str(active_session.stream_id) if active_session is not None else str(self._active_stream_id(broadcaster_id) or "manual")
+            await self._save_reminder_schedule(broadcaster_id, stream_id, datetime.now(UTC) + timedelta(seconds=self.FIRST_REMINDER_SECONDS), 0)
             await self.send_announcement(broadcaster_id, self._spawn_message(event), "orange")
-            await self.start_reminders(broadcaster_id)
+            await self.start_reminders(broadcaster_id, stream_id)
         except asyncio.CancelledError:
             raise
         except Exception:
             LOGGER.exception("[Raid Bosses] Scheduled spawn failed for broadcaster %s.", broadcaster_id)
         finally:
-            self.spawn_tasks.pop(broadcaster_id, None)
+            if self.spawn_tasks.get(broadcaster_id) is asyncio.current_task():
+                self.spawn_tasks.pop(broadcaster_id, None)
 
     async def _reminder_loop(self, broadcaster_id: str) -> None:
         try:
-            await asyncio.sleep(self.FIRST_REMINDER_SECONDS)
-
             while True:
                 event = await self.get_active_event(broadcaster_id)
 
                 if event is None:
                     return
 
+                schedule = await self._get_schedule(broadcaster_id)
+                next_reminder_at = datetime.fromisoformat(str(schedule["next_reminder_at"])) if schedule is not None and schedule["next_reminder_at"] else datetime.now(UTC)
+                await self._sleep_until(next_reminder_at)
                 await self._wait_for_reminder_activity(broadcaster_id)
+                event = await self.get_active_event(broadcaster_id)
+
+                if event is None:
+                    return
+
                 await self._send_message(broadcaster_id, self._reminder_message(event))
                 self.reminder_message_counts[broadcaster_id] = 0
                 self.reminder_activity_events[broadcaster_id].clear()
-                await asyncio.sleep(self.REPEAT_REMINDER_SECONDS)
+                next_reminder_at = datetime.now(UTC) + timedelta(seconds=self.REPEAT_REMINDER_SECONDS)
+                stream_id = str(schedule["stream_id"]) if schedule is not None else str(self._active_stream_id(broadcaster_id) or "unknown")
+                await self._save_reminder_schedule(broadcaster_id, stream_id, next_reminder_at, 0)
         except asyncio.CancelledError:
             raise
         except Exception:
             LOGGER.exception("[Raid Bosses] Reminder loop failed for broadcaster %s.", broadcaster_id)
         finally:
-            self.reminder_tasks.pop(broadcaster_id, None)
-            self.reminder_message_counts.pop(broadcaster_id, None)
-            self.reminder_activity_events.pop(broadcaster_id, None)
+            if self.reminder_tasks.get(broadcaster_id) is asyncio.current_task():
+                self.reminder_tasks.pop(broadcaster_id, None)
+                self.reminder_message_counts.pop(broadcaster_id, None)
+                self.reminder_activity_events.pop(broadcaster_id, None)
 
     async def _wait_for_reminder_activity(self, broadcaster_id: str) -> None:
         if self.reminder_message_counts.get(broadcaster_id, 0) >= self.REQUIRED_REMINDER_MESSAGES:
@@ -327,6 +260,54 @@ class RaidBossService:
             self.reminder_activity_events[broadcaster_id] = activity_event
 
         await activity_event.wait()
+
+    @staticmethod
+    async def _sleep_until(target: datetime) -> None:
+        await asyncio.sleep(max(0.0, (target - datetime.now(UTC)).total_seconds()))
+
+    def _active_stream_id(self, broadcaster_id: str) -> str | None:
+        services = getattr(self.bot, "services", None)
+        stream_logs = getattr(services, "stream_logs", None)
+        active_sessions = getattr(stream_logs, "active_sessions", {})
+        session = active_sessions.get(str(broadcaster_id))
+        return str(session.stream_id) if session is not None else None
+
+    async def _get_schedule(self, broadcaster_id: str):
+        async with self.db.acquire() as connection:
+            return await connection.fetchone("SELECT * FROM raid_boss_schedules WHERE broadcaster_id = ?", (str(broadcaster_id),))
+
+    async def _save_spawn_schedule(self, broadcaster_id: str, stream_id: str, boss_tier: str | None, boss_type: str | None, warning_at: datetime, spawn_at: datetime) -> None:
+        query = """
+        INSERT INTO raid_boss_schedules (broadcaster_id, stream_id, boss_tier, boss_type, warning_at, warning_sent, spawn_at)
+        VALUES (?, ?, ?, ?, ?, 0, ?)
+        ON CONFLICT(broadcaster_id) DO UPDATE SET
+            stream_id = excluded.stream_id,
+            boss_tier = excluded.boss_tier,
+            boss_type = excluded.boss_type,
+            warning_at = excluded.warning_at,
+            warning_sent = 0,
+            spawn_at = excluded.spawn_at,
+            next_reminder_at = NULL,
+            reminder_message_count = 0
+        """
+
+        async with self.db.acquire() as connection:
+            await connection.execute(query, (broadcaster_id, stream_id, boss_tier, boss_type, warning_at.isoformat(), spawn_at.isoformat()))
+
+    async def _save_reminder_schedule(self, broadcaster_id: str, stream_id: str, next_reminder_at: datetime, message_count: int) -> None:
+        query = """
+        INSERT INTO raid_boss_schedules (broadcaster_id, stream_id, next_reminder_at, reminder_message_count)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(broadcaster_id) DO UPDATE SET
+            stream_id = excluded.stream_id,
+            warning_at = NULL,
+            spawn_at = NULL,
+            next_reminder_at = excluded.next_reminder_at,
+            reminder_message_count = excluded.reminder_message_count
+        """
+
+        async with self.db.acquire() as connection:
+            await connection.execute(query, (broadcaster_id, stream_id, next_reminder_at.isoformat(), message_count))
 
     async def _send_message(self, broadcaster_id: str, message: str) -> None:
         channel = self.bot.create_partialuser(str(broadcaster_id))
@@ -905,6 +886,12 @@ class RaidBossService:
 
         if reminder_task is not None:
             reminder_task.cancel()
+
+        self.reminder_message_counts.pop(str(broadcaster_id), None)
+        self.reminder_activity_events.pop(str(broadcaster_id), None)
+
+        async with self.db.acquire() as connection:
+            await connection.execute("DELETE FROM raid_boss_schedules WHERE broadcaster_id = ?", (str(broadcaster_id),))
 
         return payout_pool
 

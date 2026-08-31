@@ -1,11 +1,11 @@
 import logging
 
-from config.settings import settings
-
+from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatterIdentityService, FeatureToggleService, ProfileSettingsService
 from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PointsService, RaidBossService, RedeemService, ViewerQueueService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
+from config.settings import settings
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -74,8 +74,10 @@ class ServiceContainer:
             LOGGER.info("[Services] %s setup complete.", name)
 
         for session in self.stream_logs.active_sessions.values():
-            await self.raid_bosses.register_stream(session.broadcaster_id, session.stream_id)
-            await self.raid_bosses.start_reminders(session.broadcaster_id)
+            profile = get_active_profile(session.broadcaster_id)
+
+            if profile is not None and profile.raid_bosses.enabled and self.features.is_enabled(session.broadcaster_id, FeatureName.RAID_BOSSES):
+                await self.raid_bosses.restore_session(session.broadcaster_id, session.stream_id, profile.raid_bosses)
 
         LOGGER.info("[Services] Service setup completed.")
 
