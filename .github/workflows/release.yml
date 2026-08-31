@@ -89,3 +89,20 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "RatsBoomBot ${tag}" \
             --generate-notes
+
+  deploy-production:
+    name: Deploy production
+    if: github.event_name == 'push'
+    needs: publish-release
+    runs-on:
+      - self-hosted
+      - linux
+      - ratsboombot
+    permissions:
+      contents: read
+    concurrency:
+      group: production-deployment
+      cancel-in-progress: false
+    steps:
+      - name: Deploy RatsBoomBot on Raspberry Pi
+        run: /opt/ratsboombot/deploy/linux/deploy.sh
