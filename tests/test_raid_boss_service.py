@@ -7,6 +7,7 @@ import pytest
 from bot.profiles import RaidBossConfig, RaidBossNames
 from bot.services.engagement.points import PointsService
 from bot.services.engagement.raid_boss import RaidBossService
+from storage.migration_runner import run_migrations
 
 
 class FakeRaidChannel:
@@ -93,8 +94,13 @@ async def test_scheduled_tutorial_warns_then_spawns_and_starts_reminders(tmp_pat
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         bot = FakeRaidBot()
         service = RaidBossService(bot=bot, db=database)
+        await run_migrations(database)
         await service.setup()
-        monkeypatch.setattr(service, "PRE_SPAWN_SECONDS", 0)
+
+        async def skip_deadline(target):
+            return None
+
+        monkeypatch.setattr(service, "_sleep_until", skip_deadline)
 
         scheduled = await service.schedule_spawn("channel-1", build_config(tutorial_enabled=True), "tutorial", "melee")
         spawn_task = service.spawn_tasks["channel-1"]
@@ -113,30 +119,85 @@ async def test_scheduled_tutorial_warns_then_spawns_and_starts_reminders(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_scheduled_spawn_restores_original_deadlines_after_restart(tmp_path, monkeypatch) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        await run_migrations(database)
+        first_service = RaidBossService(bot=FakeRaidBot(), db=database)
+        await first_service.schedule_spawn("channel-1", build_config(), stream_id="stream-1")
+        original_schedule = await first_service._get_schedule("channel-1")
+        original_task = first_service.spawn_tasks.pop("channel-1")
+        original_task.cancel()
+        await asyncio.gather(original_task, return_exceptions=True)
+
+        restored = []
+        restarted_service = RaidBossService(bot=FakeRaidBot(), db=database)
+
+        async def capture_restore(broadcaster_id, config, boss_tier, boss_type, warning_at, spawn_at, warning_sent):
+            restored.append((broadcaster_id, warning_at, spawn_at, warning_sent))
+
+        monkeypatch.setattr(restarted_service, "_spawn_after_warning", capture_restore)
+        await restarted_service.restore_session("channel-1", "stream-1", build_config())
+        await restarted_service.spawn_tasks["channel-1"]
+
+        assert len(restored) == 1
+        assert restored[0][0] == "channel-1"
+        assert restored[0][1].isoformat() == str(original_schedule["warning_at"])
+        assert restored[0][2].isoformat() == str(original_schedule["spawn_at"])
+        assert restored[0][3] is False
+
+
+@pytest.mark.asyncio
+async def test_reminder_deadline_and_chat_count_restore_after_restart(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        await run_migrations(database)
+        first_service = RaidBossService(bot=FakeRaidBot(), db=database)
+        await first_service.spawn("channel-1", "melee", build_config())
+        await first_service.start_reminders("channel-1", "stream-1")
+
+        for _ in range(7):
+            await first_service.track_message(SimpleNamespace(broadcaster=SimpleNamespace(id="channel-1")))
+
+        original_schedule = await first_service._get_schedule("channel-1")
+        original_task = first_service.reminder_tasks.pop("channel-1")
+        original_task.cancel()
+        await asyncio.gather(original_task, return_exceptions=True)
+
+        restarted_service = RaidBossService(bot=FakeRaidBot(), db=database)
+        await restarted_service.start_reminders("channel-1", "stream-1")
+        restored_schedule = await restarted_service._get_schedule("channel-1")
+
+        assert restarted_service.reminder_message_counts["channel-1"] == 7
+        assert str(restored_schedule["next_reminder_at"]) == str(original_schedule["next_reminder_at"])
+        await restarted_service.stop()
+
+
+@pytest.mark.asyncio
 async def test_automatic_boss_warns_at_20_minutes_and_spawns_at_30_minutes(tmp_path, monkeypatch) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         bot = FakeRaidBot()
         service = RaidBossService(bot=bot, db=database)
+        await run_migrations(database)
         await service.setup()
         async with database.acquire() as connection:
             await connection.execute("INSERT INTO raid_boss_channel_state (broadcaster_id, tutorial_completed) VALUES (?, 1)", ("channel-1",))
 
-        sleeps = []
+        deadlines = []
 
-        async def capture_sleep(seconds):
-            sleeps.append(seconds)
+        async def capture_deadline(target):
+            deadlines.append(target)
 
         async def skip_reminders(broadcaster_id):
             return None
 
-        monkeypatch.setattr("bot.services.engagement.raid_boss.asyncio.sleep", capture_sleep)
+        monkeypatch.setattr(service, "_sleep_until", capture_deadline)
         monkeypatch.setattr(service, "start_reminders", skip_reminders)
         scheduled = await service.schedule_spawn("channel-1", build_config())
         spawn_task = service.spawn_tasks["channel-1"]
         await spawn_task
 
         assert scheduled is True
-        assert sleeps[:2] == [20 * 60, 10 * 60]
+        assert len(deadlines) == 2
+        assert (deadlines[1] - deadlines[0]).total_seconds() == 10 * 60
         assert "10 minutes" in bot.messages[0]
         assert "has appeared" in bot.announcements[0]["message"]
         await service.stop()
@@ -147,46 +208,50 @@ async def test_active_raid_reminds_after_45_minutes_then_waits_60_minutes(tmp_pa
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         bot = FakeRaidBot()
         service = RaidBossService(bot=bot, db=database)
+        await run_migrations(database)
         await service.setup()
         await service.spawn("channel-1", "melee", build_config())
         service.reminder_message_counts["channel-1"] = 20
         service.reminder_activity_events["channel-1"] = asyncio.Event()
-        sleeps = []
+        deadlines = []
 
-        async def capture_sleep(seconds):
-            sleeps.append(seconds)
+        async def capture_deadline(target):
+            deadlines.append(target)
 
-            if len(sleeps) == 2:
+            if len(deadlines) == 2:
                 raise asyncio.CancelledError
 
-        monkeypatch.setattr("bot.services.engagement.raid_boss.asyncio.sleep", capture_sleep)
+        monkeypatch.setattr(service, "_sleep_until", capture_deadline)
 
         with pytest.raises(asyncio.CancelledError):
             await service._reminder_loop("channel-1")
 
-        assert sleeps == [45 * 60, 60 * 60]
+        assert len(deadlines) == 2
+        assert (deadlines[1] - deadlines[0]).total_seconds() == 60 * 60
         assert len(bot.messages) == 1
         assert bot.messages[0].startswith("Raid reminder:")
 
 
 @pytest.mark.asyncio
-async def test_raid_reminder_waits_for_twenty_chat_messages() -> None:
-    service = RaidBossService(bot=None, db=None)
-    service.reminder_tasks["channel-1"] = asyncio.current_task()
-    service.reminder_message_counts["channel-1"] = 0
-    service.reminder_activity_events["channel-1"] = asyncio.Event()
-    wait_task = asyncio.create_task(service._wait_for_reminder_activity("channel-1"))
+async def test_raid_reminder_waits_for_twenty_chat_messages(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        await run_migrations(database)
+        service = RaidBossService(bot=None, db=database)
+        service.reminder_tasks["channel-1"] = asyncio.current_task()
+        service.reminder_message_counts["channel-1"] = 0
+        service.reminder_activity_events["channel-1"] = asyncio.Event()
+        wait_task = asyncio.create_task(service._wait_for_reminder_activity("channel-1"))
 
-    for _ in range(19):
-        service.track_message(SimpleNamespace(broadcaster=SimpleNamespace(id="channel-1")))
+        for _ in range(19):
+            await service.track_message(SimpleNamespace(broadcaster=SimpleNamespace(id="channel-1")))
 
-    await asyncio.sleep(0)
-    assert wait_task.done() is False
+        await asyncio.sleep(0)
+        assert wait_task.done() is False
 
-    service.track_message(SimpleNamespace(broadcaster=SimpleNamespace(id="channel-1")))
-    await wait_task
+        await service.track_message(SimpleNamespace(broadcaster=SimpleNamespace(id="channel-1")))
+        await wait_task
 
-    assert service.reminder_message_counts["channel-1"] == 20
+        assert service.reminder_message_counts["channel-1"] == 20
 
 
 @pytest.mark.asyncio
@@ -208,6 +273,7 @@ async def test_raid_announcement_falls_back_to_bot_chat(monkeypatch) -> None:
 async def test_automatic_cycle_waits_for_tutorial_completion(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
         await service.setup()
 
         event = await service.spawn_automatic("channel-1", build_config())
@@ -231,6 +297,7 @@ async def test_automatic_cycle_uses_main_boss_pity_chances(tmp_path, monkeypatch
 
     async with asqlite.create_pool(str(tmp_path / f"raid-{consecutive_minis}-{roll}.db")) as database:
         service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
         await service.setup()
         async with database.acquire() as connection:
             await connection.execute("INSERT INTO raid_boss_channel_state (broadcaster_id, tutorial_completed, consecutive_mini_bosses) VALUES (?, 1, ?)", ("channel-1", consecutive_minis))
@@ -259,6 +326,7 @@ async def test_critical_hit_adds_fifty_percent_damage(tmp_path, monkeypatch) -> 
 
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
         await service.setup()
         config = build_config(max_hp=1000)
         await service.spawn("channel-1", "melee", config)
@@ -275,6 +343,7 @@ async def test_mini_boss_uses_tier_specific_name_balance_and_persisted_tier(tmp_
 
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
         await service.setup()
         config = build_config(
             mini_names=RaidBossNames(melee="Behemoth", ranged="Magitek Gunship", magic="Ahriman"),
@@ -299,6 +368,7 @@ async def test_mini_boss_uses_tier_specific_name_balance_and_persisted_tier(tmp_
 async def test_main_boss_remains_the_default_spawn_tier(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
         await service.setup()
         config = build_config(max_hp=150000, duration_streams=5, reward_pool=100000)
 
@@ -318,6 +388,7 @@ async def test_attack_is_limited_once_per_viewer_per_stream(tmp_path) -> None:
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config()
         await service.spawn("channel-1", "melee", config)
@@ -337,6 +408,7 @@ async def test_matching_weapon_and_power_potion_stack(tmp_path) -> None:
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(max_hp=5000)
         await points.add_points("channel-1", "user-1", "alice", 1000)
@@ -371,6 +443,7 @@ async def test_weapon_durability_disables_bonus_until_repaired(tmp_path) -> None
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(max_hp=5000, weapon_cost=200, weapon_durability=1, repair_cost=150)
         await points.add_points("channel-1", "user-1", "alice", 1000)
@@ -401,6 +474,7 @@ async def test_dashboard_metrics_summarize_latest_encounter(tmp_path, monkeypatc
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(max_hp=5000, weapon_cost=200, potion_cost=300)
         await points.add_points("channel-1", "user-1", "alice", 1000)
@@ -433,6 +507,7 @@ async def test_failed_subjugation_uses_half_or_quarter_reward_pool(tmp_path) -> 
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
 
         quarter_config = build_config(base_damage_min=100, base_damage_max=100)
@@ -457,6 +532,7 @@ async def test_final_hit_distributes_full_pool_and_finisher_reward(tmp_path) -> 
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(max_hp=100)
         await service.spawn("channel-1", "magic", config)
@@ -475,6 +551,7 @@ async def test_first_encounter_gives_every_participant_a_random_starter_weapon(t
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(tutorial_enabled=True, tutorial_name="Striking Dummy", tutorial_hp=10000, tutorial_duration_streams=2, base_damage_min=5000, base_damage_max=5000, reward_points_per_hp=0.5)
 
@@ -506,6 +583,7 @@ async def test_tutorial_reward_rerolls_an_owned_starter_weapon(tmp_path, monkeyp
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(tutorial_enabled=True, tutorial_hp=100, base_damage_min=100, base_damage_max=100)
         async with database.acquire() as connection:
@@ -527,6 +605,7 @@ async def test_latest_loot_persists_points_final_hit_bonus_and_items(tmp_path, m
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(tutorial_enabled=True, tutorial_hp=100, base_damage_min=100, base_damage_max=100)
         await service.spawn("channel-1", "melee", config, "tutorial")
@@ -552,6 +631,7 @@ async def test_latest_loot_includes_tutorial_collection_points(tmp_path) -> None
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(tutorial_enabled=True, tutorial_hp=100, base_damage_min=100, base_damage_max=100, tutorial_complete_collection_points=5000)
         async with database.acquire() as connection:
@@ -576,6 +656,7 @@ async def test_tutorial_rewards_five_thousand_points_when_all_starter_weapons_ar
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(tutorial_enabled=True, tutorial_hp=100, base_damage_min=100, base_damage_max=100, tutorial_complete_collection_points=5000)
         async with database.acquire() as connection:
@@ -595,6 +676,7 @@ async def test_previous_pilot_does_not_prevent_manual_tutorial_spawn(tmp_path) -
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(tutorial_enabled=True)
         await service.spawn("channel-1", "magic", config, "mini")
@@ -613,6 +695,7 @@ async def test_defeated_boss_can_drop_type_matching_unique_weapon(tmp_path) -> N
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(max_hp=100, final_hit_unique_drop_chance=1.1)
         await service.spawn("channel-1", "magic", config)
@@ -630,6 +713,7 @@ async def test_top_contributor_gets_separate_unique_drop_roll(tmp_path) -> None:
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(max_hp=200, final_hit_unique_drop_chance=0.0, top_contributor_unique_drop_chance=1.1)
         await service.spawn("channel-1", "ranged", config)
@@ -648,6 +732,7 @@ async def test_top_ten_percent_each_receive_an_independent_unique_drop_roll(tmp_
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(max_hp=2000, final_hit_unique_drop_chance=0.0, top_contributor_unique_drop_chance=1.1, top_contributor_percent=0.10)
         await service.spawn("channel-1", "melee", config)
@@ -667,6 +752,7 @@ async def test_boss_expires_after_configured_number_of_unique_streams(tmp_path) 
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
         await points.setup()
+        await run_migrations(database)
         await service.setup()
         config = build_config(duration_streams=2)
         await service.spawn("channel-1", "melee", config)
