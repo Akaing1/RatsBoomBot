@@ -46,3 +46,6 @@ def test_streamer_dashboard_has_profile_customization_page() -> None:
     assert "Save Changes" in template
     assert "Use Default" in template
     assert "Social links" in template
+    assert "Channel default:" in template
+    assert "Profile default:" not in template
+    assert "Please contact the developer" in template
