@@ -883,6 +883,12 @@ body.landing-page {
 .profile-setting-input { width: 100%; margin-top: 16px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 9px; outline: none; resize: vertical; background: var(--background); color: var(--text); font: inherit; line-height: 1.45; }
 .profile-setting-input:focus { border-color: var(--accent); }
 .profile-setting-actions { margin-top: auto; padding-top: 16px; }
+.timer-message-editor { display: grid; gap: 14px; }
+.timer-message-list { display: grid; gap: 12px; }
+.timer-message-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.timer-message-row .profile-setting-input { resize: vertical; }
+.timer-remove-button { min-height: 42px; }
+.timer-add-button { justify-self: start; }
 
 @media (max-width: 900px) {
     .toggle-grid, .profile-settings-grid {
@@ -891,6 +897,9 @@ body.landing-page {
 }
 
 @media (max-width: 560px) {
+    .timer-message-row { grid-template-columns: 1fr; }
+    .timer-remove-button { justify-self: start; }
+
     .toggle-card-heading {
         flex-direction: column;
     }
