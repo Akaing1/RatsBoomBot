@@ -311,16 +311,16 @@ class RaidBossService:
 
     async def _send_message(self, broadcaster_id: str, message: str) -> None:
         channel = self.bot.create_partialuser(str(broadcaster_id))
-        await channel.send_message(sender=self.bot.user, message=message)
+        await self.bot.services.chat_identity.send_message(channel, message)
 
     async def send_announcement(self, broadcaster_id: str, message: str, color: str) -> None:
         channel = self.bot.create_partialuser(str(broadcaster_id))
 
         try:
-            await channel.send_announcement(moderator=str(self.bot.user.id), message=message, color=color)
+            await self.bot.services.chat_identity.send_announcement(channel, message, color)
         except Exception:
             LOGGER.warning("[Raid Bosses] Could not send a raid announcement for broadcaster %s. Falling back to a chat message.", broadcaster_id, exc_info=True, extra={"broadcaster_id": str(broadcaster_id)})
-            await channel.send_message(sender=self.bot.user, message=message)
+            await self.bot.services.chat_identity.send_message(channel, message)
 
     @staticmethod
     def _spawn_message(event: RaidBossEvent) -> str:

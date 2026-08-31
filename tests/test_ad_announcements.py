@@ -10,6 +10,7 @@ from bot.services.stream.ad_announcements import AdAnnouncementService
 class FakeBroadcaster:
 
     def __init__(self, next_ad_at):
+        self.id = "channel-1"
         self.next_ad_at = next_ad_at
         self.announcements = []
         self.messages = []
@@ -22,8 +23,20 @@ class FakeBroadcaster:
     async def send_announcement(self, *, moderator, message: str, color: str) -> None:
         self.announcements.append({"moderator": moderator, "message": message, "color": color})
 
-    async def send_message(self, *, sender, message: str) -> None:
+    async def send_message(self, *, sender, message: str, reply_to_message_id=None) -> None:
         self.messages.append(message)
+
+
+class FakeChatIdentity:
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    async def send_announcement(self, broadcaster, message, color):
+        await broadcaster.send_announcement(moderator=self.bot.user.id, message=message, color=color)
+
+    async def send_message(self, broadcaster, message):
+        await broadcaster.send_message(sender=self.bot.user, message=message)
 
 
 class FakeBroadcasterService:
@@ -39,7 +52,8 @@ class FakeBot:
         self.services = SimpleNamespace(
             features=SimpleNamespace(
                 is_enabled=lambda broadcaster_id, feature: ad_announcements_enabled
-            )
+            ),
+            chat_identity=FakeChatIdentity(self)
         )
         self.user = SimpleNamespace(id="bot-1")
 

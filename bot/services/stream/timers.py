@@ -199,7 +199,7 @@ class TimerService:
 
         try:
             channel = self.bot.create_partialuser(broadcaster_id)
-            await channel.send_message(sender=self.bot.user, message=message)
+            await self.bot.services.chat_identity.send_message(channel, message)
         except Exception:
             LOGGER.exception(
                 "[Timers] Failed to send announcement to %s (%s).",

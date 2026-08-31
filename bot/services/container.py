@@ -1,7 +1,7 @@
 import logging
 
 from bot.profiles import FeatureName, get_active_profile
-from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatterIdentityService, FeatureToggleService, ProfileSettingsService
+from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatIdentityService, ChatterIdentityService, FeatureToggleService, ProfileSettingsService
 from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PointsService, RaidBossService, RedeemService, ViewerQueueService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
@@ -20,6 +20,7 @@ class ServiceContainer:
 
         self.broadcasters = BroadcasterService(bot, broadcaster_ids)
         self.broadcaster_settings = BroadcasterSettingsService(db)
+        self.chat_identity = ChatIdentityService(bot, db)
         self.chatters = ChatterIdentityService(bot, db)
         self.profile_settings = ProfileSettingsService(db)
         self.features = FeatureToggleService(db, self.profile_settings)
@@ -47,6 +48,7 @@ class ServiceContainer:
         services = (
             ("BroadcasterService", self.broadcasters),
             ("BroadcasterSettingsService", self.broadcaster_settings),
+            ("ChatIdentityService", self.chat_identity),
             ("ChatterIdentityService", self.chatters),
             ("ProfileSettingsService", self.profile_settings),
             ("FeatureToggleService", self.features),

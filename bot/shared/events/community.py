@@ -32,7 +32,7 @@ class CommunityEvents(commands.Component):
         broadcaster = self.bot.create_partialuser(broadcaster_id)
 
         try:
-            await broadcaster.send_message(sender=self.bot.user, message=message)
+            await self.bot.services.chat_identity.send_message(broadcaster, message)
         except Exception:
             LOGGER.exception(
                 "[Events] Failed to send community message for broadcaster %s.",

@@ -114,7 +114,7 @@ class RaidEvents(commands.Component):
             channel = self.bot.create_partialuser(broadcaster_id)
 
             try:
-                await channel.send_message(sender=self.bot.user, message=message)
+                await self.bot.services.chat_identity.send_message(channel, message)
             except Exception:
                 LOGGER.exception(
                     "[Events] Failed to send raid message in %s (%s).",

@@ -102,6 +102,11 @@ async def setup_database(db: asqlite.Pool) -> tuple[list[tuple[Any, Any]], list[
             FROM tokens
             """
         )
+        custom_bot_rows = await connection.fetchall(
+            "SELECT DISTINCT bot_user_id FROM channel_chat_identities WHERE bot_user_id IS NOT NULL"
+        )
+
+    custom_bot_ids = {str(row["bot_user_id"]) for row in custom_bot_rows}
 
     tokens: list[tuple[Any, Any]] = []
     subscriptions: list[Any] = []
@@ -111,9 +116,9 @@ async def setup_database(db: asqlite.Pool) -> tuple[list[tuple[Any, Any]], list[
         user_id = str(row["user_id"])
         tokens.append((row["token"], row["refresh"]))
 
-        if user_id == str(settings.BOT_ID):
+        if user_id == str(settings.BOT_ID) or user_id in custom_bot_ids:
             LOGGER.debug(
-                "[OAuth] Loaded bot OAuth token for user %s.",
+                "[OAuth] Loaded chat bot OAuth token for user %s.",
                 user_id
             )
             continue

@@ -145,7 +145,7 @@ class RedeemEvents(commands.Component):
         broadcaster = self.bot.create_partialuser(broadcaster_id)
 
         try:
-            await broadcaster.send_message(sender=self.bot.user, message=result.message)
+            await self.bot.services.chat_identity.send_message(broadcaster, result.message)
         except Exception:
             LOGGER.exception(
                 "[Events] Failed to send redemption response for '%s'.",

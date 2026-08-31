@@ -523,6 +523,63 @@
     </div>
 </section>
 
+{% if identity_message %}
+    <div class="toggle-feedback {% if identity_result == 'success' %}success{% else %}error{% endif %}" role="status">
+        <span class="toggle-feedback-icon">{% if identity_result == "success" %}&#10003;{% else %}!{% endif %}</span>
+        <span>{{ identity_message }}</span>
+    </div>
+{% endif %}
+
+<section class="panel custom-bot-panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Premium feature</p>
+            <h3>Custom bot identity</h3>
+            <p class="panel-description">Use a dedicated Twitch account as this channel's visible chat and announcement identity.</p>
+        </div>
+        <span class="toggle-status {% if chat_identity.connected %}enabled{% endif %}">{% if chat_identity.connected %}Connected{% elif chat_identity.premium_enabled %}Ready to connect{% else %}Standard{% endif %}</span>
+    </div>
+
+    {% if chat_identity.connected %}
+        <div class="channel-user-details">
+            <div><span>Active identity</span><strong>{{ chat_identity.bot_display_name }} (@{{ chat_identity.bot_login }})</strong></div>
+            <div><span>Twitch user ID</span><strong>{{ chat_identity.bot_user_id }}</strong></div>
+        </div>
+        <p class="panel-description">If this account cannot send, RatsBoomBot automatically attempts the message and records the failure in the channel log.</p>
+    {% elif chat_identity.premium_enabled %}
+        <p class="panel-description">Sign into the dedicated character account on Twitch. Do not use the broadcaster account or the RatsBoomBot account.</p>
+    {% else %}
+        <p class="panel-description">Enable this entitlement for channels subscribed to the premium custom-identity option.</p>
+    {% endif %}
+
+    {% if administrator and administrator.role == "owner" %}
+        <div class="toggle-actions profile-setting-actions">
+            {% if chat_identity.premium_enabled %}
+                <a class="button primary" href="/admin/channels/{{ broadcaster.id }}/custom-bot/connect">{% if chat_identity.connected %}Reconnect Account{% else %}Connect Custom Bot{% endif %}</a>
+
+                {% if chat_identity.connected %}
+                    <form method="post" action="/admin/channels/{{ broadcaster.id }}/custom-bot/disconnect" onsubmit="return confirm('Disconnect @{{ chat_identity.bot_login }} from this channel?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="button secondary" type="submit">Disconnect Account</button>
+                    </form>
+                {% endif %}
+
+                <form method="post" action="/admin/channels/{{ broadcaster.id }}/custom-bot/premium">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="action" value="disable">
+                    <button class="button danger" type="submit">Disable Premium Access</button>
+                </form>
+            {% else %}
+                <form method="post" action="/admin/channels/{{ broadcaster.id }}/custom-bot/premium">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="action" value="enable">
+                    <button class="button primary" type="submit">Enable Premium Access</button>
+                </form>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+
 <div class="channel-removal-section">
     <section class="panel danger-zone">
         <div class="panel-header">

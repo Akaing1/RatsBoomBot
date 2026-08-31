@@ -4,13 +4,14 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **8.1.0**
+Current version: **8.2.0**
 
 ## Highlights
 
 - Multi-channel Twitch chat and EventSub handling
 - Channel-specific profiles, commands, currencies, messages, and feature defaults
 - Twitch OAuth for the bot account and connected broadcasters
+- Optional premium per-channel Twitch bot identities with automatic fallback
 - Persistent points, counters, redeem history, settings, and moderation data
 - Daily, first, second, self-timeout, and targeted-timeout redeems
 - Streamer.bot and Mix It Up redeem-history import tools
@@ -145,6 +146,7 @@ The administrator dashboard at `/admin` provides:
 - Runtime, database, and OAuth status
 - Broadcaster onboarding and removal
 - Per-channel feature and command controls
+- Owner-managed premium custom bot identity access and OAuth connections
 - Viewer queue and redeem activity inspection
 - Real-time CPU, memory, disk, temperature, uptime, and process metrics
 - Real-time application logs
@@ -152,6 +154,12 @@ The administrator dashboard at `/admin` provides:
 - Owner-managed administrator accounts
 
 Forms use CSRF protection, and sessions are signed with `SESSION_SECRET`.
+
+### Premium Custom Bot Identities
+
+An owner can grant a connected channel access to a dedicated Twitch chat identity from its administrator page. The custom account authorizes through the existing bot OAuth callback and is then used for command responses, timers, community events, redeems, raids, shoutouts, ad warnings, and announcements in that channel only.
+
+Custom identities are database-backed and do not require per-customer environment variables or a separate bot process. If a custom account cannot send, RatsBoomBot retries with the standard bot identity and records the failure in the channel's persistent stream log. Billing is intentionally external to the entitlement toggle so subscriptions can be managed manually or connected to a payment provider later.
 
 ## Stream Logs
 
@@ -167,7 +175,7 @@ The service resumes the same Twitch stream after a bot restart. Each channel ret
 
 ## Database and Migrations
 
-The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadcaster connections, administrator accounts, settings, overrides, points, counters, redeem history, dashboard activity, viewer queues, raid bosses and scheduler state, first-chat shoutouts, moderation data, and migration history.
+The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadcaster connections, premium chat identity assignments, administrator accounts, settings, overrides, points, counters, redeem history, dashboard activity, viewer queues, raid bosses and scheduler state, first-chat shoutouts, moderation data, and migration history.
 
 League statistics are stored separately in `.data/league.db`. This database contains replaceable external cache data, including seasonal champion summaries, recent ranked matches, and item metadata.
 
@@ -180,6 +188,11 @@ Migrations run automatically during startup:
 5. Redemption activity
 6. Second-redeem constraints
 7. First-chat shoutout history
+8. Chatter identity cache
+9. Reklop counter seed
+10. Persistent viewer queues
+11. Persistent raid bosses and scheduler state
+12. Premium custom bot identities
 
 Use a new migration for schema changes instead of rebuilding the production database.
 
