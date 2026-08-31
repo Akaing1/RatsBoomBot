@@ -51,3 +51,4 @@ def test_streamer_dashboard_has_profile_customization_page() -> None:
     assert "Please contact the developer" in template
     assert "data-add-timer" in template
     assert "data-remove-timer" in template
+    assert "full-width" in template
