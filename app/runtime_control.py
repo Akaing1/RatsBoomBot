@@ -5,7 +5,9 @@ import signal
 
 LOGGER = logging.getLogger("RatBoomBot")
 
-RESTART_DELAY_SECONDS = 1.0
+# Give the browser and reverse proxy enough time to receive the restarting page
+# before this process closes its active connections.
+RESTART_DELAY_SECONDS = 5.0
 
 
 async def restart_runtime() -> None:

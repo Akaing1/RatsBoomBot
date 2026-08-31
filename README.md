@@ -304,6 +304,16 @@ Point commands use the profile's currency command and provide `leaderboard`, `re
 
 The production instance runs on a Raspberry Pi under systemd and HTTPS. Assets under `deploy/` include the service unit, Linux deployment with pre-deployment backup, scheduled SQLite backups with integrity checks and retention, a Windows PowerShell deployment wrapper, and Cloudflare tunnel support.
 
+Merges and direct pushes to `master` publish the configured application version and then deploy production through a self-hosted GitHub Actions runner on the Raspberry Pi. Register the runner with the custom label `ratsboombot` and run its service as the `rats-bot` user. The runner invokes `/opt/ratsboombot/deploy/linux/deploy.sh`, which retains the existing backup, compile check, systemd restart, health check, and automatic rollback behavior.
+
+The runner host must allow the `rats-bot` user to run the two systemd commands used by the deployment script without an interactive password:
+
+```text
+rats-bot ALL=(root) NOPASSWD: /usr/bin/systemctl restart ratsboombot, /usr/bin/systemctl is-active --quiet ratsboombot
+```
+
+Keep the production runner restricted to the `ratsboombot` label. The deployment job runs only after the GitHub release job succeeds on `master`; pull requests never execute code on the Pi.
+
 Production should configure:
 
 ```env
@@ -339,7 +349,7 @@ Version **6.0.0** marks the checkpoint where RatsBoomBot became a structured mul
 - Broadcaster onboarding is intended for invited channels and is not invitation-gated in the application.
 - New channels require a registered profile for complete behavior.
 - Some game data depends on third-party services and public player profiles.
-- Production deployment remains operator-managed rather than turnkey hosting.
+- Production deployment requires a registered self-hosted Raspberry Pi runner.
 - Not every profile-specific message and redeem has a dashboard editor.
 
 ## Development Guidelines

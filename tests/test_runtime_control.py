@@ -47,6 +47,10 @@ def test_systemd_restarts_after_clean_dashboard_shutdown() -> None:
     assert "Restart=always" in service_text
 
 
+def test_restart_delay_allows_proxy_response_to_finish() -> None:
+    assert runtime_control.RESTART_DELAY_SECONDS >= 5.0
+
+
 @pytest.mark.asyncio
 async def test_restart_route_requires_owner_before_scheduling_restart(monkeypatch) -> None:
     async def reject_non_owner(request: Request):
