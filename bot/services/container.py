@@ -58,7 +58,6 @@ class ServiceContainer:
             ("PointsService", self.points),
             ("PassivePointsService", self.passive_points),
             ("RaidBossService", self.raid_bosses),
-            ("PassivePointsService", self.passive_points),
             ("CounterService", self.counters),
             ("ViewerQueueService", self.viewer_queue),
             ("RedeemService", self.redeems),
@@ -123,6 +122,7 @@ class ServiceContainer:
             ("ShoutoutService", self.shoutouts),
             ("LeagueService", self.league),
             ("RaidBossService", self.raid_bosses),
+            ("PassivePointsService", self.passive_points),
             ("StreamLogService", self.stream_logs)
         )
 
