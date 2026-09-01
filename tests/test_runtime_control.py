@@ -51,6 +51,15 @@ def test_restart_delay_allows_proxy_response_to_finish() -> None:
     assert runtime_control.RESTART_DELAY_SECONDS >= 5.0
 
 
+def test_dashboard_restarts_without_navigating_to_interrupted_request() -> None:
+    repository_root = Path(runtime_control.__file__).resolve().parents[1]
+    dashboard_template = (repository_root / "web" / "templates" / "admin" / "dashboard.html").read_text(encoding="utf-8")
+
+    assert 'event.preventDefault();' in dashboard_template
+    assert 'await fetch(restartForm.action' in dashboard_template
+    assert 'window.location.href = "/admin";' in dashboard_template
+
+
 @pytest.mark.asyncio
 async def test_restart_route_requires_owner_before_scheduling_restart(monkeypatch) -> None:
     async def reject_non_owner(request: Request):
