@@ -311,7 +311,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 While a channel is live, connected logged-in chatters earn 10 passive points every two minutes. Twitch's connected-chatter list is used as an approximation of watch activity; the broadcaster and configured bot identities are excluded. The bot identity used by the channel must authorize `moderator:read:chatters` and be a moderator in that channel. Payout intervals are persisted so a bot restart cannot award the same interval twice.
 
-Meinya's roulette uses a standard single-zero wheel: 18 red, 18 black, and one green. Red and black return 2× the wager, green returns 36×, and bets are capped at 1,000 petals. Wagers and payouts settle atomically to prevent concurrent commands from overspending a balance.
+Meinya's roulette uses a standard single-zero wheel: 18 red, 18 black, and one green. Red and black return 2× the wager, green returns 5×, and bets are capped at 1,000 petals. Green is intentionally a high-risk novelty bet rather than an equal-odds choice. Wagers and payouts settle atomically to prevent concurrent commands from overspending a balance.
 
 Point commands use the profile's currency command and provide `leaderboard`, `reset`, `add`, `gamble`, and `duel` subcommands. Permission-sensitive actions are restricted to moderators or the broadcaster where appropriate.
 
