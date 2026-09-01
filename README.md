@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **8.4.1**
+Current version: **8.5.0**
 
 ## Highlights
 
@@ -305,11 +305,13 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 | Clips | `!clip`, `!clip short` |
 | Raids | `!startraid <channel>` |
 | Moderation | `!kamikaze <username>` |
-| Points | Profile currency command with `leaderboard`, `gamble`, `duel`, `add`, and `reset` subcommands |
+| Points | Profile currency command with `leaderboard`, `gamble`, `duel`, `add`, and `reset` subcommands; Meinya also supports `!petals roulette` / `!petals spin` |
 | Overwatch | `!ow`, `!owrank`, `!owrecord`, `!owreset` |
 | League of Legends | `!champs`, `!champs <champion>`, `!register <Riot ID> [region]`, `!unregister`, `!rank [chatter]`, `!ladder` |
 
 While a channel is live, connected logged-in chatters earn 10 passive points every two minutes. Twitch's connected-chatter list is used as an approximation of watch activity; the broadcaster and configured bot identities are excluded. The bot identity used by the channel must authorize `moderator:read:chatters` and be a moderator in that channel. Payout intervals are persisted so a bot restart cannot award the same interval twice.
+
+Meinya's roulette uses a standard single-zero wheel: 18 red, 18 black, and one green. Red and black return 2× the wager, green returns 36×, and bets are capped at 1,000 petals. Wagers and payouts settle atomically to prevent concurrent commands from overspending a balance.
 
 Point commands use the profile's currency command and provide `leaderboard`, `reset`, `add`, `gamble`, and `duel` subcommands. Permission-sensitive actions are restricted to moderators or the broadcaster where appropriate.
 
@@ -354,6 +356,8 @@ RatsBoomBot uses a practical three-part version number:
 - Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes
 - Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement
 - Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
+
+Version **8.5.0** adds standard single-zero roulette as a Meinya loyalty-points game.
 
 Version **8.4.1** removes the remaining pre-release Ahirman test encounter from raid history.
 
