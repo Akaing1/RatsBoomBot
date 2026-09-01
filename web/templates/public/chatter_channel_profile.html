@@ -29,18 +29,29 @@
             <a class="button primary" href="https://twitch.tv/{{ profile.channel.login }}">Watch channel</a>
         </header>
 
-        <section class="chatter-stat-grid" aria-label="Channel chatter statistics">
-            <article><span>Messages sent</span><strong>{{ "{:,}".format(profile.messages_sent) }}</strong></article>
-            <article><span>Current {{ profile.currency_name }}</span><strong>{{ "{:,}".format(profile.current_points) }}</strong></article>
-            <article><span>Lifetime earned</span><strong>{{ "{:,}".format(profile.lifetime_points_earned) }}</strong></article>
-            <article><span>Daily check-ins</span><strong>{{ profile.daily_check_ins }}</strong></article>
-            <article><span>Firsts</span><strong>{{ profile.firsts }}</strong></article>
-            <article><span>Raid damage</span><strong>{{ "{:,}".format(profile.damage_dealt) }}</strong></article>
-            <article><span>Best contribution</span><strong>{{ "{:,}".format(profile.highest_contribution) }}</strong></article>
-            <article><span>Raid reward points</span><strong>{{ "{:,}".format(profile.raid_reward_points) }}</strong></article>
+        <nav class="chatter-tabs" aria-label="Channel profile sections">
+            <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
+            <button type="button" data-chatter-tab="raids" aria-selected="false">Raids</button>
+        </nav>
+
+        <section data-chatter-panel="overview">
+            <div class="chatter-stat-grid" aria-label="Channel chatter statistics">
+                <article><span>Messages sent</span><strong>{{ "{:,}".format(profile.messages_sent) }}</strong></article>
+                <article><span>Current {{ profile.currency_name }}</span><strong>{{ "{:,}".format(profile.current_points) }}</strong></article>
+                <article><span>Lifetime earned</span><strong>{{ "{:,}".format(profile.lifetime_points_earned) }}</strong></article>
+                <article><span>Daily check-ins</span><strong>{{ profile.daily_check_ins }}</strong></article>
+                <article><span>Firsts</span><strong>{{ profile.firsts }}</strong></article>
+            </div>
         </section>
 
-        <section class="chatter-detail-grid">
+        <section data-chatter-panel="raids" hidden>
+            <div class="chatter-stat-grid" aria-label="Channel raid statistics">
+                <article><span>Total damage</span><strong>{{ "{:,}".format(profile.damage_dealt) }}</strong></article>
+                <article><span>Best contribution</span><strong>{{ "{:,}".format(profile.highest_contribution) }}</strong></article>
+                <article><span>Raid reward points</span><strong>{{ "{:,}".format(profile.raid_reward_points) }}</strong></article>
+                <article><span>Top Contributor finishes</span><strong>{{ profile.top_contributor_finishes }}</strong></article>
+            </div>
+            <div class="chatter-detail-grid">
             <article class="panel chatter-detail-panel">
                 <div class="panel-header"><div><p class="eyebrow">Raid record</p><h3>Boss encounters</h3></div></div>
                 <dl class="chatter-detail-list">
@@ -63,9 +74,27 @@
                     <p class="chatter-empty-copy">No raid equipment collected in this channel yet.</p>
                 {% endif %}
             </article>
+            </div>
+            <section class="chatter-section chatter-raid-history-section">
+                <div class="chatter-section-heading"><div><p class="eyebrow">Latest battles</p><h2>Recent raid history</h2></div><p>The five most recent completed raids in this channel.</p></div>
+                {% if profile.recent_raids %}
+                    <div class="chatter-raid-history">
+                        {% for raid in profile.recent_raids %}
+                            <article>
+                                <div><strong>{{ raid.boss_name }}</strong><span>{{ raid.date }}</span></div>
+                                <div><strong>{{ "{:,}".format(raid.damage) }} damage</strong><span>{{ "{:,}".format(raid.reward_points) }} points earned</span></div>
+                                <div class="chatter-raid-result"><span class="{{ raid.status }}">{{ raid.status | title }}</span>{% if raid.top_contributor %}<em>Top Contributor</em>{% endif %}</div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="panel compact-empty-state"><h3>No completed raids yet</h3><p>Raid results will appear here after this chatter completes a boss encounter.</p></div>
+                {% endif %}
+            </section>
         </section>
 
         <p class="chatter-history-note">Lifetime earnings exclude moderator grants and viewer-to-viewer transfers. Historical totals begin with the balance recorded when chatter profiles launched.</p>
     </main>
+    <script src="{{ url_for('static', path='/js/chatter-tabs.js') }}?v={{ deployment_stamp() }}" defer></script>
 </body>
 </html>
