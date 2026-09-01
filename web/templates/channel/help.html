@@ -49,7 +49,6 @@
 <section
     id="raid-contributor-panel"
     class="panel raid-contributor-panel"
-    {% if not raid_contributor_data.active or not raid_contributor_data.contributors %}hidden{% endif %}
 >
     <div class="panel-header raid-contributor-header">
         <div>
@@ -58,6 +57,8 @@
             <p id="raid-contributor-boss" class="panel-description">
                 {% if raid_contributor_data.active %}
                     {{ raid_contributor_data.boss_name }} · {{ "{:,}".format(raid_contributor_data.current_hp) }}/{{ "{:,}".format(raid_contributor_data.max_hp) }} HP
+                {% else %}
+                    No active raid boss.
                 {% endif %}
             </p>
         </div>
@@ -136,13 +137,24 @@
     function render(data) {
         const contributors = Array.isArray(data.contributors) ? data.contributors : [];
 
-        if (!data.active || contributors.length === 0) {
-            panel.hidden = true;
+        panel.hidden = false;
+
+        if (!data.active) {
+            boss.textContent = "No active raid boss.";
             list.replaceChildren();
             return;
         }
 
         boss.textContent = `${data.boss_name} · ${number.format(data.current_hp)}/${number.format(data.max_hp)} HP`;
+        if (contributors.length === 0) {
+            list.replaceChildren();
+            const empty = document.createElement("li");
+            empty.className = "raid-contributor-empty";
+            empty.textContent = "No contributors yet.";
+            list.append(empty);
+            return;
+        }
+
         list.replaceChildren(...contributors.map((contributor) => {
             const row = document.createElement("li");
             row.className = "raid-contributor-row";
