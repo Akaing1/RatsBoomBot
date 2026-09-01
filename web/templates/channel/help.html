@@ -46,6 +46,35 @@
     </article>
 </section>
 
+<section
+    id="raid-contributor-panel"
+    class="panel raid-contributor-panel"
+    {% if not raid_contributor_data.active or not raid_contributor_data.contributors %}hidden{% endif %}
+>
+    <div class="panel-header raid-contributor-header">
+        <div>
+            <p class="eyebrow">Live raid leaderboard</p>
+            <h3>Current Raid Contributors</h3>
+            <p id="raid-contributor-boss" class="panel-description">
+                {% if raid_contributor_data.active %}
+                    {{ raid_contributor_data.boss_name }} · {{ "{:,}".format(raid_contributor_data.current_hp) }}/{{ "{:,}".format(raid_contributor_data.max_hp) }} HP
+                {% endif %}
+            </p>
+        </div>
+        <span class="activity-badge">Live</span>
+    </div>
+
+    <ol id="raid-contributor-list" class="raid-contributor-list">
+        {% for contributor in raid_contributor_data.contributors %}
+            <li class="raid-contributor-row">
+                <span class="raid-contributor-rank">#{{ contributor.rank }}</span>
+                <strong class="raid-contributor-name">{{ contributor.username }}</strong>
+                <span class="raid-contributor-damage">{{ "{:,}".format(contributor.damage) }} damage</span>
+            </li>
+        {% endfor %}
+    </ol>
+</section>
+
 <section class="command-help-list" aria-label="Channel command reference">
     {% for group in command_groups %}
         <details class="command-help-group">
@@ -88,4 +117,70 @@
         </details>
     {% endfor %}
 </section>
+{% endblock %}
+
+
+{% block page_scripts %}
+<script>
+(() => {
+    const panel = document.getElementById("raid-contributor-panel");
+    const boss = document.getElementById("raid-contributor-boss");
+    const list = document.getElementById("raid-contributor-list");
+
+    if (!panel || !boss || !list) {
+        return;
+    }
+
+    const number = new Intl.NumberFormat();
+
+    function render(data) {
+        const contributors = Array.isArray(data.contributors) ? data.contributors : [];
+
+        if (!data.active || contributors.length === 0) {
+            panel.hidden = true;
+            list.replaceChildren();
+            return;
+        }
+
+        boss.textContent = `${data.boss_name} · ${number.format(data.current_hp)}/${number.format(data.max_hp)} HP`;
+        list.replaceChildren(...contributors.map((contributor) => {
+            const row = document.createElement("li");
+            row.className = "raid-contributor-row";
+
+            const rank = document.createElement("span");
+            rank.className = "raid-contributor-rank";
+            rank.textContent = `#${contributor.rank}`;
+
+            const name = document.createElement("strong");
+            name.className = "raid-contributor-name";
+            name.textContent = contributor.username;
+
+            const damage = document.createElement("span");
+            damage.className = "raid-contributor-damage";
+            damage.textContent = `${number.format(contributor.damage)} damage`;
+
+            row.append(rank, name, damage);
+            return row;
+        }));
+        panel.hidden = false;
+    }
+
+    async function refresh() {
+        try {
+            const response = await fetch("/channel/api/raid-contributors", {
+                headers: {"Accept": "application/json"},
+                cache: "no-store"
+            });
+
+            if (response.ok) {
+                render(await response.json());
+            }
+        } catch (_error) {
+            // Keep the most recent successful data visible during a transient refresh failure.
+        }
+    }
+
+    window.setInterval(refresh, 15000);
+})();
+</script>
 {% endblock %}
