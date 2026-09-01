@@ -110,13 +110,22 @@
         process automatically, which normally takes several seconds.
     </p>
 
-    <form method="post" action="/admin/runtime/restart" onsubmit="return confirm('Restart RatsBoomBot now?');">
+    <form id="restart-runtime-form" method="post" action="/admin/runtime/restart">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <button class="button danger" type="submit">
+        <button id="restart-runtime-button" class="button danger" type="submit">
             Restart Bot
         </button>
     </form>
+
+    <div id="restart-runtime-status" class="status-row" hidden>
+        <span class="status-indicator offline"></span>
+        <strong>Restarting RatsBoomBot...</strong>
+    </div>
+
+    <p id="restart-runtime-detail" class="page-description" hidden>
+        Waiting for the new process to become healthy. This page will return automatically.
+    </p>
 </section>
 {% endif %}
 
@@ -195,4 +204,56 @@
         </div>
     {% endif %}
 </section>
+{% endblock %}
+
+{% block page_scripts %}
+{% if administrator and administrator.role == "owner" %}
+<script>
+    const restartForm = document.getElementById("restart-runtime-form");
+    const restartButton = document.getElementById("restart-runtime-button");
+    const restartStatus = document.getElementById("restart-runtime-status");
+    const restartDetail = document.getElementById("restart-runtime-detail");
+    let shutdownObserved = false;
+
+    async function waitForRestart() {
+        try {
+            const response = await fetch(`/health?restart=${Date.now()}`, { cache: "no-store" });
+
+            if (!response.ok) {
+                shutdownObserved = true;
+            } else if (shutdownObserved) {
+                window.location.href = "/admin";
+                return;
+            }
+        } catch (error) {
+            shutdownObserved = true;
+        }
+
+        window.setTimeout(waitForRestart, 1500);
+    }
+
+    restartForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        if (!window.confirm("Restart RatsBoomBot now?")) return;
+
+        restartButton.disabled = true;
+        restartForm.hidden = true;
+        restartStatus.hidden = false;
+        restartDetail.hidden = false;
+
+        try {
+            await fetch(restartForm.action, {
+                method: "POST",
+                body: new FormData(restartForm),
+                credentials: "same-origin"
+            });
+        } catch (error) {
+            shutdownObserved = true;
+        }
+
+        window.setTimeout(waitForRestart, 500);
+    });
+</script>
+{% endif %}
 {% endblock %}
