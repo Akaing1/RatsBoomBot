@@ -202,6 +202,7 @@ Migrations run automatically during startup:
 12. Premium custom bot identities
 13. Public chatter profile statistics
 14. Removal of the three pre-release raid test encounters
+15. Passive point payout history
 
 Use a new migration for schema changes instead of rebuilding the production database.
 
@@ -307,6 +308,8 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 | Overwatch | `!ow`, `!owrank`, `!owrecord`, `!owreset` |
 | League of Legends | `!champs`, `!champs <champion>`, `!register <Riot ID> [region]`, `!unregister`, `!rank [chatter]`, `!ladder` |
 
+While a channel is live, connected logged-in chatters earn 10 passive points every two minutes. Twitch's connected-chatter list is used as an approximation of watch activity; the broadcaster and configured bot identities are excluded. The bot identity used by the channel must authorize `moderator:read:chatters` and be a moderator in that channel. Payout intervals are persisted so a bot restart cannot award the same interval twice.
+
 Point commands use the profile's currency command and provide `leaderboard`, `reset`, `add`, `gamble`, and `duel` subcommands. Permission-sensitive actions are restricted to moderators or the broadcaster where appropriate.
 
 ## Production Deployment
@@ -350,6 +353,8 @@ RatsBoomBot uses a practical three-part version number:
 - Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes
 - Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement
 - Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
+
+Version **8.4.0** adds persistent passive point earnings for connected live chatters.
 
 Version **6.0.0** marks the checkpoint where RatsBoomBot became a structured multi-channel platform with profile-specific engagement, streamer dashboards, migration tools, clips, raids, first-chat shoutouts, and production-oriented stream logging.
 
