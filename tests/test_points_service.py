@@ -45,3 +45,29 @@ async def test_transfer_points_is_isolated_per_broadcaster(tmp_path) -> None:
         assert await service.get_points("channel-1", "sender-1") == 60
         assert await service.get_points("channel-2", "sender-1") == 100
         assert await service.get_points("channel-2", "recipient-1") == 0
+
+
+@pytest.mark.asyncio
+async def test_settle_wager_debits_bet_and_credits_total_payout(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "points.db")) as database:
+        service = PointsService(bot=None, db=database)
+        await service.setup()
+        await service.add_points("channel-1", "viewer-1", "viewer", 1000)
+
+        balance = await service.settle_wager("channel-1", "viewer-1", "viewer", bet=100, payout=200)
+
+        assert balance == 1100
+        assert await service.get_points("channel-1", "viewer-1") == 1100
+
+
+@pytest.mark.asyncio
+async def test_settle_wager_rejects_insufficient_balance_without_changing_points(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "points.db")) as database:
+        service = PointsService(bot=None, db=database)
+        await service.setup()
+        await service.add_points("channel-1", "viewer-1", "viewer", 50)
+
+        balance = await service.settle_wager("channel-1", "viewer-1", "viewer", bet=100, payout=200)
+
+        assert balance is None
+        assert await service.get_points("channel-1", "viewer-1") == 50
