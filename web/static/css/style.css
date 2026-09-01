@@ -1289,7 +1289,7 @@ body.landing-page {
 }
 
 .raid-contributor-damage {
-    color: var(--text-muted);
+    color: var(--muted);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
@@ -1302,4 +1302,11 @@ body.landing-page {
     .raid-contributor-damage {
         grid-column: 2;
     }
+}
+
+
+.raid-contributor-empty {
+    padding: 14px 16px;
+    color: var(--muted);
+    font-style: italic;
 }
