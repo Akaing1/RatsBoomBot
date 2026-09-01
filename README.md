@@ -201,6 +201,7 @@ Migrations run automatically during startup:
 11. Persistent raid bosses and scheduler state
 12. Premium custom bot identities
 13. Public chatter profile statistics
+14. Removal of the three pre-release raid test encounters
 
 Use a new migration for schema changes instead of rebuilding the production database.
 
