@@ -401,6 +401,106 @@ class PointsCommandHandler:
             command=command_name
         )
 
+    async def roulette(self, ctx: commands.Context, color: str, amount: str, command_name: str) -> None:
+        self.log_command(ctx, f"!{command_name} roulette")
+
+        context = self.get_context(ctx, command_name)
+
+        if context is None:
+            return
+
+        broadcaster_id, config = context
+        services = self.bot.services
+        user_id = str(ctx.chatter.id)
+        username = ctx.chatter.name
+        selected_color = color.strip().lower()
+
+        if selected_color not in {"red", "black", "green"}:
+            await self.send_message(ctx, config.messages.roulette_color_invalid, command=command_name)
+            return
+
+        try:
+            bet = int(amount)
+        except (TypeError, ValueError):
+            await self.send_message(ctx, config.messages.roulette_usage, command=command_name)
+            return
+
+        if bet <= 0:
+            await self.send_message(ctx, config.messages.roulette_bet_invalid, command=command_name)
+            return
+
+        if bet > config.roulette_max_bet:
+            await self.send_message(ctx, config.messages.roulette_bet_maximum, maximum=config.roulette_max_bet, command=command_name)
+            return
+
+        try:
+            current_points = await services.points.get_points(broadcaster_id, user_id)
+        except Exception:
+            LOGGER.exception("[Points] Failed to load roulette balance for %s in broadcaster %s.", username, broadcaster_id)
+            return
+
+        if bet > current_points:
+            await self.send_message(ctx, config.messages.roulette_insufficient, points=current_points, bet=bet, command=command_name)
+            return
+
+        number = random.randrange(37)
+
+        if number == 0:
+            result_color = "green"
+        elif number in {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}:
+            result_color = "red"
+        else:
+            result_color = "black"
+
+        won = selected_color == result_color
+        multiplier = 36 if result_color == "green" else 2
+        payout = bet * multiplier if won else 0
+        profit = payout - bet if won else 0
+
+        try:
+            new_balance = await services.points.settle_wager(
+                broadcaster_id=broadcaster_id,
+                user_id=user_id,
+                username=username,
+                bet=bet,
+                payout=payout
+            )
+        except Exception:
+            LOGGER.exception("[Points] Failed to resolve roulette for %s in broadcaster %s.", username, broadcaster_id)
+            return
+
+        if new_balance is None:
+            current_points = await services.points.get_points(broadcaster_id, user_id)
+            await self.send_message(ctx, config.messages.roulette_insufficient, points=current_points, bet=bet, command=command_name)
+            return
+
+        LOGGER.info(
+            "[Points] User %s bet %d on %s; roulette landed on %d %s in broadcaster %s. New balance: %d.",
+            username,
+            bet,
+            selected_color,
+            number,
+            result_color,
+            broadcaster_id,
+            new_balance,
+            extra={"broadcaster_id": broadcaster_id, "category": "POINTS"}
+        )
+
+        template = config.messages.roulette_win if won else config.messages.roulette_loss
+        await self.send_message(
+            ctx,
+            template,
+            username=username,
+            selected=selected_color,
+            number=number,
+            result=result_color,
+            bet=bet,
+            payout=payout,
+            profit=profit,
+            new_balance=new_balance,
+            command=command_name
+        )
+
     async def create_duel(self, ctx: commands.Context, opponent: User | None, amount: str | None, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} duel")
 
