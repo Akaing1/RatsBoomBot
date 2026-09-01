@@ -401,7 +401,7 @@ class PointsCommandHandler:
             command=command_name
         )
 
-    async def roulette(self, ctx: commands.Context, color: str, amount: str, command_name: str) -> None:
+    async def roulette(self, ctx: commands.Context, color: str | None, amount: str | None, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} roulette")
 
         context = self.get_context(ctx, command_name)
@@ -413,6 +413,10 @@ class PointsCommandHandler:
         services = self.bot.services
         user_id = str(ctx.chatter.id)
         username = ctx.chatter.name
+        if color is None or amount is None:
+            await self.send_message(ctx, config.messages.roulette_usage, command=command_name)
+            return
+
         selected_color = color.strip().lower()
 
         if selected_color not in {"red", "black", "green"}:
