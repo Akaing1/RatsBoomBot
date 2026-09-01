@@ -457,7 +457,7 @@ class PointsCommandHandler:
             result_color = "black"
 
         won = selected_color == result_color
-        multiplier = 36 if result_color == "green" else 2
+        multiplier = 5 if result_color == "green" else 2
         payout = bet * multiplier if won else 0
         profit = payout - bet if won else 0
 
