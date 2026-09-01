@@ -120,6 +120,42 @@ class ChatterStatsService:
                 """,
                 (user_id,)
             )
+            claims = await connection.fetchone(
+                """
+                SELECT COALESCE(SUM(claim_count), 0) AS daily_check_ins
+                FROM (
+                    SELECT COUNT(*) AS claim_count FROM redeem_claims WHERE user_id = ? AND redeem_type = 'daily'
+                    UNION ALL
+                    SELECT COALESCE(SUM(claim_count), 0) FROM imported_redeem_totals WHERE user_id = ? AND redeem_type = 'daily'
+                )
+                """,
+                (user_id, user_id)
+            )
+            rewards = await connection.fetchone(
+                """
+                SELECT COALESCE(SUM(contribution_points + final_hit_points + bonus_points), 0) AS points
+                FROM raid_boss_reward_summaries
+                WHERE user_id = ?
+                """,
+                (user_id,)
+            )
+            top_contributor = await connection.fetchone(
+                """
+                WITH contributions AS (
+                    SELECT event_id, user_id, SUM(damage) AS damage
+                    FROM raid_boss_attacks
+                    GROUP BY event_id, user_id
+                )
+                SELECT COUNT(*) AS finishes
+                FROM contributions AS mine
+                JOIN raid_boss_events AS events ON events.id = mine.event_id
+                WHERE mine.user_id = ?
+                  AND events.status IN ('defeated', 'failed')
+                  AND mine.damage = (SELECT MAX(others.damage) FROM contributions AS others WHERE others.event_id = mine.event_id)
+                """,
+                (user_id,)
+            )
+            recent_raids = await connection.fetchall(self._recent_raids_query(), (user_id, user_id))
             channels = await connection.fetchall(
                 """
                 SELECT observations.broadcaster_id,
@@ -140,17 +176,25 @@ class ChatterStatsService:
                 (user_id,)
             )
 
+        channel_summaries = [self._channel_summary(row) for row in channels]
+        favorite_channel = max(channel_summaries, key=lambda channel: channel["messages_sent"], default=None)
+
         return {
             "identity": dict(identity),
             "messages_sent": int(totals["messages_sent"]),
             "lifetime_points_earned": int(totals["lifetime_points_earned"]),
             "channels_interacted": int(totals["channels_interacted"]),
+            "daily_check_ins": int(claims["daily_check_ins"]),
+            "favorite_channel": favorite_channel,
             "damage_dealt": int(raid["damage_dealt"]),
             "highest_contribution": int(highest["highest_contribution"]),
             "bosses_attacked": int(raid["bosses_attacked"]),
             "bosses_defeated": int(raid["bosses_defeated"]),
             "final_hits": int(raid["final_hits"]),
-            "channels": [self._channel_summary(row) for row in channels]
+            "raid_reward_points": int(rewards["points"]),
+            "top_contributor_finishes": int(top_contributor["finishes"]),
+            "recent_raids": [self._raid_history(row) for row in recent_raids],
+            "channels": channel_summaries
         }
 
     async def get_channel_profile(self, chatter_value: str, channel_value: str) -> dict[str, Any] | None:
@@ -238,6 +282,24 @@ class ChatterStatsService:
                 """,
                 (broadcaster_id, user_id)
             )
+            top_contributor = await connection.fetchone(
+                """
+                WITH contributions AS (
+                    SELECT event_id, user_id, SUM(damage) AS damage
+                    FROM raid_boss_attacks
+                    WHERE broadcaster_id = ?
+                    GROUP BY event_id, user_id
+                )
+                SELECT COUNT(*) AS finishes
+                FROM contributions AS mine
+                JOIN raid_boss_events AS events ON events.id = mine.event_id
+                WHERE mine.user_id = ?
+                  AND events.status IN ('defeated', 'failed')
+                  AND mine.damage = (SELECT MAX(others.damage) FROM contributions AS others WHERE others.event_id = mine.event_id)
+                """,
+                (broadcaster_id, user_id)
+            )
+            recent_raids = await connection.fetchall(self._recent_raids_query(channel=True), (user_id, user_id, broadcaster_id))
 
         profile = get_active_profile(broadcaster_id)
         claim_counts = {str(row["redeem_type"]): int(row["claim_count"]) for row in claims}
@@ -256,6 +318,8 @@ class ChatterStatsService:
             "final_hits": int(raid["final_hits"]),
             "raid_reward_points": int(rewards["points"]),
             "raids_rewarded": int(rewards["raids_rewarded"]),
+            "top_contributor_finishes": int(top_contributor["finishes"]),
+            "recent_raids": [self._raid_history(row) for row in recent_raids],
             "daily_check_ins": claim_counts.get("daily", 0),
             "firsts": claim_counts.get("first", 0),
             "seconds": claim_counts.get("second", 0),
@@ -282,4 +346,39 @@ class ChatterStatsService:
             "login": broadcaster.login or str(broadcaster.id),
             "display_name": broadcaster.display_name or broadcaster.login or str(broadcaster.id),
             "profile_image_url": broadcaster.profile_image_url
+        }
+
+    @staticmethod
+    def _recent_raids_query(channel: bool = False) -> str:
+        channel_filter = "AND events.broadcaster_id = ?" if channel else ""
+        return f"""
+        WITH contributions AS (
+            SELECT event_id, user_id, SUM(damage) AS damage
+            FROM raid_boss_attacks
+            GROUP BY event_id, user_id
+        )
+        SELECT events.id, events.broadcaster_id, events.boss_name, events.boss_tier, events.status, events.spawned_at,
+               mine.damage,
+               COALESCE(summaries.contribution_points + summaries.final_hit_points + summaries.bonus_points, 0) AS reward_points,
+               CASE WHEN mine.damage = (SELECT MAX(others.damage) FROM contributions AS others WHERE others.event_id = events.id) THEN 1 ELSE 0 END AS top_contributor
+        FROM raid_boss_events AS events
+        JOIN contributions AS mine ON mine.event_id = events.id
+        LEFT JOIN raid_boss_reward_summaries AS summaries ON summaries.event_id = events.id AND summaries.user_id = ?
+        WHERE mine.user_id = ? {channel_filter}
+          AND events.status IN ('defeated', 'failed')
+        ORDER BY events.id DESC
+        LIMIT 5
+        """
+
+    def _raid_history(self, row) -> dict[str, Any]:
+        return {
+            "event_id": int(row["id"]),
+            "channel": self._channel_metadata(str(row["broadcaster_id"])),
+            "boss_name": str(row["boss_name"]),
+            "boss_tier": str(row["boss_tier"]),
+            "status": str(row["status"]),
+            "date": str(row["spawned_at"])[:10],
+            "damage": int(row["damage"]),
+            "reward_points": int(row["reward_points"]),
+            "top_contributor": bool(row["top_contributor"])
         }

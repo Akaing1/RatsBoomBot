@@ -102,10 +102,18 @@ async def test_chatter_profiles_aggregate_global_and_channel_activity(tmp_path) 
         assert global_profile["damage_dealt"] == 275
         assert global_profile["highest_contribution"] == 275
         assert global_profile["bosses_defeated"] == 1
+        assert global_profile["daily_check_ins"] == 4
+        assert global_profile["favorite_channel"]["display_name"] == "TestChannel"
+        assert global_profile["raid_reward_points"] == 240
+        assert global_profile["top_contributor_finishes"] == 1
+        assert global_profile["recent_raids"][0]["boss_name"] == "Test Boss"
+        assert global_profile["recent_raids"][0]["top_contributor"] is True
         assert channel_profile["current_points"] == 350
         assert channel_profile["daily_check_ins"] == 4
         assert channel_profile["firsts"] == 2
         assert channel_profile["raid_reward_points"] == 240
+        assert channel_profile["top_contributor_finishes"] == 1
+        assert channel_profile["recent_raids"][0]["reward_points"] == 240
         assert channel_profile["inventory"][0]["equipped"] == 1
 
 
