@@ -60,7 +60,7 @@ class Settings:
     CHANNEL_REDIRECT_URI = os.getenv("CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/admin/oauth/channel")
     PUBLIC_CHANNEL_REDIRECT_URI = os.getenv("PUBLIC_CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/channel/connect")
 
-    BOT_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('BOT_SCOPES', 'user:read:chat user:write:chat user:bot')} moderator:manage:announcements".split()))
+    BOT_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('BOT_SCOPES', 'user:read:chat user:write:chat user:bot')} moderator:manage:announcements moderator:read:chatters".split()))
 
     CHANNEL_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('CHANNEL_SCOPES') or DEFAULT_CHANNEL_SCOPES} channel:manage:broadcast".split()))
 

@@ -2,7 +2,7 @@ import logging
 
 from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatIdentityService, ChatterIdentityService, ChatterStatsService, FeatureToggleService, ProfileSettingsService
-from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PointsService, RaidBossService, RedeemService, ViewerQueueService
+from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PassivePointsService, PointsService, RaidBossService, RedeemService, ViewerQueueService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
 from config.settings import settings
@@ -29,6 +29,7 @@ class ServiceContainer:
         self.help = HelpService(bot)
         self.timers = TimerService(bot, self.broadcasters, self.broadcaster_settings)
         self.points = PointsService(bot, db, self.chatter_stats)
+        self.passive_points = PassivePointsService(bot, db, self.points, self.chat_identity, self.features)
         self.raid_bosses = RaidBossService(bot, db, self.chatter_stats)
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
@@ -55,6 +56,7 @@ class ServiceContainer:
             ("ProfileSettingsService", self.profile_settings),
             ("FeatureToggleService", self.features),
             ("PointsService", self.points),
+            ("PassivePointsService", self.passive_points),
             ("RaidBossService", self.raid_bosses),
             ("CounterService", self.counters),
             ("ViewerQueueService", self.viewer_queue),
@@ -82,6 +84,9 @@ class ServiceContainer:
 
             if profile is not None and profile.raid_bosses.enabled and self.features.is_enabled(session.broadcaster_id, FeatureName.RAID_BOSSES):
                 await self.raid_bosses.restore_session(session.broadcaster_id, session.stream_id, profile.raid_bosses)
+
+            if profile is not None and self.features.is_enabled(session.broadcaster_id, FeatureName.POINTS):
+                await self.passive_points.start_for_stream(session.broadcaster_id, session.stream_id)
 
         LOGGER.info("[Services] Service setup completed.")
 
@@ -117,6 +122,7 @@ class ServiceContainer:
             ("ShoutoutService", self.shoutouts),
             ("LeagueService", self.league),
             ("RaidBossService", self.raid_bosses),
+            ("PassivePointsService", self.passive_points),
             ("StreamLogService", self.stream_logs)
         )
 

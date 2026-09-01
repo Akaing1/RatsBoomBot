@@ -187,7 +187,7 @@ class RaidBossService:
                 await self._sleep_until(warning_at)
 
             if not warning_sent and datetime.now(UTC) < spawn_at:
-                await self._send_message(broadcaster_id, "A raid boss is approaching! It will appear in 10 minutes. Get ready to use !raid attack!")
+                await self._send_message(broadcaster_id, "A dangerous presence is approaching... Prepare yourselves for the raid in 10 minutes!")
 
                 async with self.db.acquire() as connection:
                     await connection.execute("UPDATE raid_boss_schedules SET warning_sent = 1 WHERE broadcaster_id = ?", (broadcaster_id,))

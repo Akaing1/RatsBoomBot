@@ -51,6 +51,7 @@ class StreamEvents(commands.Component):
         )
 
         await services.stream_logs.start_session(broadcaster_id=broadcaster_id, stream_id=stream_id, channel_name=channel_name)
+        await services.passive_points.start_for_stream(broadcaster_id, stream_id)
         active_event = await services.raid_bosses.get_active_event(broadcaster_id)
         await services.raid_bosses.register_stream(broadcaster_id, stream_id)
 
@@ -95,4 +96,5 @@ class StreamEvents(commands.Component):
         )
 
         await services.raid_bosses.cancel_announcements(broadcaster_id)
+        await services.passive_points.stop_for_stream(broadcaster_id)
         await services.stream_logs.end_session(broadcaster_id)

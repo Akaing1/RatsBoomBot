@@ -123,7 +123,7 @@ async def test_scheduled_tutorial_warns_then_spawns_and_starts_reminders(tmp_pat
         assert scheduled is True
         assert event is not None
         assert event.boss_tier == "tutorial"
-        assert bot.messages[0] == "A raid boss is approaching! It will appear in 10 minutes. Get ready to use !raid attack!"
+        assert bot.messages[0] == "A dangerous presence is approaching... Prepare yourselves for the raid in 10 minutes!"
         assert bot.announcements[0]["moderator"] == "bot-1"
         assert bot.announcements[0]["color"] == "orange"
         assert "has appeared" in bot.announcements[0]["message"]
