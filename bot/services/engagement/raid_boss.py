@@ -760,6 +760,25 @@ class RaidBossService:
             "critical_hits": int(row["critical_hits"])
         }
 
+    async def get_contributors(self, broadcaster_id: str) -> list[tuple[str, int]]:
+        event = await self.get_active_event(broadcaster_id)
+
+        if event is None:
+            return []
+
+        query = """
+        SELECT username, SUM(damage) AS total_damage
+        FROM raid_boss_attacks
+        WHERE event_id = ?
+        GROUP BY user_id, username
+        ORDER BY total_damage DESC, username COLLATE NOCASE
+        """
+
+        async with self.db.acquire() as connection:
+            rows = await connection.fetchall(query, (event.id,))
+
+        return [(str(row["username"]), int(row["total_damage"])) for row in rows]
+
     async def get_leaderboard(self, broadcaster_id: str, limit: int = 5) -> list[tuple[str, int]]:
         event = await self.get_active_event(broadcaster_id)
 
