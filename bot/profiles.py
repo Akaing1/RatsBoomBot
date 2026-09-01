@@ -316,6 +316,9 @@ class PointsConfig:
     message_cooldown_seconds: int = 60
     gamble_win_chance: float = 0.45
     roulette_max_bet: int = 1000
+    subscription_reward: int = 0
+    cheer_reward: int = 0
+    cheer_minimum_bits: int = 100
     duel_expiration_seconds: int = 60
     messages: PointsMessages = PointsMessages()
 
