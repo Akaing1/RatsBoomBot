@@ -57,6 +57,8 @@
             <p id="raid-contributor-boss" class="panel-description">
                 {% if raid_contributor_data.active %}
                     {{ raid_contributor_data.boss_name }} · {{ "{:,}".format(raid_contributor_data.current_hp) }}/{{ "{:,}".format(raid_contributor_data.max_hp) }} HP
+                {% else %}
+                    No active raid boss.
                 {% endif %}
             </p>
         </div>
