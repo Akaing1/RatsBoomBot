@@ -1245,3 +1245,61 @@ body.landing-page {
     .chatter-raid-history article { grid-template-columns: 1fr; gap: 12px; }
     .chatter-raid-result { align-items: flex-start; }
 }
+
+
+.raid-contributor-panel {
+    margin-bottom: 28px;
+}
+
+.raid-contributor-header {
+    align-items: flex-start;
+}
+
+.raid-contributor-header .panel-description {
+    margin-top: 6px;
+}
+
+.raid-contributor-list {
+    display: grid;
+    gap: 10px;
+    margin: 22px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.raid-contributor-row {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-raised);
+}
+
+.raid-contributor-rank {
+    color: var(--accent);
+    font-weight: 800;
+}
+
+.raid-contributor-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.raid-contributor-damage {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+    .raid-contributor-row {
+        grid-template-columns: 38px minmax(0, 1fr);
+    }
+
+    .raid-contributor-damage {
+        grid-column: 2;
+    }
+}

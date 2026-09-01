@@ -350,6 +350,81 @@ class PointsService:
 
         return remaining_points
 
+    async def settle_wager(self, broadcaster_id: str, user_id: str, username: str, bet: int, payout: int) -> int | None:
+        broadcaster_id = str(broadcaster_id)
+        user_id = str(user_id)
+
+        if bet <= 0 or payout < 0:
+            raise ValueError("Bet must be positive and payout cannot be negative.")
+
+        try:
+            async with self.db.acquire() as connection:
+                await connection.execute("BEGIN")
+
+                try:
+                    await connection.execute(
+                        """
+                        UPDATE viewers
+                        SET points = points - ?
+                        WHERE broadcaster_id = ?
+                          AND user_id = ?
+                          AND points >= ?
+                        """,
+                        (bet, broadcaster_id, user_id, bet)
+                    )
+                    changed = await connection.fetchone("SELECT changes() AS count")
+
+                    if int(changed["count"]) == 0:
+                        await connection.rollback()
+                        return None
+
+                    if payout:
+                        await connection.execute(
+                            """
+                            UPDATE viewers
+                            SET username = ?, points = points + ?
+                            WHERE broadcaster_id = ?
+                              AND user_id = ?
+                            """,
+                            (username, payout, broadcaster_id, user_id)
+                        )
+
+                    profit = max(payout - bet, 0)
+
+                    if profit and self.chatter_stats is not None:
+                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, profit, connection)
+
+                    balance = await connection.fetchone(
+                        "SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?",
+                        (broadcaster_id, user_id)
+                    )
+                    await connection.commit()
+                except Exception:
+                    await connection.rollback()
+                    raise
+        except Exception:
+            LOGGER.exception(
+                "[Points] Failed to settle a wager of %d points for user %s in broadcaster %s.",
+                bet,
+                user_id,
+                broadcaster_id
+            )
+            raise
+
+        new_balance = int(balance["points"])
+
+        LOGGER.info(
+            "[Points] Settled a wager of %d with a %d-point payout for %s in broadcaster %s. New balance: %d.",
+            bet,
+            payout,
+            username,
+            broadcaster_id,
+            new_balance,
+            extra={"broadcaster_id": broadcaster_id, "category": "POINTS"}
+        )
+
+        return new_balance
+
     async def remove_points(self, broadcaster_id: str, user_id: str, amount: int) -> None:
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)

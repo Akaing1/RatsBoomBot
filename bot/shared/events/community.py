@@ -7,6 +7,62 @@ from bot.profiles import FeatureName, get_active_profile, render_profile_message
 LOGGER = logging.getLogger("RatBoomBot")
 
 
+async def award_subscription_points(bot, payload) -> int:
+    broadcaster_id = str(payload.broadcaster.id)
+    services = bot.services
+    profile = get_active_profile(broadcaster_id)
+
+    if services is None or profile is None:
+        return 0
+
+    if not services.features.is_enabled(broadcaster_id, FeatureName.POINTS):
+        return 0
+
+    amount = int(profile.points.subscription_reward)
+
+    if amount <= 0:
+        return 0
+
+    user_id = str(payload.user.id)
+    username = str(payload.user.name)
+    await services.points.add_points(broadcaster_id, user_id, username, amount)
+    services.stream_logs.write(broadcaster_id, "POINTS", f"Awarded {amount} subscription points to {username} ({user_id}).")
+    return amount
+
+
+async def award_cheer_points(bot, payload) -> int:
+    cheer = getattr(payload, "cheer", None)
+
+    if cheer is None:
+        return 0
+
+    broadcaster_id = str(payload.broadcaster.id)
+    services = bot.services
+    profile = get_active_profile(broadcaster_id)
+
+    if services is None or profile is None:
+        return 0
+
+    if not services.features.is_enabled(broadcaster_id, FeatureName.POINTS):
+        return 0
+
+    bits = int(cheer.bits)
+    amount = int(profile.points.cheer_reward)
+
+    if amount <= 0 or bits < int(profile.points.cheer_minimum_bits):
+        return 0
+
+    user_id = str(payload.chatter.id)
+    username = str(payload.chatter.name)
+
+    if not user_id or user_id == "None" or username.lower() == "anonymous_cheerer":
+        return 0
+
+    await services.points.add_points(broadcaster_id, user_id, username, amount)
+    services.stream_logs.write(broadcaster_id, "POINTS", f"Awarded {amount} cheer points to {username} ({user_id}) for {bits} Bits.")
+    return amount
+
+
 class CommunityEvents(commands.Component):
 
     def __init__(self, bot):
@@ -114,6 +170,15 @@ class CommunityEvents(commands.Component):
             )
         else:
             services.stream_logs.write(broadcaster_id, "SUBSCRIPTION", f"{username} subscribed.")
+
+            try:
+                await award_subscription_points(self.bot, payload)
+            except Exception:
+                LOGGER.exception(
+                    "[Points] Failed to award subscription points to %s in broadcaster %s.",
+                    username,
+                    broadcaster_id
+                )
 
         if not self.community_events_enabled(broadcaster_id):
             return

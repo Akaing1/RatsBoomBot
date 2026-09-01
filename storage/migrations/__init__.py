@@ -17,6 +17,7 @@ from storage.migrations.v012_custom_bot_identities import migrate as migrate_cus
 from storage.migrations.v013_chatter_profiles import migrate as migrate_chatter_profiles
 from storage.migrations.v014_remove_test_raid_records import migrate as migrate_remove_test_raid_records
 from storage.migrations.v015_passive_point_payouts import migrate as migrate_passive_point_payouts
+from storage.migrations.v016_remove_remaining_ahirman_test_record import migrate as migrate_remove_remaining_ahirman_test_record
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -43,5 +44,6 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=12, name="custom_bot_identities", run=migrate_custom_bot_identities),
     Migration(version=13, name="chatter_profiles", run=migrate_chatter_profiles),
     Migration(version=14, name="remove_test_raid_records", run=migrate_remove_test_raid_records),
-    Migration(version=15, name="passive_point_payouts", run=migrate_passive_point_payouts)
+    Migration(version=15, name="passive_point_payouts", run=migrate_passive_point_payouts),
+    Migration(version=16, name="remove_remaining_ahirman_test_record", run=migrate_remove_remaining_ahirman_test_record)
 )

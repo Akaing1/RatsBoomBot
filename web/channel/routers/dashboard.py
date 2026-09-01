@@ -31,6 +31,48 @@ async def get_redemption_dashboard_data(services, broadcaster_id: str) -> dict[s
     return activity
 
 
+async def get_raid_contributor_data(services, broadcaster_id: str) -> dict[str, object]:
+    event = await services.raid_bosses.get_active_event(broadcaster_id)
+
+    if event is None:
+        return {"active": False, "contributors": []}
+
+    contributors = await services.raid_bosses.get_contributors(broadcaster_id)
+
+    return {
+        "active": True,
+        "boss_name": event.boss_name,
+        "current_hp": event.current_hp,
+        "max_hp": event.max_hp,
+        "contributors": [
+            {"rank": rank, "username": username, "damage": damage}
+            for rank, (username, damage) in enumerate(contributors, start=1)
+        ]
+    }
+
+
+@router.get("/channel/api/raid-contributors", response_class=JSONResponse)
+async def channel_raid_contributors(request: Request):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+
+    services = runtime_bot.services
+    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+
+    if broadcaster is None:
+        logout_channel_user(request)
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    return JSONResponse(await get_raid_contributor_data(services, broadcaster_id))
+
+
 @router.get("/channel/api/redemptions", response_class=JSONResponse)
 async def channel_redemption_activity(request: Request):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
@@ -160,6 +202,7 @@ async def channel_help_page(request: Request):
     command_groups = build_command_help_groups(services.features, broadcaster_id, profile)
     command_count = sum(len(group.commands) for group in command_groups)
     enabled_command_count = sum(group.enabled_count for group in command_groups)
+    raid_contributor_data = await get_raid_contributor_data(services, broadcaster_id)
 
     return templates.TemplateResponse(
         request=request,
@@ -170,6 +213,7 @@ async def channel_help_page(request: Request):
             "command_groups": command_groups,
             "command_count": command_count,
             "enabled_command_count": enabled_command_count,
+            "raid_contributor_data": raid_contributor_data,
             "csrf_token": get_csrf_token(request)
         }
     )

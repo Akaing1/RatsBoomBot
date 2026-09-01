@@ -787,3 +787,23 @@ async def test_boss_expires_after_configured_number_of_unique_streams(tmp_path) 
         assert failed_reward == 250
         assert await points.get_points("channel-1", "user-1") == 250
         assert await service.get_active_event("channel-1") is None
+
+
+
+@pytest.mark.asyncio
+async def test_get_contributors_returns_every_attacker_ranked_by_total_damage(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
+        await service.setup()
+        config = build_config(max_hp=1000)
+
+        await service.spawn("channel-1", "melee", config)
+        await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        await service.attack("channel-1", "stream-2", "user-1", "alice", config)
+        await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+        await service.attack("channel-1", "stream-1", "user-3", "charlie", config)
+
+        contributors = await service.get_contributors("channel-1")
+
+        assert contributors == [("alice", 200), ("bob", 100), ("charlie", 100)]

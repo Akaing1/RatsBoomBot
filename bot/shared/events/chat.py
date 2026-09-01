@@ -2,6 +2,7 @@ import logging
 
 from twitchio.ext import commands
 
+from bot.shared.events.community import award_cheer_points
 from config.settings import settings
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -42,6 +43,15 @@ class ChatEvents(commands.Component):
                 chatter_name,
                 chatter_id,
                 broadcaster_name
+            )
+
+        try:
+            await award_cheer_points(self.bot, payload)
+        except Exception:
+            LOGGER.exception(
+                "[Points] Failed to award cheer points to %s in broadcaster %s.",
+                chatter_name,
+                broadcaster_id
             )
 
         try:

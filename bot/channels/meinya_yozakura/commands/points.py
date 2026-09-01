@@ -54,6 +54,13 @@ class MeinyaPointsCommands(ChannelComponent):
 
         await self.handler.gamble(ctx, amount, "petals")
 
+    @petals.command(name="roulette", aliases=("spin",))
+    async def petals_roulette(self, ctx: commands.Context, color: str = None, amount: str = None) -> None:
+        if not await self.require_feature(ctx, FeatureName.POINTS):
+            return
+
+        await self.handler.roulette(ctx, color, amount, "petals")
+
     @petals.group(name="duel", invoke_fallback=True)
     async def petals_duel(self, ctx: commands.Context, opponent: LocalizedUser = None, amount: str = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
