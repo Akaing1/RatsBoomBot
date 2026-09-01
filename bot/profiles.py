@@ -285,6 +285,13 @@ class PointsMessages:
     gamble_all_win: str = "{username} doubled their points and now has {new_balance} points!"
     gamble_loss: str = "{username} lost {amount} points and now has {new_balance} points."
     gamble_all_loss: str = "{username} lost all their points."
+    roulette_usage: str = "Use it like this: !{command} roulette red 100"
+    roulette_color_invalid: str = "Choose red, black, or green."
+    roulette_bet_invalid: str = "Your roulette bet must be a positive whole number."
+    roulette_bet_maximum: str = "The maximum roulette bet is {maximum} points."
+    roulette_insufficient: str = "You only have {points} points."
+    roulette_win: str = "The wheel landed on {number} {result}! {username} won {profit} points and now has {new_balance}!"
+    roulette_loss: str = "The wheel landed on {number} {result}. {username} lost {bet} points and now has {new_balance}."
     duel_usage: str = "Use it like this: !{command} duel @user 100"
     duel_amount_invalid: str = "The duel amount must be a number or 'all'."
     duel_self: str = "You cannot duel yourself."
@@ -308,6 +315,7 @@ class PointsConfig:
     points_per_message: int = 10
     message_cooldown_seconds: int = 60
     gamble_win_chance: float = 0.45
+    roulette_max_bet: int = 1000
     duel_expiration_seconds: int = 60
     messages: PointsMessages = PointsMessages()
 
