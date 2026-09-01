@@ -137,13 +137,24 @@
     function render(data) {
         const contributors = Array.isArray(data.contributors) ? data.contributors : [];
 
-        if (!data.active || contributors.length === 0) {
-            panel.hidden = true;
+        panel.hidden = false;
+
+        if (!data.active) {
+            boss.textContent = "No active raid boss.";
             list.replaceChildren();
             return;
         }
 
         boss.textContent = `${data.boss_name} · ${number.format(data.current_hp)}/${number.format(data.max_hp)} HP`;
+        if (contributors.length === 0) {
+            list.replaceChildren();
+            const empty = document.createElement("li");
+            empty.className = "raid-contributor-empty";
+            empty.textContent = "No contributors yet.";
+            list.append(empty);
+            return;
+        }
+
         list.replaceChildren(...contributors.map((contributor) => {
             const row = document.createElement("li");
             row.className = "raid-contributor-row";
