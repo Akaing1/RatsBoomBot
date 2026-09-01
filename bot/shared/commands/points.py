@@ -229,7 +229,7 @@ class PointsCommandHandler:
             return
 
         try:
-            await services.points.add_points(broadcaster_id=broadcaster_id, user_id=str(target.id), username=target.name, amount=amount)
+            await services.points.add_points(broadcaster_id=broadcaster_id, user_id=str(target.id), username=target.name, amount=amount, earned=False)
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to add %d points to %s in broadcaster %s.",
@@ -554,7 +554,7 @@ class PointsCommandHandler:
 
         try:
             await services.points.remove_points(broadcaster_id=broadcaster_id, user_id=loser_id, amount=duel.amount)
-            await services.points.add_points(broadcaster_id=broadcaster_id, user_id=winner_id, username=winner_name, amount=duel.amount)
+            await services.points.add_points(broadcaster_id=broadcaster_id, user_id=winner_id, username=winner_name, amount=duel.amount, earned=False)
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to resolve duel between %s and %s.",

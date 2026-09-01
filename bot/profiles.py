@@ -46,6 +46,7 @@ class GlobalCommandName(Enum):
     PP = "pp"
     LURK = "lurk"
     HELP = "help"
+    STATS = "stats"
 
     KAMIKAZE = "kamikaze"
 
@@ -89,6 +90,7 @@ class GlobalCommandDefaults:
     pp: bool = True
     lurk: bool = True
     help: bool = True
+    stats: bool = True
 
     kamikaze: bool = True
 

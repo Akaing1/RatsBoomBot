@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chatter Not Found | RatsBoomBot</title>
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
+</head>
+<body class="chatter-profile-page">
+    <main class="chatter-profile-content">
+        <section class="message-card error-card">
+            <div class="message-icon">!</div>
+            <p class="eyebrow">Chatter profiles</p>
+            <h2>{% if unavailable %}Profiles are temporarily unavailable{% else %}Chatter not found{% endif %}</h2>
+            <p>{% if unavailable %}RatsBoomBot is restarting or offline. Try again shortly.{% elif channel_name %}@{{ query }} has no recorded activity in {{ channel_name }}.{% else %}No public profile exists for “{{ query }}” yet. Profiles appear after someone chats in a connected channel.{% endif %}</p>
+            <form class="chatter-search centered" method="get" action="/chatters">
+                <input type="search" name="q" placeholder="Find another chatter" aria-label="Find another chatter" required>
+                <button class="button primary" type="submit">Search</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>

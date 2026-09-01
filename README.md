@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **8.2.0**
+Current version: **8.3.0**
 
 ## Highlights
 
@@ -12,6 +12,7 @@ Current version: **8.2.0**
 - Channel-specific profiles, commands, currencies, messages, and feature defaults
 - Twitch OAuth for the bot account and connected broadcasters
 - Optional premium per-channel Twitch bot identities with automatic fallback
+- Public global and per-channel chatter profiles with searchable community statistics
 - Persistent points, counters, redeem history, settings, and moderation data
 - Daily, first, second, self-timeout, and targeted-timeout redeems
 - Streamer.bot and Mix It Up redeem-history import tools
@@ -90,6 +91,12 @@ The repository includes a disabled `template_profile` and an enabled developer p
 Each channel can name its currency and choose its command. The shared system supports passive chat rewards, balance checks, leaderboards, moderator grants, broadcaster resets, gambling, and viewer duels.
 
 Points can remain disabled without disabling unrelated redeem tracking.
+
+### Chatter Profiles
+
+`!stats` opens the invoking viewer's public chatter profile, while `!stats <username>` opens another chatter's profile. Global profiles summarize exact tracked messages, channels visited, raid damage, boss participation, final hits, and bot-earned loyalty rewards. Each connected channel links to a detail page with the chatter's current balance, lifetime earnings, redeems, raid record, and inventory.
+
+Historical message totals are seeded from the previous point-eligible message count. After migration 13, every non-bot message is counted independently of the loyalty cooldown. Historical lifetime earnings begin with the balance present at migration; future totals include chat, redeem, raid, gamble, and other bot rewards while excluding moderator grants and viewer transfers.
 
 ### Redeems and Stream Activity
 
@@ -175,7 +182,7 @@ The service resumes the same Twitch stream after a bot restart. Each channel ret
 
 ## Database and Migrations
 
-The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadcaster connections, premium chat identity assignments, administrator accounts, settings, overrides, points, counters, redeem history, dashboard activity, viewer queues, raid bosses and scheduler state, first-chat shoutouts, moderation data, and migration history.
+The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadcaster connections, premium chat identity assignments, administrator accounts, settings, overrides, points, chatter profiles, counters, redeem history, dashboard activity, viewer queues, raid bosses and scheduler state, first-chat shoutouts, moderation data, and migration history.
 
 League statistics are stored separately in `.data/league.db`. This database contains replaceable external cache data, including seasonal champion summaries, recent ranked matches, and item metadata.
 
@@ -193,6 +200,7 @@ Migrations run automatically during startup:
 10. Persistent viewer queues
 11. Persistent raid bosses and scheduler state
 12. Premium custom bot identities
+13. Public chatter profile statistics
 
 Use a new migration for schema changes instead of rebuilding the production database.
 
@@ -286,7 +294,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 | Group | Commands |
 | --- | --- |
-| Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help` |
+| Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats [username]` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube`, `!setdiscord`, `!setyoutube` |
 | Settings | `!set game <game name>`, `!set title <stream title>`, `!timers`, `!timers on`, `!timers off` |

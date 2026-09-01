@@ -45,6 +45,11 @@ class ChatEvents(commands.Component):
             )
 
         try:
+            await services.chatter_stats.track_message(payload)
+        except Exception:
+            LOGGER.exception("[Chatter Stats] Failed to count a message from %s in %s.", chatter_name, broadcaster_name)
+
+        try:
             moderation_result = await services.moderation.evaluate_message(payload)
         except Exception:
             LOGGER.exception(
