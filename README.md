@@ -90,7 +90,7 @@ The repository includes a disabled `template_profile` and an enabled developer p
 
 Each channel can name its currency and choose its command. The shared system supports passive chat rewards, balance checks, leaderboards, moderator grants, broadcaster resets, gambling, and viewer duels.
 
-Points can remain disabled without disabling unrelated redeem tracking.
+Points can remain disabled without disabling unrelated redeem tracking. Meinya silently awards 500 petals for a new subscription and 200 petals for a cheer of at least 100 Bits. These rewards use existing subscription and chat-message events and do not require additional OAuth scopes.
 
 ### Chatter Profiles
 
