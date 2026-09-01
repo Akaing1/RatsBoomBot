@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **8.3.2**
+Current version: **8.4.1**
 
 ## Highlights
 
@@ -203,6 +203,7 @@ Migrations run automatically during startup:
 13. Public chatter profile statistics
 14. Removal of the three pre-release raid test encounters
 15. Passive point payout history
+16. Removal of the remaining pre-release Ahirman test encounter
 
 Use a new migration for schema changes instead of rebuilding the production database.
 
@@ -353,6 +354,8 @@ RatsBoomBot uses a practical three-part version number:
 - Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes
 - Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement
 - Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
+
+Version **8.4.1** removes the remaining pre-release Ahirman test encounter from raid history.
 
 Version **8.4.0** adds persistent passive point earnings for connected live chatters.
 
