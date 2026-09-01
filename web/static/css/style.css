@@ -1180,3 +1180,51 @@ body.landing-page {
         align-items: flex-start;
     }
 }
+
+.chatter-profile-page { background: radial-gradient(circle at top, rgba(139,92,246,.12), transparent 34%), var(--background); }
+.chatter-profile-content { width: min(100% - 40px, 1120px); margin: 0 auto; padding: 34px 0 70px; }
+.chatter-search { display: flex; align-items: center; gap: 9px; }
+.chatter-search.centered { max-width: 440px; margin: 24px auto 0; }
+.chatter-search input { width: min(270px, 42vw); min-height: 42px; padding: 0 14px; border: 1px solid var(--border); border-radius: 9px; outline: 0; background: var(--surface); color: var(--text); }
+.chatter-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,92,246,.15); }
+.chatter-profile-hero { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 22px; margin-bottom: 26px; padding: 28px; border: 1px solid var(--border); border-radius: 18px; background: rgba(24,27,33,.9); }
+.chatter-profile-hero h1 { margin: 0; font-size: 38px; }
+.chatter-profile-hero p:not(.eyebrow) { margin: 7px 0 0; color: var(--muted); }
+.chatter-profile-avatar, .channel-profile-hero > img { display: grid; width: 76px; height: 76px; place-items: center; border-radius: 20px; background: linear-gradient(135deg, var(--accent), #ec4899); color: #fff; font-size: 28px; font-weight: 800; object-fit: cover; }
+.chatter-stat-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; margin-bottom: 30px; }
+.chatter-stat-grid article { padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.chatter-stat-grid span { display: block; margin-bottom: 10px; color: var(--muted); font-size: 12px; }
+.chatter-stat-grid strong { font-size: 25px; }
+.chatter-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
+.chatter-section-heading h2 { margin: 0; font-size: 28px; }
+.chatter-section-heading > p { max-width: 510px; margin: 0; color: var(--muted); line-height: 1.5; text-align: right; }
+.chatter-channel-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.chatter-channel-card { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 14px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); transition: border-color .18s ease, transform .18s ease; }
+.chatter-channel-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.chatter-channel-card img, .chatter-channel-avatar { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; background: var(--surface-raised); font-weight: 800; object-fit: cover; }
+.chatter-channel-card h3 { margin: 0; font-size: 16px; }
+.chatter-channel-card p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.chatter-channel-card > span { color: var(--accent); font-size: 27px; }
+.chatter-history-note { margin: 24px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; text-align: center; }
+.chatter-detail-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+.chatter-detail-panel { margin: 0; }
+.chatter-detail-list { margin: 0; }
+.chatter-detail-list div, .chatter-inventory-list div { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; border-top: 1px solid var(--border); }
+.chatter-detail-list div:first-child, .chatter-inventory-list div:first-child { border-top: 0; }
+.chatter-detail-list dt, .chatter-inventory-list span { color: var(--muted); }
+.chatter-detail-list dd { margin: 0; font-weight: 800; }
+.chatter-inventory-list em { margin-left: 6px; color: var(--success); font-size: 10px; font-style: normal; font-weight: 800; text-transform: uppercase; }
+.chatter-inventory-list strong { font-size: 12px; }
+.chatter-empty-copy { color: var(--muted); line-height: 1.6; }
+
+@media (max-width: 760px) {
+    .chatter-profile-content { width: min(100% - 28px,1120px); padding-top: 18px; }
+    .chatter-search { width: 100%; }
+    .chatter-search input { width: 100%; }
+    .chatter-profile-hero { grid-template-columns: auto minmax(0,1fr); padding: 21px; }
+    .chatter-profile-hero .button { grid-column: 1 / -1; }
+    .chatter-profile-hero h1 { font-size: 29px; }
+    .chatter-stat-grid, .chatter-channel-grid, .chatter-detail-grid { grid-template-columns: 1fr; }
+    .chatter-section-heading { align-items: flex-start; flex-direction: column; }
+    .chatter-section-heading > p { text-align: left; }
+}

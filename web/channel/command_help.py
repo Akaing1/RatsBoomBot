@@ -53,7 +53,8 @@ UTILITY_COMMANDS = CommandGroupDefinition(
         CommandDefinition("!height [username]", "Generate a height from 1' 0\" through 8' 0\".", global_command=GlobalCommandName.HEIGHT),
         CommandDefinition("!pp [username]", "Generate a measurement from -1in through 20in.", global_command=GlobalCommandName.PP),
         CommandDefinition("!lurk", "Let chat know you are stepping away to lurk.", global_command=GlobalCommandName.LURK),
-        CommandDefinition("!help", "Show the compact command list in Twitch chat.", global_command=GlobalCommandName.HELP)
+        CommandDefinition("!help", "Show the compact command list in Twitch chat.", global_command=GlobalCommandName.HELP),
+        CommandDefinition("!stats [username]", "Open your public chatter profile or another chatter's profile.", global_command=GlobalCommandName.STATS)
     )
 )
 

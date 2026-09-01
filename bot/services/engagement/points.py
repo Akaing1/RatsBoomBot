@@ -24,9 +24,10 @@ class PendingDuel:
 class PointsService:
     LEGACY_BROADCASTER_ID = "shared"
 
-    def __init__(self, bot, db):
+    def __init__(self, bot, db, chatter_stats=None):
         self.bot = bot
         self.db = db
+        self.chatter_stats = chatter_stats
         self.cooldowns: dict[str, float] = {}
         self.pending_duels: dict[str, PendingDuel] = {}
 
@@ -202,6 +203,9 @@ class PointsService:
         try:
             async with self.db.acquire() as connection:
                 await connection.execute(query, values)
+
+                if self.chatter_stats is not None:
+                    await self.chatter_stats.record_points_earned(broadcaster_id, user_id, points_config.points_per_message, connection)
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to award message points to %s for broadcaster %s.",
@@ -244,7 +248,7 @@ class PointsService:
 
         return int(row["points"])
 
-    async def add_points(self, broadcaster_id: str, user_id: str, username: str, amount: int) -> None:
+    async def add_points(self, broadcaster_id: str, user_id: str, username: str, amount: int, earned: bool = True) -> None:
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
 
@@ -267,6 +271,9 @@ class PointsService:
         try:
             async with self.db.acquire() as connection:
                 await connection.execute(query, values)
+
+                if earned and self.chatter_stats is not None:
+                    await self.chatter_stats.record_points_earned(broadcaster_id, user_id, amount, connection)
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to add %d points to %s for broadcaster %s.",

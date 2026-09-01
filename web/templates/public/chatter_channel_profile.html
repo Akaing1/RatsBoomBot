@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{{ profile.identity.display_name }}'s RatsBoomBot statistics in {{ profile.channel.display_name }}.">
+    <title>{{ profile.identity.display_name }} in {{ profile.channel.display_name }} | RatsBoomBot</title>
+    <link rel="canonical" href="{{ public_base_url }}/chatters/{{ profile.identity.login }}/channels/{{ profile.channel.login }}">
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
+</head>
+<body class="chatter-profile-page">
+    <header class="public-command-navigation">
+        <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
+            <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
+            <span><strong>RatsBoomBot</strong><small>Chatter profiles</small></span>
+        </a>
+        <a class="button secondary" href="/chatters/{{ profile.identity.login }}">Back to global profile</a>
+    </header>
+
+    <main class="chatter-profile-content">
+        <header class="chatter-profile-hero channel-profile-hero">
+            {% if profile.channel.profile_image_url %}<img src="{{ profile.channel.profile_image_url }}" alt="{{ profile.channel.display_name }}">{% else %}<div class="chatter-profile-avatar">{{ profile.channel.display_name[0] | upper }}</div>{% endif %}
+            <div>
+                <p class="eyebrow">@{{ profile.identity.login }} in</p>
+                <h1>{{ profile.channel.display_name }}</h1>
+                <p>Channel-specific activity, loyalty progress, redeems, and raid equipment.</p>
+            </div>
+            <a class="button primary" href="https://twitch.tv/{{ profile.channel.login }}">Watch channel</a>
+        </header>
+
+        <section class="chatter-stat-grid" aria-label="Channel chatter statistics">
+            <article><span>Messages sent</span><strong>{{ "{:,}".format(profile.messages_sent) }}</strong></article>
+            <article><span>Current {{ profile.currency_name }}</span><strong>{{ "{:,}".format(profile.current_points) }}</strong></article>
+            <article><span>Lifetime earned</span><strong>{{ "{:,}".format(profile.lifetime_points_earned) }}</strong></article>
+            <article><span>Daily check-ins</span><strong>{{ profile.daily_check_ins }}</strong></article>
+            <article><span>Firsts</span><strong>{{ profile.firsts }}</strong></article>
+            <article><span>Raid damage</span><strong>{{ "{:,}".format(profile.damage_dealt) }}</strong></article>
+            <article><span>Best contribution</span><strong>{{ "{:,}".format(profile.highest_contribution) }}</strong></article>
+            <article><span>Raid reward points</span><strong>{{ "{:,}".format(profile.raid_reward_points) }}</strong></article>
+        </section>
+
+        <section class="chatter-detail-grid">
+            <article class="panel chatter-detail-panel">
+                <div class="panel-header"><div><p class="eyebrow">Raid record</p><h3>Boss encounters</h3></div></div>
+                <dl class="chatter-detail-list">
+                    <div><dt>Bosses attacked</dt><dd>{{ profile.bosses_attacked }}</dd></div>
+                    <div><dt>Successful defeats</dt><dd>{{ profile.bosses_defeated }}</dd></div>
+                    <div><dt>Final hits</dt><dd>{{ profile.final_hits }}</dd></div>
+                    <div><dt>Raids rewarded</dt><dd>{{ profile.raids_rewarded }}</dd></div>
+                </dl>
+            </article>
+
+            <article class="panel chatter-detail-panel">
+                <div class="panel-header"><div><p class="eyebrow">Raid inventory</p><h3>Equipment</h3></div></div>
+                {% if profile.inventory %}
+                    <div class="chatter-inventory-list">
+                        {% for item in profile.inventory %}
+                            <div><span>{{ item.item_id | replace('_', ' ') | title }}{% if item.equipped %} <em>Equipped</em>{% endif %}</span><strong>{{ item.durability }} durability</strong></div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="chatter-empty-copy">No raid equipment collected in this channel yet.</p>
+                {% endif %}
+            </article>
+        </section>
+
+        <p class="chatter-history-note">Lifetime earnings exclude moderator grants and viewer-to-viewer transfers. Historical totals begin with the balance recorded when chatter profiles launched.</p>
+    </main>
+</body>
+</html>

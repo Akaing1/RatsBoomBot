@@ -59,9 +59,10 @@ class RaidBossService:
     REPEAT_REMINDER_SECONDS = 60 * 60
     REQUIRED_REMINDER_MESSAGES = 20
 
-    def __init__(self, bot, db):
+    def __init__(self, bot, db, chatter_stats=None):
         self.bot = bot
         self.db = db
+        self.chatter_stats = chatter_stats
         self.spawn_tasks: dict[str, asyncio.Task] = {}
         self.reminder_tasks: dict[str, asyncio.Task] = {}
         self.reminder_message_counts: dict[str, int] = {}
@@ -1000,8 +1001,7 @@ class RaidBossService:
             (str(broadcaster_id), str(user_id), username)
         )
 
-    @staticmethod
-    async def _add_points(connection, broadcaster_id: str, user_id: str, username: str, amount: int) -> None:
+    async def _add_points(self, connection, broadcaster_id: str, user_id: str, username: str, amount: int) -> None:
         if amount <= 0:
             return
 
@@ -1013,6 +1013,9 @@ class RaidBossService:
             """,
             (str(broadcaster_id), str(user_id), username, amount)
         )
+
+        if self.chatter_stats is not None:
+            await self.chatter_stats.record_points_earned(broadcaster_id, user_id, amount, connection)
 
     @staticmethod
     def _event_from_row(row) -> RaidBossEvent:

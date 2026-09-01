@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from bot.profiles import FeatureName, get_active_profile
 from config.settings import settings
@@ -9,6 +9,51 @@ from web.shared.common import templates
 from web.state import get_bot
 
 router = APIRouter()
+
+
+@router.get("/chatters", response_class=HTMLResponse)
+async def public_chatter_search(request: Request, q: str = ""):
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": q, "unavailable": True}, status_code=503)
+
+    identity = await runtime_bot.services.chatter_stats.resolve_identity(q)
+
+    if identity is None:
+        return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": q}, status_code=404)
+
+    return RedirectResponse(url=f"/chatters/{identity['login']}", status_code=303)
+
+
+@router.get("/chatters/{chatter_name}", response_class=HTMLResponse)
+async def public_chatter_profile(request: Request, chatter_name: str):
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": chatter_name, "unavailable": True}, status_code=503)
+
+    profile = await runtime_bot.services.chatter_stats.get_global_profile(chatter_name)
+
+    if profile is None:
+        return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": chatter_name}, status_code=404)
+
+    return templates.TemplateResponse(request=request, name="public/chatter_profile.html", context={"profile": profile, "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")})
+
+
+@router.get("/chatters/{chatter_name}/channels/{channel_name}", response_class=HTMLResponse)
+async def public_chatter_channel_profile(request: Request, chatter_name: str, channel_name: str):
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": chatter_name, "unavailable": True}, status_code=503)
+
+    profile = await runtime_bot.services.chatter_stats.get_channel_profile(chatter_name, channel_name)
+
+    if profile is None:
+        return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": chatter_name, "channel_name": channel_name}, status_code=404)
+
+    return templates.TemplateResponse(request=request, name="public/chatter_channel_profile.html", context={"profile": profile, "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")})
 
 
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)

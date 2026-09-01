@@ -16,6 +16,7 @@ from bot.shared.commands.raids import RaidCommands
 from bot.shared.commands.settings import SettingsCommands
 from bot.shared.commands.shoutout import ShoutoutCommands
 from bot.shared.commands.socials import SocialCommands
+from bot.shared.commands.stats import StatsCommands
 from bot.shared.commands.utility import UtilityCommands
 from bot.shared.commands.viewer_queue import ViewerQueueCommands
 from bot.shared.events.chat import ChatEvents
@@ -31,6 +32,7 @@ GLOBAL_COMPONENTS: tuple[type[commands.Component], ...] = (
     UtilityCommands,
     ClipCommands,
     SocialCommands,
+    StatsCommands,
     PointsCommands,
     RaidBossCommands,
     RaidCommands,

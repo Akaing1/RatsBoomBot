@@ -1,7 +1,7 @@
 import logging
 
 from bot.profiles import FeatureName, get_active_profile
-from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatIdentityService, ChatterIdentityService, FeatureToggleService, ProfileSettingsService
+from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatIdentityService, ChatterIdentityService, ChatterStatsService, FeatureToggleService, ProfileSettingsService
 from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PointsService, RaidBossService, RedeemService, ViewerQueueService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
@@ -22,13 +22,14 @@ class ServiceContainer:
         self.broadcaster_settings = BroadcasterSettingsService(db)
         self.chat_identity = ChatIdentityService(bot, db)
         self.chatters = ChatterIdentityService(bot, db)
+        self.chatter_stats = ChatterStatsService(bot, db, self.broadcasters)
         self.profile_settings = ProfileSettingsService(db)
         self.features = FeatureToggleService(db, self.profile_settings)
         self.stream_logs = StreamLogService(bot, self.broadcasters, settings.STREAM_LOGS_PATH)
         self.help = HelpService(bot)
         self.timers = TimerService(bot, self.broadcasters, self.broadcaster_settings)
-        self.points = PointsService(bot, db)
-        self.raid_bosses = RaidBossService(bot, db)
+        self.points = PointsService(bot, db, self.chatter_stats)
+        self.raid_bosses = RaidBossService(bot, db, self.chatter_stats)
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
         self.viewer_queue = ViewerQueueService(bot, db)
@@ -50,6 +51,7 @@ class ServiceContainer:
             ("BroadcasterSettingsService", self.broadcaster_settings),
             ("ChatIdentityService", self.chat_identity),
             ("ChatterIdentityService", self.chatters),
+            ("ChatterStatsService", self.chatter_stats),
             ("ProfileSettingsService", self.profile_settings),
             ("FeatureToggleService", self.features),
             ("PointsService", self.points),

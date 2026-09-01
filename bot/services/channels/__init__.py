@@ -3,6 +3,7 @@ from bot.services.channels.broadcaster_settings import BroadcasterSettingsServic
 from bot.services.channels.profile_settings import ProfileSettingsService
 from bot.services.channels.channel import ChannelService
 from bot.services.channels.chatter_identity import ChatterIdentityService
+from bot.services.channels.chatter_stats import ChatterStatsService
 from bot.services.channels.chat_identity import ChatIdentityService, ChatIdentityState
 from bot.services.channels.feature_toggle import FeatureToggleService
 
@@ -11,6 +12,7 @@ __all__ = (
     "BroadcasterSettingsService",
     "ChannelService",
     "ChatterIdentityService",
+    "ChatterStatsService",
     "ChatIdentityService",
     "ChatIdentityState",
     "FeatureToggleService",
