@@ -85,7 +85,7 @@ class RaidBossCommands(commands.Component):
             details.append(f"{int(loot['bonus_points']):,} bonus loot points")
 
         if items:
-            details.append("items: " + ", ".join(str(item).replace("_", " ") for item in items))
+            details.append("items: " + ", ".join(context[1].weapon_names.display(str(item)) for item in items))
 
         await ctx.reply(f"Your loot from {loot['boss_name']}: {' | '.join(details)}.")
 
@@ -119,7 +119,7 @@ class RaidBossCommands(commands.Component):
         bonuses = []
 
         if result.weapon:
-            bonuses.append(result.weapon)
+            bonuses.append(config.weapon_names.display(result.weapon))
 
         if result.potion_used:
             bonuses.append("power potion")
@@ -134,15 +134,15 @@ class RaidBossCommands(commands.Component):
             bonuses.append("critical hit")
 
         if result.broken_weapon:
-            bonuses.append(f"broken {result.broken_weapon}; base damage only")
+            bonuses.append(f"broken {config.weapon_names.display(result.broken_weapon)}; base damage only")
 
         if result.shattered_weapon:
-            bonuses.append(f"{result.shattered_weapon} shattered")
+            bonuses.append(f"{config.weapon_names.display(result.shattered_weapon)} shattered")
 
         bonus_text = f" using {' + '.join(bonuses)}" if bonuses else ""
 
         if result.defeated:
-            drop_text = " Loot: " + ", ".join(f"{username} received {int(item_id.removesuffix('_points')):,} points" if item_id.endswith("_points") else f"{username} found {item_id.replace('_', ' ')}" for username, item_id in result.drops) + "!" if result.drops else ""
+            drop_text = " Loot: " + ", ".join(f"{username} received {int(item_id.removesuffix('_points')):,} points" if item_id.endswith("_points") else f"{username} found {config.weapon_names.display(item_id)}" for username, item_id in result.drops) + "!" if result.drops else ""
             message = f"@{chatter.name} dealt the final {result.damage:,} damage{bonus_text} and defeated {result.boss_name}! The {result.reward:,}-point reward pool has been distributed by contribution!{drop_text}"
             await self.bot.services.raid_bosses.send_announcement(broadcaster_id, message, "green")
             return
@@ -157,7 +157,7 @@ class RaidBossCommands(commands.Component):
             return
 
         config = context[1]
-        await ctx.send(f"Raid shop: Basic Sword — {config.weapon_cost:,} points | Basic Bow — {config.weapon_cost:,} | Apprentice Tome — {config.weapon_cost:,} | Power Potion — {config.potion_cost:,}. Use !raid help to view crafting, consumables, repairs, and full raid details.")
+        await ctx.send(f"Raid shop: {config.weapon_names.basic_sword} — {config.weapon_cost:,} points (!raid buy sword) | {config.weapon_names.basic_bow} — {config.weapon_cost:,} (!raid buy bow) | {config.weapon_names.apprentice_tome} — {config.weapon_cost:,} (!raid buy tome) | Power Potion — {config.potion_cost:,} (!raid buy potion). Use !raid help for full raid details.")
 
     @raid.command(name="help")
     async def raid_help(self, ctx: commands.Context) -> None:
@@ -196,7 +196,8 @@ class RaidBossCommands(commands.Component):
         elif result.startswith("out_of_stock:"):
             await ctx.reply(f"Blessing of the Gods is out of stock for this stream—it was purchased by {result.split(':', 1)[1]}!")
         else:
-            await ctx.reply(f"You purchased {item.lower()}! Use !raid equip {item.lower()} if it is a weapon.")
+            purchased_item = context[1].weapon_names.display(self.bot.services.raid_bosses.normalize_item(item))
+            await ctx.reply(f"You purchased {purchased_item}! Use !raid equip {item.lower()} if it is a weapon.")
 
     @raid.command(name="craft")
     async def craft(self, ctx: commands.Context, *, item: str | None = None) -> None:
@@ -205,7 +206,7 @@ class RaidBossCommands(commands.Component):
         if context is None:
             return
         if not item:
-            await ctx.reply("Use !raid craft refined sword, refined bow, enchanted tome, masterwork sword, masterwork bow, or archmage grimoire.")
+            await ctx.reply("Use !raid craft sword, !raid craft bow, or !raid craft tome. The highest available next tier will be crafted.")
             return
 
         chatter = ctx.chatter
@@ -218,7 +219,9 @@ class RaidBossCommands(commands.Component):
         elif result == "insufficient":
             await ctx.reply("You do not have enough loyalty points for that crafting fee.")
         else:
-            await ctx.reply(f"You crafted {item.lower()}! Use !raid equip {item.lower()} to wield it.")
+            crafted_item_id = result.split(":", 1)[1]
+            crafted_item = context[1].weapon_names.display(crafted_item_id)
+            await ctx.reply(f"You crafted {crafted_item}! Use !raid equip {crafted_item_id.replace('_', ' ')} to wield it.")
 
     @raid.command(name="equip")
     async def equip(self, ctx: commands.Context, *, weapon: str | None = None) -> None:
@@ -238,7 +241,8 @@ class RaidBossCommands(commands.Component):
             await ctx.reply("You do not own that weapon. Use !raid shop to see the available equipment.")
             return
 
-        await ctx.reply(f"You equipped your {weapon.lower()}.")
+        equipped_item = context[1].weapon_names.display(self.bot.services.raid_bosses.normalize_item(weapon))
+        await ctx.reply(f"You equipped your {equipped_item}.")
 
     @raid.command(name="inventory")
     async def inventory(self, ctx: commands.Context) -> None:
@@ -249,9 +253,10 @@ class RaidBossCommands(commands.Component):
 
         chatter = ctx.chatter
         weapons, equipped, durability, consumables = await self.bot.services.raid_bosses.get_inventory(context[0], str(chatter.id))
-        weapon_text = ", ".join(f"{weapon.replace('_', ' ')} x{quantity}" for weapon, quantity in weapons) if weapons else "none"
+        weapon_text = ", ".join(f"{context[1].weapon_names.display(weapon)} x{quantity}" for weapon, quantity in weapons) if weapons else "none"
         durability_text = f"{durability}/{context[1].weapon_durability}" if equipped else "none"
-        await ctx.reply(f"Weapons: {weapon_text}. Equipped: {(equipped or 'none').replace('_', ' ')}. Durability: {durability_text}. Power attacks: {consumables['power']}; Second Winds: {consumables['second_wind']}; Berserks: {consumables['berserk']}.")
+        equipped_text = context[1].weapon_names.display(equipped) if equipped else "none"
+        await ctx.reply(f"Weapons: {weapon_text}. Equipped: {equipped_text}. Durability: {durability_text}. Power attacks: {consumables['power']}; Second Winds: {consumables['second_wind']}; Berserks: {consumables['berserk']}.")
 
     @raid.command(name="unequip")
     async def unequip(self, ctx: commands.Context) -> None:
@@ -291,7 +296,8 @@ class RaidBossCommands(commands.Component):
         elif result == "insufficient":
             await ctx.reply("You do not have enough loyalty points for that repair.")
         else:
-            await ctx.reply(f"Your {weapon.lower()} was repaired to {context[1].weapon_durability} durability for {context[1].repair_cost:,} points.")
+            repaired_item = context[1].weapon_names.display(self.bot.services.raid_bosses.normalize_item(weapon))
+            await ctx.reply(f"Your {repaired_item} was repaired to {context[1].weapon_durability} durability for {context[1].repair_cost:,} points.")
 
     @raid.command(name="leaderboard")
     async def leaderboard(self, ctx: commands.Context) -> None:

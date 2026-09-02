@@ -323,7 +323,7 @@ class ChatterStatsService:
             "daily_check_ins": claim_counts.get("daily", 0),
             "firsts": claim_counts.get("first", 0),
             "seconds": claim_counts.get("second", 0),
-            "inventory": [dict(row) for row in inventory]
+            "inventory": [dict(row) | {"display_name": profile.raid_bosses.weapon_names.display(str(row["item_id"])) if profile else str(row["item_id"]).replace("_", " ").title()} for row in inventory]
         }
 
     def _resolve_broadcaster(self, value: str):

@@ -31,10 +31,16 @@ UNIQUE_WEAPON_TYPES = {
 }
 STANDARD_WEAPON_TYPES = BASIC_WEAPON_TYPES | REFINED_WEAPON_TYPES | MASTERWORK_WEAPON_TYPES
 WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES
-ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "blessing_of_the_gods": "blessing"}
+ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "blessing_of_the_gods": "blessing", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
 CRAFTING_RECIPES = {
     "refined_sword": "basic_sword", "refined_bow": "basic_bow", "enchanted_tome": "apprentice_tome",
     "masterwork_sword": "refined_sword", "masterwork_bow": "refined_bow", "archmage_grimoire": "enchanted_tome"
+}
+CRAFTING_FAMILIES = {
+    "sword": (("masterwork_sword", "refined_sword"), ("refined_sword", "basic_sword")),
+    "bow": (("masterwork_bow", "refined_bow"), ("refined_bow", "basic_bow")),
+    "tome": (("archmage_grimoire", "enchanted_tome"), ("enchanted_tome", "apprentice_tome")),
+    "magic": (("archmage_grimoire", "enchanted_tome"), ("enchanted_tome", "apprentice_tome"))
 }
 
 
@@ -708,20 +714,33 @@ class RaidBossService:
         return "purchased"
 
     async def craft(self, broadcaster_id: str, user_id: str, username: str, item_id: str, config: RaidBossConfig) -> str:
-        item_id = self.normalize_item(item_id)
+        requested_item = "_".join(item_id.lower().strip().split())
+        family = CRAFTING_FAMILIES.get(requested_item)
+        item_id = self.normalize_item(item_id) if family is None else ""
         ingredient = CRAFTING_RECIPES.get(item_id)
 
-        if ingredient is None:
+        if family is None and ingredient is None:
             return "invalid"
 
-        cost = config.masterwork_crafting_cost if item_id in MASTERWORK_WEAPON_TYPES else config.refined_crafting_cost
-
         async with self.db.acquire() as connection:
-            owned = await connection.fetchone("SELECT quantity FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (str(broadcaster_id), str(user_id), ingredient))
-            balance = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?", (str(broadcaster_id), str(user_id)))
+            owned = None
+
+            if family is not None:
+                for output, required_item in family:
+                    candidate = await connection.fetchone("SELECT quantity FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (str(broadcaster_id), str(user_id), required_item))
+
+                    if candidate is not None and int(candidate["quantity"]) >= 2:
+                        item_id, ingredient, owned = output, required_item, candidate
+                        break
+            else:
+                owned = await connection.fetchone("SELECT quantity FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (str(broadcaster_id), str(user_id), ingredient))
 
             if owned is None or int(owned["quantity"]) < 2:
                 return "materials"
+
+            cost = config.masterwork_crafting_cost if item_id in MASTERWORK_WEAPON_TYPES else config.refined_crafting_cost
+            balance = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?", (str(broadcaster_id), str(user_id)))
+
             if balance is None or int(balance["points"]) < cost:
                 return "insufficient"
 
@@ -734,7 +753,7 @@ class RaidBossService:
             if player and player["equipped_weapon"] == ingredient and int(owned["quantity"]) == 2:
                 await connection.execute("UPDATE raid_boss_players SET equipped_weapon = ? WHERE broadcaster_id = ? AND user_id = ?", (item_id, str(broadcaster_id), str(user_id)))
 
-        return "crafted"
+        return f"crafted:{item_id}"
 
     @staticmethod
     def normalize_item(item_id: str) -> str:

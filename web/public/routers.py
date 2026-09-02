@@ -170,9 +170,9 @@ async def public_channel_raid_page(request: Request, channel_name: str):
     raid_state = await get_public_raid_state(services, broadcaster.id)
     recent_events = await services.raid_bosses.get_recent_events(broadcaster.id)
     shop_items = (
-        {"name": "Basic Sword", "item_id": "basic sword", "type": "Melee", "cost": config.weapon_cost},
-        {"name": "Basic Bow", "item_id": "basic bow", "type": "Ranged", "cost": config.weapon_cost},
-        {"name": "Apprentice Tome", "item_id": "apprentice tome", "type": "Magic", "cost": config.weapon_cost}
+        {"name": config.weapon_names.basic_sword, "item_id": "sword", "type": "Melee", "cost": config.weapon_cost},
+        {"name": config.weapon_names.basic_bow, "item_id": "bow", "type": "Ranged", "cost": config.weapon_cost},
+        {"name": config.weapon_names.apprentice_tome, "item_id": "tome", "type": "Magic", "cost": config.weapon_cost}
     )
     raid_commands = (
         {"syntax": "!raid", "description": "Show the current encounter status."},
@@ -180,7 +180,7 @@ async def public_channel_raid_page(request: Request, channel_name: str):
         {"syntax": "!raid help", "description": "Open this complete raid guide."},
         {"syntax": "!raid shop", "description": "Show Basic weapons and the Power Potion in chat."},
         {"syntax": "!raid buy <item>", "description": "Purchase a weapon or consumable with loyalty points."},
-        {"syntax": "!raid craft <weapon>", "description": "Combine two matching weapons from the previous tier and pay the crafting fee."},
+        {"syntax": "!raid craft <sword|bow|tome>", "description": "Craft the highest available next tier using two matching weapons and the crafting fee."},
         {"syntax": "!raid inventory", "description": "View your weapons, equipped item, durability, and potion attacks."},
         {"syntax": "!raid equip <weapon>", "description": "Equip an owned weapon."},
         {"syntax": "!raid unequip", "description": "Remove your equipped weapon and return to base attack damage."},

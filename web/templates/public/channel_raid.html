@@ -140,7 +140,11 @@
                 <div class="public-raid-section-content public-raid-copy">
                     <p><strong>Refined:</strong> two Basic weapons plus {{ "{:,}".format(config.refined_crafting_cost) }} points. Refined weapons add +{{ config.refined_weapon_attack }} damage.</p>
                     <p><strong>Masterwork:</strong> two Refined weapons plus {{ "{:,}".format(config.masterwork_crafting_cost) }} points. Masterwork weapons add +{{ config.masterwork_weapon_attack }} damage.</p>
-                    <p>Sword progresses Basic Sword → Refined Sword → Masterwork Sword; Bow follows the same tiers; magic progresses Apprentice Tome → Enchanted Tome → Archmage's Grimoire. Mythical weapons add +{{ config.unique_weapon_attack }} damage.</p>
+                    <p><strong>Sword:</strong> {{ config.weapon_names.basic_sword }} → {{ config.weapon_names.refined_sword }} → {{ config.weapon_names.masterwork_sword }}. Mythical: {{ config.weapon_names.mythical_blade }}.</p>
+                    <p><strong>Bow:</strong> {{ config.weapon_names.basic_bow }} → {{ config.weapon_names.refined_bow }} → {{ config.weapon_names.masterwork_bow }}. Mythical: {{ config.weapon_names.mythical_longbow }}.</p>
+                    <p><strong>Magic:</strong> {{ config.weapon_names.apprentice_tome }} → {{ config.weapon_names.enchanted_tome }} → {{ config.weapon_names.archmage_grimoire }}. Mythical: {{ config.weapon_names.mythical_grimoire }}.</p>
+                    <p>Mythical weapons add +{{ config.unique_weapon_attack }} damage.</p>
+                    <p>Use <code>!raid craft sword</code>, <code>!raid craft bow</code>, or <code>!raid craft tome</code>. The bot automatically crafts the highest next tier supported by your inventory.</p>
                 </div>
             </details>
 

@@ -67,7 +67,7 @@
                 {% if profile.inventory %}
                     <div class="chatter-inventory-list">
                         {% for item in profile.inventory %}
-                            <div><span>{{ item.item_id | replace('_', ' ') | title }}{% if item.equipped %} <em>Equipped</em>{% endif %}</span><strong>{{ item.durability }} durability</strong></div>
+                            <div><span>{{ item.display_name or (item.item_id | replace('_', ' ') | title) }}{% if item.equipped %} <em>Equipped</em>{% endif %}</span><strong>{{ item.durability }} durability</strong></div>
                         {% endfor %}
                     </div>
                 {% else %}
