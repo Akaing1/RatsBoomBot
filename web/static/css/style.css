@@ -1369,3 +1369,5 @@ body.landing-page {
     .public-raid-navigation > a:not(.button) { display: none; }
     .public-raid-history-list article { grid-template-columns: 1fr; gap: 10px; }
 }
+
+.public-raid-guide-link { width: fit-content; margin-top: 18px; }
