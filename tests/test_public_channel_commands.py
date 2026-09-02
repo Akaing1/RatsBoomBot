@@ -29,6 +29,10 @@ class FakeRaidBossService:
             "total_damage": 8391
         }
 
+    async def get_contributors(self, broadcaster_id: str):
+        assert broadcaster_id == "channel-1"
+        return [(f"viewer-{index}", 1300 - (index * 100)) for index in range(1, 13)]
+
 
 @pytest.fixture(autouse=True)
 def reset_active_profiles():
@@ -52,7 +56,7 @@ def test_public_channel_page_only_shows_enabled_commands_and_available_raid(monk
     monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=services))
 
     with TestClient(app) as client:
-        response = client.get("/commands/MeinyaYozakura")
+        response = client.get("/help/MeinyaYozakura")
 
     assert response.status_code == 200
     assert "!pp [username]" in response.text
@@ -60,6 +64,9 @@ def test_public_channel_page_only_shows_enabled_commands_and_available_raid(monk
     assert ">Disabled<" not in response.text
     assert "Ahriman" in response.text
     assert "11,609/20,000 HP" in response.text
+    assert "viewer-10" in response.text
+    assert "viewer-11" in response.text
+    assert "Show all 12 contributors" in response.text
 
 
 def test_public_channel_page_returns_not_found_for_unknown_channel(monkeypatch) -> None:
@@ -67,7 +74,16 @@ def test_public_channel_page_returns_not_found_for_unknown_channel(monkeypatch) 
     monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=services))
 
     with TestClient(app) as client:
-        response = client.get("/commands/unknown")
+        response = client.get("/help/unknown")
 
     assert response.status_code == 404
     assert "Channel not found" in response.text
+
+
+
+def test_legacy_commands_route_redirects_to_help() -> None:
+    with TestClient(app, follow_redirects=False) as client:
+        response = client.get("/commands/MeinyaYozakura")
+
+    assert response.status_code == 308
+    assert response.headers["location"] == "/help/MeinyaYozakura"
