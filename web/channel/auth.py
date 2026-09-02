@@ -12,12 +12,15 @@ CUSTOM_BOT_BROADCASTER_KEY = "channel_custom_bot_broadcaster_id"
 
 
 def create_channel_oauth_state(request: Request) -> str:
+    request.session.pop(CUSTOM_BOT_OAUTH_STATE_KEY, None)
+    request.session.pop(CUSTOM_BOT_BROADCASTER_KEY, None)
     state = secrets.token_urlsafe(32)
     request.session[CHANNEL_OAUTH_STATE_KEY] = state
     return state
 
 
 def create_custom_bot_oauth_state(request: Request, broadcaster_id: str) -> str:
+    request.session.pop(CHANNEL_OAUTH_STATE_KEY, None)
     state = secrets.token_urlsafe(32)
     request.session[CUSTOM_BOT_OAUTH_STATE_KEY] = state
     request.session[CUSTOM_BOT_BROADCASTER_KEY] = str(broadcaster_id)
