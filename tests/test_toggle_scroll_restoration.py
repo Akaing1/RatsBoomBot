@@ -55,9 +55,17 @@ def test_streamer_dashboard_has_profile_customization_page() -> None:
     assert "data-add-timer" in template
     assert "data-remove-timer" in template
     assert "full-width" in template
-    assert "Connect Custom Bot Account" in template
+    assert "Generate Authorization Link" in template
     assert "/channel/custom-bot/connect" in template
     assert "/channel/custom-bot/disconnect" in template
+
+    link_template = (PROJECT_ROOT / "web/templates/channel/custom_bot_link.html").read_text(encoding="utf-8")
+    result_template = (PROJECT_ROOT / "web/templates/channel/custom_bot_result.html").read_text(encoding="utf-8")
+
+    assert "valid for 15 minutes" in link_template
+    assert "Copy Link" in link_template
+    assert "another device" in link_template
+    assert "Custom Bot Authorization" in result_template
 
 
 def test_stylesheets_use_deployment_stamp_for_cache_busting() -> None:

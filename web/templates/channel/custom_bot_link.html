@@ -1,0 +1,57 @@
+{% extends "channel/layout.html" %}
+
+{% block title %}Custom Bot Authorization | RatsBoomBot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Premium bot identity</p>
+        <h2>Authorization link ready</h2>
+        <p class="page-description">This one-time link is valid for 15 minutes and will only accept {{ bot_display_name }} (@{{ bot_login }}).</p>
+    </div>
+</header>
+
+<section class="panel custom-bot-link-panel">
+    <div class="panel-header">
+        <div><p class="eyebrow">Expected Twitch account</p><h3>{{ bot_display_name }} (@{{ bot_login }})</h3></div>
+        <span class="toggle-status enabled">Ready</span>
+    </div>
+
+    <div class="premium-connect-notice">
+        <strong>Open this link where the dedicated bot account can sign into Twitch.</strong>
+        <p>You can use a private window, another browser, another device, or send it directly to the person who controls the account.</p>
+    </div>
+
+    <label for="custom-bot-authorization-url">One-time authorization link</label>
+    <div class="custom-bot-link-controls">
+        <input id="custom-bot-authorization-url" class="profile-setting-input" type="text" value="{{ authorization_url }}" readonly>
+        <button class="button secondary" type="button" data-copy-custom-bot-link>Copy Link</button>
+        <a class="button primary" href="{{ authorization_url }}" target="_blank" rel="noopener">Open Link</a>
+    </div>
+    <p class="panel-description" data-copy-custom-bot-status aria-live="polite"></p>
+
+    <div class="toggle-actions profile-setting-actions"><a class="button secondary" href="/channel/customization">Return to Customization</a></div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+    (() => {
+        const button = document.querySelector("[data-copy-custom-bot-link]");
+        const input = document.getElementById("custom-bot-authorization-url");
+        const status = document.querySelector("[data-copy-custom-bot-status]");
+
+        if (!button || !input || !status) return;
+
+        button.addEventListener("click", async () => {
+            try {
+                await navigator.clipboard.writeText(input.value);
+                status.textContent = "Authorization link copied.";
+            } catch (error) {
+                input.select();
+                status.textContent = "Copy was unavailable. The link has been selected for you.";
+            }
+        });
+    })();
+</script>
+{% endblock %}
