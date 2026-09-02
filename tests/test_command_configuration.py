@@ -42,6 +42,18 @@ def test_meinya_uses_final_fantasy_fourteen_raid_pilot() -> None:
     assert config.mini_names.melee == "Behemoth"
     assert config.mini_names.ranged == "Magitek Gunship"
     assert config.mini_names.magic == "Ahriman"
+    assert config.weapon_names.basic_sword == "Weathered Shortsword"
+    assert config.weapon_names.refined_sword == "Lost Allagan Saber"
+    assert config.weapon_names.masterwork_sword == "Burtgang"
+    assert config.weapon_names.mythical_blade == "Ultimate Sword of the Heavens"
+    assert config.weapon_names.basic_bow == "Weathered Shortbow"
+    assert config.weapon_names.refined_bow == "Lost Allagan Composite Bow"
+    assert config.weapon_names.masterwork_bow == "Rosenbogen"
+    assert config.weapon_names.mythical_longbow == "Ultimate Bow of the Heavens"
+    assert config.weapon_names.apprentice_tome == "Weathered Grimoire"
+    assert config.weapon_names.enchanted_tome == "Lost Allagan Grimoire"
+    assert config.weapon_names.archmage_grimoire == "Ona Ramuhda"
+    assert config.weapon_names.mythical_grimoire == "Ultimate Grimoire of the Heavens"
     assert config.weapon_cost == 5000
     assert config.potion_cost == 1500
     assert config.weapon_durability == 15

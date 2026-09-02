@@ -357,12 +357,32 @@ class RaidBossNames:
 
 
 @dataclass(frozen=True)
+class RaidWeaponNames:
+    basic_sword: str = "Basic Sword"
+    refined_sword: str = "Refined Sword"
+    masterwork_sword: str = "Masterwork Sword"
+    mythical_blade: str = "Mythical Blade"
+    basic_bow: str = "Basic Bow"
+    refined_bow: str = "Refined Bow"
+    masterwork_bow: str = "Masterwork Bow"
+    mythical_longbow: str = "Mythical Longbow"
+    apprentice_tome: str = "Apprentice Tome"
+    enchanted_tome: str = "Enchanted Tome"
+    archmage_grimoire: str = "Archmage's Grimoire"
+    mythical_grimoire: str = "Mythical Grimoire"
+
+    def display(self, item_id: str) -> str:
+        return str(getattr(self, item_id, item_id.replace("_", " ").title()))
+
+
+@dataclass(frozen=True)
 class RaidBossConfig:
     enabled: bool = False
     offline_testing_enabled: bool = False
     tutorial_name: str = "Training Dummy"
     names: RaidBossNames = RaidBossNames()
     mini_names: RaidBossNames = RaidBossNames()
+    weapon_names: RaidWeaponNames = RaidWeaponNames()
     max_hp: int = 150000
     duration_streams: int = 5
     reward_pool: int = 100000

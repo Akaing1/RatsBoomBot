@@ -5,6 +5,7 @@ from bot.profiles import (
     RaidMessages,
     RaidBossConfig,
     RaidBossNames,
+    RaidWeaponNames,
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
@@ -24,6 +25,20 @@ MEINYA_RAID_BOSSES = RaidBossConfig(
         melee="Behemoth",
         ranged="Magitek Gunship",
         magic="Ahriman"
+    ),
+    weapon_names=RaidWeaponNames(
+        basic_sword="Weathered Shortsword",
+        refined_sword="Lost Allagan Saber",
+        masterwork_sword="Burtgang",
+        mythical_blade="Ultimate Sword of the Heavens",
+        basic_bow="Weathered Shortbow",
+        refined_bow="Lost Allagan Composite Bow",
+        masterwork_bow="Rosenbogen",
+        mythical_longbow="Ultimate Bow of the Heavens",
+        apprentice_tome="Weathered Grimoire",
+        enchanted_tome="Lost Allagan Grimoire",
+        archmage_grimoire="Ona Ramuhda",
+        mythical_grimoire="Ultimate Grimoire of the Heavens"
     ),
     mini_hp_min=20000,
     mini_hp_max=50000,

@@ -170,9 +170,9 @@ async def public_channel_raid_page(request: Request, channel_name: str):
     raid_state = await get_public_raid_state(services, broadcaster.id)
     recent_events = await services.raid_bosses.get_recent_events(broadcaster.id)
     shop_items = (
-        {"name": "Basic Sword", "item_id": "sword", "type": "Melee", "cost": config.weapon_cost},
-        {"name": "Basic Bow", "item_id": "bow", "type": "Ranged", "cost": config.weapon_cost},
-        {"name": "Apprentice Tome", "item_id": "tome", "type": "Magic", "cost": config.weapon_cost}
+        {"name": config.weapon_names.basic_sword, "item_id": "sword", "type": "Melee", "cost": config.weapon_cost},
+        {"name": config.weapon_names.basic_bow, "item_id": "bow", "type": "Ranged", "cost": config.weapon_cost},
+        {"name": config.weapon_names.apprentice_tome, "item_id": "tome", "type": "Magic", "cost": config.weapon_cost}
     )
     raid_commands = (
         {"syntax": "!raid", "description": "Show the current encounter status."},
