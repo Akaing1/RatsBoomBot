@@ -58,6 +58,8 @@ def test_streamer_dashboard_has_profile_customization_page() -> None:
     assert "Generate Authorization Link" in template
     assert "/channel/custom-bot/connect" in template
     assert "/channel/custom-bot/disconnect" in template
+    assert 'class="button danger" type="submit">Disconnect Account' in template
+    assert "custom-bot-actions" in template
 
     link_template = (PROJECT_ROOT / "web/templates/channel/custom_bot_link.html").read_text(encoding="utf-8")
     result_template = (PROJECT_ROOT / "web/templates/channel/custom_bot_result.html").read_text(encoding="utf-8")
