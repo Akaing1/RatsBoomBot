@@ -112,6 +112,50 @@
     </div>
 </section>
 
+{% if chat_identity.premium_enabled %}
+    {% if identity_message %}
+        <div class="toggle-feedback {% if identity_result == 'success' %}success{% else %}error{% endif %}" role="status">
+            <span class="toggle-feedback-icon">{% if identity_result == "success" %}&#10003;{% else %}!{% endif %}</span>
+            <span>{{ identity_message }}</span>
+        </div>
+    {% endif %}
+
+    <section class="panel toggle-management-panel profile-settings-panel custom-bot-panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Premium feature</p>
+                <h3>Custom bot identity</h3>
+                <p class="panel-description">Connect a dedicated Twitch account that will speak for the bot in your channel.</p>
+            </div>
+            <span class="toggle-status {% if chat_identity.connected %}enabled{% endif %}">{% if chat_identity.connected %}Connected{% else %}Ready to connect{% endif %}</span>
+        </div>
+
+        {% if chat_identity.connected %}
+            <div class="channel-user-details">
+                <div><span>Active identity</span><strong>{{ chat_identity.bot_display_name }} (@{{ chat_identity.bot_login }})</strong></div>
+                <div><span>Twitch user ID</span><strong>{{ chat_identity.bot_user_id }}</strong></div>
+            </div>
+            <p class="panel-description">Messages and announcements use this account when possible. RatsBoomBot remains the automatic fallback if it cannot send.</p>
+        {% else %}
+            <div class="premium-connect-notice">
+                <strong>Authorize the dedicated bot account—not your broadcaster account.</strong>
+                <p>RatsBoomBot never receives the account password. Twitch returns only the authorization tokens required to send chat messages and announcements.</p>
+            </div>
+        {% endif %}
+
+        <div class="toggle-actions profile-setting-actions">
+            <a class="button primary" href="/channel/custom-bot/connect">{% if chat_identity.connected %}Reconnect Custom Bot{% else %}Connect Custom Bot Account{% endif %}</a>
+
+            {% if chat_identity.connected %}
+                <form method="post" action="/channel/custom-bot/disconnect" onsubmit="return confirm('Disconnect @{{ chat_identity.bot_login }} from your channel?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="button secondary" type="submit">Disconnect Account</button>
+                </form>
+            {% endif %}
+        </div>
+    </section>
+{% endif %}
+
 <template id="timer-message-template">
     <div class="timer-message-row">
         <textarea class="profile-setting-input" rows="3" maxlength="500" data-timer-message aria-label="Timer message"></textarea>
