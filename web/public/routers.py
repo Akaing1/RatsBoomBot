@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from bot.profiles import FeatureName, get_active_profile
 from config.settings import settings
@@ -110,6 +110,98 @@ async def public_channel_commands(request: Request, channel_name: str):
             "command_count": sum(len(group.commands) for group in command_groups),
             "raid_metrics": raid_metrics,
             "raid_contributors": raid_contributors,
+            "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")
+        }
+    )
+
+
+
+def find_public_broadcaster(services, channel_name: str):
+    return next((item for item in services.broadcasters.get_broadcasters().values() if channel_name.lower() in {str(item.login or "").lower(), str(item.display_name or "").lower()}), None)
+
+
+async def get_public_raid_state(services, broadcaster_id: str) -> dict[str, object]:
+    metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster_id)
+    contributors = await services.raid_bosses.get_contributors(broadcaster_id) if metrics and metrics["status"] == "active" else []
+    return {
+        "metrics": metrics,
+        "contributors": [
+            {"rank": rank, "username": username, "damage": damage}
+            for rank, (username, damage) in enumerate(contributors, start=1)
+        ]
+    }
+
+
+@router.get("/api/raid/{channel_name}", response_class=JSONResponse)
+async def public_raid_state(channel_name: str):
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+
+    services = runtime_bot.services
+    broadcaster = find_public_broadcaster(services, channel_name)
+
+    if broadcaster is None:
+        return JSONResponse({"detail": "Channel not found."}, status_code=404)
+
+    profile = get_active_profile(broadcaster.id)
+
+    if profile is None or not services.features.is_enabled(broadcaster.id, FeatureName.RAID_BOSSES):
+        return JSONResponse({"detail": "Raid bosses are not enabled for this channel."}, status_code=404)
+
+    return JSONResponse(await get_public_raid_state(services, broadcaster.id))
+
+
+@router.get("/raid/{channel_name}", response_class=HTMLResponse)
+async def public_channel_raid_page(request: Request, channel_name: str):
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return templates.TemplateResponse(request=request, name="public/channel_commands_unavailable.html", context={"channel_name": channel_name}, status_code=503)
+
+    services = runtime_bot.services
+    broadcaster = find_public_broadcaster(services, channel_name)
+
+    if broadcaster is None:
+        return templates.TemplateResponse(request=request, name="public/channel_commands_unavailable.html", context={"channel_name": channel_name, "not_found": True}, status_code=404)
+
+    profile = get_active_profile(broadcaster.id)
+
+    if profile is None or not services.features.is_enabled(broadcaster.id, FeatureName.RAID_BOSSES):
+        return templates.TemplateResponse(request=request, name="public/channel_commands_unavailable.html", context={"channel_name": channel_name, "not_found": True}, status_code=404)
+
+    config = profile.raid_bosses
+    raid_state = await get_public_raid_state(services, broadcaster.id)
+    recent_events = await services.raid_bosses.get_recent_events(broadcaster.id)
+    shop_items = (
+        {"name": "Sword", "item_id": "sword", "type": "Melee", "cost": config.weapon_cost},
+        {"name": "Bow", "item_id": "bow", "type": "Ranged", "cost": config.weapon_cost},
+        {"name": "Spellbook", "item_id": "spellbook", "type": "Magic", "cost": config.weapon_cost}
+    )
+    raid_commands = (
+        {"syntax": "!raid", "description": "Show the current encounter status."},
+        {"syntax": "!raid attack", "description": "Attack once during the current stream."},
+        {"syntax": "!raid shop", "description": "Open this raid guide and shop."},
+        {"syntax": "!raid buy <item>", "description": "Purchase a weapon or potion with loyalty points."},
+        {"syntax": "!raid inventory", "description": "View your weapons, equipped item, durability, and potion attacks."},
+        {"syntax": "!raid equip <weapon>", "description": "Equip an owned weapon."},
+        {"syntax": "!raid repair <weapon>", "description": "Restore an owned weapon to full durability."},
+        {"syntax": "!raid leaderboard", "description": "Show the leading contributors in chat."},
+        {"syntax": "!loot", "description": "Show your rewards from the most recently completed raid."}
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="public/channel_raid.html",
+        context={
+            "broadcaster": broadcaster,
+            "config": config,
+            "raid_metrics": raid_state["metrics"],
+            "raid_contributors": raid_state["contributors"],
+            "recent_events": recent_events,
+            "shop_items": shop_items,
+            "raid_commands": raid_commands,
             "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")
         }
     )
