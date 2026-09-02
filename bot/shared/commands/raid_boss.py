@@ -39,7 +39,24 @@ class RaidBossCommands(commands.Component):
 
         return broadcaster_id, profile.raid_bosses
 
-    @commands.command(name="loot")
+    @commands.group(name="raid", invoke_fallback=True)
+    async def raid(self, ctx: commands.Context) -> None:
+        context = self.get_context(ctx)
+
+        if context is None:
+            return
+
+        event = await self.bot.services.raid_bosses.get_active_event(context[0])
+
+        if event is None:
+            await ctx.send("There is no active raid boss right now.")
+            return
+
+        percent = event.current_hp / event.max_hp * 100
+        streams_remaining = event.stream_limit - event.streams_used + 1
+        await ctx.send(f"{event.boss_name} [{event.boss_tier.title()} Boss / {event.boss_type.title()}] — {event.current_hp:,}/{event.max_hp:,} HP ({percent:.1f}%). {streams_remaining} raid stream(s) remain. Use !raid attack once this stream!")
+
+    @raid.command(name="loot")
     async def loot(self, ctx: commands.Context) -> None:
         context = self.get_context(ctx)
 
@@ -71,23 +88,6 @@ class RaidBossCommands(commands.Component):
             details.append("items: " + ", ".join(str(item).replace("_", " ") for item in items))
 
         await ctx.reply(f"Your loot from {loot['boss_name']}: {' | '.join(details)}.")
-
-    @commands.group(name="raid", invoke_fallback=True)
-    async def raid(self, ctx: commands.Context) -> None:
-        context = self.get_context(ctx)
-
-        if context is None:
-            return
-
-        event = await self.bot.services.raid_bosses.get_active_event(context[0])
-
-        if event is None:
-            await ctx.send("There is no active raid boss right now.")
-            return
-
-        percent = event.current_hp / event.max_hp * 100
-        streams_remaining = event.stream_limit - event.streams_used + 1
-        await ctx.send(f"{event.boss_name} [{event.boss_tier.title()} Boss / {event.boss_type.title()}] — {event.current_hp:,}/{event.max_hp:,} HP ({percent:.1f}%). {streams_remaining} raid stream(s) remain. Use !raid attack once this stream!")
 
     @raid.command(name="attack")
     async def attack(self, ctx: commands.Context) -> None:

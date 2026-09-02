@@ -186,7 +186,7 @@ async def public_channel_raid_page(request: Request, channel_name: str):
         {"syntax": "!raid unequip", "description": "Remove your equipped weapon and return to base attack damage."},
         {"syntax": "!raid repair <weapon>", "description": "Restore an owned weapon to full durability."},
         {"syntax": "!raid leaderboard", "description": "Show the leading contributors in chat."},
-        {"syntax": "!loot", "description": "Show your rewards from the most recently completed raid."}
+        {"syntax": "!raid loot", "description": "Show your rewards from the most recently completed raid."}
     )
 
     return templates.TemplateResponse(
