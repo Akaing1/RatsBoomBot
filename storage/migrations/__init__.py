@@ -21,6 +21,7 @@ from storage.migrations.v016_remove_remaining_ahirman_test_record import migrate
 from storage.migrations.v017_remove_ahirman_test_run import migrate as migrate_remove_ahirman_test_run
 from storage.migrations.v018_remove_ahriman_test_run import migrate as migrate_remove_ahriman_test_run
 from storage.migrations.v019_custom_bot_authorization_links import migrate as migrate_custom_bot_authorization_links
+from storage.migrations.v020_raid_crafting_progression import migrate as migrate_raid_crafting_progression
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -51,5 +52,6 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=16, name="remove_remaining_ahirman_test_record", run=migrate_remove_remaining_ahirman_test_record),
     Migration(version=17, name="remove_ahirman_test_run", run=migrate_remove_ahirman_test_run),
     Migration(version=18, name="remove_ahriman_test_run", run=migrate_remove_ahriman_test_run),
-    Migration(version=19, name="custom_bot_authorization_links", run=migrate_custom_bot_authorization_links)
+    Migration(version=19, name="custom_bot_authorization_links", run=migrate_custom_bot_authorization_links),
+    Migration(version=20, name="raid_crafting_progression", run=migrate_raid_crafting_progression)
 )

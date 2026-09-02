@@ -10,16 +10,32 @@ from bot.profiles import RaidBossConfig
 LOGGER = logging.getLogger("RatBoomBot")
 
 BASIC_WEAPON_TYPES = {
-    "sword": "melee",
-    "bow": "ranged",
-    "spellbook": "magic"
+    "basic_sword": "melee",
+    "basic_bow": "ranged",
+    "apprentice_tome": "magic"
+}
+REFINED_WEAPON_TYPES = {
+    "refined_sword": "melee",
+    "refined_bow": "ranged",
+    "enchanted_tome": "magic"
+}
+MASTERWORK_WEAPON_TYPES = {
+    "masterwork_sword": "melee",
+    "masterwork_bow": "ranged",
+    "archmage_grimoire": "magic"
 }
 UNIQUE_WEAPON_TYPES = {
     "mythical_blade": "melee",
     "mythical_longbow": "ranged",
     "mythical_grimoire": "magic"
 }
-WEAPON_TYPES = BASIC_WEAPON_TYPES | UNIQUE_WEAPON_TYPES
+STANDARD_WEAPON_TYPES = BASIC_WEAPON_TYPES | REFINED_WEAPON_TYPES | MASTERWORK_WEAPON_TYPES
+WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES
+ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "blessing_of_the_gods": "blessing"}
+CRAFTING_RECIPES = {
+    "refined_sword": "basic_sword", "refined_bow": "basic_bow", "enchanted_tome": "apprentice_tome",
+    "masterwork_sword": "refined_sword", "masterwork_bow": "refined_bow", "archmage_grimoire": "enchanted_tome"
+}
 
 
 @dataclass(frozen=True)
@@ -49,6 +65,9 @@ class RaidAttackResult:
     critical_hit: bool = False
     broken_weapon: str | None = None
     drops: tuple[tuple[str, str], ...] = ()
+    buff_used: str | None = None
+    blessing_active: bool = False
+    shattered_weapon: str | None = None
 
 
 class RaidBossService:
@@ -455,27 +474,62 @@ class RaidBossService:
         if event is None:
             return RaidAttackResult(0, 0, "", None, False, False, error="There is no active raid boss.")
 
+        stream_id = str(stream_id)
         player = await self._get_player(broadcaster_id, user_id)
         weapon = player["equipped_weapon"] if player else None
         weapon_durability = int(player["weapon_durability"]) if player else 0
         weapon_used = weapon if weapon and weapon_durability > 0 else None
         potion_attacks = int(player["potion_attacks_remaining"]) if player else 0
+        second_wind_charges = int(player["second_wind_charges"]) if player and "second_wind_charges" in player.keys() else 0
+        berserk_charges = int(player["berserk_charges"]) if player and "berserk_charges" in player.keys() else 0
+
+        async with self.db.acquire() as connection:
+            prior = await connection.fetchone(
+                "SELECT COUNT(*) AS attacks, COALESCE(SUM(CASE WHEN buff_used = 'berserk' THEN 1 ELSE 0 END), 0) AS berserks FROM raid_boss_attacks WHERE event_id = ? AND stream_id = ? AND user_id = ?",
+                (event.id, stream_id, user_id)
+            )
+            blessing = await connection.fetchone("SELECT blessing_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (broadcaster_id, stream_id))
+
+        attack_number = int(prior["attacks"]) + 1
+
+        if attack_number > 2 or (attack_number == 2 and second_wind_charges <= 0):
+            return RaidAttackResult(0, event.current_hp, event.boss_name, weapon, False, False, error="You already attacked during this stream.")
+
+        berserk_used = berserk_charges > 0 and int(prior["berserks"]) == 0
+
+        if berserk_used and (weapon_used is None or weapon_durability < config.berserk_durability_cost):
+            return RaidAttackResult(0, event.current_hp, event.boss_name, weapon, False, False, error=f"Berserk requires an equipped weapon with at least {config.berserk_durability_cost} durability.")
+
         damage = random.randint(config.base_damage_min, config.base_damage_max)
 
         if weapon_used:
-            weapon_attack = config.unique_weapon_attack if weapon_used in UNIQUE_WEAPON_TYPES else config.weapon_attack
+            if weapon_used in UNIQUE_WEAPON_TYPES:
+                weapon_attack = config.unique_weapon_attack
+            elif weapon_used in MASTERWORK_WEAPON_TYPES:
+                weapon_attack = config.masterwork_weapon_attack
+            elif weapon_used in REFINED_WEAPON_TYPES:
+                weapon_attack = config.refined_weapon_attack
+            else:
+                weapon_attack = config.weapon_attack
 
             if WEAPON_TYPES.get(weapon_used) == event.boss_type:
                 weapon_attack = round(weapon_attack * config.weapon_multiplier)
 
             damage += weapon_attack
 
-        potion_used = potion_attacks > 0
+        potion_used = potion_attacks > 0 and not berserk_used
 
-        if potion_used:
+        if berserk_used:
+            damage = round(damage * config.berserk_multiplier)
+        elif potion_used:
             damage = round(damage * config.potion_multiplier)
 
-        critical_hit = random.random() < config.critical_chance
+        blessing_active = blessing is not None
+
+        if blessing_active:
+            damage = round(damage * config.blessing_multiplier)
+
+        critical_hit = not berserk_used and random.random() < config.critical_chance
 
         if critical_hit:
             damage = round(damage * config.critical_multiplier)
@@ -483,18 +537,21 @@ class RaidBossService:
         damage = min(damage, event.current_hp)
         now = datetime.now(UTC).isoformat()
 
+        shattered_weapon = weapon_used if berserk_used and weapon_used in STANDARD_WEAPON_TYPES and random.random() < config.berserk_shatter_chance else None
+        buff_used = "berserk" if berserk_used else "power_potion" if potion_used else None
+
         async with self.db.acquire() as connection:
             attack_row = await connection.fetchone(
                 """
                 INSERT INTO raid_boss_attacks (
                     event_id, broadcaster_id, stream_id, user_id, username, damage,
-                    weapon, potion_used, critical_hit, attacked_at
+                    attack_number, weapon, potion_used, critical_hit, buff_used, blessing_active, weapon_shattered, attacked_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(event_id, stream_id, user_id) DO NOTHING
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(event_id, stream_id, user_id, attack_number) DO NOTHING
                 RETURNING event_id
                 """,
-                (event.id, broadcaster_id, str(stream_id), user_id, username, damage, weapon_used, int(potion_used), int(critical_hit), now)
+                (event.id, broadcaster_id, stream_id, user_id, username, damage, attack_number, weapon_used, int(potion_used), int(critical_hit), buff_used, int(blessing_active), int(shattered_weapon is not None), now)
             )
 
             if attack_row is None:
@@ -521,11 +578,20 @@ class RaidBossService:
                     (broadcaster_id, user_id)
                 )
 
+            if berserk_used:
+                await connection.execute("UPDATE raid_boss_players SET berserk_charges = MAX(berserk_charges - 1, 0) WHERE broadcaster_id = ? AND user_id = ?", (broadcaster_id, user_id))
+
+            if attack_number == 2:
+                await connection.execute("UPDATE raid_boss_players SET second_wind_charges = MAX(second_wind_charges - 1, 0) WHERE broadcaster_id = ? AND user_id = ?", (broadcaster_id, user_id))
+
             if weapon_used:
-                await connection.execute(
-                    "UPDATE raid_boss_inventory SET durability = MAX(durability - 1, 0) WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?",
-                    (broadcaster_id, user_id, weapon_used)
-                )
+                durability_cost = config.berserk_durability_cost if berserk_used else 1
+
+                if shattered_weapon:
+                    await connection.execute("UPDATE raid_boss_inventory SET quantity = MAX(quantity - 1, 0), durability = ? WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (config.weapon_durability, broadcaster_id, user_id, weapon_used))
+                    await connection.execute("UPDATE raid_boss_players SET equipped_weapon = NULL WHERE broadcaster_id = ? AND user_id = ? AND NOT EXISTS (SELECT 1 FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ? AND quantity > 0)", (broadcaster_id, user_id, broadcaster_id, user_id, weapon_used))
+                else:
+                    await connection.execute("UPDATE raid_boss_inventory SET durability = MAX(durability - ?, 0) WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (durability_cost, broadcaster_id, user_id, weapon_used))
 
         if row is None:
             return RaidAttackResult(0, 0, event.boss_name, weapon, potion_used, False, error="The raid ended before your attack landed.")
@@ -542,7 +608,7 @@ class RaidBossService:
 
         LOGGER.info("[Raid Bosses] %s dealt %d damage to %s in broadcaster %s.", username, damage, event.boss_name, broadcaster_id)
         broken_weapon = weapon if weapon and not weapon_used else None
-        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops)
+        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops, buff_used=buff_used, blessing_active=blessing_active, shattered_weapon=shattered_weapon)
 
     async def register_stream(self, broadcaster_id: str, stream_id: str) -> tuple[RaidBossEvent | None, int]:
         event = await self.get_active_event(broadcaster_id)
@@ -580,22 +646,23 @@ class RaidBossService:
 
         return await self.get_active_event(broadcaster_id), 0
 
-    async def buy(self, broadcaster_id: str, user_id: str, username: str, item_id: str, config: RaidBossConfig) -> str | None:
-        item_id = item_id.lower()
-        cost = config.potion_cost if item_id == "potion" else config.weapon_cost
+    async def buy(self, broadcaster_id: str, user_id: str, username: str, item_id: str, config: RaidBossConfig, stream_id: str | None = None) -> str | None:
+        item_id = self.normalize_item(item_id)
+        costs = {"potion": config.potion_cost, "second_wind": config.second_wind_cost, "berserk": config.berserk_cost, "blessing": config.blessing_cost}
+        cost = costs.get(item_id, config.weapon_cost)
 
-        if item_id not in (*BASIC_WEAPON_TYPES, "potion"):
+        if item_id not in (*BASIC_WEAPON_TYPES, *costs):
             return None
 
-        async with self.db.acquire() as connection:
-            if item_id in WEAPON_TYPES:
-                owned = await connection.fetchone(
-                    "SELECT quantity FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ? AND quantity > 0",
-                    (str(broadcaster_id), str(user_id), item_id)
-                )
+        if item_id == "blessing" and stream_id is None:
+            return "stream_required"
 
-                if owned is not None:
-                    return "owned"
+        async with self.db.acquire() as connection:
+            if item_id == "blessing":
+                existing = await connection.fetchone("SELECT blessing_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (str(broadcaster_id), str(stream_id)))
+
+                if existing is not None:
+                    return f"out_of_stock:{existing['blessing_username']}"
 
             balance = await connection.fetchone(
                 "SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?",
@@ -611,29 +678,71 @@ class RaidBossService:
             )
             await self._ensure_player(connection, broadcaster_id, user_id, username)
 
-            if item_id == "potion":
+            if item_id in {"potion", "second_wind", "berserk"}:
+                column = {"potion": "potion_attacks_remaining", "second_wind": "second_wind_charges", "berserk": "berserk_charges"}[item_id]
+                amount = config.potion_attacks if item_id == "potion" else 1
                 await connection.execute(
-                    """
-                    UPDATE raid_boss_players
-                    SET potion_attacks_remaining = potion_attacks_remaining + ?
-                    WHERE broadcaster_id = ? AND user_id = ?
-                    """,
-                    (config.potion_attacks, str(broadcaster_id), str(user_id))
+                    f"UPDATE raid_boss_players SET {column} = {column} + ? WHERE broadcaster_id = ? AND user_id = ?",
+                    (amount, str(broadcaster_id), str(user_id))
                 )
+            elif item_id == "blessing":
+                inserted = await connection.fetchone(
+                    "INSERT INTO raid_boss_stream_effects (broadcaster_id, stream_id, blessing_user_id, blessing_username, purchased_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(broadcaster_id, stream_id) DO NOTHING RETURNING blessing_username",
+                    (str(broadcaster_id), str(stream_id), str(user_id), username, datetime.now(UTC).isoformat())
+                )
+
+                if inserted is None:
+                    existing = await connection.fetchone("SELECT blessing_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (str(broadcaster_id), str(stream_id)))
+                    await connection.execute("UPDATE viewers SET points = points + ? WHERE broadcaster_id = ? AND user_id = ?", (cost, str(broadcaster_id), str(user_id)))
+                    return f"out_of_stock:{existing['blessing_username']}"
             else:
                 await connection.execute(
                     """
                     INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability)
                     VALUES (?, ?, ?, 1, ?)
-                    ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET quantity = 1, durability = excluded.durability
+                    ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET quantity = quantity + 1
                     """,
                     (str(broadcaster_id), str(user_id), item_id, config.weapon_durability)
                 )
 
         return "purchased"
 
+    async def craft(self, broadcaster_id: str, user_id: str, username: str, item_id: str, config: RaidBossConfig) -> str:
+        item_id = self.normalize_item(item_id)
+        ingredient = CRAFTING_RECIPES.get(item_id)
+
+        if ingredient is None:
+            return "invalid"
+
+        cost = config.masterwork_crafting_cost if item_id in MASTERWORK_WEAPON_TYPES else config.refined_crafting_cost
+
+        async with self.db.acquire() as connection:
+            owned = await connection.fetchone("SELECT quantity FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (str(broadcaster_id), str(user_id), ingredient))
+            balance = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?", (str(broadcaster_id), str(user_id)))
+
+            if owned is None or int(owned["quantity"]) < 2:
+                return "materials"
+            if balance is None or int(balance["points"]) < cost:
+                return "insufficient"
+
+            await self._ensure_player(connection, broadcaster_id, user_id, username)
+            player = await connection.fetchone("SELECT equipped_weapon FROM raid_boss_players WHERE broadcaster_id = ? AND user_id = ?", (str(broadcaster_id), str(user_id)))
+            await connection.execute("UPDATE viewers SET points = points - ? WHERE broadcaster_id = ? AND user_id = ?", (cost, str(broadcaster_id), str(user_id)))
+            await connection.execute("UPDATE raid_boss_inventory SET quantity = quantity - 2 WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (str(broadcaster_id), str(user_id), ingredient))
+            await connection.execute("INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES (?, ?, ?, 1, ?) ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET quantity = quantity + 1", (str(broadcaster_id), str(user_id), item_id, config.weapon_durability))
+
+            if player and player["equipped_weapon"] == ingredient and int(owned["quantity"]) == 2:
+                await connection.execute("UPDATE raid_boss_players SET equipped_weapon = ? WHERE broadcaster_id = ? AND user_id = ?", (item_id, str(broadcaster_id), str(user_id)))
+
+        return "crafted"
+
+    @staticmethod
+    def normalize_item(item_id: str) -> str:
+        normalized = "_".join(item_id.lower().strip().split())
+        return ITEM_ALIASES.get(normalized, normalized)
+
     async def equip(self, broadcaster_id: str, user_id: str, username: str, weapon: str) -> bool:
-        weapon = weapon.lower()
+        weapon = self.normalize_item(weapon)
 
         if weapon not in WEAPON_TYPES:
             return False
@@ -655,25 +764,29 @@ class RaidBossService:
 
         return True
 
-    async def get_inventory(self, broadcaster_id: str, user_id: str) -> tuple[list[str], str | None, int, int]:
+    async def get_inventory(self, broadcaster_id: str, user_id: str) -> tuple[list[tuple[str, int]], str | None, int, dict[str, int]]:
         async with self.db.acquire() as connection:
             rows = await connection.fetchall(
-                "SELECT item_id, durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND quantity > 0 ORDER BY item_id",
+                "SELECT item_id, quantity, durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND quantity > 0 ORDER BY item_id",
                 (str(broadcaster_id), str(user_id))
             )
             player = await connection.fetchone(
-                "SELECT equipped_weapon, potion_attacks_remaining FROM raid_boss_players WHERE broadcaster_id = ? AND user_id = ?",
+                "SELECT equipped_weapon, potion_attacks_remaining, second_wind_charges, berserk_charges FROM raid_boss_players WHERE broadcaster_id = ? AND user_id = ?",
                 (str(broadcaster_id), str(user_id))
             )
 
-        weapons = [str(row["item_id"]) for row in rows]
+        weapons = [(str(row["item_id"]), int(row["quantity"])) for row in rows]
         equipped = str(player["equipped_weapon"]) if player and player["equipped_weapon"] else None
         equipped_durability = next((int(row["durability"]) for row in rows if str(row["item_id"]) == equipped), 0)
-        potions = int(player["potion_attacks_remaining"]) if player else 0
+        potions = {
+            "power": int(player["potion_attacks_remaining"]) if player else 0,
+            "second_wind": int(player["second_wind_charges"]) if player else 0,
+            "berserk": int(player["berserk_charges"]) if player else 0
+        }
         return weapons, equipped, equipped_durability, potions
 
     async def repair(self, broadcaster_id: str, user_id: str, weapon: str, config: RaidBossConfig) -> str:
-        weapon = weapon.lower()
+        weapon = self.normalize_item(weapon)
 
         if weapon not in WEAPON_TYPES:
             return "invalid"
@@ -1030,6 +1143,7 @@ class RaidBossService:
             return await connection.fetchone(
                 """
                 SELECT players.equipped_weapon, players.potion_attacks_remaining,
+                       players.second_wind_charges, players.berserk_charges,
                        COALESCE(inventory.durability, 0) AS weapon_durability
                 FROM raid_boss_players AS players
                 LEFT JOIN raid_boss_inventory AS inventory

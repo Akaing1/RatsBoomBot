@@ -175,15 +175,16 @@ async def public_channel_raid_page(request: Request, channel_name: str):
     raid_state = await get_public_raid_state(services, broadcaster.id)
     recent_events = await services.raid_bosses.get_recent_events(broadcaster.id)
     shop_items = (
-        {"name": "Sword", "item_id": "sword", "type": "Melee", "cost": config.weapon_cost},
-        {"name": "Bow", "item_id": "bow", "type": "Ranged", "cost": config.weapon_cost},
-        {"name": "Spellbook", "item_id": "spellbook", "type": "Magic", "cost": config.weapon_cost}
+        {"name": "Basic Sword", "item_id": "basic sword", "type": "Melee", "cost": config.weapon_cost},
+        {"name": "Basic Bow", "item_id": "basic bow", "type": "Ranged", "cost": config.weapon_cost},
+        {"name": "Apprentice Tome", "item_id": "apprentice tome", "type": "Magic", "cost": config.weapon_cost}
     )
     raid_commands = (
         {"syntax": "!raid", "description": "Show the current encounter status."},
         {"syntax": "!raid attack", "description": "Attack once during the current stream."},
         {"syntax": "!raid shop", "description": "Open this raid guide and shop."},
-        {"syntax": "!raid buy <item>", "description": "Purchase a weapon or potion with loyalty points."},
+        {"syntax": "!raid buy <item>", "description": "Purchase a weapon or consumable with loyalty points."},
+        {"syntax": "!raid craft <weapon>", "description": "Combine two matching weapons from the previous tier and pay the crafting fee."},
         {"syntax": "!raid inventory", "description": "View your weapons, equipped item, durability, and potion attacks."},
         {"syntax": "!raid equip <weapon>", "description": "Equip an owned weapon."},
         {"syntax": "!raid repair <weapon>", "description": "Restore an owned weapon to full durability."},

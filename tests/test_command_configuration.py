@@ -43,7 +43,7 @@ def test_meinya_uses_final_fantasy_fourteen_raid_pilot() -> None:
     assert config.mini_names.ranged == "Magitek Gunship"
     assert config.mini_names.magic == "Ahriman"
     assert config.weapon_cost == 5000
-    assert config.potion_cost == 2500
+    assert config.potion_cost == 1500
     assert config.weapon_durability == 15
     assert config.repair_cost == 1500
 
