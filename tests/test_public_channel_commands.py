@@ -33,6 +33,22 @@ class FakeRaidBossService:
         assert broadcaster_id == "channel-1"
         return [(f"viewer-{index}", 1300 - (index * 100)) for index in range(1, 13)]
 
+    async def get_recent_events(self, broadcaster_id: str):
+        assert broadcaster_id == "channel-1"
+        return [{
+            "boss_name": "Training Dummy",
+            "boss_type": "melee",
+            "boss_tier": "tutorial",
+            "status": "defeated",
+            "max_hp": 10000,
+            "current_hp": 0,
+            "reward_pool": 5000,
+            "spawned_at": "2026-08-30T12:00:00+00:00",
+            "ended_at": "2026-08-30T13:00:00+00:00",
+            "unique_attackers": 4,
+            "total_damage": 10000
+        }]
+
 
 @pytest.fixture(autouse=True)
 def reset_active_profiles():
@@ -87,3 +103,28 @@ def test_legacy_commands_route_redirects_to_help() -> None:
 
     assert response.status_code == 308
     assert response.headers["location"] == "/help/MeinyaYozakura"
+
+
+
+def test_public_raid_page_shows_live_shop_mechanics_commands_and_history(monkeypatch) -> None:
+    broadcaster_id = "channel-1"
+    profile = ChannelProfile(channel_name="MeinyaYozakura", features=FeatureDefaults(raid_bosses=True), raid_bosses=RaidBossConfig(enabled=True))
+    activate_profile(broadcaster_id, profile)
+    broadcaster = Broadcaster(id=broadcaster_id, login="meinyayozakura", display_name="MeinyaYozakura")
+    broadcasters = SimpleNamespace(get_broadcasters=lambda: {broadcaster_id: broadcaster})
+    services = SimpleNamespace(broadcasters=broadcasters, features=FeatureToggleService(db=None), raid_bosses=FakeRaidBossService())
+    monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=services))
+
+    with TestClient(app) as client:
+        response = client.get("/raid/MeinyaYozakura")
+        state_response = client.get("/api/raid/MeinyaYozakura")
+
+    assert response.status_code == 200
+    assert "Raid shop" in response.text
+    assert "!raid buy potion" in response.text
+    assert "How raids work" in response.text
+    assert "Raid rewards" in response.text
+    assert "Training Dummy" in response.text
+    assert "Show all 12 contributors" in response.text
+    assert state_response.status_code == 200
+    assert state_response.json()["contributors"][0] == {"rank": 1, "username": "viewer-1", "damage": 1200}
