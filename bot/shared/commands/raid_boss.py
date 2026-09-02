@@ -1,10 +1,12 @@
 import logging
 import random
+from urllib.parse import quote
 
 from twitchio.ext import commands
 
 from bot.profiles import FeatureName, RaidBossConfig, get_active_profile
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
+from config.settings import settings
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -146,7 +148,10 @@ class RaidBossCommands(commands.Component):
             return
 
         config = context[1]
-        await ctx.send(f"Raid shop: sword (melee), bow (ranged), or spellbook (magic) — {config.weapon_cost:,} points each with +{config.weapon_attack} attack and {config.weapon_durability} durability. Matching weapons double their attack stat. Power potion — {config.potion_cost:,} points for {config.potion_attacks} attacks at {config.potion_multiplier:g}x damage. Full repair — {config.repair_cost:,} points. Use !raid buy <item> or !raid repair <weapon>.")
+        profile = get_active_profile(context[0])
+        channel_name = profile.channel_name if profile is not None else context[0]
+        raid_page_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/raid/{quote(channel_name)}"
+        await ctx.send(f"Raid shop: weapons {config.weapon_cost:,} points, power potions {config.potion_cost:,}, and repairs {config.repair_cost:,}. View item stats, mechanics, rewards, and the live encounter: {raid_page_url}")
 
     @raid.command(name="buy")
     async def buy(self, ctx: commands.Context, item: str | None = None) -> None:
