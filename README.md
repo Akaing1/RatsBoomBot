@@ -204,6 +204,8 @@ Migrations run automatically during startup:
 14. Removal of the three pre-release raid test encounters
 15. Passive point payout history
 16. Removal of the remaining pre-release Ahirman test encounter
+17. Removal of the complete failed Ahirman test encounter
+18. Removal of the correctly spelled Ahriman test encounter
 
 Use a new migration for schema changes instead of rebuilding the production database.
 
