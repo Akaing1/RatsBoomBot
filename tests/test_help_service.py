@@ -8,4 +8,4 @@ def test_help_message_links_to_channel_public_command_page(monkeypatch) -> None:
 
     message = service.format_help_message("MeinyaYozakura")
 
-    assert message == "View all active commands and raid information for MeinyaYozakura: https://ratsboombot.com/commands/MeinyaYozakura"
+    assert message == "View all active commands and raid information for MeinyaYozakura: https://ratsboombot.com/help/MeinyaYozakura"

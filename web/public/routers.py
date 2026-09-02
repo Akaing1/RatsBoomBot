@@ -73,7 +73,12 @@ async def landing_page(request: Request):
     )
 
 
-@router.get("/commands/{channel_name}", response_class=HTMLResponse)
+@router.get("/commands/{channel_name}", include_in_schema=False)
+async def legacy_public_channel_commands(channel_name: str):
+    return RedirectResponse(url=f"/help/{channel_name}", status_code=308)
+
+
+@router.get("/help/{channel_name}", response_class=HTMLResponse)
 async def public_channel_commands(request: Request, channel_name: str):
     runtime_bot = get_bot()
 

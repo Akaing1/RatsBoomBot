@@ -213,6 +213,12 @@ button, input { font: inherit; }
 .public-raid-contributors li span strong { width: 32px; color: var(--accent); }
 .public-raid-contributors li b { white-space: nowrap; }
 .public-raid-contributors-empty { margin: 14px 0 0; color: var(--muted); font-size: 13px; }
+.public-raid-contributors-more { margin-top: 12px; }
+.public-raid-contributors-more summary { width: fit-content; padding: 10px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-raised); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+.public-raid-contributors-more summary::-webkit-details-marker { display: none; }
+.public-raid-contributors-more summary:hover { border-color: var(--accent); }
+.public-raid-contributors-more[open] summary { margin-bottom: 4px; color: var(--accent); }
+.public-raid-contributors-more ol { margin-top: 0; }
 
 .public-command-groups { display: flex; flex-direction: column; gap: 14px; }
 .public-command-group { margin: 0; padding: 0; overflow: hidden; }
