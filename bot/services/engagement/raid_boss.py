@@ -760,6 +760,40 @@ class RaidBossService:
             "critical_hits": int(row["critical_hits"])
         }
 
+    async def get_recent_events(self, broadcaster_id: str, limit: int = 5) -> list[dict[str, object]]:
+        query = """
+        SELECT events.boss_name, events.boss_type, events.boss_tier, events.status,
+               events.max_hp, events.current_hp, events.reward_pool, events.spawned_at,
+               events.ended_at,
+               (SELECT COUNT(DISTINCT user_id) FROM raid_boss_attacks WHERE event_id = events.id) AS unique_attackers,
+               (SELECT COALESCE(SUM(damage), 0) FROM raid_boss_attacks WHERE event_id = events.id) AS total_damage
+        FROM raid_boss_events AS events
+        WHERE events.broadcaster_id = ?
+          AND events.status IN ('defeated', 'failed')
+        ORDER BY events.id DESC
+        LIMIT ?
+        """
+
+        async with self.db.acquire() as connection:
+            rows = await connection.fetchall(query, (str(broadcaster_id), max(1, limit)))
+
+        return [
+            {
+                "boss_name": str(row["boss_name"]),
+                "boss_type": str(row["boss_type"]),
+                "boss_tier": str(row["boss_tier"]),
+                "status": str(row["status"]),
+                "max_hp": int(row["max_hp"]),
+                "current_hp": int(row["current_hp"]),
+                "reward_pool": int(row["reward_pool"]),
+                "spawned_at": str(row["spawned_at"]),
+                "ended_at": str(row["ended_at"] or ""),
+                "unique_attackers": int(row["unique_attackers"]),
+                "total_damage": int(row["total_damage"])
+            }
+            for row in rows
+        ]
+
     async def get_contributors(self, broadcaster_id: str) -> list[tuple[str, int]]:
         event = await self.get_active_event(broadcaster_id)
 
