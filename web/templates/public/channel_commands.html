@@ -7,7 +7,7 @@
 
     <title>Commands | {{ broadcaster.name or broadcaster.id }} | RatsBoomBot</title>
 
-    <link rel="canonical" href="{{ public_base_url }}/commands/{{ broadcaster.login or broadcaster.id }}">
+    <link rel="canonical" href="{{ public_base_url }}/help/{{ broadcaster.login or broadcaster.id }}">
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
 </head>
@@ -67,10 +67,21 @@
 
                         {% if raid_contributors %}
                             <ol>
-                                {% for username, damage in raid_contributors %}
+                                {% for username, damage in raid_contributors[:10] %}
                                     <li><span><strong>#{{ loop.index }}</strong>{{ username }}</span><b>{{ "{:,}".format(damage) }} damage</b></li>
                                 {% endfor %}
                             </ol>
+
+                            {% if raid_contributors | length > 10 %}
+                                <details class="public-raid-contributors-more">
+                                    <summary>Show all {{ raid_contributors | length }} contributors</summary>
+                                    <ol>
+                                        {% for username, damage in raid_contributors[10:] %}
+                                            <li><span><strong>#{{ loop.index + 10 }}</strong>{{ username }}</span><b>{{ "{:,}".format(damage) }} damage</b></li>
+                                        {% endfor %}
+                                    </ol>
+                                </details>
+                            {% endif %}
                         {% else %}
                             <p class="public-raid-contributors-empty">No one has attacked this boss yet.</p>
                         {% endif %}
