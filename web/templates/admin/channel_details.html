@@ -547,7 +547,7 @@
         </div>
         <p class="panel-description">If this account cannot send, RatsBoomBot automatically attempts the message and records the failure in the channel log.</p>
     {% elif chat_identity.premium_enabled %}
-        <p class="panel-description">Sign into the dedicated character account on Twitch. Do not use the broadcaster account or the RatsBoomBot account.</p>
+        <p class="panel-description">The streamer can connect their dedicated Twitch account from the Customization page.</p>
     {% else %}
         <p class="panel-description">Enable this entitlement for channels subscribed to the premium custom-identity option.</p>
     {% endif %}
@@ -555,15 +555,6 @@
     {% if administrator and administrator.role == "owner" %}
         <div class="toggle-actions profile-setting-actions">
             {% if chat_identity.premium_enabled %}
-                <a class="button primary" href="/admin/channels/{{ broadcaster.id }}/custom-bot/connect">{% if chat_identity.connected %}Reconnect Account{% else %}Connect Custom Bot{% endif %}</a>
-
-                {% if chat_identity.connected %}
-                    <form method="post" action="/admin/channels/{{ broadcaster.id }}/custom-bot/disconnect" onsubmit="return confirm('Disconnect @{{ chat_identity.bot_login }} from this channel?');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button class="button secondary" type="submit">Disconnect Account</button>
-                    </form>
-                {% endif %}
-
                 <form method="post" action="/admin/channels/{{ broadcaster.id }}/custom-bot/premium">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="action" value="disable">
