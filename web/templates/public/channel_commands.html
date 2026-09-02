@@ -57,17 +57,40 @@
                     <article><span>Total attacks</span><strong>{{ raid_metrics.total_attacks }}</strong></article>
                     <article><span>Reward pool</span><strong>{{ "{:,}".format(raid_metrics.reward_pool) }}</strong></article>
                 </div>
+
+                {% if raid_metrics.status == 'active' %}
+                    <div class="public-raid-contributors">
+                        <div class="public-raid-contributors-header">
+                            <h3>Current contributors</h3>
+                            <span>{{ raid_contributors | length }} fighters</span>
+                        </div>
+
+                        {% if raid_contributors %}
+                            <ol>
+                                {% for username, damage in raid_contributors %}
+                                    <li><span><strong>#{{ loop.index }}</strong>{{ username }}</span><b>{{ "{:,}".format(damage) }} damage</b></li>
+                                {% endfor %}
+                            </ol>
+                        {% else %}
+                            <p class="public-raid-contributors-empty">No one has attacked this boss yet.</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
             </section>
         {% endif %}
 
         {% if command_groups %}
             <section class="public-command-groups" aria-label="Active channel commands">
                 {% for group in command_groups %}
-                    <article class="panel public-command-group">
-                        <div class="public-command-group-header">
-                            <div><p class="eyebrow">{{ group.commands | length }} commands</p><h2>{{ group.name }}</h2></div>
-                            <p>{{ group.description }}</p>
-                        </div>
+                    <details class="panel public-command-group">
+                        <summary class="public-command-group-summary">
+                            <div>
+                                <p class="eyebrow">{{ group.commands | length }} commands</p>
+                                <h2>{{ group.name }}</h2>
+                                <p>{{ group.description }}</p>
+                            </div>
+                            <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
+                        </summary>
 
                         <div class="public-command-list">
                             {% for command in group.commands %}
@@ -77,7 +100,7 @@
                                 </div>
                             {% endfor %}
                         </div>
-                    </article>
+                    </details>
                 {% endfor %}
             </section>
         {% else %}
