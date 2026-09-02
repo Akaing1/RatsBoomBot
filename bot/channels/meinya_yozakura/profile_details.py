@@ -29,7 +29,7 @@ MEINYA_RAID_BOSSES = RaidBossConfig(
     mini_hp_max=50000,
     mini_hp_step=15000,
     weapon_cost=5000,
-    potion_cost=2500
+    potion_cost=1500
 )
 
 

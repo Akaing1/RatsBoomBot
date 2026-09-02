@@ -124,11 +124,20 @@ class RaidBossCommands(commands.Component):
         if result.potion_used:
             bonuses.append("power potion")
 
+        if result.buff_used == "berserk":
+            bonuses.append("berserk")
+
+        if result.blessing_active:
+            bonuses.append("Blessing of the Gods")
+
         if result.critical_hit:
             bonuses.append("critical hit")
 
         if result.broken_weapon:
             bonuses.append(f"broken {result.broken_weapon}; base damage only")
+
+        if result.shattered_weapon:
+            bonuses.append(f"{result.shattered_weapon} shattered")
 
         bonus_text = f" using {' + '.join(bonuses)}" if bonuses else ""
 
@@ -151,10 +160,10 @@ class RaidBossCommands(commands.Component):
         profile = get_active_profile(context[0])
         channel_name = profile.channel_name if profile is not None else context[0]
         raid_page_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/raid/{quote(channel_name)}"
-        await ctx.send(f"Raid shop: weapons {config.weapon_cost:,} points, power potions {config.potion_cost:,}, and repairs {config.repair_cost:,}. View item stats, mechanics, rewards, and the live encounter: {raid_page_url}")
+        await ctx.send(f"Raid shop: basic weapons {config.weapon_cost:,}, Power Potion {config.potion_cost:,}, Second Wind {config.second_wind_cost:,}, Berserk {config.berserk_cost:,}, Blessing {config.blessing_cost:,}, repairs {config.repair_cost:,}. Craft upgrades with !raid craft. Details: {raid_page_url}")
 
     @raid.command(name="buy")
-    async def buy(self, ctx: commands.Context, item: str | None = None) -> None:
+    async def buy(self, ctx: commands.Context, *, item: str | None = None) -> None:
         context = self.get_context(ctx)
 
         if context is None:
@@ -165,19 +174,45 @@ class RaidBossCommands(commands.Component):
             return
 
         chatter = ctx.chatter
-        result = await self.bot.services.raid_bosses.buy(context[0], str(chatter.id), chatter.name, item, context[1])
+        normalized_item = "_".join(item.lower().split())
+        stream_id = await self.get_stream_id(context[0], context[1]) if normalized_item in {"blessing", "blessing_of_the_gods"} else None
+        result = await self.bot.services.raid_bosses.buy(context[0], str(chatter.id), chatter.name, item, context[1], stream_id)
 
         if result is None:
             await ctx.reply("That item is not in the raid shop. Use !raid shop to see the available items.")
         elif result == "insufficient":
             await ctx.reply("You do not have enough loyalty points for that item.")
-        elif result == "owned":
-            await ctx.reply("You already own that weapon. Use !raid equip to select it.")
+        elif result == "stream_required":
+            await ctx.reply("Blessing of the Gods can only be purchased while the stream is live.")
+        elif result.startswith("out_of_stock:"):
+            await ctx.reply(f"Blessing of the Gods is out of stock for this stream—it was purchased by {result.split(':', 1)[1]}!")
         else:
             await ctx.reply(f"You purchased {item.lower()}! Use !raid equip {item.lower()} if it is a weapon.")
 
+    @raid.command(name="craft")
+    async def craft(self, ctx: commands.Context, *, item: str | None = None) -> None:
+        context = self.get_context(ctx)
+
+        if context is None:
+            return
+        if not item:
+            await ctx.reply("Use !raid craft refined sword, refined bow, enchanted tome, masterwork sword, masterwork bow, or archmage grimoire.")
+            return
+
+        chatter = ctx.chatter
+        result = await self.bot.services.raid_bosses.craft(context[0], str(chatter.id), chatter.name, item, context[1])
+
+        if result == "invalid":
+            await ctx.reply("That is not a crafting recipe. Use !raid shop to view recipes.")
+        elif result == "materials":
+            await ctx.reply("You need two copies of the previous weapon tier to craft that item.")
+        elif result == "insufficient":
+            await ctx.reply("You do not have enough loyalty points for that crafting fee.")
+        else:
+            await ctx.reply(f"You crafted {item.lower()}! Use !raid equip {item.lower()} to wield it.")
+
     @raid.command(name="equip")
-    async def equip(self, ctx: commands.Context, weapon: str | None = None) -> None:
+    async def equip(self, ctx: commands.Context, *, weapon: str | None = None) -> None:
         context = self.get_context(ctx)
 
         if context is None:
@@ -204,13 +239,13 @@ class RaidBossCommands(commands.Component):
             return
 
         chatter = ctx.chatter
-        weapons, equipped, durability, potion_attacks = await self.bot.services.raid_bosses.get_inventory(context[0], str(chatter.id))
-        weapon_text = ", ".join(weapons) if weapons else "none"
+        weapons, equipped, durability, consumables = await self.bot.services.raid_bosses.get_inventory(context[0], str(chatter.id))
+        weapon_text = ", ".join(f"{weapon.replace('_', ' ')} x{quantity}" for weapon, quantity in weapons) if weapons else "none"
         durability_text = f"{durability}/{context[1].weapon_durability}" if equipped else "none"
-        await ctx.reply(f"Weapons: {weapon_text}. Equipped: {equipped or 'none'}. Durability: {durability_text}. Power-potion attacks: {potion_attacks}.")
+        await ctx.reply(f"Weapons: {weapon_text}. Equipped: {(equipped or 'none').replace('_', ' ')}. Durability: {durability_text}. Power attacks: {consumables['power']}; Second Winds: {consumables['second_wind']}; Berserks: {consumables['berserk']}.")
 
     @raid.command(name="repair")
-    async def repair(self, ctx: commands.Context, weapon: str | None = None) -> None:
+    async def repair(self, ctx: commands.Context, *, weapon: str | None = None) -> None:
         context = self.get_context(ctx)
 
         if context is None:

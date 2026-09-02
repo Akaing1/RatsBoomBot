@@ -120,6 +120,10 @@
                             <code>!raid buy potion</code>
                         </article>
 
+                        <article><span class="public-raid-item-type">Consumable</span><h3>Second Wind</h3><strong>{{ "{:,}".format(config.second_wind_cost) }} points</strong><p>Grants one additional attack in a stream and is consumed only by that successful second attack.</p><code>!raid buy second wind</code></article>
+                        <article><span class="public-raid-item-type">Consumable</span><h3>Berserk</h3><strong>{{ "{:,}".format(config.berserk_cost) }} points</strong><p>Your next eligible attack deals {{ config.berserk_multiplier | int }}&times; damage, costs {{ config.berserk_durability_cost }} durability, cannot crit, and has a {{ (config.berserk_shatter_chance * 100) | int }}% standard-weapon shatter chance. Once per viewer each stream.</p><code>!raid buy berserk</code></article>
+                        <article><span class="public-raid-item-type">Stream-wide</span><h3>Blessing of the Gods</h3><strong>{{ "{:,}".format(config.blessing_cost) }} points</strong><p>The first buyer each stream grants everyone +{{ ((config.blessing_multiplier - 1) * 100) | int }}% damage on subsequent attacks that stream.</p><code>!raid buy blessing</code></article>
+
                         <article>
                             <span class="public-raid-item-type">Service</span>
                             <h3>Full repair</h3>
@@ -132,13 +136,22 @@
             </details>
 
             <details class="panel public-command-group">
+                <summary class="public-command-group-summary"><div><p class="eyebrow">Linear progression</p><h2>Weapon crafting</h2><p>Combine two copies of a tier to create the next one. Mythical drops remain separate.</p></div><span class="public-command-chevron" aria-hidden="true">&#8964;</span></summary>
+                <div class="public-raid-section-content public-raid-copy">
+                    <p><strong>Refined:</strong> two Basic weapons plus {{ "{:,}".format(config.refined_crafting_cost) }} points. Refined weapons add +{{ config.refined_weapon_attack }} damage.</p>
+                    <p><strong>Masterwork:</strong> two Refined weapons plus {{ "{:,}".format(config.masterwork_crafting_cost) }} points. Masterwork weapons add +{{ config.masterwork_weapon_attack }} damage.</p>
+                    <p>Sword progresses Basic Sword → Refined Sword → Masterwork Sword; Bow follows the same tiers; magic progresses Apprentice Tome → Enchanted Tome → Archmage's Grimoire. Mythical weapons add +{{ config.unique_weapon_attack }} damage.</p>
+                </div>
+            </details>
+
+            <details class="panel public-command-group">
                 <summary class="public-command-group-summary">
                     <div><p class="eyebrow">Damage and equipment</p><h2>How raids work</h2><p>Understand attack limits, weapon matching, potions, and critical hits.</p></div>
                     <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
                 </summary>
 
                 <div class="public-raid-section-content public-raid-rule-grid">
-                    <article><strong>Attack once per stream!</strong><span>Attack limit for each active boss</span></article>
+                    <article><strong>Attack once per stream</strong><span>Second Wind permits one additional attack</span></article>
                     <article><strong>Type matching</strong><span>Melee, ranged, and magic weapons double their attack bonus against the matching boss type</span></article>
                     <article><strong>Buy items to grow stronger!</strong><span>Buy weapons and buffs to improve damage</span></article>
                 </div>
