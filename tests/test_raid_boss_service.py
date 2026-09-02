@@ -807,3 +807,38 @@ async def test_get_contributors_returns_every_attacker_ranked_by_total_damage(tm
         contributors = await service.get_contributors("channel-1")
 
         assert contributors == [("alice", 200), ("bob", 100), ("charlie", 100)]
+
+
+
+@pytest.mark.asyncio
+async def test_get_recent_events_uses_production_raid_schema(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid-history.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
+        await service.setup()
+
+        async with database.acquire() as connection:
+            await connection.execute(
+                """
+                INSERT INTO raid_boss_events (
+                    broadcaster_id, boss_name, boss_type, boss_tier, max_hp, current_hp,
+                    reward_pool, final_hit_reward, status, spawned_at, stream_limit
+                )
+                VALUES ('channel-1', 'Training Dummy', 'melee', 'tutorial', 10000, 0, 5000, 500, 'defeated', '2026-08-30T12:00:00+00:00', 2)
+                """
+            )
+
+        events = await service.get_recent_events("channel-1")
+
+        assert events == [{
+            "boss_name": "Training Dummy",
+            "boss_type": "melee",
+            "boss_tier": "tutorial",
+            "status": "defeated",
+            "max_hp": 10000,
+            "current_hp": 0,
+            "reward_pool": 5000,
+            "spawned_at": "2026-08-30T12:00:00+00:00",
+            "unique_attackers": 0,
+            "total_damage": 0
+        }]

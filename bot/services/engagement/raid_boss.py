@@ -764,7 +764,6 @@ class RaidBossService:
         query = """
         SELECT events.boss_name, events.boss_type, events.boss_tier, events.status,
                events.max_hp, events.current_hp, events.reward_pool, events.spawned_at,
-               events.ended_at,
                (SELECT COUNT(DISTINCT user_id) FROM raid_boss_attacks WHERE event_id = events.id) AS unique_attackers,
                (SELECT COALESCE(SUM(damage), 0) FROM raid_boss_attacks WHERE event_id = events.id) AS total_damage
         FROM raid_boss_events AS events
@@ -787,7 +786,6 @@ class RaidBossService:
                 "current_hp": int(row["current_hp"]),
                 "reward_pool": int(row["reward_pool"]),
                 "spawned_at": str(row["spawned_at"]),
-                "ended_at": str(row["ended_at"] or ""),
                 "unique_attackers": int(row["unique_attackers"]),
                 "total_damage": int(row["total_damage"])
             }
