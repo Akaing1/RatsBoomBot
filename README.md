@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **8.6.1**
+Current version: **8.7.0**
 
 ## Highlights
 
@@ -153,7 +153,7 @@ The administrator dashboard at `/admin` provides:
 - Runtime, database, and OAuth status
 - Broadcaster onboarding and removal
 - Per-channel feature and command controls
-- Owner-managed premium custom bot identity access and OAuth connections
+- Owner-managed premium custom bot access entitlements
 - Viewer queue and redeem activity inspection
 - Real-time CPU, memory, disk, temperature, uptime, and process metrics
 - Real-time application logs
@@ -164,7 +164,9 @@ Forms use CSRF protection, and sessions are signed with `SESSION_SECRET`.
 
 ### Premium Custom Bot Identities
 
-An owner can grant a connected channel access to a dedicated Twitch chat identity from its administrator page. The custom account authorizes through the existing bot OAuth callback and is then used for command responses, timers, community events, redeems, raids, shoutouts, ad warnings, and announcements in that channel only.
+An owner can grant a connected channel access to a dedicated Twitch chat identity from its administrator page. Once enabled, the streamer connects, reconnects, or disconnects their dedicated bot account from the Customization page in Streamer Control. The streamer signs in to Twitch as the dedicated bot account and authorizes it directly, so the RatsBoomBot owner never needs the account's password or credentials.
+
+The custom account authorizes through the existing public channel OAuth callback and is then used for command responses, timers, community events, redeems, raids, shoutouts, ad warnings, and announcements in that channel only. No additional environment variable or Twitch Developer Console redirect URI is required for this self-service flow.
 
 Custom identities are database-backed and do not require per-customer environment variables or a separate bot process. If a custom account cannot send, RatsBoomBot retries with the standard bot identity and records the failure in the channel's persistent stream log. Billing is intentionally external to the entitlement toggle so subscriptions can be managed manually or connected to a payment provider later.
 
@@ -358,6 +360,8 @@ RatsBoomBot uses a practical three-part version number:
 - Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes
 - Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement
 - Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
+
+Version **8.7.0** adds streamer-managed OAuth onboarding for premium custom bot identities. Administrators grant access, while streamers securely connect and manage their own dedicated Twitch bot accounts from Streamer Control.
 
 Version **8.6.1** fixes the public raid page's recent-history query against the production raid schema.
 

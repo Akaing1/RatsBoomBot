@@ -49,4 +49,4 @@ def test_meinya_uses_final_fantasy_fourteen_raid_pilot() -> None:
 
 
 def test_meinya_uses_custom_ad_announcement_message() -> None:
-    assert MEINYA_PROFILE.ad_announcement_message == "3 minutes of ads starting in {time}! We have to run 3 minutes of ads at the top of every hour to disable the prerolls, so please forgive me! See you soon!"
+    assert MEINYA_PROFILE.ad_announcement_message == "3 minutes of ads starting in ~{time}! We have to run 3 minutes of ads at the top of every hour to disable the prerolls, so please forgive me! See you soon!"

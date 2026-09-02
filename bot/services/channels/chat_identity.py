@@ -60,6 +60,11 @@ class ChatIdentityService:
         user_id = str(user_id)
         return any(state.bot_user_id == user_id for state in self.identities.values())
 
+    def custom_bot_broadcaster_id(self, user_id: str) -> str | None:
+        user_id = str(user_id)
+        state = next((state for state in self.identities.values() if state.bot_user_id == user_id), None)
+        return state.broadcaster_id if state is not None else None
+
     async def set_premium_enabled(self, broadcaster_id: str, enabled: bool) -> ChatIdentityState:
         broadcaster_id = str(broadcaster_id)
 

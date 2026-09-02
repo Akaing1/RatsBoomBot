@@ -282,8 +282,11 @@ async def channel_customization_page(request: Request):
             "broadcaster": broadcaster,
             "channel_settings": await services.broadcaster_settings.get_settings(broadcaster_id),
             "setting_groups": services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)}),
+            "chat_identity": services.chat_identity.get_state(broadcaster_id),
             "setting_result": request.query_params.get("setting_result"),
             "setting_message": request.query_params.get("setting_message"),
+            "identity_result": request.query_params.get("identity_result"),
+            "identity_message": request.query_params.get("identity_message"),
             "csrf_token": get_csrf_token(request)
         }
     )

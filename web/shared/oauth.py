@@ -53,6 +53,10 @@ def build_public_channel_oauth_url(force_verify: bool = True, state: str | None 
     )
 
 
+def build_public_custom_bot_oauth_url(force_verify: bool = True, state: str | None = None) -> str:
+    return _build_oauth_url(redirect_uri=settings.PUBLIC_CHANNEL_REDIRECT_URI, scopes=settings.BOT_SCOPES, force_verify=force_verify, state=state)
+
+
 def _build_oauth_url(*, redirect_uri: str, scopes: str, force_verify: bool, state: str | None = None) -> str:
     params = {
         "client_id": settings.CLIENT_ID,
