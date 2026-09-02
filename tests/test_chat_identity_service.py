@@ -72,6 +72,21 @@ async def test_custom_identity_requires_premium_access(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_custom_identity_resolves_its_assigned_channel(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "identity.db")) as database:
+        await run_migrations(database)
+
+        service = ChatIdentityService(SimpleNamespace(bot_id="main-bot"), database)
+        await service.setup()
+        await service.set_premium_enabled("channel-1", True)
+        await add_token(database, "custom-bot")
+        await service.connect("channel-1", "custom-bot", "characterbot", "CharacterBot")
+
+        assert service.custom_bot_broadcaster_id("custom-bot") == "channel-1"
+        assert service.custom_bot_broadcaster_id("unassigned-bot") is None
+
+
+@pytest.mark.asyncio
 async def test_failed_custom_identity_falls_back_to_main_bot(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "identity.db")) as database:
         await run_migrations(database)
