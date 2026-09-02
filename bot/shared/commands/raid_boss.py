@@ -157,7 +157,7 @@ class RaidBossCommands(commands.Component):
             return
 
         config = context[1]
-        await ctx.send(f"Raid shop: Basic Sword — {config.weapon_cost:,} points | Basic Bow — {config.weapon_cost:,} | Apprentice Tome — {config.weapon_cost:,} | Power Potion — {config.potion_cost:,}. Use !raid help to view crafting, consumables, repairs, and full raid details.")
+        await ctx.send(f"Raid shop: Basic Sword — {config.weapon_cost:,} points (!raid buy sword) | Basic Bow — {config.weapon_cost:,} (!raid buy bow) | Apprentice Tome — {config.weapon_cost:,} (!raid buy tome) | Power Potion — {config.potion_cost:,} (!raid buy potion). Use !raid help for full raid details.")
 
     @raid.command(name="help")
     async def raid_help(self, ctx: commands.Context) -> None:
