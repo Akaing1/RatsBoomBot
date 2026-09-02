@@ -1376,3 +1376,13 @@ body.landing-page {
 .premium-connect-notice { margin: 18px 0; padding: 16px 18px; border: 1px solid rgba(139,92,246,.4); border-radius: 12px; background: rgba(139,92,246,.08); }
 .premium-connect-notice strong { display: block; }
 .premium-connect-notice p { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.custom-bot-link-form { width: min(100%, 760px); }
+.custom-bot-link-form label, .custom-bot-link-panel label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+.custom-bot-link-controls { display: flex; align-items: stretch; gap: 10px; }
+.custom-bot-link-controls .profile-setting-input { flex: 1; margin: 0; min-width: 0; }
+.custom-bot-link-panel { max-width: 960px; }
+.custom-bot-result-card { max-width: 620px; }
+
+@media (max-width: 700px) {
+    .custom-bot-link-controls { align-items: stretch; flex-direction: column; }
+}

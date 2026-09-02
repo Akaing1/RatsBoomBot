@@ -138,13 +138,20 @@
             <p class="panel-description">Messages and announcements use this account when possible. RatsBoomBot remains the automatic fallback if it cannot send.</p>
         {% else %}
             <div class="premium-connect-notice">
-                <strong>Authorize the dedicated bot account—not your broadcaster account.</strong>
-                <p>RatsBoomBot never receives the account password. Twitch returns only the authorization tokens required to send chat messages and announcements.</p>
+                <strong>Generate a secure authorization link for the dedicated bot account.</strong>
+                <p>The link can be opened in a private window, another browser, or another device. RatsBoomBot never receives the account password.</p>
             </div>
         {% endif %}
 
         <div class="toggle-actions profile-setting-actions">
-            <a class="button primary" href="/channel/custom-bot/connect">{% if chat_identity.connected %}Reconnect Custom Bot{% else %}Connect Custom Bot Account{% endif %}</a>
+            <form class="custom-bot-link-form" method="post" action="/channel/custom-bot/connect">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <label for="custom-bot-login">Dedicated bot Twitch username</label>
+                <div class="custom-bot-link-controls">
+                    <input id="custom-bot-login" class="profile-setting-input" type="text" name="bot_login" value="{{ chat_identity.bot_login or '' }}" placeholder="characterbot" maxlength="25" required>
+                    <button class="button primary" type="submit">{% if chat_identity.connected %}Generate Reconnect Link{% else %}Generate Authorization Link{% endif %}</button>
+                </div>
+            </form>
 
             {% if chat_identity.connected %}
                 <form method="post" action="/channel/custom-bot/disconnect" onsubmit="return confirm('Disconnect @{{ chat_identity.bot_login }} from your channel?');">

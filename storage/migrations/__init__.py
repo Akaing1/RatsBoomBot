@@ -20,6 +20,7 @@ from storage.migrations.v015_passive_point_payouts import migrate as migrate_pas
 from storage.migrations.v016_remove_remaining_ahirman_test_record import migrate as migrate_remove_remaining_ahirman_test_record
 from storage.migrations.v017_remove_ahirman_test_run import migrate as migrate_remove_ahirman_test_run
 from storage.migrations.v018_remove_ahriman_test_run import migrate as migrate_remove_ahriman_test_run
+from storage.migrations.v019_custom_bot_authorization_links import migrate as migrate_custom_bot_authorization_links
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -49,5 +50,6 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=15, name="passive_point_payouts", run=migrate_passive_point_payouts),
     Migration(version=16, name="remove_remaining_ahirman_test_record", run=migrate_remove_remaining_ahirman_test_record),
     Migration(version=17, name="remove_ahirman_test_run", run=migrate_remove_ahirman_test_run),
-    Migration(version=18, name="remove_ahriman_test_run", run=migrate_remove_ahriman_test_run)
+    Migration(version=18, name="remove_ahriman_test_run", run=migrate_remove_ahriman_test_run),
+    Migration(version=19, name="custom_bot_authorization_links", run=migrate_custom_bot_authorization_links)
 )
