@@ -166,6 +166,11 @@ class TwitchBot(commands.AutoBot):
         if user_id in {broadcaster_id, str(self.bot_id)} or user_id in self.broadcaster_ids:
             raise ValueError("Choose a dedicated Twitch bot account that is not connected as a broadcaster.")
 
+        assigned_broadcaster_id = self.services.chat_identity.custom_bot_broadcaster_id(user_id)
+
+        if assigned_broadcaster_id is not None and assigned_broadcaster_id != broadcaster_id:
+            raise ValueError("That Twitch account is already connected as another channel's custom bot.")
+
         previous_user_id = identity_state.bot_user_id
         await self.add_token(token, refresh)
 
