@@ -37,7 +37,8 @@ def test_admin_feature_page_lists_unique_profile_integrations() -> None:
     assert "League of Legends" in template
     assert "Overwatch" in template
     assert "Premium feature" in template
-    assert "Connect Custom Bot" in template
+    assert "Enable Premium Access" in template
+    assert "/admin/channels/{{ broadcaster.id }}/custom-bot/connect" not in template
 
 
 def test_streamer_dashboard_has_profile_customization_page() -> None:
@@ -54,6 +55,9 @@ def test_streamer_dashboard_has_profile_customization_page() -> None:
     assert "data-add-timer" in template
     assert "data-remove-timer" in template
     assert "full-width" in template
+    assert "Connect Custom Bot Account" in template
+    assert "/channel/custom-bot/connect" in template
+    assert "/channel/custom-bot/disconnect" in template
 
 
 def test_stylesheets_use_deployment_stamp_for_cache_busting() -> None:
