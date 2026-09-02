@@ -180,7 +180,7 @@ async def public_channel_raid_page(request: Request, channel_name: str):
         {"syntax": "!raid help", "description": "Open this complete raid guide."},
         {"syntax": "!raid shop", "description": "Show Basic weapons and the Power Potion in chat."},
         {"syntax": "!raid buy <item>", "description": "Purchase a weapon or consumable with loyalty points."},
-        {"syntax": "!raid craft <weapon>", "description": "Combine two matching weapons from the previous tier and pay the crafting fee."},
+        {"syntax": "!raid craft <sword|bow|tome>", "description": "Craft the highest available next tier using two matching weapons and the crafting fee."},
         {"syntax": "!raid inventory", "description": "View your weapons, equipped item, durability, and potion attacks."},
         {"syntax": "!raid equip <weapon>", "description": "Equip an owned weapon."},
         {"syntax": "!raid unequip", "description": "Remove your equipped weapon and return to base attack damage."},

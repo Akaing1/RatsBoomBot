@@ -205,7 +205,7 @@ class RaidBossCommands(commands.Component):
         if context is None:
             return
         if not item:
-            await ctx.reply("Use !raid craft refined sword, refined bow, enchanted tome, masterwork sword, masterwork bow, or archmage grimoire.")
+            await ctx.reply("Use !raid craft sword, !raid craft bow, or !raid craft tome. The highest available next tier will be crafted.")
             return
 
         chatter = ctx.chatter
@@ -218,7 +218,8 @@ class RaidBossCommands(commands.Component):
         elif result == "insufficient":
             await ctx.reply("You do not have enough loyalty points for that crafting fee.")
         else:
-            await ctx.reply(f"You crafted {item.lower()}! Use !raid equip {item.lower()} to wield it.")
+            crafted_item = result.split(":", 1)[1].replace("_", " ")
+            await ctx.reply(f"You crafted {crafted_item}! Use !raid equip {crafted_item} to wield it.")
 
     @raid.command(name="equip")
     async def equip(self, ctx: commands.Context, *, weapon: str | None = None) -> None:
