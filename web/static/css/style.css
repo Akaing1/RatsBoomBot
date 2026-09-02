@@ -1371,3 +1371,8 @@ body.landing-page {
 }
 
 .public-raid-guide-link { width: fit-content; margin-top: 18px; }
+
+
+.premium-connect-notice { margin: 18px 0; padding: 16px 18px; border: 1px solid rgba(139,92,246,.4); border-radius: 12px; background: rgba(139,92,246,.08); }
+.premium-connect-notice strong { display: block; }
+.premium-connect-notice p { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
