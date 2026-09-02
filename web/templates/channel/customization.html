@@ -143,7 +143,7 @@
             </div>
         {% endif %}
 
-        <div class="toggle-actions profile-setting-actions">
+        <div class="toggle-actions profile-setting-actions custom-bot-actions">
             <form class="custom-bot-link-form" method="post" action="/channel/custom-bot/connect">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <label for="custom-bot-login">Dedicated bot Twitch username</label>
@@ -156,7 +156,7 @@
             {% if chat_identity.connected %}
                 <form method="post" action="/channel/custom-bot/disconnect" onsubmit="return confirm('Disconnect @{{ chat_identity.bot_login }} from your channel?');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button class="button secondary" type="submit">Disconnect Account</button>
+                    <button class="button danger" type="submit">Disconnect Account</button>
                 </form>
             {% endif %}
         </div>
