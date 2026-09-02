@@ -97,9 +97,6 @@ async def public_channel_commands(request: Request, channel_name: str):
         return templates.TemplateResponse(request=request, name="public/channel_commands_unavailable.html", context={"channel_name": channel_name, "not_found": True}, status_code=404)
 
     command_groups = build_enabled_command_help_groups(services.features, broadcaster.id, profile)
-    raid_enabled = services.features.is_enabled(broadcaster.id, FeatureName.RAID_BOSSES)
-    raid_metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster.id) if raid_enabled else None
-    raid_contributors = await services.raid_bosses.get_contributors(broadcaster.id) if raid_metrics and raid_metrics["status"] == "active" else []
 
     return templates.TemplateResponse(
         request=request,
@@ -108,8 +105,6 @@ async def public_channel_commands(request: Request, channel_name: str):
             "broadcaster": broadcaster,
             "command_groups": command_groups,
             "command_count": sum(len(group.commands) for group in command_groups),
-            "raid_metrics": raid_metrics,
-            "raid_contributors": raid_contributors,
             "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")
         }
     )
@@ -182,11 +177,13 @@ async def public_channel_raid_page(request: Request, channel_name: str):
     raid_commands = (
         {"syntax": "!raid", "description": "Show the current encounter status."},
         {"syntax": "!raid attack", "description": "Attack once during the current stream."},
-        {"syntax": "!raid shop", "description": "Open this raid guide and shop."},
+        {"syntax": "!raid help", "description": "Open this complete raid guide."},
+        {"syntax": "!raid shop", "description": "Show Basic weapons and the Power Potion in chat."},
         {"syntax": "!raid buy <item>", "description": "Purchase a weapon or consumable with loyalty points."},
         {"syntax": "!raid craft <weapon>", "description": "Combine two matching weapons from the previous tier and pay the crafting fee."},
         {"syntax": "!raid inventory", "description": "View your weapons, equipped item, durability, and potion attacks."},
         {"syntax": "!raid equip <weapon>", "description": "Equip an owned weapon."},
+        {"syntax": "!raid unequip", "description": "Remove your equipped weapon and return to base attack damage."},
         {"syntax": "!raid repair <weapon>", "description": "Restore an owned weapon to full durability."},
         {"syntax": "!raid leaderboard", "description": "Show the leading contributors in chat."},
         {"syntax": "!loot", "description": "Show your rewards from the most recently completed raid."}

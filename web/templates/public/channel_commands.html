@@ -37,61 +37,6 @@
             {% if broadcaster.login %}<a class="button primary" href="https://twitch.tv/{{ broadcaster.login }}">Watch on Twitch</a>{% endif %}
         </header>
 
-        {% if raid_metrics %}
-            <section class="panel public-raid-panel">
-                <div class="panel-header">
-                    <div><p class="eyebrow">Raid encounter</p><h2>{{ raid_metrics.boss_name }}</h2></div>
-                    <span class="channel-state {% if raid_metrics.status == 'active' %}live{% endif %}">{{ raid_metrics.status | title }}</span>
-                </div>
-
-                <div class="raid-monitor-heading">
-                    <p>{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; Stream {{ raid_metrics.streams_used }} of {{ raid_metrics.stream_limit }}</p>
-                    <strong>{{ "{:,}".format(raid_metrics.current_hp) }}/{{ "{:,}".format(raid_metrics.max_hp) }} HP</strong>
-                </div>
-
-                <div class="progress-track raid-hp-track"><span style="width: {{ raid_metrics.hp_percent }}%"></span></div>
-
-                <div class="public-raid-stats">
-                    <article><span>Damage dealt</span><strong>{{ "{:,}".format(raid_metrics.total_damage) }}</strong></article>
-                    <article><span>Attackers</span><strong>{{ raid_metrics.unique_attackers }}</strong></article>
-                    <article><span>Total attacks</span><strong>{{ raid_metrics.total_attacks }}</strong></article>
-                    <article><span>Reward pool</span><strong>{{ "{:,}".format(raid_metrics.reward_pool) }}</strong></article>
-                </div>
-
-                {% if raid_metrics.status == 'active' %}
-                    <div class="public-raid-contributors">
-                        <div class="public-raid-contributors-header">
-                            <h3>Current contributors</h3>
-                            <span>{{ raid_contributors | length }} fighters</span>
-                        </div>
-
-                        {% if raid_contributors %}
-                            <ol>
-                                {% for username, damage in raid_contributors[:10] %}
-                                    <li><span><strong>#{{ loop.index }}</strong>{{ username }}</span><b>{{ "{:,}".format(damage) }} damage</b></li>
-                                {% endfor %}
-                            </ol>
-
-                            {% if raid_contributors | length > 10 %}
-                                <details class="public-raid-contributors-more">
-                                    <summary>Show all {{ raid_contributors | length }} contributors</summary>
-                                    <ol>
-                                        {% for username, damage in raid_contributors[10:] %}
-                                            <li><span><strong>#{{ loop.index + 10 }}</strong>{{ username }}</span><b>{{ "{:,}".format(damage) }} damage</b></li>
-                                        {% endfor %}
-                                    </ol>
-                                </details>
-                            {% endif %}
-                        {% else %}
-                            <p class="public-raid-contributors-empty">No one has attacked this boss yet.</p>
-                        {% endif %}
-                    </div>
-                {% endif %}
-
-                <a class="button secondary public-raid-guide-link" href="/raid/{{ broadcaster.login or broadcaster.id }}">Open full raid guide</a>
-            </section>
-        {% endif %}
-
         {% if command_groups %}
             <section class="public-command-groups" aria-label="Active channel commands">
                 {% for group in command_groups %}

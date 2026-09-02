@@ -57,7 +57,7 @@ def reset_active_profiles():
     clear_profiles()
 
 
-def test_public_channel_page_only_shows_enabled_commands_and_available_raid(monkeypatch) -> None:
+def test_public_channel_page_only_shows_enabled_non_raid_commands(monkeypatch) -> None:
     broadcaster_id = "channel-1"
     profile = ChannelProfile(
         channel_name="MeinyaYozakura",
@@ -78,11 +78,8 @@ def test_public_channel_page_only_shows_enabled_commands_and_available_raid(monk
     assert "!pp [username]" in response.text
     assert "!height [username]" not in response.text
     assert ">Disabled<" not in response.text
-    assert "Ahriman" in response.text
-    assert "11,609/20,000 HP" in response.text
-    assert "viewer-10" in response.text
-    assert "viewer-11" in response.text
-    assert "Show all 12 contributors" in response.text
+    assert "Ahriman" not in response.text
+    assert "Raid bosses" not in response.text
 
 
 def test_public_channel_page_returns_not_found_for_unknown_channel(monkeypatch) -> None:

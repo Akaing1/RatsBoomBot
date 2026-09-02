@@ -475,6 +475,26 @@ async def test_crafting_consumes_two_weapons_and_fees_then_auto_equips(tmp_path)
 
 
 @pytest.mark.asyncio
+async def test_equipped_weapon_can_be_unequipped_without_removing_inventory(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(weapon_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.buy("channel-1", "user-1", "alice", "sword", config)
+        await service.equip("channel-1", "user-1", "alice", "sword")
+
+        assert await service.unequip("channel-1", "user-1") is True
+        weapons, equipped, durability, _ = await service.get_inventory("channel-1", "user-1")
+        assert weapons == [("basic_sword", 1)]
+        assert equipped is None
+        assert durability == 0
+        assert await service.unequip("channel-1", "user-1") is False
+
+
+@pytest.mark.asyncio
 async def test_second_wind_allows_exactly_one_extra_attack_and_consumes_charge(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)

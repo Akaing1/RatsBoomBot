@@ -764,6 +764,15 @@ class RaidBossService:
 
         return True
 
+    async def unequip(self, broadcaster_id: str, user_id: str) -> bool:
+        async with self.db.acquire() as connection:
+            row = await connection.fetchone(
+                "UPDATE raid_boss_players SET equipped_weapon = NULL WHERE broadcaster_id = ? AND user_id = ? AND equipped_weapon IS NOT NULL RETURNING user_id",
+                (str(broadcaster_id), str(user_id))
+            )
+
+        return row is not None
+
     async def get_inventory(self, broadcaster_id: str, user_id: str) -> tuple[list[tuple[str, int]], str | None, int, dict[str, int]]:
         async with self.db.acquire() as connection:
             rows = await connection.fetchall(

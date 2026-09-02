@@ -199,27 +199,6 @@ def get_profile_command_groups(profile: ChannelProfile) -> tuple[CommandGroupDef
             )
         ))
 
-    if profile.raid_bosses.enabled:
-        test_commands = (CommandDefinition("!raid nextstream", "Advance to the next simulated stream while offline.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),) if profile.raid_bosses.offline_testing_enabled else ()
-        groups.append(CommandGroupDefinition(
-            name="Raid bosses",
-            description="Attack the active boss, prepare equipment, and compete for contribution rewards.",
-            commands=(
-                CommandDefinition("!raid", "Show the active boss, type, and remaining HP.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raid attack", "Attack once during each Twitch stream.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!loot", "Show your personal rewards from the latest completed raid.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raid shop", "Show the raid equipment shop.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raid buy <item>", "Buy a weapon or power potion with loyalty points.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raid equip <weapon>", "Equip an owned sword, bow, or spellbook.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raid inventory", "Show owned weapons, equipped weapon, and potion attacks.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raid repair <weapon>", "Restore an owned weapon to full durability.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raid leaderboard", "Show the current contribution leaderboard.", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raid spawn <tutorial|mini|main> <type|random>", "Manually spawn a tutorial, mini, or main raid boss.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
-                CommandDefinition("!raid end", "End the raid as a failed subjugation and distribute reduced rewards.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
-                *test_commands
-            )
-        ))
-
     return tuple(groups)
 
 
