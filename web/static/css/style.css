@@ -1377,6 +1377,7 @@ body.landing-page {
 .premium-connect-notice strong { display: block; }
 .premium-connect-notice p { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .custom-bot-link-form { width: min(100%, 760px); }
+.custom-bot-actions { align-items: flex-end; }
 .custom-bot-link-form label, .custom-bot-link-panel label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 700; }
 .custom-bot-link-controls { display: flex; align-items: stretch; gap: 10px; }
 .custom-bot-link-controls .profile-setting-input { flex: 1; margin: 0; min-width: 0; }
