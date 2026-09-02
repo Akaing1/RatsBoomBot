@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Raid boss guide, shop, commands, and live encounter for {{ broadcaster.name or broadcaster.id }}.">
+
+    <title>Raids | {{ broadcaster.name or broadcaster.id }} | RatsBoomBot</title>
+
+    <link rel="canonical" href="{{ public_base_url }}/raid/{{ broadcaster.login or broadcaster.id }}">
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
+</head>
+
+<body class="public-command-page">
+    <header class="public-command-navigation">
+        <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
+            <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
+            <span><strong>RatsBoomBot</strong><small>Channel raid guide</small></span>
+        </a>
+
+        <nav class="public-raid-navigation" aria-label="Channel links">
+            <a href="/help/{{ broadcaster.login or broadcaster.id }}">Command Help</a>
+            {% if broadcaster.login %}<a class="button primary" href="https://twitch.tv/{{ broadcaster.login }}">Watch on Twitch</a>{% endif %}
+        </nav>
+    </header>
+
+    <main class="public-command-content">
+        <header class="public-command-hero">
+            {% if broadcaster.profile_image_url %}
+                <img src="{{ broadcaster.profile_image_url }}" alt="{{ broadcaster.name or broadcaster.id }}">
+            {% else %}
+                <div class="public-command-avatar">{{ (broadcaster.name or broadcaster.id)[0] | upper }}</div>
+            {% endif %}
+
+            <div>
+                <p class="eyebrow">Raid headquarters</p>
+                <h1>{{ broadcaster.name or broadcaster.id }}</h1>
+                <p>Live encounter progress, contributor rankings, shop items, mechanics, rewards, and commands.</p>
+            </div>
+        </header>
+
+        <section id="public-raid-live-panel" class="panel public-raid-panel">
+            {% if raid_metrics and raid_metrics.status == 'active' %}
+                <div class="panel-header">
+                    <div><p class="eyebrow">Active encounter</p><h2 id="public-raid-boss-name">{{ raid_metrics.boss_name }}</h2></div>
+                    <span class="channel-state live">Live</span>
+                </div>
+
+                <div class="raid-monitor-heading">
+                    <p id="public-raid-boss-details">{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; Stream {{ raid_metrics.streams_used }} of {{ raid_metrics.stream_limit }}</p>
+                    <strong id="public-raid-hp-text">{{ "{:,}".format(raid_metrics.current_hp) }}/{{ "{:,}".format(raid_metrics.max_hp) }} HP</strong>
+                </div>
+
+                <div class="progress-track raid-hp-track"><span id="public-raid-hp-bar" style="width: {{ raid_metrics.hp_percent }}%"></span></div>
+
+                <div class="public-raid-stats">
+                    <article><span>Damage dealt</span><strong id="public-raid-damage">{{ "{:,}".format(raid_metrics.total_damage) }}</strong></article>
+                    <article><span>Attackers</span><strong id="public-raid-attackers">{{ raid_metrics.unique_attackers }}</strong></article>
+                    <article><span>Total attacks</span><strong id="public-raid-attacks">{{ raid_metrics.total_attacks }}</strong></article>
+                    <article><span>Reward pool</span><strong id="public-raid-reward">{{ "{:,}".format(raid_metrics.reward_pool) }}</strong></article>
+                </div>
+
+                <div class="public-raid-contributors">
+                    <div class="public-raid-contributors-header">
+                        <h3>Current contributors</h3>
+                        <span id="public-raid-fighter-count">{{ raid_contributors | length }} fighters</span>
+                    </div>
+
+                    <ol id="public-raid-top-contributors">
+                        {% for contributor in raid_contributors[:10] %}
+                            <li><span><strong>#{{ contributor.rank }}</strong>{{ contributor.username }}</span><b>{{ "{:,}".format(contributor.damage) }} damage</b></li>
+                        {% endfor %}
+                    </ol>
+
+                    <details id="public-raid-more-contributors" class="public-raid-contributors-more" {% if raid_contributors | length <= 10 %}hidden{% endif %}>
+                        <summary id="public-raid-more-summary">Show all {{ raid_contributors | length }} contributors</summary>
+                        <ol id="public-raid-extra-contributors">
+                            {% for contributor in raid_contributors[10:] %}
+                                <li><span><strong>#{{ contributor.rank }}</strong>{{ contributor.username }}</span><b>{{ "{:,}".format(contributor.damage) }} damage</b></li>
+                            {% endfor %}
+                        </ol>
+                    </details>
+
+                    <p id="public-raid-contributors-empty" class="public-raid-contributors-empty" {% if raid_contributors %}hidden{% endif %}>No one has attacked this boss yet.</p>
+                </div>
+            {% else %}
+                <div class="compact-empty-state public-raid-idle">
+                    <p class="eyebrow">Raid encounter</p>
+                    <h2>No active raid boss</h2>
+                    <p>The next encounter will appear here automatically after it spawns.</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="public-raid-guide" aria-label="Raid guide">
+            <details class="panel public-command-group" open>
+                <summary class="public-command-group-summary">
+                    <div><p class="eyebrow">Spend loyalty points</p><h2>Raid shop</h2><p>Weapons persist in your inventory. Potions add automatic powered attacks.</p></div>
+                    <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
+                </summary>
+
+                <div class="public-raid-section-content">
+                    <div class="public-raid-shop-grid">
+                        {% for item in shop_items %}
+                            <article>
+                                <span class="public-raid-item-type">{{ item.type }}</span>
+                                <h3>{{ item.name }}</h3>
+                                <strong>{{ "{:,}".format(item.cost) }} points</strong>
+                                <p>+{{ config.weapon_attack }} attack and {{ config.weapon_durability }} durability. Matching {{ item.type | lower }} bosses doubles the weapon bonus.</p>
+                                <code>!raid buy {{ item.item_id }}</code>
+                            </article>
+                        {% endfor %}
+
+                        <article>
+                            <span class="public-raid-item-type">Consumable</span>
+                            <h3>Power potion</h3>
+                            <strong>{{ "{:,}".format(config.potion_cost) }} points</strong>
+                            <p>Adds {{ config.potion_attacks }} automatic attacks at {{ config.potion_multiplier | int }}&times; total damage. Additional purchases stack.</p>
+                            <code>!raid buy potion</code>
+                        </article>
+
+                        <article>
+                            <span class="public-raid-item-type">Service</span>
+                            <h3>Full repair</h3>
+                            <strong>{{ "{:,}".format(config.repair_cost) }} points</strong>
+                            <p>Restores one owned weapon to its full {{ config.weapon_durability }} durability.</p>
+                            <code>!raid repair &lt;weapon&gt;</code>
+                        </article>
+                    </div>
+                </div>
+            </details>
+
+            <details class="panel public-command-group">
+                <summary class="public-command-group-summary">
+                    <div><p class="eyebrow">Damage and equipment</p><h2>How raids work</h2><p>Understand attack limits, weapon matching, potions, and critical hits.</p></div>
+                    <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
+                </summary>
+
+                <div class="public-raid-section-content public-raid-rule-grid">
+                    <article><strong>{{ config.base_damage_min }}–{{ config.base_damage_max }}</strong><span>Base damage per attack</span></article>
+                    <article><strong>Once per stream</strong><span>Attack limit for each active boss</span></article>
+                    <article><strong>{{ config.critical_chance * 100 | int }}% at {{ config.critical_multiplier }}&times;</strong><span>Critical-hit chance and multiplier</span></article>
+                    <article><strong>{{ config.weapon_durability }} attacks</strong><span>Basic weapon durability when full</span></article>
+                    <article><strong>Type matching</strong><span>Melee, ranged, and magic weapons double their attack bonus against the matching boss type</span></article>
+                    <article><strong>Persistent inventory</strong><span>Weapons and unused potion attacks survive streams, bosses, and bot restarts</span></article>
+                </div>
+            </details>
+
+            <details class="panel public-command-group">
+                <summary class="public-command-group-summary">
+                    <div><p class="eyebrow">Points and drops</p><h2>Raid rewards</h2><p>Rewards scale with contribution and the outcome of the encounter.</p></div>
+                    <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
+                </summary>
+
+                <div class="public-raid-section-content public-raid-copy">
+                    <p>Defeating a main boss distributes up to <strong>{{ "{:,}".format(config.reward_pool) }} points</strong> based on damage contribution, with a <strong>{{ "{:,}".format(config.final_hit_reward) }}-point</strong> final-hit bonus.</p>
+                    <p>Mini bosses use a <strong>{{ "{:,}".format(config.mini_reward_pool) }}-point</strong> pool and a <strong>{{ "{:,}".format(config.mini_final_hit_reward) }}-point</strong> final-hit bonus.</p>
+                    <p>Successful non-tutorial raids can drop mythical melee, ranged, or magic weapons. Tutorial participants receive a starter weapon they do not own, or {{ "{:,}".format(config.tutorial_complete_collection_points) }} points after completing the full starter collection.</p>
+                    <p>Failed encounters still distribute a reduced portion of their reward pool according to contribution.</p>
+                </div>
+            </details>
+
+            <details class="panel public-command-group">
+                <summary class="public-command-group-summary">
+                    <div><p class="eyebrow">{{ raid_commands | length }} viewer commands</p><h2>Raid commands</h2><p>Everything viewers need to fight, shop, manage equipment, and check rewards.</p></div>
+                    <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
+                </summary>
+
+                <div class="public-command-list">
+                    {% for command in raid_commands %}
+                        <div class="public-command-row"><code>{{ command.syntax }}</code><div><p>{{ command.description }}</p><span>Everyone</span></div></div>
+                    {% endfor %}
+                </div>
+            </details>
+
+            <details class="panel public-command-group">
+                <summary class="public-command-group-summary">
+                    <div><p class="eyebrow">{{ recent_events | length }} recent encounters</p><h2>Recent raid history</h2><p>The latest completed encounters for this channel.</p></div>
+                    <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
+                </summary>
+
+                <div class="public-raid-section-content">
+                    {% if recent_events %}
+                        <div class="public-raid-history-list">
+                            {% for event in recent_events %}
+                                <article>
+                                    <div><span>{{ event.boss_tier | title }} {{ event.boss_type | title }} boss</span><h3>{{ event.boss_name }}</h3><p>{{ event.spawned_at[:10] }}</p></div>
+                                    <div><strong>{{ "{:,}".format(event.total_damage) }} damage</strong><span>{{ event.unique_attackers }} attackers</span></div>
+                                    <b class="channel-state {% if event.status == 'defeated' %}live{% endif %}">{{ event.status | title }}</b>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="compact-empty-state"><h3>No completed raids yet</h3><p>Completed encounters will appear here.</p></div>
+                    {% endif %}
+                </div>
+            </details>
+        </section>
+    </main>
+
+    {% if broadcaster.login %}
+    <script>
+    (() => {
+        const endpoint = "/api/raid/{{ broadcaster.login }}";
+        const panel = document.getElementById("public-raid-live-panel");
+
+        if (!panel) {
+            return;
+        }
+
+        const number = new Intl.NumberFormat();
+
+        function contributorRow(contributor) {
+            const row = document.createElement("li");
+            const identity = document.createElement("span");
+            const rank = document.createElement("strong");
+            const username = document.createTextNode(contributor.username);
+            const damage = document.createElement("b");
+
+            rank.textContent = `#${contributor.rank}`;
+            damage.textContent = `${number.format(contributor.damage)} damage`;
+            identity.append(rank, username);
+            row.append(identity, damage);
+            return row;
+        }
+
+        function render(data) {
+            const metrics = data.metrics;
+
+            if (!metrics || metrics.status !== "active" || !document.getElementById("public-raid-boss-name")) {
+                window.location.reload();
+                return;
+            }
+
+            document.getElementById("public-raid-boss-name").textContent = metrics.boss_name;
+            document.getElementById("public-raid-boss-details").textContent = `${metrics.boss_tier} boss · ${metrics.boss_type} · Stream ${metrics.streams_used} of ${metrics.stream_limit}`;
+            document.getElementById("public-raid-hp-text").textContent = `${number.format(metrics.current_hp)}/${number.format(metrics.max_hp)} HP`;
+            document.getElementById("public-raid-hp-bar").style.width = `${metrics.hp_percent}%`;
+            document.getElementById("public-raid-damage").textContent = number.format(metrics.total_damage);
+            document.getElementById("public-raid-attackers").textContent = number.format(metrics.unique_attackers);
+            document.getElementById("public-raid-attacks").textContent = number.format(metrics.total_attacks);
+            document.getElementById("public-raid-reward").textContent = number.format(metrics.reward_pool);
+
+            const contributors = Array.isArray(data.contributors) ? data.contributors : [];
+            const top = document.getElementById("public-raid-top-contributors");
+            const extra = document.getElementById("public-raid-extra-contributors");
+            const more = document.getElementById("public-raid-more-contributors");
+            const summary = document.getElementById("public-raid-more-summary");
+            const empty = document.getElementById("public-raid-contributors-empty");
+
+            top.replaceChildren(...contributors.slice(0, 10).map(contributorRow));
+            extra.replaceChildren(...contributors.slice(10).map(contributorRow));
+            more.hidden = contributors.length <= 10;
+            summary.textContent = `Show all ${contributors.length} contributors`;
+            empty.hidden = contributors.length > 0;
+            document.getElementById("public-raid-fighter-count").textContent = `${contributors.length} fighters`;
+        }
+
+        async function refresh() {
+            try {
+                const response = await fetch(endpoint, {headers: {"Accept": "application/json"}, cache: "no-store"});
+
+                if (response.ok) {
+                    render(await response.json());
+                }
+            } catch (_error) {
+                // Keep the most recent successful state visible during a transient refresh failure.
+            }
+        }
+
+        window.setInterval(refresh, 15000);
+    })();
+    </script>
+    {% endif %}
+</body>
+</html>
