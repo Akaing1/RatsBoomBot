@@ -10,4 +10,4 @@ class HelpService:
 
     def format_help_message(self, channel_name: str) -> str:
         command_page_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/help/{quote(channel_name)}"
-        return f"View all active commands and raid information for {channel_name}: {command_page_url}"
+        return f"View all active commands for {channel_name}: {command_page_url}"

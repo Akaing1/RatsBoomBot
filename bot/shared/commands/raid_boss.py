@@ -157,10 +157,19 @@ class RaidBossCommands(commands.Component):
             return
 
         config = context[1]
+        await ctx.send(f"Raid shop: Basic Sword — {config.weapon_cost:,} points | Basic Bow — {config.weapon_cost:,} | Apprentice Tome — {config.weapon_cost:,} | Power Potion — {config.potion_cost:,}. Use !raid help to view crafting, consumables, repairs, and full raid details.")
+
+    @raid.command(name="help")
+    async def raid_help(self, ctx: commands.Context) -> None:
+        context = self.get_context(ctx)
+
+        if context is None:
+            return
+
         profile = get_active_profile(context[0])
         channel_name = profile.channel_name if profile is not None else context[0]
         raid_page_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/raid/{quote(channel_name)}"
-        await ctx.send(f"Raid shop: basic weapons {config.weapon_cost:,}, Power Potion {config.potion_cost:,}, Second Wind {config.second_wind_cost:,}, Berserk {config.berserk_cost:,}, Blessing {config.blessing_cost:,}, repairs {config.repair_cost:,}. Craft upgrades with !raid craft. Details: {raid_page_url}")
+        await ctx.send(f"Raid guide, shop, crafting recipes, equipment, rewards, and live encounter: {raid_page_url}")
 
     @raid.command(name="buy")
     async def buy(self, ctx: commands.Context, *, item: str | None = None) -> None:
@@ -243,6 +252,21 @@ class RaidBossCommands(commands.Component):
         weapon_text = ", ".join(f"{weapon.replace('_', ' ')} x{quantity}" for weapon, quantity in weapons) if weapons else "none"
         durability_text = f"{durability}/{context[1].weapon_durability}" if equipped else "none"
         await ctx.reply(f"Weapons: {weapon_text}. Equipped: {(equipped or 'none').replace('_', ' ')}. Durability: {durability_text}. Power attacks: {consumables['power']}; Second Winds: {consumables['second_wind']}; Berserks: {consumables['berserk']}.")
+
+    @raid.command(name="unequip")
+    async def unequip(self, ctx: commands.Context) -> None:
+        context = self.get_context(ctx)
+
+        if context is None:
+            return
+
+        unequipped = await self.bot.services.raid_bosses.unequip(context[0], str(ctx.chatter.id))
+
+        if not unequipped:
+            await ctx.reply("You do not currently have a raid weapon equipped.")
+            return
+
+        await ctx.reply("Your raid weapon has been unequipped. Future attacks will use base damage until you equip another weapon.")
 
     @raid.command(name="repair")
     async def repair(self, ctx: commands.Context, *, weapon: str | None = None) -> None:
