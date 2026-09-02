@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **8.5.0**
+Current version: **8.5.2**
 
 ## Highlights
 
@@ -356,6 +356,8 @@ RatsBoomBot uses a practical three-part version number:
 - Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes
 - Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement
 - Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
+
+Version **8.5.2** corrects the Ahriman test-run cleanup and converts the public command Help page to full-width dropdown sections with an active raid contributor leaderboard.
 
 Version **8.5.0** adds standard single-zero roulette as a Meinya loyalty-points game.
 
