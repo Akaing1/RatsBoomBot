@@ -17,13 +17,13 @@ router = APIRouter()
 # releases; patch-level fixes remain in the complete GitHub release history.
 HOME_RELEASE_HIGHLIGHTS = (
     {
-        "version": "v8.9.0",
-        "title": "Raid progression gets deeper",
-        "summary": "Craft themed weapons, plan stronger attacks, and find every raid detail in one dedicated guide.",
+        "version": "v8.10.0",
+        "title": "Crafting and consumables arrive",
+        "summary": "Build a long-term raid loadout, spend points on tactical buffs, and follow every raid detail from one guide.",
         "highlights": (
-            "Basic, refined, and masterwork weapon paths.",
-            "Second Wind, Berserk, and Blessing consumables.",
-            "Simpler !raid commands and themed channel gear."
+            "Basic weapons now craft into Refined and Masterwork gear.",
+            "Second Wind, Berserk, and Blessing add new raid decisions.",
+            "Mythical weapons now add +225 damage."
         )
     },
     {
