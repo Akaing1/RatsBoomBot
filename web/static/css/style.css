@@ -214,6 +214,7 @@ button, input { font: inherit; }
 .public-raid-contributors li b { white-space: nowrap; }
 .public-raid-contributors-empty { margin: 14px 0 0; color: var(--muted); font-size: 13px; }
 .public-raid-contributors-more { margin-top: 12px; }
+.public-raid-is-hidden { display: none; }
 .public-raid-contributors-more summary { width: fit-content; padding: 10px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-raised); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
 .public-raid-contributors-more summary::-webkit-details-marker { display: none; }
 .public-raid-contributors-more summary:hover { border-color: var(--accent); }
