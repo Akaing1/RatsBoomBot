@@ -73,7 +73,7 @@
                         {% endfor %}
                     </ol>
 
-                    <details id="public-raid-more-contributors" class="public-raid-contributors-more" {% if raid_contributors | length <= 10 %}hidden{% endif %}>
+                    <details id="public-raid-more-contributors" class="public-raid-contributors-more{% if raid_contributors | length <= 10 %} public-raid-is-hidden{% endif %}">
                         <summary id="public-raid-more-summary">Show all {{ raid_contributors | length }} contributors</summary>
                         <ol id="public-raid-extra-contributors">
                             {% for contributor in raid_contributors[10:] %}
@@ -82,7 +82,7 @@
                         </ol>
                     </details>
 
-                    <p id="public-raid-contributors-empty" class="public-raid-contributors-empty" {% if raid_contributors %}hidden{% endif %}>No one has attacked this boss yet.</p>
+                    <p id="public-raid-contributors-empty" class="public-raid-contributors-empty{% if raid_contributors %} public-raid-is-hidden{% endif %}">No one has attacked this boss yet.</p>
                 </div>
             {% else %}
                 <div class="compact-empty-state public-raid-idle">
@@ -266,8 +266,10 @@
             top.replaceChildren(...contributors.slice(0, 10).map(contributorRow));
             extra.replaceChildren(...contributors.slice(10).map(contributorRow));
             more.hidden = contributors.length <= 10;
+            more.classList.toggle("public-raid-is-hidden", contributors.length <= 10);
             summary.textContent = `Show all ${contributors.length} contributors`;
             empty.hidden = contributors.length > 0;
+            empty.classList.toggle("public-raid-is-hidden", contributors.length > 0);
             document.getElementById("public-raid-fighter-count").textContent = `${contributors.length} fighters`;
         }
 
