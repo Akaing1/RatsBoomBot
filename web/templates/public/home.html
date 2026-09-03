@@ -53,8 +53,6 @@
 
                     <a class="button secondary" href="#features">Explore Features</a>
                 </div>
-
-                <p class="hero-note">Work in progress: new channel profiles are currently created by hand. Please contact the owner for enrollment details.</p>
             </div>
 
             <div class="hero-preview" aria-label="RatsBoomBot feature preview">
@@ -104,9 +102,9 @@
 
         <section class="landing-section landing-whats-new" id="whats-new">
             <div class="landing-section-heading">
-                <p class="eyebrow">Curated release notes</p>
+                <p class="eyebrow">Latest release notes</p>
                 <h2>What’s new in RatsBoomBot.</h2>
-                <p>Highlights are updated for meaningful feature releases, not every maintenance update.</p>
+                <p>Highlights of the last few patches~</p>
             </div>
 
             <div class="whats-new-grid">
@@ -259,26 +257,26 @@
             <div class="landing-section-heading">
                 <p class="eyebrow">Manual enrollment while we grow</p>
                 <h2>A tailored profile comes before Twitch sign-in.</h2>
-                <p class="enrollment-notice"><strong>Work in progress:</strong> please contact the owner for details about enrolling for RatsBoomBot services.</p>
+                <p class="enrollment-notice"><strong>Work in progress:</strong> Some features are only available through manual intervention: please contact the developer for more information</p>
             </div>
 
             <div class="landing-step-grid">
                 <article>
                     <span>1</span>
-                    <h3>Contact the owner</h3>
-                    <p>Discuss your channel, community, and the features you want enabled before setup begins.</p>
+                    <h3>Proceed to your dashboard</h3>
+                    <p>Authorize the bot to the account you want and get started-no password required.</p>
                 </article>
 
                 <article>
                     <span>2</span>
                     <h3>Build your profile</h3>
-                    <p>Your messages, currency, redeems, commands, integrations, and permissions are configured manually.</p>
+                    <p>Your messages, currency, redeems, commands, integrations, and permissions can be configured on the dashboard.</p>
                 </article>
 
                 <article>
                     <span>3</span>
-                    <h3>Authorize and go live</h3>
-                    <p>Once your profile is ready, sign in with Twitch and use your private dashboard—no extra password required.</p>
+                    <h3>Go live</h3>
+                    <p>Once your profile is ready, boot up stream and you are all set to go!</p>
                 </article>
             </div>
         </section>
@@ -287,7 +285,7 @@
             <div>
                 <p class="eyebrow">Ready when you are</p>
                 <h2>{% if is_authenticated %}Your dashboard is waiting.{% else %}Bring your community into the fun.{% endif %}</h2>
-                <p>Work in progress: channels are enrolled and configured manually. Please contact the owner before authorizing a new channel.</p>
+                <p>No more opening 100 applications to start stream - everything in one place ready to go.</p>
             </div>
 
             <a class="button primary landing-primary-action" href="{{ dashboard_url }}">
@@ -299,10 +297,10 @@
     <footer class="landing-footer">
         <a class="landing-brand" href="/">
             <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="">
-            <span><strong>RatsBoomBot</strong><small>Community-first Twitch automation</small></span>
+            <span><strong>RatsBoomBot</strong><small>Community-first driven Twitch Bot</small></span>
         </a>
 
-        <p>Not affiliated with Twitch. Twitch is a trademark of Twitch Interactive, Inc.</p>
+        <p>Not affiliated with Twitch. Personal project conducted by Ninjakaing</p>
     </footer>
 </body>
 </html>
