@@ -23,6 +23,7 @@ from storage.migrations.v018_remove_ahriman_test_run import migrate as migrate_r
 from storage.migrations.v019_custom_bot_authorization_links import migrate as migrate_custom_bot_authorization_links
 from storage.migrations.v020_raid_crafting_progression import migrate as migrate_raid_crafting_progression
 from storage.migrations.v021_patch_notes import migrate as migrate_patch_notes
+from storage.migrations.v022_seed_crafting_patch_note import migrate as migrate_seed_crafting_patch_note
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -56,4 +57,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=19, name="custom_bot_authorization_links", run=migrate_custom_bot_authorization_links),
     Migration(version=20, name="raid_crafting_progression", run=migrate_raid_crafting_progression)
     , Migration(version=21, name="patch_notes", run=migrate_patch_notes)
+    , Migration(version=22, name="seed_crafting_patch_note", run=migrate_seed_crafting_patch_note)
 )
