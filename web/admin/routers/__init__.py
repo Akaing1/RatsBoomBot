@@ -9,6 +9,7 @@ from web.admin.routers.logs import router as logs_router
 from web.admin.routers.oauth import router as oauth_router
 from web.admin.routers.performance import router as performance_router
 from web.admin.routers.runtime_logs import router as runtime_logs_router
+from web.admin.routers.patch_notes import router as patch_notes_router
 
 router = APIRouter(prefix="/admin")
 router.include_router(auth_router)
@@ -19,6 +20,7 @@ router.include_router(logs_router)
 router.include_router(performance_router)
 router.include_router(runtime_logs_router)
 router.include_router(administrators_router)
+router.include_router(patch_notes_router)
 
 
 @router.get("", response_class=HTMLResponse, include_in_schema=False)

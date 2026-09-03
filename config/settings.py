@@ -40,6 +40,7 @@ class Settings:
     DATABASE_PATH = os.getenv("DATABASE_PATH", ".data/tokens.db")
     LEAGUE_DATABASE_PATH = os.getenv("LEAGUE_DATABASE_PATH", ".data/league.db")
     STREAM_LOGS_PATH = os.getenv("STREAM_LOGS_PATH", ".data/logs")
+    DISCORD_PATCH_NOTES_WEBHOOK_URL = os.getenv("DISCORD_PATCH_NOTES_WEBHOOK_URL")
 
     ADMIN_HOST = os.getenv("ADMIN_HOST", "127.0.0.1")
     ADMIN_PORT = int(os.getenv("ADMIN_PORT", "4345"))

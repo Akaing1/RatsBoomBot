@@ -13,6 +13,10 @@ on:
         description: Create the one-time editable Discord status card
         required: true
         type: boolean
+      publish_patch_note:
+        description: Patch-note slug to announce (for example, crafting-and-consumables)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -184,3 +188,18 @@ jobs:
           response="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -d '{"content":"⚪ **RatsBoomBot Status**\n**Production:** Status monitoring is being initialized","username":"RatsBoomBot"}' "${DISCORD_WEBHOOK_URL}?wait=true")"
           message_id="$(jq -r '.id' <<< "$response")"
           echo "Create the repository variable DISCORD_STATUS_MESSAGE_ID with this value: ${message_id}"
+
+  publish-patch-note:
+    name: Publish patch-note announcement
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_patch_note != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Announce the selected patch note
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_PATCH_NOTES_WEBHOOK_URL }}
+          PATCH_NOTE: ${{ inputs.publish_patch_note }}
+        run: |
+          if [[ "$PATCH_NOTE" != "crafting-and-consumables" ]]; then echo "Unknown patch-note slug: $PATCH_NOTE"; exit 1; fi
+          content=$'**Rats RPG Patch Notes — Crafting & Consumables**\nCrafting is here: build Basic weapons into Refined and Masterwork gear, prepare with new raid consumables, and chase stronger Mythical drops.\n\n**Highlights**\n• Refined and Masterwork weapon progression\n• Mythical weapons now add +225 damage\n• Second Wind, Berserk, and Blessing consumables\n\nRead the complete patch notes: <https://ratsboombot.com/patch-notes/crafting-and-consumables>'
+          payload="$(jq -nc --arg content "$content" --arg username "RatsBoomBot" '{content: $content, username: $username}')"
+          curl --fail --silent --show-error -H 'Content-Type: application/json' -d "$payload" "$DISCORD_WEBHOOK_URL"

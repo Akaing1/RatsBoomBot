@@ -7,6 +7,8 @@ from web.channel.auth import CHANNEL_USER_ID_KEY
 from web.channel.command_help import build_enabled_command_help_groups
 from web.shared.common import templates
 from web.state import get_bot
+from web.state import get_db
+from storage.patch_notes_repository import list_notes, get_note
 
 router = APIRouter()
 
@@ -110,6 +112,18 @@ async def landing_page(request: Request):
             "release_history_url": GITHUB_RELEASE_HISTORY_URL
         }
     )
+
+
+@router.get("/patch-notes", response_class=HTMLResponse)
+async def public_patch_notes(request: Request):
+    return templates.TemplateResponse(request=request, name="public/patch_notes.html", context={"patch_notes": await list_notes(get_db(), True), "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")})
+
+
+@router.get("/patch-notes/{slug}", response_class=HTMLResponse)
+async def public_patch_note(request: Request, slug: str):
+    note = await get_note(get_db(), slug)
+    if note is None or note["published_at"] is None: return templates.TemplateResponse(request=request, name="public/patch_notes.html", context={"patch_notes": [], "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")}, status_code=404)
+    return templates.TemplateResponse(request=request, name="public/patch_note.html", context={"note": note, "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")})
 
 
 @router.get("/commands/{channel_name}", include_in_schema=False)
