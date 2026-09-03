@@ -10,6 +10,10 @@ def test_root_is_the_public_landing_page() -> None:
 
     assert response.status_code == 200
     assert "An all-in-one bot tailored to your needs" in response.text
+    assert "What’s new in RatsBoomBot." in response.text
+    assert "v8.9.0" in response.text
+    assert "Highlights are updated for meaningful feature releases" in response.text
+    assert "https://github.com/Akaing1/RatsBoomBot/releases" in response.text
     assert '<details class="landing-feature-card">' in response.text
     assert "!register &lt;Riot ID&gt; [region]" in response.text
     assert "please contact the owner" in response.text.lower()

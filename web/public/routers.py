@@ -11,6 +11,43 @@ from web.state import get_bot
 router = APIRouter()
 
 
+# Keep this intentionally curated. Homepage highlights change for minor and major
+# releases; patch-level fixes remain in the complete GitHub release history.
+HOME_RELEASE_HIGHLIGHTS = (
+    {
+        "version": "v8.9.0",
+        "title": "Raid progression gets deeper",
+        "summary": "Craft themed weapons, plan stronger attacks, and find every raid detail in one dedicated guide.",
+        "highlights": (
+            "Basic, refined, and masterwork weapon paths.",
+            "Second Wind, Berserk, and Blessing consumables.",
+            "Simpler !raid commands and themed channel gear."
+        )
+    },
+    {
+        "version": "v8.7.0",
+        "title": "A bot identity that is yours",
+        "summary": "Premium channels can securely connect a dedicated Twitch account to speak as their own bot identity.",
+        "highlights": (
+            "Streamer-managed custom bot onboarding.",
+            "Secure reconnect links for dedicated accounts.",
+            "Automatic RatsBoomBot fallback when needed."
+        )
+    },
+    {
+        "version": "v8.6.0",
+        "title": "Raid information goes public",
+        "summary": "View live encounters, rewards, shop options, and raid history without having to parse chat commands.",
+        "highlights": (
+            "Public raid guide pages for enabled channels.",
+            "Live boss progress and contributor rankings.",
+            "Raid history, mechanics, and reward details."
+        )
+    }
+)
+GITHUB_RELEASE_HISTORY_URL = "https://github.com/Akaing1/RatsBoomBot/releases"
+
+
 @router.get("/chatters", response_class=HTMLResponse)
 async def public_chatter_search(request: Request, q: str = ""):
     runtime_bot = get_bot()
@@ -68,7 +105,9 @@ async def landing_page(request: Request):
         context={
             "dashboard_url": dashboard_url,
             "is_authenticated": is_authenticated,
-            "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")
+            "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
+            "release_highlights": HOME_RELEASE_HIGHLIGHTS,
+            "release_history_url": GITHUB_RELEASE_HISTORY_URL
         }
     )
 
