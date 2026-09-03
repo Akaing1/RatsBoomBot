@@ -1391,6 +1391,11 @@ body.landing-page {
 .custom-bot-link-form { width: min(100%, 760px); }
 .custom-bot-actions { align-items: flex-end; }
 .custom-bot-link-form label, .custom-bot-link-panel label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+.patch-notes-form { display: grid; gap: 18px; max-width: 900px; }
+.patch-notes-form label { display: grid; gap: 8px; font-size: 13px; font-weight: 800; }
+.patch-notes-form input, .patch-notes-form textarea { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--background); color: var(--text); font: inherit; }
+.patch-notes-form textarea { min-height: 110px; resize: vertical; }
+.patch-notes-form textarea[name="body"] { min-height: 300px; }
 .custom-bot-link-controls { display: flex; align-items: stretch; gap: 10px; }
 .custom-bot-link-controls .profile-setting-input { flex: 1; margin: 0; min-width: 0; }
 .custom-bot-link-panel { max-width: 960px; }

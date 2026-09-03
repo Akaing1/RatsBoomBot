@@ -117,7 +117,7 @@ jobs:
       - name: Mark Discord status as updating
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_STATUS_WEBHOOK_URL }}
-          DISCORD_MESSAGE_ID: ${{ vars.DISCORD_STATUS_MESSAGE_ID }}
+          DISCORD_MESSAGE_ID: ${{ secrets.DISCORD_STATUS_MESSAGE_ID }}
         run: |
           if [[ -z "$DISCORD_WEBHOOK_URL" || -z "$DISCORD_MESSAGE_ID" ]]; then exit 0; fi
           payload="$(jq -nc --arg content $'🟡 **RatsBoomBot Status**\n**Production:** Deploying an update…' --arg username "RatsBoomBot" '{content: $content, username: $username}')"
@@ -167,7 +167,7 @@ jobs:
       - name: Update the saved status card
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_STATUS_WEBHOOK_URL }}
-          DISCORD_MESSAGE_ID: ${{ vars.DISCORD_STATUS_MESSAGE_ID }}
+          DISCORD_MESSAGE_ID: ${{ secrets.DISCORD_STATUS_MESSAGE_ID }}
           DEPLOYMENT_RESULT: ${{ needs.deploy-production.result }}
         run: |
           if [[ -z "$DISCORD_WEBHOOK_URL" || -z "$DISCORD_MESSAGE_ID" ]]; then exit 0; fi
