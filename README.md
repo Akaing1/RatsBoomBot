@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **8.9.0**
+Current version: **8.9.3**
 
 ## Highlights
 
@@ -363,6 +363,8 @@ RatsBoomBot uses a practical three-part version number:
 - Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
 
 The home page’s **What’s New** panel is intentionally updated only for minor and major releases. Patch releases remain available in the full GitHub release history.
+
+Version **8.9.3** adds a persistent Discord status card that updates during and after production deployments.
 
 Version **8.9.0** adds a curated home-page **What’s New** panel for meaningful feature-release highlights.
 
