@@ -196,8 +196,21 @@ class RaidBossCommands(commands.Component):
         elif result.startswith("out_of_stock:"):
             await ctx.reply(f"Blessing of the Gods is out of stock for this stream—it was purchased by {result.split(':', 1)[1]}!")
         else:
-            purchased_item = context[1].weapon_names.display(self.bot.services.raid_bosses.normalize_item(item))
-            await ctx.reply(f"You purchased {purchased_item}! Use !raid equip {item.lower()} if it is a weapon.")
+            item_id = self.bot.services.raid_bosses.normalize_item(item)
+            config = context[1]
+
+            if item_id in {"basic_sword", "basic_bow", "apprentice_tome"}:
+                purchased_item = config.weapon_names.display(item_id)
+                equip_name = {"basic_sword": "sword", "basic_bow": "bow", "apprentice_tome": "tome"}[item_id]
+                await ctx.reply(f"You purchased {purchased_item}! It was added to your raid inventory. Use !raid equip {equip_name} before attacking.")
+            elif item_id == "potion":
+                await ctx.reply(f"Power Potion acquired! Your next {config.potion_attacks} raid attacks will deal {config.potion_multiplier:g}× damage automatically.")
+            elif item_id == "second_wind":
+                await ctx.reply("Second Wind acquired! After your normal attack, it grants one additional attack in a stream.")
+            elif item_id == "berserk":
+                await ctx.reply(f"Berserk acquired! Your next raid attack this stream deals {config.berserk_multiplier:g}× damage, cannot crit, and overrides Power Potion. It costs {config.berserk_durability_cost} weapon durability and has a {config.berserk_shatter_chance:.0%} shatter chance.")
+            elif item_id == "blessing":
+                await self.bot.services.raid_bosses.send_announcement(context[0], f"@{chatter.name} purchased Blessing of the Gods! Everyone's subsequent raid attacks this stream deal +{(config.blessing_multiplier - 1):.0%} damage.", "purple")
 
     @raid.command(name="craft")
     async def craft(self, ctx: commands.Context, *, item: str | None = None) -> None:
