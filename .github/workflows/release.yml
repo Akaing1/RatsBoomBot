@@ -7,6 +7,12 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
+    inputs:
+      initialize_discord_status:
+        description: Create the one-time editable Discord status card
+        required: true
+        type: boolean
 
 permissions:
   contents: read
@@ -104,6 +110,15 @@ jobs:
       group: production-deployment
       cancel-in-progress: false
     steps:
+      - name: Mark Discord status as updating
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_STATUS_WEBHOOK_URL }}
+          DISCORD_MESSAGE_ID: ${{ vars.DISCORD_STATUS_MESSAGE_ID }}
+        run: |
+          if [[ -z "$DISCORD_WEBHOOK_URL" || -z "$DISCORD_MESSAGE_ID" ]]; then exit 0; fi
+          payload="$(jq -nc --arg content $'🟡 **RatsBoomBot Status**\n**Production:** Deploying an update…' --arg username "RatsBoomBot" '{content: $content, username: $username}')"
+          curl --fail --silent --show-error -X PATCH -H 'Content-Type: application/json' -d "$payload" "${DISCORD_WEBHOOK_URL}/messages/${DISCORD_MESSAGE_ID}"
+
       - name: Deploy RatsBoomBot on Raspberry Pi
         run: /opt/ratsboombot/deploy/linux/deploy.sh
 
@@ -136,3 +151,36 @@ jobs:
 
           payload="$(jq -nc --arg content "$content" --arg username "RatsBoomBot" '{content: $content, username: $username}')"
           curl --fail --silent --show-error -H 'Content-Type: application/json' -d "$payload" "$DISCORD_WEBHOOK_URL"
+
+  update-discord-status:
+    name: Update Discord status card
+    if: always() && github.event_name == 'push'
+    needs: deploy-production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Update the saved status card
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_STATUS_WEBHOOK_URL }}
+          DISCORD_MESSAGE_ID: ${{ vars.DISCORD_STATUS_MESSAGE_ID }}
+          DEPLOYMENT_RESULT: ${{ needs.deploy-production.result }}
+        run: |
+          if [[ -z "$DISCORD_WEBHOOK_URL" || -z "$DISCORD_MESSAGE_ID" ]]; then exit 0; fi
+          version="$(sed -nE 's/^APP_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' config/version.py)"
+          if [[ "$DEPLOYMENT_RESULT" == "success" ]]; then content=$'🟢 **RatsBoomBot Status**\n**Production:** Healthy and active\n**Version:** v'"${version}"; else content=$'🔴 **RatsBoomBot Status**\n**Production:** Deployment failed\n<https://github.com/'"${GITHUB_REPOSITORY}"$'/actions/runs/'"${GITHUB_RUN_ID}"$'>'; fi
+          payload="$(jq -nc --arg content "$content" --arg username "RatsBoomBot" '{content: $content, username: $username}')"
+          curl --fail --silent --show-error -X PATCH -H 'Content-Type: application/json' -d "$payload" "${DISCORD_WEBHOOK_URL}/messages/${DISCORD_MESSAGE_ID}"
+
+  initialize-discord-status:
+    name: Initialize Discord status card
+    if: github.event_name == 'workflow_dispatch' && inputs.initialize_discord_status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create the status card and print its ID
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_STATUS_WEBHOOK_URL }}
+        run: |
+          response="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -d '{"content":"⚪ **RatsBoomBot Status**\n**Production:** Status monitoring is being initialized","username":"RatsBoomBot"}' "${DISCORD_WEBHOOK_URL}?wait=true")"
+          message_id="$(jq -r '.id' <<< "$response")"
+          echo "Create the repository variable DISCORD_STATUS_MESSAGE_ID with this value: ${message_id}"
