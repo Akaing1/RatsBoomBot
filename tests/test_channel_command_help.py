@@ -91,12 +91,16 @@ def test_profile_feature_toggle_disables_integration_command_help() -> None:
     assert all(not command.enabled for command in league.commands)
 
 
-def test_command_help_keeps_raid_boss_commands_on_the_dedicated_raid_page() -> None:
+def test_command_help_includes_raid_boss_commands_for_raid_enabled_channels() -> None:
     broadcaster_id = "channel-1"
     profile = ChannelProfile(channel_name="channel", raid_bosses=RaidBossConfig(enabled=True))
     activate_profile(broadcaster_id, profile)
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
-    assert "Raid bosses" not in {group.name for group in groups}
+    raid_bosses = get_group(groups, "Raid Bosses")
+
+    assert get_command(raid_bosses, "!raid attack").enabled is True
+    assert get_command(raid_bosses, "!raid craft <sword|bow|tome>").enabled is True
+    assert get_command(raid_bosses, "!raid loot").enabled is True
 
 
 def test_command_help_includes_stream_information_settings() -> None:
@@ -118,12 +122,14 @@ def test_raid_boss_toggle_is_hidden_for_unconfigured_profiles() -> None:
     assert FeatureName.RAID_BOSSES not in features
 
 
-def test_command_help_hides_raid_boss_offline_controls() -> None:
+def test_command_help_keeps_raid_boss_testing_controls_hidden() -> None:
     broadcaster_id = "channel-1"
     profile = ChannelProfile(channel_name="channel", raid_bosses=RaidBossConfig(enabled=True, offline_testing_enabled=True))
     activate_profile(broadcaster_id, profile)
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
-    assert "Raid bosses" not in {group.name for group in groups}
+    raid_bosses = get_group(groups, "Raid Bosses")
+
+    assert "!raid next" not in {command.syntax for command in raid_bosses.commands}
 
 
 def test_command_help_marks_commands_disabled_when_channel_profile_is_off() -> None:
