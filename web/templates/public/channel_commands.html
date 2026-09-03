@@ -42,11 +42,7 @@
                 {% for group in command_groups %}
                     <details class="panel public-command-group">
                         <summary class="public-command-group-summary">
-                            <div>
-                                <p class="eyebrow">{{ group.commands | length }} commands</p>
-                                <h2>{{ group.name }}</h2>
-                                <p>{{ group.description }}</p>
-                            </div>
+                            <span class="public-command-group-copy"><span class="eyebrow">{{ group.commands | length }} commands</span><span class="public-command-group-title">{{ group.name }}</span><span class="public-command-group-description">{{ group.description }}</span></span>
                             <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
                         </summary>
 
