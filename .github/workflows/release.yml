@@ -129,10 +129,10 @@ jobs:
 
           version="$(sed -nE 's/^APP_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' config/version.py)"
           if [[ "$DEPLOYMENT_RESULT" == "success" ]]; then
-            content="✅ **RatsBoomBot v${version} deployed successfully**\n<https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${version}>"
+            content=$'✅ **RatsBoomBot v'"${version}"$' deployed successfully**\n<https://github.com/'"${GITHUB_REPOSITORY}"$'/releases/tag/v'"${version}"$'>'
           else
-            content="🚨 **RatsBoomBot production deployment failed**\n<https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}>"
+            content=$'🚨 **RatsBoomBot production deployment failed**\n<https://github.com/'"${GITHUB_REPOSITORY}"$'/actions/runs/'"${GITHUB_RUN_ID}"$'>'
           fi
 
-          payload="$(jq -nc --arg content "$content" '{content: $content}')"
+          payload="$(jq -nc --arg content "$content" --arg username "RatsBoomBot" '{content: $content, username: $username}')"
           curl --fail --silent --show-error -H 'Content-Type: application/json' -d "$payload" "$DISCORD_WEBHOOK_URL"
