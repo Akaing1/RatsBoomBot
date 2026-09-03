@@ -53,15 +53,21 @@ class StreamEvents(commands.Component):
         await services.stream_logs.start_session(broadcaster_id=broadcaster_id, stream_id=stream_id, channel_name=channel_name)
         await services.passive_points.start_for_stream(broadcaster_id, stream_id)
         active_event = await services.raid_bosses.get_active_event(broadcaster_id)
-        await services.raid_bosses.register_stream(broadcaster_id, stream_id)
+        event, failed_reward = await services.raid_bosses.register_stream(broadcaster_id, stream_id)
+        profile = get_active_profile(broadcaster_id)
+        raids_enabled = profile is not None and profile.raid_bosses.enabled and services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
 
-        if active_event is not None:
-            await services.raid_bosses.start_reminders(broadcaster_id, stream_id)
-        else:
-            profile = get_active_profile(broadcaster_id)
+        if active_event is not None and event is None and failed_reward:
+            remaining_ratio = active_event.current_hp / active_event.max_hp
+            fraction = "half" if remaining_ratio <= 0.25 else "one quarter of"
+            await services.raid_bosses.send_announcement(broadcaster_id, f"The subjugation of {active_event.boss_name} has failed after {active_event.stream_limit} streams. Raiders earned {fraction} the reward pool ({failed_reward:,} points) based on contribution.", "purple")
 
-            if profile is not None and profile.raid_bosses.enabled and services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES):
+            if raids_enabled:
                 await services.raid_bosses.schedule_spawn(broadcaster_id, profile.raid_bosses, stream_id=stream_id)
+        elif active_event is not None:
+            await services.raid_bosses.start_reminders(broadcaster_id, stream_id)
+        elif raids_enabled:
+            await services.raid_bosses.schedule_spawn(broadcaster_id, profile.raid_bosses, stream_id=stream_id)
 
     @commands.Component.listener()
     async def event_stream_offline(self, payload) -> None:
