@@ -139,8 +139,8 @@
                 <summary class="public-command-group-summary"><span class="public-command-group-copy"><span class="eyebrow">Linear progression</span><span class="public-command-group-title">Weapon crafting</span><span class="public-command-group-description">Combine two copies of a tier to create the next one. Mythical drops remain separate.</span></span><span class="public-command-chevron" aria-hidden="true">&#8964;</span></summary>
                 <div class="public-raid-section-content public-crafting-guide">
                     <div class="public-crafting-recipes">
-                        <article><strong>Refined</strong><span>2 Basic weapons + {{ "{:,}".format(config.refined_crafting_cost) }} points</span><b>+{{ config.refined_weapon_attack }} damage</b></article>
-                        <article><strong>Masterwork</strong><span>2 Refined weapons + {{ "{:,}".format(config.masterwork_crafting_cost) }} points</span><b>+{{ config.masterwork_weapon_attack }} damage</b></article>
+                        <article><strong>Refined</strong><span>2 matching Basic weapons + {{ "{:,}".format(config.refined_crafting_cost) }} points</span><b>Refined Weapons deal +{{ config.refined_weapon_attack }} damage</b></article>
+                        <article><strong>Masterwork</strong><span>2 matching Refined weapons + {{ "{:,}".format(config.masterwork_crafting_cost) }} points</span><b>Masterwork Weapons deal +{{ config.masterwork_weapon_attack }} damage</b></article>
                     </div>
 
                     <div class="public-crafting-progressions">
@@ -149,7 +149,7 @@
                         <article><strong>Tome</strong><span>{{ config.weapon_names.apprentice_tome }} → {{ config.weapon_names.enchanted_tome }} → {{ config.weapon_names.archmage_grimoire }}</span></article>
                     </div>
 
-                    <div class="public-crafting-mythical"><strong>Mythical weapons</strong><span>{{ config.weapon_names.mythical_blade }}, {{ config.weapon_names.mythical_longbow }}, and {{ config.weapon_names.mythical_grimoire }} add +{{ config.unique_weapon_attack }} damage and are raid drops only.</span></div>
+                    <div class="public-crafting-mythical"><strong>Mythical weapons</strong><span>{{ config.weapon_names.mythical_blade }}, {{ config.weapon_names.mythical_longbow }}, and {{ config.weapon_names.mythical_grimoire }} deal +{{ config.unique_weapon_attack }} damage and are raid drops only.</span></div>
                     <p class="public-crafting-command">Use <code>!raid craft sword</code>, <code>!raid craft bow</code>, or <code>!raid craft tome</code>. The bot crafts the highest available next tier automatically.</p>
                 </div>
             </details>
