@@ -225,8 +225,10 @@ button, input { font: inherit; }
 .public-command-group { margin: 0; padding: 0; overflow: hidden; }
 .public-command-group-summary { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 24px; cursor: pointer; list-style: none; }
 .public-command-group-summary::-webkit-details-marker { display: none; }
-.public-command-group-summary h2 { margin: 0; font-size: 22px; }
-.public-command-group-summary p:last-of-type { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.public-command-group-copy { display: flex; min-width: 0; flex-direction: column; }
+.public-command-group-copy .eyebrow { margin: 0; }
+.public-command-group-title { margin-top: 3px; color: var(--text); font-size: 22px; font-weight: 800; line-height: 1.2; }
+.public-command-group-description { margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .public-command-chevron { color: var(--muted); font-size: 24px; line-height: 1; transition: transform .2s ease; }
 .public-command-group[open] .public-command-chevron { transform: rotate(180deg); }
 .public-command-list { display: flex; flex-direction: column; padding: 0 24px 10px; border-top: 1px solid var(--border); }
