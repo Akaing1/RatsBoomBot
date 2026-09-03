@@ -122,6 +122,27 @@ RAID_COMMANDS = CommandGroupDefinition(
     )
 )
 
+RAID_BOSS_COMMANDS = CommandGroupDefinition(
+    name="Raid Bosses",
+    description="Fight live raid bosses, manage your equipment, and spend loyalty points on raid upgrades.",
+    commands=(
+        CommandDefinition("!raid", "Show the current raid encounter and its remaining health.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid attack", "Attack the active boss once per stream; Second Wind can grant one extra attack.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid help", "Open the complete public raid guide, shop, and crafting reference.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid shop", "Show Basic weapons and the Power Potion in Twitch chat.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid buy <item>", "Buy a Basic weapon, Power Potion, Second Wind, Berserk, or Blessing of the Gods.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid craft <sword|bow|tome>", "Automatically craft the highest available tier from two matching weapons and points.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid equip <weapon>", "Equip an owned raid weapon for future attacks.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid unequip", "Unequip your current weapon and use base damage instead.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid inventory", "Show owned weapons, equipped durability, and stored consumables.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid repair <weapon>", "Restore an owned weapon to full durability for loyalty points.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid loot", "Show rewards earned from your most recent completed raid.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid leaderboard", "Show the current boss’s damage leaderboard.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid spawn <tier> <type>", "Schedule a tutorial, mini, or main boss for testing or moderation.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid end", "End the active encounter as a failed subjugation and distribute reduced rewards.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES)
+    )
+)
+
 MODERATION_COMMANDS = CommandGroupDefinition(
     name="Moderation",
     description="Community moderation games and actions.",
@@ -138,6 +159,7 @@ BASE_COMMAND_GROUPS = (
     SHOUTOUT_COMMANDS,
     CLIP_COMMANDS,
     RAID_COMMANDS,
+    RAID_BOSS_COMMANDS,
     MODERATION_COMMANDS
 )
 
