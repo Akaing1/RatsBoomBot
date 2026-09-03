@@ -1410,6 +1410,12 @@ body.landing-page {
 .patch-notes-form input, .patch-notes-form textarea { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--background); color: var(--text); font: inherit; }
 .patch-notes-form textarea { min-height: 110px; resize: vertical; }
 .patch-notes-form textarea[name="body"] { min-height: 300px; }
+.panel form[action="/admin/patch-notes/save"] { display: flex; width: min(100%,900px); flex-direction: column; gap: 18px; }
+.panel form[action="/admin/patch-notes/save"] label { display: flex; flex-direction: column; gap: 8px; color: var(--text); font-size: 13px; font-weight: 800; }
+.panel form[action="/admin/patch-notes/save"] input, .panel form[action="/admin/patch-notes/save"] textarea { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--background); color: var(--text); font: inherit; }
+.panel form[action="/admin/patch-notes/save"] textarea { min-height: 120px; resize: vertical; }
+.panel form[action="/admin/patch-notes/save"] textarea[name="body"] { min-height: 340px; }
+.panel form[action="/admin/patch-notes/save"] .button { align-self: flex-start; }
 .custom-bot-link-controls { display: flex; align-items: stretch; gap: 10px; }
 .custom-bot-link-controls .profile-setting-input { flex: 1; margin: 0; min-width: 0; }
 .custom-bot-link-panel { max-width: 960px; }
