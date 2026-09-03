@@ -24,6 +24,7 @@
         </a>
 
         <nav aria-label="Primary navigation">
+            <a href="#whats-new">What’s new</a>
             <a href="#features">Features</a>
             <a href="#how-it-works">How it works</a>
             <a class="button secondary" href="{{ dashboard_url }}">
@@ -99,6 +100,31 @@
                     </div>
                 </div>
             </div>
+        </section>
+
+        <section class="landing-section landing-whats-new" id="whats-new">
+            <div class="landing-section-heading">
+                <p class="eyebrow">Curated release notes</p>
+                <h2>What’s new in RatsBoomBot.</h2>
+                <p>Highlights are updated for meaningful feature releases, not every maintenance update.</p>
+            </div>
+
+            <div class="whats-new-grid">
+                {% for release in release_highlights %}
+                <article class="whats-new-card">
+                    <span class="whats-new-version">{{ release.version }}</span>
+                    <h3>{{ release.title }}</h3>
+                    <p>{{ release.summary }}</p>
+                    <ul>
+                        {% for highlight in release.highlights %}
+                        <li>{{ highlight }}</li>
+                        {% endfor %}
+                    </ul>
+                </article>
+                {% endfor %}
+            </div>
+
+            <a class="whats-new-history-link" href="{{ release_history_url }}" target="_blank" rel="noreferrer">View full release history <span aria-hidden="true">→</span></a>
         </section>
 
         <section class="landing-section" id="features">

@@ -357,6 +357,18 @@ body.landing-page {
 .landing-section-heading { max-width: 720px; margin-bottom: 42px; }
 .landing-section-heading h2, .landing-cta h2 { margin: 0; font-size: clamp(32px,4vw,48px); line-height: 1.12; letter-spacing: -.035em; }
 .landing-section-heading > p:last-child, .landing-cta div > p:last-child { max-width: 650px; margin: 17px 0 0; color: var(--muted); line-height: 1.7; }
+.landing-whats-new { padding-top: 34px; }
+.whats-new-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.whats-new-card { min-height: 290px; padding: 27px; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(145deg,rgba(32,36,44,.92),rgba(24,27,33,.84)); }
+.whats-new-card:first-child { border-color: rgba(139,92,246,.5); background: linear-gradient(145deg,rgba(139,92,246,.17),rgba(24,27,33,.92)); }
+.whats-new-version { display: inline-flex; padding: 5px 9px; border: 1px solid rgba(139,92,246,.4); border-radius: 999px; background: rgba(139,92,246,.11); color: #d3c7ff; font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+.whats-new-card h3 { margin: 24px 0 11px; font-size: 21px; line-height: 1.25; }
+.whats-new-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.whats-new-card ul { display: grid; gap: 9px; margin: 23px 0 0; padding: 0; list-style: none; }
+.whats-new-card li { display: flex; gap: 9px; color: #c2c9d5; font-size: 12px; line-height: 1.5; }
+.whats-new-card li::before { color: var(--accent); content: "✦"; }
+.whats-new-history-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 24px; color: #c7b7ff; font-size: 13px; font-weight: 800; }
+.whats-new-history-link:hover { color: #fff; }
 .landing-feature-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
 .landing-feature-card { min-height: 250px; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(145deg, rgba(32,36,44,.92), rgba(24,27,33,.84)); transition: transform .2s ease, border-color .2s ease; }
 .landing-feature-card:hover { border-color: rgba(139,92,246,.45); transform: translateY(-3px); }
@@ -414,7 +426,7 @@ body.landing-page {
     .hero-description { font-size: 16px; }
     .landing-section, .landing-cta, .landing-footer { width: min(100% - 32px,var(--landing-width)); }
     .landing-section { padding: 78px 0; }
-    .landing-feature-grid, .landing-step-grid { grid-template-columns: 1fr; }
+    .landing-feature-grid, .landing-step-grid, .whats-new-grid { grid-template-columns: 1fr; }
     .landing-feature-card { min-height: 220px; }
     .landing-feature-card summary { min-height: 218px; }
     .landing-cta { align-items: flex-start; flex-direction: column; margin-bottom: 70px; padding: 32px; }
