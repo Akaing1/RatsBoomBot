@@ -106,3 +106,33 @@ jobs:
     steps:
       - name: Deploy RatsBoomBot on Raspberry Pi
         run: /opt/ratsboombot/deploy/linux/deploy.sh
+
+  notify-testing-chamber:
+    name: Notify testing chamber
+    if: always() && github.event_name == 'push'
+    needs: deploy-production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Post deployment result to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_TESTING_CHAMBER_WEBHOOK_URL }}
+          DEPLOYMENT_RESULT: ${{ needs.deploy-production.result }}
+        shell: bash
+        run: |
+          if [[ -z "$DISCORD_WEBHOOK_URL" ]]; then
+            echo "Discord webhook secret is not configured; skipping notification."
+            exit 0
+          fi
+
+          version="$(sed -nE 's/^APP_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' config/version.py)"
+          if [[ "$DEPLOYMENT_RESULT" == "success" ]]; then
+            content="✅ **RatsBoomBot v${version} deployed successfully**\n<https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${version}>"
+          else
+            content="🚨 **RatsBoomBot production deployment failed**\n<https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}>"
+          fi
+
+          payload="$(jq -nc --arg content "$content" '{content: $content}')"
+          curl --fail --silent --show-error -H 'Content-Type: application/json' -d "$payload" "$DISCORD_WEBHOOK_URL"
