@@ -214,6 +214,7 @@ button, input { font: inherit; }
 .public-raid-contributors li b { white-space: nowrap; }
 .public-raid-contributors-empty { margin: 14px 0 0; color: var(--muted); font-size: 13px; }
 .public-raid-contributors-more { margin-top: 12px; }
+.public-raid-is-hidden { display: none; }
 .public-raid-contributors-more summary { width: fit-content; padding: 10px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-raised); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
 .public-raid-contributors-more summary::-webkit-details-marker { display: none; }
 .public-raid-contributors-more summary:hover { border-color: var(--accent); }
@@ -224,8 +225,10 @@ button, input { font: inherit; }
 .public-command-group { margin: 0; padding: 0; overflow: hidden; }
 .public-command-group-summary { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 24px; cursor: pointer; list-style: none; }
 .public-command-group-summary::-webkit-details-marker { display: none; }
-.public-command-group-summary h2 { margin: 0; font-size: 22px; }
-.public-command-group-summary p:last-of-type { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.public-command-group-copy { display: flex; min-width: 0; flex-direction: column; }
+.public-command-group-copy .eyebrow { margin: 0; }
+.public-command-group-title { margin-top: 3px; color: var(--text); font-size: 22px; font-weight: 800; line-height: 1.2; }
+.public-command-group-description { margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .public-command-chevron { color: var(--muted); font-size: 24px; line-height: 1; transition: transform .2s ease; }
 .public-command-group[open] .public-command-chevron { transform: rotate(180deg); }
 .public-command-list { display: flex; flex-direction: column; padding: 0 24px 10px; border-top: 1px solid var(--border); }
@@ -1363,6 +1366,16 @@ body.landing-page {
 .public-raid-copy { display: flex; flex-direction: column; gap: 14px; }
 .public-raid-copy p { margin: 0; color: var(--muted); line-height: 1.65; }
 .public-raid-copy strong { color: var(--text); }
+.public-crafting-guide { display: flex; flex-direction: column; gap: 18px; }
+.public-crafting-recipes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.public-crafting-recipes article { display: flex; flex-direction: column; gap: 5px; padding: 15px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised); }
+.public-crafting-recipes strong, .public-crafting-progressions strong, .public-crafting-mythical strong { color: var(--text); }
+.public-crafting-recipes span, .public-crafting-progressions span, .public-crafting-mythical span { color: var(--muted); line-height: 1.55; }
+.public-crafting-recipes b { color: var(--accent); font-size: 12px; }
+.public-crafting-progressions { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.public-crafting-progressions article { display: grid; grid-template-columns: 90px minmax(0,1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--border); }
+.public-crafting-mythical { display: flex; flex-direction: column; gap: 5px; }
+.public-crafting-command { margin: 0; color: var(--muted); line-height: 1.65; }
 .public-raid-history-list { display: flex; flex-direction: column; }
 .public-raid-history-list article { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 22px; padding: 15px 0; border-top: 1px solid var(--border); }
 .public-raid-history-list article:first-child { padding-top: 0; border-top: 0; }
@@ -1372,7 +1385,8 @@ body.landing-page {
 .public-raid-idle h2 { margin: 4px 0 0; }
 
 @media (max-width: 800px) {
-    .public-raid-shop-grid, .public-raid-rule-grid { grid-template-columns: 1fr; }
+    .public-raid-shop-grid, .public-raid-rule-grid, .public-crafting-recipes { grid-template-columns: 1fr; }
+    .public-crafting-progressions article { grid-template-columns: 1fr; gap: 4px; }
     .public-raid-history-list article { grid-template-columns: minmax(0,1fr) auto; }
     .public-raid-history-list article > b { grid-column: 1 / -1; justify-self: start; }
 }
