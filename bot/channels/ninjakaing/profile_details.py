@@ -2,11 +2,22 @@ from bot.profiles import (
     CommunityMessages,
     PointsConfig,
     PointsMessages,
+    RaidBossConfig,
     RaidMessages,
+    RaidWeaponNames,
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
     SocialMessages
+)
+
+
+NINJAKAING_RAID_BOSSES = RaidBossConfig(
+    enabled=True,
+    weapon_names=RaidWeaponNames(
+        basic_sword="Doran's Blade",
+        basic_bow="Doran's Bow"
+    )
 )
 
 
