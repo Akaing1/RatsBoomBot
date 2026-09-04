@@ -101,6 +101,19 @@ class RaidBossService:
     def is_buff(item_id: str) -> bool:
         return item_id in BUFF_ITEMS
 
+    @staticmethod
+    def contribution_reward_multiplier(rank: int, contributor_count: int) -> float:
+        if rank <= max(1, math.ceil(contributor_count * 0.10)):
+            return 2.0
+
+        if rank <= math.ceil(contributor_count * 0.20):
+            return 1.5
+
+        if rank <= math.ceil(contributor_count * 0.50):
+            return 1.25
+
+        return 1.0
+
     async def stop(self) -> None:
         tasks = tuple(self.spawn_tasks.values()) + tuple(self.reminder_tasks.values())
         self.spawn_tasks.clear()
@@ -1022,7 +1035,7 @@ class RaidBossService:
         damage_dealt = event.max_hp - event.current_hp
         remaining_ratio = event.current_hp / event.max_hp
         multiplier = 1.0 if defeated else (0.5 if remaining_ratio <= 0.25 else 0.25)
-        payout_pool = round(event.reward_pool * multiplier)
+        payout_pool = event.max_hp if defeated else round(event.reward_pool * multiplier)
         status = "defeated" if defeated else "failed"
 
         async with self.db.acquire() as connection:
@@ -1040,13 +1053,17 @@ class RaidBossService:
                 return 0
 
             contributions = await connection.fetchall(
-                "SELECT user_id, username, SUM(damage) AS damage FROM raid_boss_attacks WHERE event_id = ? GROUP BY user_id, username",
+                "SELECT user_id, username, SUM(damage) AS damage FROM raid_boss_attacks WHERE event_id = ? GROUP BY user_id, username ORDER BY damage DESC, username COLLATE NOCASE",
                 (event.id,)
             )
 
+            total_contribution_rewards = 0
+
             if damage_dealt > 0:
-                for contribution in contributions:
-                    reward = payout_pool * int(contribution["damage"]) // damage_dealt
+                base_reward = event.max_hp // len(contributions) if defeated and contributions else 0
+
+                for rank, contribution in enumerate(contributions, start=1):
+                    reward = int(base_reward * self.contribution_reward_multiplier(rank, len(contributions))) if defeated else payout_pool * int(contribution["damage"]) // damage_dealt
                     await self._add_points(connection, broadcaster_id, contribution["user_id"], contribution["username"], reward)
                     await connection.execute(
                         """
@@ -1079,7 +1096,8 @@ class RaidBossService:
                     (str(broadcaster_id),)
                 )
 
-        LOGGER.info("[Raid Bosses] Resolved %s as %s with a %d-point pool.", event.boss_name, status, payout_pool)
+        awarded_points = total_contribution_rewards if defeated else payout_pool
+        LOGGER.info("[Raid Bosses] Resolved %s as %s with %d contribution points awarded.", event.boss_name, status, awarded_points)
         reminder_task = self.reminder_tasks.pop(str(broadcaster_id), None)
 
         if reminder_task is not None:
@@ -1091,7 +1109,7 @@ class RaidBossService:
         async with self.db.acquire() as connection:
             await connection.execute("DELETE FROM raid_boss_schedules WHERE broadcaster_id = ?", (str(broadcaster_id),))
 
-        return payout_pool
+        return awarded_points
 
     async def _award_victory_drops(self, broadcaster_id: str, final_hitter_id: str, final_hitter_name: str, event: RaidBossEvent, config: RaidBossConfig) -> tuple[tuple[str, str], ...]:
         async with self.db.acquire() as connection:
