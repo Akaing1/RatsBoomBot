@@ -351,9 +351,13 @@ class LeagueConfig:
 
 @dataclass(frozen=True)
 class RaidBossNames:
-    melee: str = "Ironclad Brute"
-    ranged: str = "Storm Archer"
-    magic: str = "Arcane Tyrant"
+    melee: str | tuple[str, ...] = "Ironclad Brute"
+    ranged: str | tuple[str, ...] = "Storm Archer"
+    magic: str | tuple[str, ...] = "Arcane Tyrant"
+
+    def choices_for(self, boss_type: str) -> tuple[str, ...]:
+        names = getattr(self, boss_type)
+        return (names,) if isinstance(names, str) else names
 
 
 @dataclass(frozen=True)
