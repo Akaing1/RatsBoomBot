@@ -725,7 +725,7 @@ async def test_failed_subjugation_uses_half_or_quarter_reward_pool(tmp_path) -> 
 
 
 @pytest.mark.asyncio
-async def test_final_hit_distributes_full_pool_and_finisher_reward(tmp_path) -> None:
+async def test_final_hit_uses_rank_multiplier_and_finisher_reward(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
@@ -738,9 +738,34 @@ async def test_final_hit_distributes_full_pool_and_finisher_reward(tmp_path) -> 
         result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
 
         assert result.defeated is True
-        assert result.reward == 100
-        assert await points.get_points("channel-1", "user-1") == 200
+        assert result.reward == 200
+        assert await points.get_points("channel-1", "user-1") == 300
         assert await service.get_active_event("channel-1") is None
+
+
+
+@pytest.mark.asyncio
+async def test_successful_raid_uses_equal_base_shares_and_rank_bonuses(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        await service.setup()
+        config = build_config(max_hp=1000, final_hit_reward=0)
+        await service.spawn("channel-1", "melee", config)
+
+        result = None
+
+        for index in range(10):
+            result = await service.attack("channel-1", "stream-1", f"user-{index{'}'}", f"viewer{index{'}'}", config)
+
+        assert result is not None
+        assert result.reward == 1175
+        assert await points.get_points("channel-1", "user-0") == 200
+        assert await points.get_points("channel-1", "user-1") == 150
+        assert await points.get_points("channel-1", "user-2") == 125
+        assert await points.get_points("channel-1", "user-5") == 100
 
 
 @pytest.mark.asyncio
@@ -751,7 +776,7 @@ async def test_first_encounter_gives_every_participant_a_random_starter_weapon(t
         await points.setup()
         await run_migrations(database)
         await service.setup()
-        config = build_config(tutorial_enabled=True, tutorial_name="Striking Dummy", tutorial_hp=10000, tutorial_duration_streams=2, base_damage_min=5000, base_damage_max=5000, reward_points_per_hp=0.5)
+        config = build_config(tutorial_enabled=True, tutorial_name="Striking Dummy", tutorial_hp=10000, tutorial_duration_streams=2, base_damage_min=5000, base_damage_max=5000)
 
         event = await service.spawn("channel-1", "melee", config, "tutorial")
         await service.attack("channel-1", "stream-1", "user-1", "alice", config)
@@ -764,7 +789,7 @@ async def test_first_encounter_gives_every_participant_a_random_starter_weapon(t
         assert event.boss_name == "Striking Dummy"
         assert event.max_hp == 10000
         assert event.stream_limit == 2
-        assert event.reward_pool == 5000
+        assert event.reward_pool == 10000
         assert {username for username, _ in result.drops} == {"alice", "bob"}
         assert len(alice_weapons) == 1
         assert len(bob_weapons) == 1
