@@ -1064,6 +1064,7 @@ class RaidBossService:
 
                 for rank, contribution in enumerate(contributions, start=1):
                     reward = int(base_reward * self.contribution_reward_multiplier(rank, len(contributions))) if defeated else payout_pool * int(contribution["damage"]) // damage_dealt
+                    total_contribution_rewards += reward
                     await self._add_points(connection, broadcaster_id, contribution["user_id"], contribution["username"], reward)
                     await connection.execute(
                         """
