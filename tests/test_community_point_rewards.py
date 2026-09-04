@@ -51,18 +51,35 @@ async def test_cheer_reward_requires_minimum_bits(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_cheer_reward_is_fixed_for_qualifying_event(monkeypatch) -> None:
+async def test_cheer_reward_scales_with_bits(monkeypatch) -> None:
     bot = create_bot()
-    profile = SimpleNamespace(points=SimpleNamespace(cheer_reward=200, cheer_minimum_bits=100))
+    profile = SimpleNamespace(points=SimpleNamespace(cheer_reward=50, cheer_minimum_bits=100))
     payload = SimpleNamespace(
         broadcaster=SimpleNamespace(id="channel-1"),
         chatter=SimpleNamespace(id="viewer-1", name="viewer"),
-        cheer=SimpleNamespace(bits=500)
+        cheer=SimpleNamespace(bits=200)
     )
     monkeypatch.setattr(community, "get_active_profile", lambda broadcaster_id: profile)
 
     awarded = await community.award_cheer_points(bot, payload)
 
-    assert awarded == 200
-    bot.services.points.add_points.assert_awaited_once_with("channel-1", "viewer-1", "viewer", 200)
+    assert awarded == 100
+    bot.services.points.add_points.assert_awaited_once_with("channel-1", "viewer-1", "viewer", 100)
     bot.services.stream_logs.write.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_cheer_reward_uses_the_exact_bit_ratio(monkeypatch) -> None:
+    bot = create_bot()
+    profile = SimpleNamespace(points=SimpleNamespace(cheer_reward=50, cheer_minimum_bits=100))
+    payload = SimpleNamespace(
+        broadcaster=SimpleNamespace(id="channel-1"),
+        chatter=SimpleNamespace(id="viewer-1", name="viewer"),
+        cheer=SimpleNamespace(bits=150)
+    )
+    monkeypatch.setattr(community, "get_active_profile", lambda broadcaster_id: profile)
+
+    awarded = await community.award_cheer_points(bot, payload)
+
+    assert awarded == 75
+    bot.services.points.add_points.assert_awaited_once_with("channel-1", "viewer-1", "viewer", 75)
