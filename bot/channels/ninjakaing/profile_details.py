@@ -2,11 +2,43 @@ from bot.profiles import (
     CommunityMessages,
     PointsConfig,
     PointsMessages,
+    RaidBossConfig,
+    RaidBossNames,
     RaidMessages,
+    RaidWeaponNames,
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
     SocialMessages
+)
+
+
+NINJAKAING_RAID_BOSSES = RaidBossConfig(
+    enabled=True,
+    names=RaidBossNames(
+        melee=("Rift Herald", "Atakan"),
+        ranged="Elder",
+        magic="Baron"
+    ),
+    mini_names=RaidBossNames(
+        melee=("Noxian Warhound", "Frostguard Reaver", "Petricite Colossus"),
+        ranged=("Chemtech Abomination", "Bilgewater Sea Serpent"),
+        magic=("Voidborn Ravager", "Black Mist Wraith")
+    ),
+    weapon_names=RaidWeaponNames(
+        basic_sword="Doran's Blade",
+        refined_sword="Serrated Dirk",
+        masterwork_sword="Youmuu's Ghostblade",
+        mythical_blade="Infinity Edge",
+        basic_bow="Doran's Bow",
+        refined_bow="Recurve Bow",
+        masterwork_bow="Mortal Reminder",
+        mythical_longbow="Immortal Shieldbow",
+        apprentice_tome="Doran's Ring",
+        enchanted_tome="Fiendish Codex",
+        archmage_grimoire="Rite of Ruin",
+        mythical_grimoire="Rabadon's Deathcap"
+    )
 )
 
 

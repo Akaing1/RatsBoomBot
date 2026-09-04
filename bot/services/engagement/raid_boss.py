@@ -439,12 +439,12 @@ class RaidBossService:
             final_hit_reward = config.mini_final_hit_reward
             stream_limit = config.tutorial_duration_streams
         elif boss_tier == "mini":
-            boss_name = getattr(config.mini_names, boss_type)
+            boss_name = random.choice(config.mini_names.choices_for(boss_type))
             max_hp = random.randrange(config.mini_hp_min, config.mini_hp_max + 1, config.mini_hp_step)
             final_hit_reward = config.mini_final_hit_reward
             stream_limit = config.mini_duration_streams
         else:
-            boss_name = getattr(config.names, boss_type)
+            boss_name = random.choice(config.names.choices_for(boss_type))
             max_hp = config.max_hp
             final_hit_reward = config.final_hit_reward
             stream_limit = config.duration_streams

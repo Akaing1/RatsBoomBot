@@ -1,6 +1,6 @@
 from bot.channels.ninjakaing.commands.general import NinjakaingCommands
 from bot.channels.ninjakaing.commands.points import NinjakaingPointsCommands
-from bot.channels.ninjakaing.profile_details import NINJAKAING_COMMUNITY_MESSAGES, NINJAKAING_POINTS, NINJAKAING_RAID_MESSAGES, NINJAKAING_REDEEMS, NINJAKAING_SHOUTOUT_MESSAGES, NINJAKAING_SOCIAL_MESSAGES, NINJAKAING_TIMER_MESSAGES
+from bot.channels.ninjakaing.profile_details import NINJAKAING_COMMUNITY_MESSAGES, NINJAKAING_POINTS, NINJAKAING_RAID_BOSSES, NINJAKAING_RAID_MESSAGES, NINJAKAING_REDEEMS, NINJAKAING_SHOUTOUT_MESSAGES, NINJAKAING_SOCIAL_MESSAGES, NINJAKAING_TIMER_MESSAGES
 from bot.profiles import ChannelProfile, FeatureDefaults, GlobalCommandDefaults
 
 
@@ -15,7 +15,8 @@ NINJAKAING_PROFILE = ChannelProfile(
         points=True,
         redeems=True,
         community_events=True,
-        raid_responses=True
+        raid_responses=True,
+        raid_bosses=True
     ),
     globals=GlobalCommandDefaults(
         enabled=True,
@@ -43,5 +44,6 @@ NINJAKAING_PROFILE = ChannelProfile(
     shoutout_messages=NINJAKAING_SHOUTOUT_MESSAGES,
     social_messages=NINJAKAING_SOCIAL_MESSAGES,
     redeems=NINJAKAING_REDEEMS,
-    points=NINJAKAING_POINTS
+    points=NINJAKAING_POINTS,
+    raid_bosses=NINJAKAING_RAID_BOSSES
 )
