@@ -9,8 +9,8 @@ class XxemaresCommands(ChannelComponent):
     def __init__(self, bot, profile: ChannelProfile, broadcaster_id: str):
         super().__init__(bot, profile, broadcaster_id)
 
-    @commands.command(name="templatetest")
-    async def friend_test(self, ctx: commands.Context) -> None:
+    @commands.command(name="xxemarestest")
+    async def xxemares_test(self, ctx: commands.Context) -> None:
         if not await self.require_profile_channel(ctx):
             return
 
