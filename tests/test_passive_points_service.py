@@ -70,6 +70,5 @@ async def test_passive_points_awards_once_per_stream_interval(monkeypatch, tmp_p
         broadcaster.fetch_chatters.assert_awaited_with(
             moderator="bot-1",
             first=1000,
-            max_results=None,
-            token_for="bot-1"
+            max_results=None
         )
