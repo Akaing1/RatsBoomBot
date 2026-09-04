@@ -103,8 +103,7 @@ class PassivePointsService:
         response = await broadcaster.fetch_chatters(
             moderator=moderator_id,
             first=1000,
-            max_results=None,
-            token_for=moderator_id
+            max_results=None
         )
         excluded_ids = {broadcaster_id, str(self.bot.bot_id)}
         eligible = []
