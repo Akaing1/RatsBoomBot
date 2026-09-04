@@ -628,7 +628,7 @@ class RaidBossService:
             reward = await self.resolve(broadcaster_id, defeated=True, final_hitter_id=user_id, final_hitter_name=username)
 
             if reward > 0:
-                drops = await self._award_victory_drops(broadcaster_id, user_id, username, event, config)
+                drops = await self._award_victory_drops(broadcaster_id, event, config)
 
         LOGGER.info("[Raid Bosses] %s dealt %d damage to %s in broadcaster %s.", username, damage, event.boss_name, broadcaster_id)
         broken_weapon = weapon if weapon and not weapon_used else None
@@ -1111,7 +1111,7 @@ class RaidBossService:
 
         return awarded_points
 
-    async def _award_victory_drops(self, broadcaster_id: str, final_hitter_id: str, final_hitter_name: str, event: RaidBossEvent, config: RaidBossConfig) -> tuple[tuple[str, str], ...]:
+    async def _award_victory_drops(self, broadcaster_id: str, event: RaidBossEvent, config: RaidBossConfig) -> tuple[tuple[str, str], ...]:
         async with self.db.acquire() as connection:
             contributors = await connection.fetchall(
                 """
@@ -1147,9 +1147,6 @@ class RaidBossService:
                         awards.append((recipient_id, recipient_name, f"{config.tutorial_complete_collection_points}_points"))
             else:
                 mythical_weapon = next(item_id for item_id, weapon_type in UNIQUE_WEAPON_TYPES.items() if weapon_type == event.boss_type)
-
-                if random.random() < config.final_hit_unique_drop_chance:
-                    awards.append((str(final_hitter_id), final_hitter_name, mythical_weapon))
 
                 contributor_count = len(contributors)
                 top_count = max(1, math.ceil(contributor_count * config.top_contributor_percent)) if contributor_count else 0

@@ -913,24 +913,6 @@ async def test_previous_pilot_does_not_prevent_manual_tutorial_spawn(tmp_path) -
 
 
 @pytest.mark.asyncio
-async def test_defeated_boss_can_drop_type_matching_unique_weapon(tmp_path) -> None:
-    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
-        points = PointsService(bot=None, db=database)
-        service = RaidBossService(bot=None, db=database)
-        await points.setup()
-        await run_migrations(database)
-        await service.setup()
-        config = build_config(max_hp=100, final_hit_unique_drop_chance=1.1)
-        await service.spawn("channel-1", "magic", config)
-
-        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
-        weapons, _, _, _ = await service.get_inventory("channel-1", "user-1")
-
-        assert result.drops == (("alice", "mythical_grimoire"),)
-        assert weapons == [("mythical_grimoire", 1)]
-
-
-@pytest.mark.asyncio
 async def test_top_contributor_gets_separate_unique_drop_roll(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)
@@ -938,7 +920,7 @@ async def test_top_contributor_gets_separate_unique_drop_roll(tmp_path) -> None:
         await points.setup()
         await run_migrations(database)
         await service.setup()
-        config = build_config(max_hp=200, final_hit_unique_drop_chance=0.0, top_contributor_unique_drop_chance=1.1)
+        config = build_config(max_hp=200, top_contributor_unique_drop_chance=1.1)
         await service.spawn("channel-1", "ranged", config)
         await service.attack("channel-1", "stream-1", "user-1", "alice", config)
 
@@ -957,7 +939,7 @@ async def test_top_ten_percent_each_receive_an_independent_unique_drop_roll(tmp_
         await points.setup()
         await run_migrations(database)
         await service.setup()
-        config = build_config(max_hp=2000, final_hit_unique_drop_chance=0.0, top_contributor_unique_drop_chance=1.1, top_contributor_percent=0.10)
+        config = build_config(max_hp=2000, top_contributor_unique_drop_chance=1.1, top_contributor_percent=0.10)
         await service.spawn("channel-1", "melee", config)
 
         result = None
