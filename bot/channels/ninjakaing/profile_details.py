@@ -21,9 +21,9 @@ NINJAKAING_RAID_BOSSES = RaidBossConfig(
         magic="Baron"
     ),
     mini_names=RaidBossNames(
-        melee=("Grubs", "Gromp", "Krugs", "Wolves"),
-        ranged="Raptors",
-        magic=("Blue Sentinel", "Cinder Brambleback")
+        melee=("Noxian Warhound", "Frostguard Reaver", "Petricite Colossus"),
+        ranged=("Chemtech Abomination", "Bilgewater Sea Serpent"),
+        magic=("Voidborn Ravager", "Black Mist Wraith")
     ),
     weapon_names=RaidWeaponNames(
         basic_sword="Doran's Blade",
