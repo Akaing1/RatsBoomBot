@@ -758,7 +758,7 @@ async def test_successful_raid_uses_equal_base_shares_and_rank_bonuses(tmp_path)
         result = None
 
         for index in range(10):
-            result = await service.attack("channel-1", "stream-1", f"user-{index{'}'}", f"viewer{index{'}'}", config)
+            result = await service.attack("channel-1", "stream-1", f"user-{index}", f"viewer{index}", config)
 
         assert result is not None
         assert result.reward == 1175
