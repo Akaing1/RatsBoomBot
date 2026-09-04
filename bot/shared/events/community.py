@@ -47,10 +47,13 @@ async def award_cheer_points(bot, payload) -> int:
         return 0
 
     bits = int(cheer.bits)
-    amount = int(profile.points.cheer_reward)
+    reward_per_minimum = int(profile.points.cheer_reward)
+    minimum_bits = int(profile.points.cheer_minimum_bits)
 
-    if amount <= 0 or bits < int(profile.points.cheer_minimum_bits):
+    if reward_per_minimum <= 0 or minimum_bits <= 0 or bits < minimum_bits:
         return 0
+
+    amount = bits * reward_per_minimum // minimum_bits
 
     user_id = str(payload.chatter.id)
     username = str(payload.chatter.name)
