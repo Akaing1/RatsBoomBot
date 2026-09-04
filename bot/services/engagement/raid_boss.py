@@ -32,6 +32,7 @@ UNIQUE_WEAPON_TYPES = {
 STANDARD_WEAPON_TYPES = BASIC_WEAPON_TYPES | REFINED_WEAPON_TYPES | MASTERWORK_WEAPON_TYPES
 WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES
 ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "blessing_of_the_gods": "blessing", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
+BUFF_ITEMS = frozenset({"potion", "second_wind", "berserk", "blessing"})
 CRAFTING_RECIPES = {
     "refined_sword": "basic_sword", "refined_bow": "basic_bow", "enchanted_tome": "apprentice_tome",
     "masterwork_sword": "refined_sword", "masterwork_bow": "refined_bow", "archmage_grimoire": "enchanted_tome"
@@ -95,6 +96,10 @@ class RaidBossService:
 
     async def setup(self) -> None:
         LOGGER.info("[Raid Bosses] Raid boss storage is managed by database migrations.")
+
+    @staticmethod
+    def is_buff(item_id: str) -> bool:
+        return item_id in BUFF_ITEMS
 
     async def stop(self) -> None:
         tasks = tuple(self.spawn_tasks.values()) + tuple(self.reminder_tasks.values())
@@ -660,7 +665,7 @@ class RaidBossService:
         if item_id not in (*BASIC_WEAPON_TYPES, *costs):
             return None
 
-        if item_id == "blessing" and stream_id is None:
+        if self.is_buff(item_id) and stream_id is None:
             return "stream_required"
 
         async with self.db.acquire() as connection:
