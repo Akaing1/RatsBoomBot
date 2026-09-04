@@ -417,7 +417,6 @@ class RaidBossConfig:
     tutorial_duration_streams: int = 2
     tutorial_complete_collection_points: int = 5000
     reward_points_per_hp: float = 0.5
-    final_hit_unique_drop_chance: float = 0.03
     top_contributor_unique_drop_chance: float = 0.01
     top_contributor_percent: float = 0.10
     unique_weapon_attack: int = 225
