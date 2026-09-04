@@ -432,7 +432,7 @@ async def test_matching_weapon_and_power_potion_stack(tmp_path) -> None:
 
         assert await service.buy("channel-1", "user-1", "alice", "sword", config) == "purchased"
         assert await service.equip("channel-1", "user-1", "alice", "sword") is True
-        assert await service.buy("channel-1", "user-1", "alice", "potion", config) == "purchased"
+        assert await service.buy("channel-1", "user-1", "alice", "potion", config, "stream-1") == "purchased"
 
         result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
         weapons, equipped, durability, potion_attacks = await service.get_inventory("channel-1", "user-1")
@@ -558,7 +558,7 @@ async def test_second_wind_allows_exactly_one_extra_attack_and_consumes_charge(t
         config = build_config(max_hp=5000, second_wind_cost=100)
         await points.add_points("channel-1", "user-1", "alice", 1000)
         await service.spawn("channel-1", "melee", config)
-        await service.buy("channel-1", "user-1", "alice", "second wind", config)
+        await service.buy("channel-1", "user-1", "alice", "second wind", config, "stream-1")
 
         first = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
         second = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
@@ -585,8 +585,8 @@ async def test_berserk_takes_priority_preserves_power_and_cannot_crit(tmp_path, 
         await service.spawn("channel-1", "melee", config)
         await service.buy("channel-1", "user-1", "alice", "sword", config)
         await service.equip("channel-1", "user-1", "alice", "sword")
-        await service.buy("channel-1", "user-1", "alice", "potion", config)
-        await service.buy("channel-1", "user-1", "alice", "berserk", config)
+        await service.buy("channel-1", "user-1", "alice", "potion", config, "stream-1")
+        await service.buy("channel-1", "user-1", "alice", "berserk", config, "stream-1")
 
         result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
         _, _, _, consumables = await service.get_inventory("channel-1", "user-1")
@@ -618,6 +618,21 @@ async def test_blessing_is_one_purchase_per_stream_and_buffs_subsequent_attacks(
         assert result.damage == 125
         assert result.blessing_active is True
         assert await points.get_points("channel-1", "user-2") == 1000
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("item_id", ("potion", "second_wind", "berserk", "blessing"))
+async def test_buffs_require_an_active_stream_to_purchase(tmp_path, item_id) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(database)
+        service = RaidBossService(bot=FakeRaidBot(), db=database)
+        await run_migrations(database)
+        await service.setup()
+        config = build_config(potion_cost=100, second_wind_cost=100, berserk_cost=100, blessing_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+
+        assert await service.buy("channel-1", "user-1", "alice", item_id, config) == "stream_required"
+        assert await points.get_points("channel-1", "user-1") == 1000
 
 
 @pytest.mark.asyncio
@@ -665,7 +680,7 @@ async def test_dashboard_metrics_summarize_latest_encounter(tmp_path, monkeypatc
         await service.register_stream("channel-1", "stream-1")
         await service.buy("channel-1", "user-1", "alice", "sword", config)
         await service.equip("channel-1", "user-1", "alice", "sword")
-        await service.buy("channel-1", "user-1", "alice", "potion", config)
+        await service.buy("channel-1", "user-1", "alice", "potion", config, "stream-1")
         await service.attack("channel-1", "stream-1", "user-1", "alice", config)
         await service.attack("channel-1", "stream-1", "user-2", "bob", config)
 
