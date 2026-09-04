@@ -190,7 +190,7 @@
                 <article><span>Weapon attacks</span><strong id="raid-weapon-attacks">{% if raid_metrics %}{{ raid_metrics.weapon_attacks }}{% else %}0{% endif %}</strong></article>
                 <article><span>Potion attacks</span><strong id="raid-potion-attacks">{% if raid_metrics %}{{ raid_metrics.potion_attacks }}{% else %}0{% endif %}</strong></article>
                 <article><span>Critical hits</span><strong id="raid-critical-hits">{% if raid_metrics %}{{ raid_metrics.critical_hits }}{% else %}0{% endif %}</strong></article>
-                <article><span>Reward pool</span><strong id="raid-reward-pool">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.reward_pool) }}{% else %}0{% endif %}</strong></article>
+                <article><span>Base reward</span><strong id="raid-reward-pool">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.max_hp) }}{% else %}0{% endif %}</strong></article>
             </div>
         </div>
     </section>
@@ -776,7 +776,7 @@
             document.getElementById("raid-weapon-attacks").textContent = raid.weapon_attacks.toLocaleString();
             document.getElementById("raid-potion-attacks").textContent = raid.potion_attacks.toLocaleString();
             document.getElementById("raid-critical-hits").textContent = raid.critical_hits.toLocaleString();
-            document.getElementById("raid-reward-pool").textContent = raid.reward_pool.toLocaleString();
+            document.getElementById("raid-reward-pool").textContent = raid.max_hp.toLocaleString();
         }
 
         function render(data) {
