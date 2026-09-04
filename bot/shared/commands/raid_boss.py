@@ -183,8 +183,8 @@ class RaidBossCommands(commands.Component):
             return
 
         chatter = ctx.chatter
-        normalized_item = "_".join(item.lower().split())
-        stream_id = await self.get_stream_id(context[0], context[1]) if normalized_item in {"blessing", "blessing_of_the_gods"} else None
+        item_id = self.bot.services.raid_bosses.normalize_item(item)
+        stream_id = await self.get_stream_id(context[0], context[1]) if self.bot.services.raid_bosses.is_buff(item_id) else None
         result = await self.bot.services.raid_bosses.buy(context[0], str(chatter.id), chatter.name, item, context[1], stream_id)
 
         if result is None:
@@ -192,7 +192,7 @@ class RaidBossCommands(commands.Component):
         elif result == "insufficient":
             await ctx.reply("You do not have enough loyalty points for that item.")
         elif result == "stream_required":
-            await ctx.reply("Blessing of the Gods can only be purchased while the stream is live.")
+            await ctx.reply("Raid buffs can only be purchased while the stream is live.")
         elif result.startswith("out_of_stock:"):
             await ctx.reply(f"Blessing of the Gods is out of stock for this stream—it was purchased by {result.split(':', 1)[1]}!")
         else:
