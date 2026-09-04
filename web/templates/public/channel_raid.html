@@ -169,13 +169,13 @@
 
             <details class="panel public-command-group">
                 <summary class="public-command-group-summary">
-                    <span class="public-command-group-copy"><span class="eyebrow">Points and drops</span><span class="public-command-group-title">Raid rewards</span><span class="public-command-group-description">Rewards scale with contribution and the outcome of the encounter.</span></span>
+                    <span class="public-command-group-copy"><span class="eyebrow">Points and drops</span><span class="public-command-group-title">Raid rewards</span><span class="public-command-group-description">Rewards use equal base shares, with bonuses for the highest-ranked contributors.</span></span>
                     <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
                 </summary>
 
                 <div class="public-raid-section-content public-raid-copy">
-                    <p>Defeating a main boss distributes up to <strong>{{ "{:,}".format(config.reward_pool) }} points</strong> based on damage contribution, with a <strong>{{ "{:,}".format(config.final_hit_reward) }}-point</strong> final-hit bonus.</p>
-                    <p>Mini bosses use a <strong>{{ "{:,}".format(config.mini_reward_pool) }}-point</strong> pool and a <strong>{{ "{:,}".format(config.mini_final_hit_reward) }}-point</strong> final-hit bonus.</p>
+                    <p>Defeating a boss starts with an equal base share of its full HP value for every contributor. The top 10% receive <strong>2×</strong>, the next 10% receive <strong>1.5×</strong>, the next 30% receive <strong>1.25×</strong>, and everyone else receives the base share.</p>
+                    <p>The final hitter also receives a <strong>{{ "{:,}".format(config.final_hit_reward) }}-point</strong> bonus on main bosses or <strong>{{ "{:,}".format(config.mini_final_hit_reward) }} points</strong> on mini bosses.</p>
                     <p>Successful non-tutorial raids can drop mythical melee, ranged, or magic weapons. Tutorial participants receive a starter weapon they do not own, or {{ "{:,}".format(config.tutorial_complete_collection_points) }} points after completing the full starter collection.</p>
                     <p>Failed encounters still distribute a reduced portion of their reward pool according to contribution.</p>
                 </div>
