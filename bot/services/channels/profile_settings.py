@@ -30,6 +30,7 @@ class ProfileSettingState:
 
 PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("timer_messages", "Timers", "Timer messages", "Add, edit, or remove the automated messages that rotate in chat.", value_type="lines", maximum_length=10000, rows=6),
+    ProfileSettingDefinition("lurk_message", "Commands", "Lurk message", "Sent when a viewer uses !lurk. Use {username} for the viewer name."),
     ProfileSettingDefinition("community_messages.follow", "Community messages", "Follow message", "Sent when a viewer follows. Leave empty to send nothing."),
     ProfileSettingDefinition("community_messages.subscription", "Community messages", "Subscription message", "Sent for a new subscription."),
     ProfileSettingDefinition("community_messages.resubscription", "Community messages", "Resubscription message", "Sent for a returning subscription."),
