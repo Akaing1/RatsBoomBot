@@ -60,6 +60,7 @@ MEINYA_TIMER_MESSAGES = (
 
 
 MEINYA_AD_ANNOUNCEMENT_MESSAGE = "3 minutes of ads starting in ~{time}! We have to run 3 minutes of ads at the top of every hour to disable the prerolls, so please forgive me! See you soon!"
+MEINYA_LURK_MESSAGE = "@{username} fades into the shadows of the Blood Sakura Garden. Rest well, wandering spirit! 🌸"
 
 
 MEINYA_SOCIAL_MESSAGES = SocialMessages(
