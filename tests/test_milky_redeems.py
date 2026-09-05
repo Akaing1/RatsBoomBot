@@ -5,6 +5,7 @@ import asqlite
 import pytest
 
 from bot.channels.milky_galaxyvt.profile_details import MILKY_GALAXYVT_REDEEMS
+from bot.profiles import RedeemConfig
 from bot.services.engagement.counter import CounterService
 from bot.services.engagement.redeems import RedeemService
 from storage.migration_runner import run_migrations
@@ -25,6 +26,8 @@ class FakeBroadcaster:
         self.timeouts = []
         self.moderator_ids = set()
         self.added_moderators = []
+        self.vip_ids = set()
+        self.added_vips = []
 
     async def timeout_user(self, **values) -> None:
         self.timeouts.append(values)
@@ -36,6 +39,15 @@ class FakeBroadcaster:
 
     async def add_moderator(self, *, user) -> None:
         self.added_moderators.append(str(user))
+
+    async def fetch_vips(self, user_ids, max_results):
+        for user_id in user_ids:
+            if str(user_id) in self.vip_ids:
+                yield SimpleNamespace(id=str(user_id))
+
+    async def add_vip(self, *, user) -> None:
+        self.vip_ids.add(str(user))
+        self.added_vips.append(str(user))
 
 
 class FakeBot:
@@ -128,3 +140,22 @@ async def test_milky_slime_mason_redeem_times_out_configured_target(tmp_path) ->
     }]
     assert first_result.message == "@unfitend has been slimed out for 24 hours! Mason has been slimed out 1 time!"
     assert second_result.message == "@unfitend has been slimed out for 24 hours! Mason has been slimed out 2 times!"
+
+
+@pytest.mark.asyncio
+async def test_vip_redeem_grants_permanent_vip_once(tmp_path) -> None:
+    database_path = tmp_path / "vip-redeem.db"
+    bot = FakeBot()
+
+    async with asqlite.create_pool(str(database_path)) as database:
+        await run_migrations(database)
+        service = RedeemService(bot=bot, db=database, points_service=FakePointsService())
+        await service.setup()
+        service.get_redeem_config = lambda broadcaster_id: RedeemConfig(vip_title="VIP")
+
+        granted = await service.handle_redemption(broadcaster_id="channel-1", user_id="user-1", username="alice", reward_title="VIP", stream_id="stream-1")
+        duplicate = await service.handle_redemption(broadcaster_id="channel-1", user_id="user-1", username="alice", reward_title="VIP", stream_id="stream-1")
+
+    assert bot.broadcaster.added_vips == ["user-1"]
+    assert granted.message == "@alice is now a VIP! Welcome to the very important rat club!"
+    assert duplicate.message == "@alice, you are already a VIP in this channel."

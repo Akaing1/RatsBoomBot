@@ -17,6 +17,7 @@ DEFAULT_CHANNEL_SCOPES = (
     "moderator:read:warnings "
     "moderator:read:moderators "
     "moderator:read:vips "
+    "channel:manage:vips "
     "channel:read:redemptions "
     "channel:read:subscriptions "
     "channel:read:ads "

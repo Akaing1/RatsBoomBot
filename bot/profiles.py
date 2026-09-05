@@ -223,6 +223,9 @@ class RedeemMessages:
     )
     timeout_success: str = "@{username} has timed themselves out for {minutes} minutes!"
     timeout_failed: str = "@{username}, Twitch could not time you out."
+    vip_success: str = "@{username} is now a VIP! Welcome to the very important rat club!"
+    vip_already_granted: str = "@{username}, you are already a VIP in this channel."
+    vip_failed: str = "@{username}, VIP could not be granted. You may be a moderator or the channel may have no VIP slots available."
 
 
 @dataclass(frozen=True)
@@ -251,6 +254,7 @@ class RedeemConfig:
     daily_title: str = ""
     first_title: str = ""
     second_title: str = ""
+    vip_title: str = ""
     daily_amount: int = 0
     first_amount: int = 0
     second_amount: int = 0

@@ -40,6 +40,7 @@ PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("shoutout_messages.without_game", "Shoutouts", "Shoutout without game", "Shoutout used when no game is available."),
     ProfileSettingDefinition("redeems.daily_title", "Redeems", "Daily redeem title", "Exact Twitch reward title used for the daily claim.", maximum_length=100, rows=1),
     ProfileSettingDefinition("redeems.first_title", "Redeems", "First redeem title", "Exact Twitch reward title used for first place.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("redeems.vip_title", "Redeems", "VIP redeem title", "Exact Twitch reward title that permanently grants VIP status.", maximum_length=100, rows=1),
     ProfileSettingDefinition("redeems.daily_amount", "Redeems", "Daily point reward", "Points awarded for a daily claim.", value_type="integer", minimum=0, maximum=1000000, rows=1),
     ProfileSettingDefinition("redeems.first_amount", "Redeems", "First point reward", "Points awarded for first place.", value_type="integer", minimum=0, maximum=1000000, rows=1),
     ProfileSettingDefinition("league.game_name", "League of Legends", "Riot game name", "The game-name portion of the broadcaster's Riot ID.", maximum_length=100, rows=1),

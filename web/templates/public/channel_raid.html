@@ -58,7 +58,7 @@
                     <article><span>Damage dealt</span><strong id="public-raid-damage">{{ "{:,}".format(raid_metrics.total_damage) }}</strong></article>
                     <article><span>Attackers</span><strong id="public-raid-attackers">{{ raid_metrics.unique_attackers }}</strong></article>
                     <article><span>Total attacks</span><strong id="public-raid-attacks">{{ raid_metrics.total_attacks }}</strong></article>
-                    <article><span>Reward pool</span><strong id="public-raid-reward">{{ "{:,}".format(raid_metrics.reward_pool) }}</strong></article>
+                    <article><span>Base reward</span><strong id="public-raid-reward">{{ "{:,}".format(raid_metrics.max_hp) }}</strong></article>
                 </div>
 
                 <div class="public-raid-contributors">
@@ -260,7 +260,7 @@
             document.getElementById("public-raid-damage").textContent = number.format(metrics.total_damage);
             document.getElementById("public-raid-attackers").textContent = number.format(metrics.unique_attackers);
             document.getElementById("public-raid-attacks").textContent = number.format(metrics.total_attacks);
-            document.getElementById("public-raid-reward").textContent = number.format(metrics.reward_pool);
+            document.getElementById("public-raid-reward").textContent = number.format(metrics.max_hp);
 
             const contributors = Array.isArray(data.contributors) ? data.contributors : [];
             const top = document.getElementById("public-raid-top-contributors");
