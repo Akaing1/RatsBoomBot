@@ -60,6 +60,7 @@ MEINYA_TIMER_MESSAGES = (
 
 
 MEINYA_AD_ANNOUNCEMENT_MESSAGE = "3 minutes of ads starting in ~{time}! We have to run 3 minutes of ads at the top of every hour to disable the prerolls, so please forgive me! See you soon!"
+MEINYA_LURK_MESSAGE = "@{username} fades into the shadows of the garden. Rest well, wandering spirit!"
 
 
 MEINYA_SOCIAL_MESSAGES = SocialMessages(
@@ -104,6 +105,7 @@ MEINYA_SHOUTOUT_MESSAGES = ShoutoutMessages(
 MEINYA_REDEEMS = RedeemConfig(
     daily_title="Daily Check-in",
     first_title="FIRST",
+    vip_title="VIP REDEEM",
     daily_amount=100,
     first_amount=250,
     daily_double_chance=0.05,
@@ -129,7 +131,8 @@ MEINYA_REDEEMS = RedeemConfig(
             "and received {amount} sakura petals! They have been blessed "
             "first {claim_count} times!"
         ),
-        first_milestone="Milestone! @{username} has blessed first {claim_count} times!"
+        first_milestone="Milestone! @{username} has blessed first {claim_count} times!",
+        vip_success="@{username} is now a VIP! We appreciate your patronage and support of the Blood Sakura Garden!"
     )
 )
 
