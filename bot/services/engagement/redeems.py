@@ -326,9 +326,10 @@ class RedeemService:
         daily_title = config.daily_title.strip().lower()
         first_title = config.first_title.strip().lower()
         second_title = config.second_title.strip().lower()
+        vip_title = config.vip_title.strip().lower()
         timeout_title = config.timeout.title.strip().lower()
         target_timeout = next((timeout for timeout in config.target_timeouts if timeout.title.strip().lower() == normalized_reward), None)
-        handled_titles = {title for title in (daily_title, first_title, second_title, timeout_title) if title}
+        handled_titles = {title for title in (daily_title, first_title, second_title, vip_title, timeout_title) if title}
 
         if normalized_reward not in handled_titles and target_timeout is None:
             return RedeemResult(handled=False)
@@ -382,6 +383,9 @@ class RedeemService:
                 config=config,
                 redemption_id=redemption_id
             )
+
+        if normalized_reward == vip_title:
+            return await self.grant_vip(broadcaster_id=broadcaster_id, user_id=user_id, username=username, config=config)
 
         if normalized_reward == timeout_title:
             return await self.timeout_redeemer(broadcaster_id=broadcaster_id, user_id=user_id, username=username, config=config)
@@ -574,6 +578,40 @@ class RedeemService:
                 message = f"{message or ''}{milestone}"
 
         return RedeemResult(handled=True, message=message)
+
+    async def grant_vip(self, *, broadcaster_id: str, user_id: str, username: str, config: RedeemConfig) -> RedeemResult:
+        broadcaster = self.bot.create_partialuser(broadcaster_id)
+
+        if await self.is_moderator(broadcaster, broadcaster_id, user_id, username):
+            message = render_profile_message(config.messages.vip_failed, username=username)
+            return RedeemResult(handled=True, message=message)
+
+        if await self.is_vip(broadcaster, broadcaster_id, user_id, username):
+            message = render_profile_message(config.messages.vip_already_granted, username=username)
+            return RedeemResult(handled=True, message=message)
+
+        try:
+            await broadcaster.add_vip(user=user_id)
+        except Exception:
+            LOGGER.exception("[Redeems] Failed to grant VIP status to %s in broadcaster %s.", username, broadcaster_id)
+            message = render_profile_message(config.messages.vip_failed, username=username)
+            return RedeemResult(handled=True, message=message)
+
+        LOGGER.info("[Redeems] Granted permanent VIP status to %s in broadcaster %s.", username, broadcaster_id)
+        message = render_profile_message(config.messages.vip_success, username=username)
+        return RedeemResult(handled=True, message=message)
+
+    async def is_vip(self, broadcaster, broadcaster_id: str, user_id: str, username: str) -> bool:
+        try:
+            vips = broadcaster.fetch_vips(user_ids=[user_id], max_results=1)
+
+            async for vip in vips:
+                if str(vip.id) == str(user_id):
+                    return True
+        except Exception:
+            LOGGER.exception("[Redeems] Failed to check VIP status for %s in broadcaster %s.", username, broadcaster_id)
+
+        return False
 
     async def timeout_redeemer(self, *, broadcaster_id: str, user_id: str, username: str, config: RedeemConfig) -> RedeemResult:
         timeout = config.timeout
