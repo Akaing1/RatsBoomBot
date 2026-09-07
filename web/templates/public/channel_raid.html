@@ -101,37 +101,43 @@
                 </summary>
 
                 <div class="public-raid-section-content">
-                    <div class="public-raid-shop-grid">
-                        {% for item in shop_items %}
-                            <article>
-                                <span class="public-raid-item-type">{{ item.type }}</span>
-                                <h3>{{ item.name }}</h3>
-                                <strong>{{ "{:,}".format(item.cost) }} points</strong>
-                                <p>+{{ config.weapon_attack }} attack and {{ config.weapon_durability }} durability. Matching {{ item.type | lower }} bosses doubles the weapon bonus.</p>
-                                <code>!raid buy {{ item.item_id }}</code>
-                            </article>
-                        {% endfor %}
+                    <section class="public-raid-shop-category">
+                        <h3>Weapons</h3>
+                        <div class="public-raid-shop-grid">
+                            {% for item in shop_items %}
+                                <article>
+                                    <span class="public-raid-item-type">{{ item.type }}</span>
+                                    <h3>{{ item.name }}</h3>
+                                    <strong>{{ "{:,}".format(item.cost) }} points</strong>
+                                    <p>+{{ config.weapon_attack }} attack and {{ config.weapon_durability }} durability. Matching {{ item.type | lower }} bosses doubles the weapon bonus.</p>
+                                    <code>!raid buy {{ item.item_id }}</code>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </section>
 
-                        <article>
-                            <span class="public-raid-item-type">Consumable</span>
-                            <h3>Power potion</h3>
-                            <strong>{{ "{:,}".format(config.potion_cost) }} points</strong>
-                            <p>Adds {{ config.potion_attacks }} automatic attacks at {{ config.potion_multiplier | int }}&times; total damage. Additional purchases stack.</p>
-                            <code>!raid buy potion</code>
-                        </article>
+                    <section class="public-raid-shop-category">
+                        <h3>Consumables</h3>
+                        <div class="public-raid-shop-grid">
+                            <article><span class="public-raid-item-type">Consumable</span><h3>Power potion</h3><strong>{{ "{:,}".format(config.potion_cost) }} points</strong><p>Adds {{ config.potion_attacks }} automatic attacks at {{ config.potion_multiplier | int }}&times; total damage. Additional purchases stack.</p><code>!raid buy potion</code></article>
+                            <article><span class="public-raid-item-type">Consumable</span><h3>Second Wind</h3><strong>{{ "{:,}".format(config.second_wind_cost) }} points</strong><p>Grants one additional attack in a stream and is consumed only by that successful second attack.</p><code>!raid buy second wind</code></article>
+                            <article><span class="public-raid-item-type">Consumable</span><h3>Berserk</h3><strong>{{ "{:,}".format(config.berserk_cost) }} points</strong><p>Your next eligible attack deals {{ config.berserk_multiplier | int }}&times; damage, costs {{ config.berserk_durability_cost }} durability, cannot crit, and has a {{ (config.berserk_shatter_chance * 100) | int }}% standard-weapon shatter chance. Once per viewer each stream.</p><code>!raid buy berserk</code></article>
+                        </div>
+                    </section>
 
-                        <article><span class="public-raid-item-type">Consumable</span><h3>Second Wind</h3><strong>{{ "{:,}".format(config.second_wind_cost) }} points</strong><p>Grants one additional attack in a stream and is consumed only by that successful second attack.</p><code>!raid buy second wind</code></article>
-                        <article><span class="public-raid-item-type">Consumable</span><h3>Berserk</h3><strong>{{ "{:,}".format(config.berserk_cost) }} points</strong><p>Your next eligible attack deals {{ config.berserk_multiplier | int }}&times; damage, costs {{ config.berserk_durability_cost }} durability, cannot crit, and has a {{ (config.berserk_shatter_chance * 100) | int }}% standard-weapon shatter chance. Once per viewer each stream.</p><code>!raid buy berserk</code></article>
-                        <article><span class="public-raid-item-type">Stream-wide</span><h3>Blessing of the Gods</h3><strong>{{ "{:,}".format(config.blessing_cost) }} points</strong><p>The first buyer each stream grants everyone +{{ ((config.blessing_multiplier - 1) * 100) | int }}% damage on subsequent attacks that stream.</p><code>!raid buy blessing</code></article>
+                    <section class="public-raid-shop-category">
+                        <h3>Buffs</h3>
+                        <div class="public-raid-shop-grid">
+                            <article><span class="public-raid-item-type">Stream-wide</span><h3>Blessing of the Gods</h3><strong>{{ "{:,}".format(config.blessing_cost) }} points</strong><p>The first buyer each stream grants everyone +{{ ((config.blessing_multiplier - 1) * 100) | int }}% damage on subsequent attacks that stream.</p><code>!raid buy blessing</code></article>
+                        </div>
+                    </section>
 
-                        <article>
-                            <span class="public-raid-item-type">Service</span>
-                            <h3>Full repair</h3>
-                            <strong>{{ "{:,}".format(config.repair_cost) }} points</strong>
-                            <p>Restores one owned weapon to its full {{ config.weapon_durability }} durability.</p>
-                            <code>!raid repair &lt;weapon&gt;</code>
-                        </article>
-                    </div>
+                    <section class="public-raid-shop-category">
+                        <h3>Services</h3>
+                        <div class="public-raid-shop-grid">
+                            <article><span class="public-raid-item-type">Service</span><h3>Full repair</h3><strong>{{ "{:,}".format(config.repair_cost) }} points</strong><p>Restores one owned weapon to its full {{ config.weapon_durability }} durability.</p><code>!raid repair &lt;weapon&gt;</code></article>
+                        </div>
+                    </section>
                 </div>
             </details>
 
