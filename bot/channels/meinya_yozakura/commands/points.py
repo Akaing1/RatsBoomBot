@@ -47,7 +47,7 @@ class MeinyaPointsCommands(ChannelComponent):
 
         await self.handler.give_points(ctx, target, amount, "petals")
 
-    @petals.command(name="gamble")
+    @petals.command(name="gamble", aliases=("GAMBLE",))
     async def petals_gamble(self, ctx: commands.Context, amount: str) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
