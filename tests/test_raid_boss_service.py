@@ -83,6 +83,7 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
     assert config.repair_cost == 1500
     assert config.weapon_cost == 25000
     assert config.potion_cost == 1500
+    assert config.all_weapon_multiplier == 1.5
     assert config.refined_weapon_attack == 80
     assert config.masterwork_weapon_attack == 150
     assert config.unique_weapon_attack == 225
@@ -336,6 +337,17 @@ def test_common_matching_weapon_supports_three_stream_mini_boss_clear() -> None:
 
     assert minimum_matching_damage * 20 * 3 >= 20000
     assert (config.base_damage_max + round(config.weapon_attack * config.weapon_multiplier)) * 50 * config.duration_streams < config.max_hp
+
+
+def test_damage_multipliers_are_additive() -> None:
+    assert RaidBossService.apply_damage_multipliers(100, (2.0, 1.25, 1.5)) == 275
+
+
+def test_all_weapon_bonus_applies_to_every_boss_type() -> None:
+    config = RaidBossConfig()
+
+    for boss_type in ("melee", "ranged", "magic"):
+        assert RaidBossService.weapon_bonus_multiplier("all", boss_type, config) == 1.5
 
 
 @pytest.mark.asyncio
@@ -599,6 +611,29 @@ async def test_berserk_takes_priority_preserves_power_and_cannot_crit(tmp_path, 
         assert result.critical_hit is False
         assert result.shattered_weapon == "basic_sword"
         assert consumables["power"] == config.potion_attacks
+
+
+@pytest.mark.asyncio
+async def test_power_blessing_and_critical_damage_are_additive(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: 0.0)
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, potion_cost=100, blessing_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "potion", config, "stream-1")
+        await service.buy("channel-1", "user-1", "alice", "blessing", config, "stream-1")
+
+        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+
+        assert result.damage == 275
+        assert result.potion_used is True
+        assert result.blessing_active is True
+        assert result.critical_hit is True
 
 
 @pytest.mark.asyncio

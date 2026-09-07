@@ -413,6 +413,7 @@ class RaidBossConfig:
     weapon_durability: int = 15
     repair_cost: int = 1500
     weapon_multiplier: float = 2.0
+    all_weapon_multiplier: float = 1.5
     potion_multiplier: float = 2.0
     potion_attacks: int = 3
     critical_chance: float = 0.05
