@@ -130,6 +130,9 @@ class RaidBossCommands(commands.Component):
         if result.blessing_active:
             bonuses.append("Blessing of the Gods")
 
+        if result.ancient_pact_active:
+            bonuses.append("Ancient Pact")
+
         if result.critical_hit:
             bonuses.append("critical hit")
 
@@ -166,7 +169,7 @@ class RaidBossCommands(commands.Component):
         config = context[1]
         await ctx.send(f"Raid shop — Weapons: {config.weapon_names.basic_sword}, {config.weapon_names.basic_bow}, and {config.weapon_names.apprentice_tome} — {config.weapon_cost:,} points each. Use !raid buy sword, bow, or tome.")
         await ctx.send(f"Consumables: Power Potion — {config.potion_cost:,}; Second Wind — {config.second_wind_cost:,}; Berserk — {config.berserk_cost:,}; Lucky Dice — {config.lucky_dice_cost:,}; The Fool's Card — {config.fools_card_cost:,} points. Use !raid buy <item>.")
-        await ctx.send(f"Buffs: Blessing of the Gods — {config.blessing_cost:,} points. One per stream; grants all subsequent attacks +{(config.blessing_multiplier - 1):.0%} damage. Use !raid buy blessing. Full details: !raid help.")
+        await ctx.send(f"Buffs: Blessing of the Gods — {config.blessing_cost:,}; Ancient Pact — {config.ancient_pact_cost:,} points. Each is first-come, once per stream, and one chatter cannot claim both. Use !raid buy blessing or pact. Full details: !raid help.")
 
     @raid.command(name="help")
     async def raid_help(self, ctx: commands.Context) -> None:
@@ -204,6 +207,10 @@ class RaidBossCommands(commands.Component):
             await ctx.reply("Raid buffs can only be purchased while the stream is live.")
         elif result.startswith("out_of_stock:"):
             await ctx.reply(f"Blessing of the Gods is out of stock for this stream—it was purchased by {result.split(':', 1)[1]}!")
+        elif result.startswith("ancient_out_of_stock:"):
+            await ctx.reply(f"Ancient Pact is out of stock for this stream—it was purchased by {result.split(':', 1)[1]}!")
+        elif result == "global_buff_limit":
+            await ctx.reply("You already claimed a global raid buff this stream. Another chatter must claim this one.")
         else:
             item_id = self.bot.services.raid_bosses.normalize_item(item)
             config = context[1]
@@ -224,6 +231,8 @@ class RaidBossCommands(commands.Component):
                 await ctx.reply(f"The Fool's Card acquired! Your next raid attack will gain or lose between {abs(config.fools_card_points_min):,} and {config.fools_card_points_max:,} points.")
             elif item_id == "blessing":
                 await self.bot.services.raid_bosses.send_announcement(context[0], f"@{chatter.name} purchased Blessing of the Gods! Everyone's subsequent raid attacks this stream deal +{(config.blessing_multiplier - 1):.0%} damage.", "purple")
+            elif item_id == "ancient_pact":
+                await self.bot.services.raid_bosses.send_announcement(context[0], f"@{chatter.name} formed an Ancient Pact! Everyone's base attack ceiling increases by {config.ancient_pact_ceiling_bonus:,} for the rest of this stream.", "purple")
 
     @raid.command(name="craft")
     async def craft(self, ctx: commands.Context, *, item: str | None = None) -> None:

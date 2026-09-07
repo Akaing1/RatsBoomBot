@@ -435,6 +435,8 @@ class RaidBossConfig:
     second_wind_cost: int = 1000
     berserk_cost: int = 3000
     blessing_cost: int = 500
+    ancient_pact_cost: int = 1500
+    ancient_pact_ceiling_bonus: int = 100
     berserk_multiplier: float = 5.0
     berserk_durability_cost: int = 5
     berserk_shatter_chance: float = 0.10

@@ -83,6 +83,8 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
     assert config.repair_cost == 1500
     assert config.weapon_cost == 25000
     assert config.potion_cost == 1500
+    assert config.ancient_pact_cost == 1500
+    assert config.ancient_pact_ceiling_bonus == 100
     assert config.lucky_dice_cost == 1000
     assert config.fools_card_cost == 500
     assert config.all_weapon_multiplier == 1.5
@@ -1126,3 +1128,46 @@ async def test_fools_card_applies_point_roll_on_next_successful_attack(tmp_path,
         assert result.fools_card_points == 1500
         assert await points.get_points("channel-1", "user-1") == 2400
         assert consumables["fools_card"] == 0
+
+
+@pytest.mark.asyncio
+async def test_ancient_pact_increases_stream_base_damage_ceiling(tmp_path, monkeypatch) -> None:
+    ranges = []
+
+    def capture_roll(minimum, maximum):
+        ranges.append((minimum, maximum))
+        return maximum
+
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.randint", capture_roll)
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, ancient_pact_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await points.add_points("channel-1", "user-2", "bob", 1000)
+        await service.spawn("channel-1", "melee", config)
+        assert await service.buy("channel-1", "user-1", "alice", "pact", config, "stream-1") == "purchased"
+
+        result = await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+
+        assert ranges == [(100, 200)]
+        assert result.damage == 200
+        assert result.ancient_pact_active is True
+
+
+@pytest.mark.asyncio
+async def test_same_chatter_cannot_claim_blessing_and_ancient_pact(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(blessing_cost=100, ancient_pact_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+
+        assert await service.buy("channel-1", "user-1", "alice", "blessing", config, "stream-1") == "purchased"
+        assert await service.buy("channel-1", "user-1", "alice", "pact", config, "stream-1") == "global_buff_limit"
+        assert await points.get_points("channel-1", "user-1") == 900
