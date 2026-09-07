@@ -214,6 +214,12 @@
                                     <div><span>{{ event.boss_tier | title }} {{ event.boss_type | title }} boss</span><h3>{{ event.boss_name }}</h3><p>{{ event.spawned_at[:10] }}</p></div>
                                     <div><strong>{{ "{:,}".format(event.total_damage) }} damage</strong><span>{{ event.unique_attackers }} attackers</span></div>
                                     <b class="channel-state {% if event.status == 'defeated' %}live{% endif %}">{{ event.status | title }}</b>
+                                    {% if event.contributors %}
+                                        <details class="public-raid-history-leaderboard">
+                                            <summary>View leaderboard</summary>
+                                            <ol>{% for username, damage in event.contributors %}<li><span>{{ username }}</span><strong>{{ "{:,}".format(damage) }} damage</strong></li>{% endfor %}</ol>
+                                        </details>
+                                    {% endif %}
                                 </article>
                             {% endfor %}
                         </div>
