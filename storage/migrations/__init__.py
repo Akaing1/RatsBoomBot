@@ -26,6 +26,7 @@ from storage.migrations.v021_patch_notes import migrate as migrate_patch_notes
 from storage.migrations.v022_seed_crafting_patch_note import migrate as migrate_seed_crafting_patch_note
 from storage.migrations.v023_gambling_loss_totals import migrate as migrate_gambling_loss_totals
 from storage.migrations.v024_raid_gamble_consumables import migrate as migrate_raid_gamble_consumables
+from storage.migrations.v025_ancient_pact import migrate as migrate_ancient_pact
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -62,4 +63,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=22, name="seed_crafting_patch_note", run=migrate_seed_crafting_patch_note)
     , Migration(version=23, name="gambling_loss_totals", run=migrate_gambling_loss_totals)
     , Migration(version=24, name="raid_gamble_consumables", run=migrate_raid_gamble_consumables)
+    , Migration(version=25, name="ancient_pact", run=migrate_ancient_pact)
 )
