@@ -21,15 +21,30 @@ class FakeFeatures:
         return True
 
 
+class FakeBroadcaster:
+
+    def __init__(self, chatters):
+        self.chatters = chatters
+        self.fetch_chatter_calls = []
+
+    def fetch_chatters(self, **values):
+        self.fetch_chatter_calls.append(values)
+        return self._iterate_chatters()
+
+    async def _iterate_chatters(self):
+        for chatter in self.chatters:
+            yield chatter
+
+
 @pytest.mark.asyncio
 async def test_passive_points_awards_once_per_stream_interval(monkeypatch, tmp_path) -> None:
-    chatters = SimpleNamespace(users=[
+    chatters = [
         SimpleNamespace(id="viewer-1", name="viewer_one"),
         SimpleNamespace(id="channel-1", name="broadcaster"),
         SimpleNamespace(id="bot-1", name="main_bot"),
         SimpleNamespace(id="custom-bot", name="custom_bot")
-    ])
-    broadcaster = SimpleNamespace(fetch_chatters=AsyncMock(return_value=chatters))
+    ]
+    broadcaster = FakeBroadcaster(chatters)
     bot = SimpleNamespace(bot_id="bot-1", create_partialuser=lambda user_id: broadcaster)
     chatter_stats = SimpleNamespace(record_points_earned=AsyncMock())
     points = SimpleNamespace(chatter_stats=chatter_stats)
@@ -67,8 +82,8 @@ async def test_passive_points_awards_once_per_stream_interval(monkeypatch, tmp_p
         assert int(row["points"]) == 20
         assert int(payouts["count"]) == 2
         assert chatter_stats.record_points_earned.await_count == 2
-        broadcaster.fetch_chatters.assert_awaited_with(
-            moderator="bot-1",
-            first=1000,
-            max_results=None
-        )
+        assert broadcaster.fetch_chatter_calls == [
+            {"moderator": "bot-1", "first": 1000, "max_results": None},
+            {"moderator": "bot-1", "first": 1000, "max_results": None},
+            {"moderator": "bot-1", "first": 1000, "max_results": None}
+        ]
