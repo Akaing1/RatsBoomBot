@@ -98,6 +98,10 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
     assert config.overclocked_weapon_durability == 25
     assert config.overclocked_repair_cost == 2500
     assert config.overdrive_chance == 0.50
+    assert config.top_contributor_unique_drop_chance == 0.03
+    assert config.blessed_unique_drop_chance == 0.01
+    assert config.blessed_unique_durability == 35
+    assert config.blessed_unique_repair_cost == 5000
     assert config.unique_weapon_attack == 225
     assert config.potion_multiplier == 2.0
     assert config.critical_chance == 0.05
@@ -1394,4 +1398,29 @@ async def test_yggdrasil_chatter_bonus_is_capped_then_doubled_against_magic(tmp_
 
         assert result.weapon_passive_damage == 400
         assert result.damage == 650
+
+@pytest.mark.asyncio
+async def test_blessed_unique_drop_is_a_separate_main_boss_roll(tmp_path, monkeypatch) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
+        config = build_config(max_hp=1000, top_contributor_unique_drop_chance=0.03, blessed_unique_drop_chance=0.01)
+        event = await service.spawn("channel-1", "melee", config, "main")
+
+        async with database.acquire() as connection:
+            await connection.execute("INSERT INTO raid_boss_attacks (event_id, broadcaster_id, stream_id, user_id, username, damage, attack_number, attacked_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)", (event.id, "channel-1", "stream-1", "user-1", "alice", 1000, "2026-09-07T00:00:00+00:00"))
+
+        rolls = iter((0.50, 0.0))
+        monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: next(rolls))
+        monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: values[0])
+        drops = await service._award_victory_drops("channel-1", event, config)
+        weapons, _, _, _ = await service.get_inventory("channel-1", "user-1")
+
+        assert drops == (("alice", "heavens_judgement"),)
+        assert weapons == [("heavens_judgement", 1)]
+
+        async with database.acquire() as connection:
+            item = await connection.fetchone("SELECT durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", ("channel-1", "user-1", "heavens_judgement"))
+
+        assert item["durability"] == 35
 
