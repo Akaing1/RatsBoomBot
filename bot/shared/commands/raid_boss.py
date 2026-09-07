@@ -133,6 +133,13 @@ class RaidBossCommands(commands.Component):
         if result.critical_hit:
             bonuses.append("critical hit")
 
+        if result.lucky_dice_used:
+            bonuses.append("Lucky Dice")
+
+        if result.fools_card_points is not None:
+            card_result = f"gained {result.fools_card_points:,}" if result.fools_card_points >= 0 else f"lost {abs(result.fools_card_points):,}"
+            bonuses.append(f"The Fool's Card: {card_result} points")
+
         if result.broken_weapon:
             bonuses.append(f"broken {config.weapon_names.display(result.broken_weapon)}; base damage only")
 
@@ -158,7 +165,7 @@ class RaidBossCommands(commands.Component):
 
         config = context[1]
         await ctx.send(f"Raid shop — Weapons: {config.weapon_names.basic_sword}, {config.weapon_names.basic_bow}, and {config.weapon_names.apprentice_tome} — {config.weapon_cost:,} points each. Use !raid buy sword, bow, or tome.")
-        await ctx.send(f"Consumables: Power Potion — {config.potion_cost:,}; Second Wind — {config.second_wind_cost:,}; Berserk — {config.berserk_cost:,} points. Use !raid buy <item>.")
+        await ctx.send(f"Consumables: Power Potion — {config.potion_cost:,}; Second Wind — {config.second_wind_cost:,}; Berserk — {config.berserk_cost:,}; Lucky Dice — {config.lucky_dice_cost:,}; The Fool's Card — {config.fools_card_cost:,} points. Use !raid buy <item>.")
         await ctx.send(f"Buffs: Blessing of the Gods — {config.blessing_cost:,} points. One per stream; grants all subsequent attacks +{(config.blessing_multiplier - 1):.0%} damage. Use !raid buy blessing. Full details: !raid help.")
 
     @raid.command(name="help")
@@ -211,6 +218,10 @@ class RaidBossCommands(commands.Component):
                 await ctx.reply("Second Wind acquired! After your normal attack, it grants one additional attack in a stream.")
             elif item_id == "berserk":
                 await ctx.reply(f"Berserk acquired! Your next raid attack this stream deals {config.berserk_multiplier:g}× damage, cannot crit, and overrides Power Potion. It costs {config.berserk_durability_cost} weapon durability and has a {config.berserk_shatter_chance:.0%} shatter chance.")
+            elif item_id == "lucky_dice":
+                await ctx.reply("Lucky Dice acquired! Your next raid attack rolls base damage from half the normal floor up to double the normal ceiling.")
+            elif item_id == "fools_card":
+                await ctx.reply(f"The Fool's Card acquired! Your next raid attack will gain or lose between {abs(config.fools_card_points_min):,} and {config.fools_card_points_max:,} points.")
             elif item_id == "blessing":
                 await self.bot.services.raid_bosses.send_announcement(context[0], f"@{chatter.name} purchased Blessing of the Gods! Everyone's subsequent raid attacks this stream deal +{(config.blessing_multiplier - 1):.0%} damage.", "purple")
 
@@ -271,7 +282,7 @@ class RaidBossCommands(commands.Component):
         weapon_text = ", ".join(f"{context[1].weapon_names.display(weapon)} x{quantity}" for weapon, quantity in weapons) if weapons else "none"
         durability_text = f"{durability}/{context[1].weapon_durability}" if equipped else "none"
         equipped_text = context[1].weapon_names.display(equipped) if equipped else "none"
-        await ctx.reply(f"Weapons: {weapon_text}. Equipped: {equipped_text}. Durability: {durability_text}. Power attacks: {consumables['power']}; Second Winds: {consumables['second_wind']}; Berserks: {consumables['berserk']}.")
+        await ctx.reply(f"Weapons: {weapon_text}. Equipped: {equipped_text}. Durability: {durability_text}. Power attacks: {consumables['power']}; Second Winds: {consumables['second_wind']}; Berserks: {consumables['berserk']}; Lucky Dice: {consumables['lucky_dice']}; Fool's Cards: {consumables['fools_card']}.")
 
     @raid.command(name="unequip")
     async def unequip(self, ctx: commands.Context) -> None:
