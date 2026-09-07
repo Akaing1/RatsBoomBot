@@ -1391,6 +1391,11 @@ body.landing-page {
 .public-raid-history-list article:first-child { padding-top: 0; border-top: 0; }
 .public-raid-history-list article > div { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .public-raid-history-list article span, .public-raid-history-list article p { margin: 0; color: var(--muted); font-size: 11px; }
+.public-raid-history-leaderboard { grid-column: 1 / -1; }
+.public-raid-history-leaderboard summary { width: fit-content; cursor: pointer; color: var(--accent); font-size: 12px; font-weight: 800; }
+.public-raid-history-leaderboard ol { display: grid; gap: 6px; margin: 10px 0 0; padding-left: 24px; }
+.public-raid-history-leaderboard li { display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 12px; }
+.public-raid-history-leaderboard li strong { color: var(--text); }
 .public-raid-idle { padding: 24px 0; border: 0; }
 .public-raid-idle h2 { margin: 4px 0 0; }
 
