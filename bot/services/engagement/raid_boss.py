@@ -24,13 +24,18 @@ MASTERWORK_WEAPON_TYPES = {
     "masterwork_bow": "ranged",
     "archmage_grimoire": "magic"
 }
+OVERCLOCKED_WEAPON_TYPES = {
+    "overclocked_sword": "melee",
+    "overclocked_bow": "ranged",
+    "overclocked_tome": "magic"
+}
 UNIQUE_WEAPON_TYPES = {
     "mythical_blade": "melee",
     "mythical_longbow": "ranged",
     "mythical_grimoire": "magic"
 }
 STANDARD_WEAPON_TYPES = BASIC_WEAPON_TYPES | REFINED_WEAPON_TYPES | MASTERWORK_WEAPON_TYPES
-WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES
+WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES | OVERCLOCKED_WEAPON_TYPES
 BOSS_TYPES = frozenset({"melee", "ranged", "magic"})
 ALL_WEAPON_TYPE = "all"
 ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "lucky": "lucky_dice", "dice": "lucky_dice", "fool": "fools_card", "fool_card": "fools_card", "the_fools_card": "fools_card", "ancient": "ancient_pact", "pact": "ancient_pact", "flag": "flag_bearer", "flag_bearer": "flag_bearer", "flag_bearers_will": "flag_bearer", "blessing_of_the_gods": "blessing", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
@@ -83,6 +88,8 @@ class RaidAttackResult:
     flag_bearer_activated: bool = False
     flag_bearer_bonus_damage: int = 0
     flag_bearer_username: str | None = None
+    overdrive_attempted: bool = False
+    overdrive_consumable: str | None = None
 
 
 class RaidBossService:
@@ -534,7 +541,7 @@ class RaidBossService:
 
         async with self.db.acquire() as connection:
             prior = await connection.fetchone(
-                "SELECT COUNT(*) AS attacks, COALESCE(SUM(CASE WHEN buff_used = 'berserk' THEN 1 ELSE 0 END), 0) AS berserks FROM raid_boss_attacks WHERE event_id = ? AND stream_id = ? AND user_id = ?",
+                "SELECT COUNT(*) AS attacks, COALESCE(SUM(CASE WHEN buff_used = 'berserk' THEN 1 ELSE 0 END), 0) AS berserks, COALESCE(SUM(overdrive_attempted), 0) AS overdrive_attempts, COALESCE(SUM(CASE WHEN overdrive_consumable = 'second_wind' THEN 1 ELSE 0 END), 0) AS overdrive_second_winds FROM raid_boss_attacks WHERE event_id = ? AND stream_id = ? AND user_id = ?",
                 (event.id, stream_id, user_id)
             )
             effects = await connection.fetchone("SELECT blessing_username, ancient_pact_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (broadcaster_id, stream_id))
@@ -546,7 +553,7 @@ class RaidBossService:
 
         attack_number = int(prior["attacks"]) + 1
 
-        if attack_number > 2 or (attack_number == 2 and second_wind_charges <= 0):
+        if attack_number > 2 or (attack_number == 2 and second_wind_charges <= 0 and int(prior["overdrive_second_winds"]) <= 0):
             return RaidAttackResult(0, event.current_hp, event.boss_name, weapon, False, False, error="You already attacked during this stream.")
 
         if flag_bearer is not None and str(flag_bearer["user_id"]) == user_id and not int(flag_bearer["activated"]):
@@ -578,16 +585,44 @@ class RaidBossService:
         if berserk_used and (weapon_used is None or weapon_durability < config.berserk_durability_cost):
             return RaidAttackResult(0, event.current_hp, event.boss_name, weapon, False, False, error=f"Berserk requires an equipped weapon with at least {config.berserk_durability_cost} durability.")
 
+        overdrive_attempted = weapon_used in OVERCLOCKED_WEAPON_TYPES and int(prior["overdrive_attempts"]) == 0
+        overdrive_consumable = None
+        potion_used = potion_attacks > 0 and not berserk_used
         lucky_dice_used = lucky_dice_charges > 0
+        fools_card_uses = int(fools_card_charges > 0)
+
+        if overdrive_attempted and random.random() < config.overdrive_chance:
+            eligible_consumables = []
+
+            if not berserk_used and potion_attacks > int(potion_used):
+                eligible_consumables.append("potion")
+
+            if second_wind_charges > 0:
+                eligible_consumables.append("second_wind")
+
+            if lucky_dice_charges > int(lucky_dice_used):
+                eligible_consumables.append("lucky_dice")
+
+            if fools_card_charges > fools_card_uses:
+                eligible_consumables.append("fools_card")
+
+            overdrive_consumable = random.choice(eligible_consumables) if eligible_consumables else None
+
+        potion_uses = int(potion_used) + int(overdrive_consumable == "potion")
+        lucky_dice_uses = int(lucky_dice_used) + int(overdrive_consumable == "lucky_dice")
+        fools_card_uses += int(overdrive_consumable == "fools_card")
+        lucky_dice_used = lucky_dice_uses > 0
         ancient_pact_active = effects is not None and effects["ancient_pact_username"] is not None
         standard_base_damage_max = config.base_damage_max + (config.ancient_pact_ceiling_bonus if ancient_pact_active else 0)
-        base_damage_min = round(config.base_damage_min * config.lucky_dice_floor_multiplier) if lucky_dice_used else config.base_damage_min
-        base_damage_max = round(standard_base_damage_max * config.lucky_dice_ceiling_multiplier) if lucky_dice_used else standard_base_damage_max
+        base_damage_min = round(config.base_damage_min * config.lucky_dice_floor_multiplier ** lucky_dice_uses)
+        base_damage_max = round(standard_base_damage_max * config.lucky_dice_ceiling_multiplier ** lucky_dice_uses)
         damage = random.randint(base_damage_min, base_damage_max)
-        fools_card_points = random.randint(config.fools_card_points_min, config.fools_card_points_max) if fools_card_charges > 0 else None
+        fools_card_points = sum(random.randint(config.fools_card_points_min, config.fools_card_points_max) for _ in range(fools_card_uses)) if fools_card_uses else None
 
         if weapon_used:
-            if weapon_used in UNIQUE_WEAPON_TYPES:
+            if weapon_used in OVERCLOCKED_WEAPON_TYPES:
+                weapon_attack = config.overclocked_weapon_attack
+            elif weapon_used in UNIQUE_WEAPON_TYPES:
                 weapon_attack = config.unique_weapon_attack
             elif weapon_used in MASTERWORK_WEAPON_TYPES:
                 weapon_attack = config.masterwork_weapon_attack
@@ -599,15 +634,14 @@ class RaidBossService:
             weapon_multiplier = self.weapon_bonus_multiplier(WEAPON_TYPES.get(weapon_used), event.boss_type, config)
             damage += round(weapon_attack * weapon_multiplier)
 
-        potion_used = potion_attacks > 0 and not berserk_used
         blessing_active = effects is not None and effects["blessing_username"] is not None
         critical_hit = not berserk_used and random.random() < config.critical_chance
         damage_multipliers: list[float] = []
 
         if berserk_used:
             damage_multipliers.append(config.berserk_multiplier)
-        elif potion_used:
-            damage_multipliers.append(config.potion_multiplier)
+        elif potion_uses:
+            damage_multipliers.extend(config.potion_multiplier for _ in range(potion_uses))
 
         if blessing_active:
             damage_multipliers.append(config.blessing_multiplier)
@@ -630,13 +664,14 @@ class RaidBossService:
                 """
                 INSERT INTO raid_boss_attacks (
                     event_id, broadcaster_id, stream_id, user_id, username, damage,
-                    attack_number, weapon, potion_used, critical_hit, buff_used, blessing_active, weapon_shattered, attacked_at
+                    attack_number, weapon, potion_used, critical_hit, buff_used, blessing_active, weapon_shattered,
+                    overdrive_attempted, overdrive_consumable, attacked_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(event_id, stream_id, user_id, attack_number) DO NOTHING
                 RETURNING event_id
                 """,
-                (event.id, broadcaster_id, stream_id, user_id, username, credited_damage, attack_number, weapon_used, int(potion_used), int(critical_hit), buff_used, int(blessing_active), int(shattered_weapon is not None), now)
+                (event.id, broadcaster_id, stream_id, user_id, username, credited_damage, attack_number, weapon_used, int(potion_used), int(critical_hit), buff_used, int(blessing_active), int(shattered_weapon is not None), int(overdrive_attempted), overdrive_consumable, now)
             )
 
             if attack_row is None:
@@ -661,27 +696,20 @@ class RaidBossService:
                 await connection.execute("UPDATE raid_boss_flag_bearers SET charges_remaining = MAX(charges_remaining - 1, 0) WHERE event_id = ?", (event.id,))
                 await connection.execute("UPDATE raid_boss_inventory SET durability = MAX(durability - 1, 0) WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (broadcaster_id, str(flag_bearer["user_id"]), str(flag_weapon)))
 
-            if potion_used:
-                await connection.execute(
-                    """
-                    UPDATE raid_boss_players
-                    SET potion_attacks_remaining = MAX(potion_attacks_remaining - 1, 0)
-                    WHERE broadcaster_id = ? AND user_id = ?
-                    """,
-                    (broadcaster_id, user_id)
-                )
+            if potion_uses:
+                await connection.execute("UPDATE raid_boss_players SET potion_attacks_remaining = MAX(potion_attacks_remaining - ?, 0) WHERE broadcaster_id = ? AND user_id = ?", (potion_uses, broadcaster_id, user_id))
 
             if berserk_used:
                 await connection.execute("UPDATE raid_boss_players SET berserk_charges = MAX(berserk_charges - 1, 0) WHERE broadcaster_id = ? AND user_id = ?", (broadcaster_id, user_id))
 
-            if attack_number == 2:
+            if overdrive_consumable == "second_wind" or (attack_number == 2 and int(prior["overdrive_second_winds"]) <= 0):
                 await connection.execute("UPDATE raid_boss_players SET second_wind_charges = MAX(second_wind_charges - 1, 0) WHERE broadcaster_id = ? AND user_id = ?", (broadcaster_id, user_id))
 
-            if lucky_dice_used:
-                await connection.execute("UPDATE raid_boss_players SET lucky_dice_charges = MAX(lucky_dice_charges - 1, 0) WHERE broadcaster_id = ? AND user_id = ?", (broadcaster_id, user_id))
+            if lucky_dice_uses:
+                await connection.execute("UPDATE raid_boss_players SET lucky_dice_charges = MAX(lucky_dice_charges - ?, 0) WHERE broadcaster_id = ? AND user_id = ?", (lucky_dice_uses, broadcaster_id, user_id))
 
             if fools_card_points is not None:
-                await connection.execute("UPDATE raid_boss_players SET fools_card_charges = MAX(fools_card_charges - 1, 0) WHERE broadcaster_id = ? AND user_id = ?", (broadcaster_id, user_id))
+                await connection.execute("UPDATE raid_boss_players SET fools_card_charges = MAX(fools_card_charges - ?, 0) WHERE broadcaster_id = ? AND user_id = ?", (fools_card_uses, broadcaster_id, user_id))
 
                 if fools_card_points >= 0:
                     await self._add_points(connection, broadcaster_id, user_id, username, fools_card_points)
@@ -715,7 +743,7 @@ class RaidBossService:
 
         LOGGER.info("[Raid Bosses] %s dealt %d damage to %s in broadcaster %s.", username, damage, event.boss_name, broadcaster_id)
         broken_weapon = weapon if weapon and not weapon_used else None
-        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops, buff_used=buff_used, blessing_active=blessing_active, shattered_weapon=shattered_weapon, lucky_dice_used=lucky_dice_used, fools_card_points=fools_card_points, ancient_pact_active=ancient_pact_active, flag_bearer_bonus_damage=flag_bearer_bonus_damage, flag_bearer_username=str(flag_bearer["username"]) if flag_bearer_bonus_damage and flag_bearer is not None else None)
+        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops, buff_used=buff_used, blessing_active=blessing_active, shattered_weapon=shattered_weapon, lucky_dice_used=lucky_dice_used, fools_card_points=fools_card_points, ancient_pact_active=ancient_pact_active, flag_bearer_bonus_damage=flag_bearer_bonus_damage, flag_bearer_username=str(flag_bearer["username"]) if flag_bearer_bonus_damage and flag_bearer is not None else None, overdrive_attempted=overdrive_attempted, overdrive_consumable=overdrive_consumable)
 
     async def register_stream(self, broadcaster_id: str, stream_id: str) -> tuple[RaidBossEvent | None, int]:
         event = await self.get_active_event(broadcaster_id)
