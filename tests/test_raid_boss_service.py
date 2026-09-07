@@ -83,6 +83,8 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
     assert config.repair_cost == 1500
     assert config.weapon_cost == 25000
     assert config.potion_cost == 1500
+    assert config.lucky_dice_cost == 1000
+    assert config.fools_card_cost == 500
     assert config.all_weapon_multiplier == 1.5
     assert config.refined_weapon_attack == 80
     assert config.masterwork_weapon_attack == 150
@@ -1072,3 +1074,55 @@ async def test_get_recent_events_uses_production_raid_schema(tmp_path) -> None:
             "total_damage": 0,
             "contributors": []
         }]
+
+
+@pytest.mark.asyncio
+async def test_lucky_dice_expands_next_base_damage_roll(tmp_path, monkeypatch) -> None:
+    ranges = []
+
+    def capture_roll(minimum, maximum):
+        ranges.append((minimum, maximum))
+        return maximum
+
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.randint", capture_roll)
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, lucky_dice_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "lucky dice", config, "stream-1")
+
+        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        _, _, _, consumables = await service.get_inventory("channel-1", "user-1")
+
+        assert ranges == [(50, 200)]
+        assert result.damage == 200
+        assert result.lucky_dice_used is True
+        assert consumables["lucky_dice"] == 0
+
+
+@pytest.mark.asyncio
+async def test_fools_card_applies_point_roll_on_next_successful_attack(tmp_path, monkeypatch) -> None:
+    rolls = iter((100, 1500))
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.randint", lambda minimum, maximum: next(rolls))
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, fools_card_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "fool", config, "stream-1")
+
+        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        _, _, _, consumables = await service.get_inventory("channel-1", "user-1")
+
+        assert result.fools_card_points == 1500
+        assert await points.get_points("channel-1", "user-1") == 2400
+        assert consumables["fools_card"] == 0
