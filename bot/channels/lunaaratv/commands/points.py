@@ -12,7 +12,7 @@ class LunaaratvPointsCommands(ChannelComponent):
         super().__init__(bot, profile, broadcaster_id)
         self.handler = PointsCommandHandler(bot)
 
-    @commands.group(name="lunaaratv_placeholder_points", invoke_fallback=True)
+    @commands.group(name="lunaaratv_placeholder_points", invoke_fallback=True, case_insensitive=True)
     async def points(self, ctx: commands.Context, target: LocalizedUser = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
@@ -54,7 +54,7 @@ class LunaaratvPointsCommands(ChannelComponent):
 
         await self.handler.gamble(ctx, amount, "lunaaratv_placeholder_points")
 
-    @points.group(name="duel", invoke_fallback=True)
+    @points.group(name="duel", invoke_fallback=True, case_insensitive=True)
     async def points_duel(self, ctx: commands.Context, opponent: LocalizedUser = None, amount: str = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
