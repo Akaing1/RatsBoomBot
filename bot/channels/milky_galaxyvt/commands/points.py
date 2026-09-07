@@ -12,7 +12,7 @@ class MilkyGalaxyPointsCommands(ChannelComponent):
         super().__init__(bot, profile, broadcaster_id)
         self.handler = PointsCommandHandler(bot)
 
-    @commands.group(name="dust", invoke_fallback=True)
+    @commands.group(name="dust", invoke_fallback=True, case_insensitive=True)
     async def dust(self, ctx: commands.Context, target: LocalizedUser = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
@@ -54,7 +54,7 @@ class MilkyGalaxyPointsCommands(ChannelComponent):
 
         await self.handler.gamble(ctx, amount, "dust")
 
-    @dust.group(name="duel", invoke_fallback=True)
+    @dust.group(name="duel", invoke_fallback=True, case_insensitive=True)
     async def dust_duel(self, ctx: commands.Context, opponent: LocalizedUser = None, amount: str = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
