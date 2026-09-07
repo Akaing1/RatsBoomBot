@@ -31,6 +31,8 @@ UNIQUE_WEAPON_TYPES = {
 }
 STANDARD_WEAPON_TYPES = BASIC_WEAPON_TYPES | REFINED_WEAPON_TYPES | MASTERWORK_WEAPON_TYPES
 WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES
+BOSS_TYPES = frozenset({"melee", "ranged", "magic"})
+ALL_WEAPON_TYPE = "all"
 ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "blessing_of_the_gods": "blessing", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
 BUFF_ITEMS = frozenset({"potion", "second_wind", "berserk", "blessing"})
 CRAFTING_RECIPES = {
@@ -100,6 +102,21 @@ class RaidBossService:
     @staticmethod
     def is_buff(item_id: str) -> bool:
         return item_id in BUFF_ITEMS
+
+    @staticmethod
+    def weapon_bonus_multiplier(weapon_type: str | None, boss_type: str, config: RaidBossConfig) -> float:
+        if weapon_type == ALL_WEAPON_TYPE:
+            return config.all_weapon_multiplier
+
+        if weapon_type == boss_type:
+            return config.weapon_multiplier
+
+        return 1.0
+
+    @staticmethod
+    def apply_damage_multipliers(damage: int, multipliers: tuple[float, ...]) -> int:
+        bonus = sum(multiplier - 1.0 for multiplier in multipliers)
+        return round(damage * (1.0 + bonus))
 
     @staticmethod
     def contribution_reward_multiplier(rank: int, contributor_count: int) -> float:
@@ -445,7 +462,7 @@ class RaidBossService:
         boss_tier = boss_tier.lower()
         active_event = await self.get_active_event(broadcaster_id)
 
-        if boss_type not in WEAPON_TYPES.values() or boss_tier not in {"mini", "main", "tutorial"} or active_event is not None:
+        if boss_type not in BOSS_TYPES or boss_tier not in {"mini", "main", "tutorial"} or active_event is not None:
             return None
 
         if boss_tier == "tutorial" and (not config.tutorial_enabled or await self.has_completed_tutorial(broadcaster_id)):
@@ -536,27 +553,26 @@ class RaidBossService:
             else:
                 weapon_attack = config.weapon_attack
 
-            if WEAPON_TYPES.get(weapon_used) == event.boss_type:
-                weapon_attack = round(weapon_attack * config.weapon_multiplier)
-
-            damage += weapon_attack
+            weapon_multiplier = self.weapon_bonus_multiplier(WEAPON_TYPES.get(weapon_used), event.boss_type, config)
+            damage += round(weapon_attack * weapon_multiplier)
 
         potion_used = potion_attacks > 0 and not berserk_used
+        blessing_active = blessing is not None
+        critical_hit = not berserk_used and random.random() < config.critical_chance
+        damage_multipliers: list[float] = []
 
         if berserk_used:
-            damage = round(damage * config.berserk_multiplier)
+            damage_multipliers.append(config.berserk_multiplier)
         elif potion_used:
-            damage = round(damage * config.potion_multiplier)
-
-        blessing_active = blessing is not None
+            damage_multipliers.append(config.potion_multiplier)
 
         if blessing_active:
-            damage = round(damage * config.blessing_multiplier)
-
-        critical_hit = not berserk_used and random.random() < config.critical_chance
+            damage_multipliers.append(config.blessing_multiplier)
 
         if critical_hit:
-            damage = round(damage * config.critical_multiplier)
+            damage_multipliers.append(config.critical_multiplier)
+
+        damage = self.apply_damage_multipliers(damage, tuple(damage_multipliers))
 
         damage = min(damage, event.current_hp)
         now = datetime.now(UTC).isoformat()
