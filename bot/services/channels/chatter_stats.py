@@ -102,7 +102,7 @@ class ChatterStatsService:
                        COUNT(DISTINCT attacks.event_id) AS bosses_attacked,
                        COUNT(DISTINCT CASE WHEN events.status = 'defeated' THEN attacks.event_id END) AS bosses_defeated,
                        COUNT(DISTINCT CASE WHEN events.final_hitter_id = ? THEN events.id END) AS final_hits
-                FROM raid_boss_attacks AS attacks
+                FROM raid_boss_contributions AS attacks
                 JOIN raid_boss_events AS events ON events.id = attacks.event_id
                 WHERE attacks.user_id = ?
                 """,
@@ -113,7 +113,7 @@ class ChatterStatsService:
                 SELECT COALESCE(MAX(event_damage), 0) AS highest_contribution
                 FROM (
                     SELECT SUM(damage) AS event_damage
-                    FROM raid_boss_attacks
+                    FROM raid_boss_contributions
                     WHERE user_id = ?
                     GROUP BY event_id
                 )
@@ -143,7 +143,7 @@ class ChatterStatsService:
                 """
                 WITH contributions AS (
                     SELECT event_id, user_id, SUM(damage) AS damage
-                    FROM raid_boss_attacks
+                    FROM raid_boss_contributions
                     GROUP BY event_id, user_id
                 )
                 SELECT COUNT(*) AS finishes
@@ -162,7 +162,7 @@ class ChatterStatsService:
                        COALESCE(stats.messages_sent, 0) AS messages_sent,
                        COALESCE(stats.lifetime_points_earned, 0) AS lifetime_points_earned,
                        COALESCE(viewers.points, 0) AS current_points,
-                       COALESCE((SELECT SUM(damage) FROM raid_boss_attacks WHERE broadcaster_id = observations.broadcaster_id AND user_id = observations.user_id), 0) AS raid_damage
+                       COALESCE((SELECT SUM(damage) FROM raid_boss_contributions WHERE broadcaster_id = observations.broadcaster_id AND user_id = observations.user_id), 0) AS raid_damage
                 FROM chatter_channel_observations AS observations
                 LEFT JOIN chatter_channel_stats AS stats
                   ON stats.broadcaster_id = observations.broadcaster_id
@@ -233,14 +233,14 @@ class ChatterStatsService:
                        COUNT(DISTINCT attacks.event_id) AS bosses_attacked,
                        COUNT(DISTINCT CASE WHEN events.status = 'defeated' THEN attacks.event_id END) AS bosses_defeated,
                        COUNT(DISTINCT CASE WHEN events.final_hitter_id = ? THEN events.id END) AS final_hits
-                FROM raid_boss_attacks AS attacks
+                FROM raid_boss_contributions AS attacks
                 JOIN raid_boss_events AS events ON events.id = attacks.event_id
                 WHERE attacks.broadcaster_id = ? AND attacks.user_id = ?
                 """,
                 (user_id, broadcaster_id, user_id)
             )
             highest = await connection.fetchone(
-                "SELECT COALESCE(MAX(event_damage), 0) AS highest_contribution FROM (SELECT SUM(damage) AS event_damage FROM raid_boss_attacks WHERE broadcaster_id = ? AND user_id = ? GROUP BY event_id)",
+                "SELECT COALESCE(MAX(event_damage), 0) AS highest_contribution FROM (SELECT SUM(damage) AS event_damage FROM raid_boss_contributions WHERE broadcaster_id = ? AND user_id = ? GROUP BY event_id)",
                 (broadcaster_id, user_id)
             )
             claims = await connection.fetchall(
@@ -286,7 +286,7 @@ class ChatterStatsService:
                 """
                 WITH contributions AS (
                     SELECT event_id, user_id, SUM(damage) AS damage
-                    FROM raid_boss_attacks
+                    FROM raid_boss_contributions
                     WHERE broadcaster_id = ?
                     GROUP BY event_id, user_id
                 )
@@ -354,7 +354,7 @@ class ChatterStatsService:
         return f"""
         WITH contributions AS (
             SELECT event_id, user_id, SUM(damage) AS damage
-            FROM raid_boss_attacks
+            FROM raid_boss_contributions
             GROUP BY event_id, user_id
         )
         SELECT events.id, events.broadcaster_id, events.boss_name, events.boss_tier, events.status, events.spawned_at,

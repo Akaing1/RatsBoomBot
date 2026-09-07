@@ -437,6 +437,9 @@ class RaidBossConfig:
     blessing_cost: int = 500
     ancient_pact_cost: int = 1500
     ancient_pact_ceiling_bonus: int = 100
+    flag_bearer_cost: int = 5000
+    flag_bearer_multiplier: float = 1.30
+    flag_bearer_charges: int = 10
     berserk_multiplier: float = 5.0
     berserk_durability_cost: int = 5
     berserk_shatter_chance: float = 0.10
