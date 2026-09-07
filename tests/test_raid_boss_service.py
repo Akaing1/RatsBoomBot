@@ -1034,5 +1034,6 @@ async def test_get_recent_events_uses_production_raid_schema(tmp_path) -> None:
             "reward_pool": 5000,
             "spawned_at": "2026-08-30T12:00:00+00:00",
             "unique_attackers": 0,
-            "total_damage": 0
+            "total_damage": 0,
+            "contributors": []
         }]
