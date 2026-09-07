@@ -786,7 +786,7 @@ class RaidBossService:
                         return "global_buff_limit"
 
                 if event is not None:
-                    active_flag = await connection.fetchone("SELECT user_id FROM raid_boss_flag_bearers WHERE event_id = ? AND activated = 1 AND charges_remaining > 0", (event.id,))
+                    active_flag = await connection.fetchone("SELECT user_id FROM raid_boss_flag_bearers WHERE event_id = ?", (event.id,))
 
                     if active_flag is not None and str(active_flag["user_id"]) == str(user_id):
                         return "global_buff_limit"
