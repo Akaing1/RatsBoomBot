@@ -244,8 +244,10 @@ async def test_active_raid_reminds_after_45_minutes_then_waits_60_minutes(tmp_pa
 
         assert len(deadlines) == 2
         assert (deadlines[1] - deadlines[0]).total_seconds() == pytest.approx(60 * 60, abs=0.01)
-        assert len(bot.messages) == 1
-        assert bot.messages[0].startswith("Raid reminder:")
+        assert bot.messages == []
+        assert len(bot.announcements) == 1
+        assert bot.announcements[0]["color"] == "purple"
+        assert bot.announcements[0]["message"].startswith("Raid reminder:")
 
 
 @pytest.mark.asyncio
