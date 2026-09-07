@@ -378,6 +378,9 @@ class RaidWeaponNames:
     enchanted_tome: str = "Enchanted Tome"
     archmage_grimoire: str = "Archmage's Grimoire"
     mythical_grimoire: str = "Mythical Grimoire"
+    overclocked_sword: str = "Overclocked Sword"
+    overclocked_bow: str = "Overclocked Bow"
+    overclocked_tome: str = "Overclocked Tome"
 
     def display(self, item_id: str) -> str:
         return str(getattr(self, item_id, item_id.replace("_", " ").title()))
@@ -404,6 +407,7 @@ class RaidBossConfig:
     base_damage_min: int = 390
     base_damage_max: int = 430
     weapon_cost: int = 25000
+    overclocked_weapon_cost: int = 100000
     potion_cost: int = 1500
     lucky_dice_cost: int = 1000
     fools_card_cost: int = 500
@@ -414,10 +418,14 @@ class RaidBossConfig:
     weapon_attack: int = 40
     refined_weapon_attack: int = 80
     masterwork_weapon_attack: int = 150
+    overclocked_weapon_attack: int = 150
     refined_crafting_cost: int = 5000
     masterwork_crafting_cost: int = 25000
     weapon_durability: int = 15
     repair_cost: int = 1500
+    overclocked_weapon_durability: int = 25
+    overclocked_repair_cost: int = 2500
+    overdrive_chance: float = 0.50
     weapon_multiplier: float = 2.0
     all_weapon_multiplier: float = 1.5
     potion_multiplier: float = 2.0
