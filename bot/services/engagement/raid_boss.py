@@ -45,7 +45,7 @@ STANDARD_WEAPON_TYPES = BASIC_WEAPON_TYPES | REFINED_WEAPON_TYPES | MASTERWORK_W
 WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES | OVERCLOCKED_WEAPON_TYPES | BLESSED_UNIQUE_WEAPON_TYPES
 BOSS_TYPES = frozenset({"melee", "ranged", "magic"})
 ALL_WEAPON_TYPE = "all"
-ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "lucky": "lucky_dice", "dice": "lucky_dice", "fool": "fools_card", "fool_card": "fools_card", "the_fools_card": "fools_card", "ancient": "ancient_pact", "pact": "ancient_pact", "flag": "flag_bearer", "flag_bearer": "flag_bearer", "flag_bearers_will": "flag_bearer", "blessing_of_the_gods": "blessing", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
+ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "lucky": "lucky_dice", "dice": "lucky_dice", "fool": "fools_card", "fool_card": "fools_card", "the_fools_card": "fools_card", "ancient": "ancient_pact", "pact": "ancient_pact", "flag": "flag_bearer", "flag_bearer": "flag_bearer", "flag_bearers_will": "flag_bearer", "blessing_of_the_gods": "blessing", "heaven": "heavens_judgement", "heavens_judgement": "heavens_judgement", "heaven's_judgement": "heavens_judgement", "fools_dagger": "fools_dagger", "the_fool's_dagger": "fools_dagger", "brutalizer": "obsidian_brutalizer", "faithless": "forgotten_daggers", "forgotten_daggers_of_the_faithless": "forgotten_daggers", "yggdrasil": "branch_of_yggdrasil", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
 BUFF_ITEMS = frozenset({"potion", "second_wind", "berserk", "lucky_dice", "fools_card", "blessing", "ancient_pact", "flag_bearer"})
 CRAFTING_RECIPES = {
     "refined_sword": "basic_sword", "refined_bow": "basic_bow", "enchanted_tome": "apprentice_tome",
@@ -577,7 +577,7 @@ class RaidBossService:
 
         async with self.db.acquire() as connection:
             prior = await connection.fetchone(
-                "SELECT COUNT(*) AS attacks, COALESCE(SUM(CASE WHEN buff_used = 'berserk' THEN 1 ELSE 0 END), 0) AS berserks, COALESCE(SUM(overdrive_attempted), 0) AS overdrive_attempts, COALESCE(SUM(CASE WHEN overdrive_consumable = 'second_wind' THEN 1 ELSE 0 END), 0) AS overdrive_second_winds, COALESCE(SUM(CASE WHEN weapon = 'obsidian_brutalizer' THEN 1 ELSE 0 END), 0) AS brutalizer_attacks FROM raid_boss_attacks WHERE event_id = ? AND stream_id = ? AND user_id = ?",
+                "SELECT COUNT(*) AS attacks, COALESCE(SUM(CASE WHEN buff_used = 'berserk' THEN 1 ELSE 0 END), 0) AS berserks, COALESCE(SUM(overdrive_attempted), 0) AS overdrive_attempts, COALESCE(SUM(CASE WHEN overdrive_consumable = 'second_wind' THEN 1 ELSE 0 END), 0) AS overdrive_second_winds FROM raid_boss_attacks WHERE event_id = ? AND stream_id = ? AND user_id = ?",
                 (event.id, stream_id, user_id)
             )
             brutalizer = await connection.fetchone("SELECT COUNT(*) AS attacks FROM raid_boss_attacks WHERE event_id = ? AND user_id = ? AND weapon = 'obsidian_brutalizer'", (event.id, user_id))
