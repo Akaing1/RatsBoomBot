@@ -26,18 +26,18 @@ NINJAKAING_RAID_BOSSES = RaidBossConfig(
         magic=("Voidborn Ravager", "Black Mist Wraith")
     ),
     weapon_names=RaidWeaponNames(
-        basic_sword="Doran's Blade",
+        basic_sword="Long Sword",
         refined_sword="Serrated Dirk",
-        masterwork_sword="Youmuu's Ghostblade",
-        mythical_blade="Infinity Edge",
-        basic_bow="Doran's Bow",
+        masterwork_sword="Doran's Blade",
+        mythical_blade="Voltaic Cyclo-sword",
+        basic_bow="Dagger",
         refined_bow="Recurve Bow",
-        masterwork_bow="Mortal Reminder",
+        masterwork_bow="Doran's Bow",
         mythical_longbow="Immortal Shieldbow",
-        apprentice_tome="Doran's Ring",
+        apprentice_tome="Amplifying Tome",
         enchanted_tome="Fiendish Codex",
-        archmage_grimoire="Rite of Ruin",
-        mythical_grimoire="Rabadon's Deathcap"
+        archmage_grimoire="Doran's Ring",
+        mythical_grimoire="Rite of Ruin"
     )
 )
 
