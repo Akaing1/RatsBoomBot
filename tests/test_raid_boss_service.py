@@ -1187,6 +1187,7 @@ async def test_flag_bearer_sacrifices_attack_and_receives_bonus_credit(tmp_path,
         await points.add_points("channel-1", "user-1", "alice", 1000)
         await service.spawn("channel-1", "melee", config)
         await service.buy("channel-1", "user-1", "alice", "sword", config)
+        await service.equip("channel-1", "user-1", "alice", "sword", config)
         await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1")
         monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: values[0])
 
