@@ -33,8 +33,8 @@ STANDARD_WEAPON_TYPES = BASIC_WEAPON_TYPES | REFINED_WEAPON_TYPES | MASTERWORK_W
 WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES
 BOSS_TYPES = frozenset({"melee", "ranged", "magic"})
 ALL_WEAPON_TYPE = "all"
-ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "lucky": "lucky_dice", "dice": "lucky_dice", "fool": "fools_card", "fool_card": "fools_card", "the_fools_card": "fools_card", "blessing_of_the_gods": "blessing", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
-BUFF_ITEMS = frozenset({"potion", "second_wind", "berserk", "lucky_dice", "fools_card", "blessing"})
+ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "lucky": "lucky_dice", "dice": "lucky_dice", "fool": "fools_card", "fool_card": "fools_card", "the_fools_card": "fools_card", "ancient": "ancient_pact", "pact": "ancient_pact", "blessing_of_the_gods": "blessing", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
+BUFF_ITEMS = frozenset({"potion", "second_wind", "berserk", "lucky_dice", "fools_card", "blessing", "ancient_pact"})
 CRAFTING_RECIPES = {
     "refined_sword": "basic_sword", "refined_bow": "basic_bow", "enchanted_tome": "apprentice_tome",
     "masterwork_sword": "refined_sword", "masterwork_bow": "refined_bow", "archmage_grimoire": "enchanted_tome"
@@ -76,6 +76,7 @@ class RaidAttackResult:
     drops: tuple[tuple[str, str], ...] = ()
     buff_used: str | None = None
     blessing_active: bool = False
+    ancient_pact_active: bool = False
     shattered_weapon: str | None = None
     lucky_dice_used: bool = False
     fools_card_points: int | None = None
@@ -533,7 +534,7 @@ class RaidBossService:
                 "SELECT COUNT(*) AS attacks, COALESCE(SUM(CASE WHEN buff_used = 'berserk' THEN 1 ELSE 0 END), 0) AS berserks FROM raid_boss_attacks WHERE event_id = ? AND stream_id = ? AND user_id = ?",
                 (event.id, stream_id, user_id)
             )
-            blessing = await connection.fetchone("SELECT blessing_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (broadcaster_id, stream_id))
+            effects = await connection.fetchone("SELECT blessing_username, ancient_pact_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (broadcaster_id, stream_id))
 
         attack_number = int(prior["attacks"]) + 1
 
@@ -546,8 +547,10 @@ class RaidBossService:
             return RaidAttackResult(0, event.current_hp, event.boss_name, weapon, False, False, error=f"Berserk requires an equipped weapon with at least {config.berserk_durability_cost} durability.")
 
         lucky_dice_used = lucky_dice_charges > 0
+        ancient_pact_active = effects is not None and effects["ancient_pact_username"] is not None
+        standard_base_damage_max = config.base_damage_max + (config.ancient_pact_ceiling_bonus if ancient_pact_active else 0)
         base_damage_min = round(config.base_damage_min * config.lucky_dice_floor_multiplier) if lucky_dice_used else config.base_damage_min
-        base_damage_max = round(config.base_damage_max * config.lucky_dice_ceiling_multiplier) if lucky_dice_used else config.base_damage_max
+        base_damage_max = round(standard_base_damage_max * config.lucky_dice_ceiling_multiplier) if lucky_dice_used else standard_base_damage_max
         damage = random.randint(base_damage_min, base_damage_max)
         fools_card_points = random.randint(config.fools_card_points_min, config.fools_card_points_max) if fools_card_charges > 0 else None
 
@@ -565,7 +568,7 @@ class RaidBossService:
             damage += round(weapon_attack * weapon_multiplier)
 
         potion_used = potion_attacks > 0 and not berserk_used
-        blessing_active = blessing is not None
+        blessing_active = effects is not None and effects["blessing_username"] is not None
         critical_hit = not berserk_used and random.random() < config.critical_chance
         damage_multipliers: list[float] = []
 
@@ -670,7 +673,7 @@ class RaidBossService:
 
         LOGGER.info("[Raid Bosses] %s dealt %d damage to %s in broadcaster %s.", username, damage, event.boss_name, broadcaster_id)
         broken_weapon = weapon if weapon and not weapon_used else None
-        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops, buff_used=buff_used, blessing_active=blessing_active, shattered_weapon=shattered_weapon, lucky_dice_used=lucky_dice_used, fools_card_points=fools_card_points)
+        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops, buff_used=buff_used, blessing_active=blessing_active, shattered_weapon=shattered_weapon, lucky_dice_used=lucky_dice_used, fools_card_points=fools_card_points, ancient_pact_active=ancient_pact_active)
 
     async def register_stream(self, broadcaster_id: str, stream_id: str) -> tuple[RaidBossEvent | None, int]:
         event = await self.get_active_event(broadcaster_id)
@@ -710,7 +713,7 @@ class RaidBossService:
 
     async def buy(self, broadcaster_id: str, user_id: str, username: str, item_id: str, config: RaidBossConfig, stream_id: str | None = None) -> str | None:
         item_id = self.normalize_item(item_id)
-        costs = {"potion": config.potion_cost, "second_wind": config.second_wind_cost, "berserk": config.berserk_cost, "lucky_dice": config.lucky_dice_cost, "fools_card": config.fools_card_cost, "blessing": config.blessing_cost}
+        costs = {"potion": config.potion_cost, "second_wind": config.second_wind_cost, "berserk": config.berserk_cost, "lucky_dice": config.lucky_dice_cost, "fools_card": config.fools_card_cost, "blessing": config.blessing_cost, "ancient_pact": config.ancient_pact_cost}
         cost = costs.get(item_id, config.weapon_cost)
 
         if item_id not in (*BASIC_WEAPON_TYPES, *costs):
@@ -720,11 +723,20 @@ class RaidBossService:
             return "stream_required"
 
         async with self.db.acquire() as connection:
-            if item_id == "blessing":
-                existing = await connection.fetchone("SELECT blessing_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (str(broadcaster_id), str(stream_id)))
+            if item_id in {"blessing", "ancient_pact"}:
+                existing = await connection.fetchone("SELECT blessing_user_id, blessing_username, ancient_pact_user_id, ancient_pact_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (str(broadcaster_id), str(stream_id)))
 
                 if existing is not None:
-                    return f"out_of_stock:{existing['blessing_username']}"
+                    item_user_id = existing["blessing_user_id"] if item_id == "blessing" else existing["ancient_pact_user_id"]
+                    item_username = existing["blessing_username"] if item_id == "blessing" else existing["ancient_pact_username"]
+                    other_user_id = existing["ancient_pact_user_id"] if item_id == "blessing" else existing["blessing_user_id"]
+
+                    if item_user_id is not None:
+                        prefix = "out_of_stock" if item_id == "blessing" else "ancient_out_of_stock"
+                        return f"{prefix}:{item_username}"
+
+                    if other_user_id is not None and str(other_user_id) == str(user_id):
+                        return "global_buff_limit"
 
             balance = await connection.fetchone(
                 "SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?",
@@ -747,16 +759,32 @@ class RaidBossService:
                     f"UPDATE raid_boss_players SET {column} = {column} + ? WHERE broadcaster_id = ? AND user_id = ?",
                     (amount, str(broadcaster_id), str(user_id))
                 )
-            elif item_id == "blessing":
+            elif item_id in {"blessing", "ancient_pact"}:
+                if item_id == "blessing":
+                    columns = ("blessing_user_id", "blessing_username", "purchased_at")
+                else:
+                    columns = ("ancient_pact_user_id", "ancient_pact_username", "ancient_pact_purchased_at")
+
+                user_column, username_column, purchased_column = columns
                 inserted = await connection.fetchone(
-                    "INSERT INTO raid_boss_stream_effects (broadcaster_id, stream_id, blessing_user_id, blessing_username, purchased_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(broadcaster_id, stream_id) DO NOTHING RETURNING blessing_username",
+                    f"""
+                    INSERT INTO raid_boss_stream_effects (broadcaster_id, stream_id, {user_column}, {username_column}, {purchased_column})
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(broadcaster_id, stream_id) DO UPDATE SET
+                        {user_column} = excluded.{user_column},
+                        {username_column} = excluded.{username_column},
+                        {purchased_column} = excluded.{purchased_column}
+                    WHERE {user_column} IS NULL
+                    RETURNING {username_column}
+                    """,
                     (str(broadcaster_id), str(stream_id), str(user_id), username, datetime.now(UTC).isoformat())
                 )
 
                 if inserted is None:
-                    existing = await connection.fetchone("SELECT blessing_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (str(broadcaster_id), str(stream_id)))
+                    existing = await connection.fetchone(f"SELECT {username_column} AS username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (str(broadcaster_id), str(stream_id)))
                     await connection.execute("UPDATE viewers SET points = points + ? WHERE broadcaster_id = ? AND user_id = ?", (cost, str(broadcaster_id), str(user_id)))
-                    return f"out_of_stock:{existing['blessing_username']}"
+                    prefix = "out_of_stock" if item_id == "blessing" else "ancient_out_of_stock"
+                    return f"{prefix}:{existing['username']}"
             else:
                 await connection.execute(
                     """
