@@ -1396,8 +1396,8 @@ async def test_yggdrasil_chatter_bonus_is_capped_then_doubled_against_magic(tmp_
         monkeypatch.setattr(service, "_live_chatter_count", large_chat)
         result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
 
-        assert result.weapon_passive_damage == 400
-        assert result.damage == 650
+        assert result.weapon_passive_damage == 600
+        assert result.damage == 850
 
 @pytest.mark.asyncio
 async def test_blessed_unique_drop_is_a_separate_main_boss_roll(tmp_path, monkeypatch) -> None:
