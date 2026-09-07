@@ -93,6 +93,11 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
     assert config.all_weapon_multiplier == 1.5
     assert config.refined_weapon_attack == 80
     assert config.masterwork_weapon_attack == 150
+    assert config.overclocked_weapon_cost == 100000
+    assert config.overclocked_weapon_attack == 150
+    assert config.overclocked_weapon_durability == 25
+    assert config.overclocked_repair_cost == 2500
+    assert config.overdrive_chance == 0.50
     assert config.unique_weapon_attack == 225
     assert config.potion_multiplier == 2.0
     assert config.critical_chance == 0.05
@@ -1187,7 +1192,7 @@ async def test_flag_bearer_sacrifices_attack_and_receives_bonus_credit(tmp_path,
         await points.add_points("channel-1", "user-1", "alice", 1000)
         await service.spawn("channel-1", "melee", config)
         await service.buy("channel-1", "user-1", "alice", "sword", config)
-        await service.equip("channel-1", "user-1", "alice", "sword", config)
+        await service.equip("channel-1", "user-1", "alice", "sword")
         await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1")
         monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: values[0])
 
@@ -1245,4 +1250,54 @@ async def test_reserved_flag_bearer_blocks_same_chatters_other_global_buff(tmp_p
         assert await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1") == "purchased"
         assert await service.buy("channel-1", "user-1", "alice", "blessing", config, "stream-1") == "global_buff_limit"
         assert await points.get_points("channel-1", "user-1") == 900
+
+@pytest.mark.asyncio
+async def test_overclocked_weapon_purchase_and_repair_use_tier_values(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(overclocked_weapon_cost=1000, overclocked_repair_cost=250)
+        await points.add_points("channel-1", "user-1", "alice", 2000)
+
+        assert await service.buy("channel-1", "user-1", "alice", "overclocked sword", config) == "purchased"
+        assert await service.equip("channel-1", "user-1", "alice", "overclocked sword") is True
+
+        async with database.acquire() as connection:
+            item = await connection.fetchone("SELECT durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", ("channel-1", "user-1", "overclocked_sword"))
+            await connection.execute("UPDATE raid_boss_inventory SET durability = 1 WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", ("channel-1", "user-1", "overclocked_sword"))
+
+        assert item["durability"] == 25
+        assert await service.repair("channel-1", "user-1", "overclocked sword", config) == "repaired"
+        assert await points.get_points("channel-1", "user-1") == 750
+
+
+@pytest.mark.asyncio
+async def test_overdrive_consumes_an_owned_charge_only_once_per_stream(tmp_path, monkeypatch) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=10000, overclocked_weapon_cost=100, potion_cost=100, second_wind_cost=100, overdrive_chance=1.0)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "overclocked sword", config)
+        await service.equip("channel-1", "user-1", "alice", "overclocked sword")
+        await service.buy("channel-1", "user-1", "alice", "potion", config, "stream-1")
+        await service.buy("channel-1", "user-1", "alice", "second wind", config, "stream-1")
+        rolls = iter((0.0, 1.0, 1.0))
+        monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: next(rolls))
+        monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: values[0])
+
+        first = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        second = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        _, _, _, consumables = await service.get_inventory("channel-1", "user-1")
+
+        assert first.overdrive_attempted is True
+        assert first.overdrive_consumable == "potion"
+        assert first.damage == 1200
+        assert second.overdrive_attempted is False
+        assert consumables["power"] == 0
 
