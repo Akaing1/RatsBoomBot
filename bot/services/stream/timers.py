@@ -187,8 +187,9 @@ class TimerService:
             if elapsed < announcement.interval_seconds or message_count < announcement.required_messages:
                 continue
 
+            channel = self.bot.create_partialuser(str(broadcaster_id))
+
             try:
-                channel = self.bot.create_partialuser(str(broadcaster_id))
                 await self.bot.services.chat_identity.send_announcement(channel, announcement.message, announcement.color)
             except Exception:
                 LOGGER.warning("[Timers] Timed announcement failed for %s (%s); falling back to chat.", broadcaster_name, broadcaster_id, exc_info=True)
