@@ -118,6 +118,9 @@ def test_public_raid_page_shows_live_shop_mechanics_commands_and_history(monkeyp
 
     assert response.status_code == 200
     assert "Raid shop" in response.text
+    assert "Weapons" in response.text
+    assert "Consumables" in response.text
+    assert "Buffs" in response.text
     assert "!raid buy potion" in response.text
     assert "How raids work" in response.text
     assert "Raid rewards" in response.text
