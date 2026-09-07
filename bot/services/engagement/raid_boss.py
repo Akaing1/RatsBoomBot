@@ -580,6 +580,7 @@ class RaidBossService:
                 "SELECT COUNT(*) AS attacks, COALESCE(SUM(CASE WHEN buff_used = 'berserk' THEN 1 ELSE 0 END), 0) AS berserks, COALESCE(SUM(overdrive_attempted), 0) AS overdrive_attempts, COALESCE(SUM(CASE WHEN overdrive_consumable = 'second_wind' THEN 1 ELSE 0 END), 0) AS overdrive_second_winds, COALESCE(SUM(CASE WHEN weapon = 'obsidian_brutalizer' THEN 1 ELSE 0 END), 0) AS brutalizer_attacks FROM raid_boss_attacks WHERE event_id = ? AND stream_id = ? AND user_id = ?",
                 (event.id, stream_id, user_id)
             )
+            brutalizer = await connection.fetchone("SELECT COUNT(*) AS attacks FROM raid_boss_attacks WHERE event_id = ? AND user_id = ? AND weapon = 'obsidian_brutalizer'", (event.id, user_id))
             effects = await connection.fetchone("SELECT blessing_username, ancient_pact_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (broadcaster_id, stream_id))
             flag_bearer = await connection.fetchone("SELECT user_id, username, charges_remaining, activated FROM raid_boss_flag_bearers WHERE event_id = ?", (event.id,))
             flag_weapons = []
@@ -666,7 +667,7 @@ class RaidBossService:
                 weapon_attack = config.fools_dagger_attack
                 weapon_passive = "Gambler's Fervor"
             elif weapon_used == "obsidian_brutalizer":
-                weapon_attack = config.obsidian_brutalizer_attack + int(prior["brutalizer_attacks"]) * config.obsidian_brutalizer_stack_damage
+                weapon_attack = config.obsidian_brutalizer_attack + int(brutalizer["attacks"]) * config.obsidian_brutalizer_stack_damage
                 weapon_passive = "Blunt Force"
             elif weapon_used == "forgotten_daggers":
                 weapon_attack = config.forgotten_daggers_attack
