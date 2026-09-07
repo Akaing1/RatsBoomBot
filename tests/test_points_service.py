@@ -71,3 +71,44 @@ async def test_settle_wager_rejects_insufficient_balance_without_changing_points
 
         assert balance is None
         assert await service.get_points("channel-1", "viewer-1") == 50
+
+
+@pytest.mark.asyncio
+async def test_settle_wager_tracks_and_credits_gambling_losses(tmp_path, monkeypatch) -> None:
+    from config.settings import settings
+    from storage.migrations.v023_gambling_loss_totals import migrate
+
+    monkeypatch.setattr(settings, "BOT_ID", "ratsboombot")
+    async with asqlite.create_pool(str(tmp_path / "points.db")) as database:
+        async with database.acquire() as connection:
+            await migrate(connection)
+
+        service = PointsService(bot=None, db=database)
+        await service.setup()
+        await service.add_points("channel-1", "viewer-1", "viewer", 100)
+
+        balance = await service.settle_wager("channel-1", "viewer-1", "viewer", bet=40, payout=0)
+
+        assert balance == 60
+        assert await service.get_gambling_loss_total("channel-1") == 40
+        assert await service.get_points("channel-1", "ratsboombot") == 40
+
+
+@pytest.mark.asyncio
+async def test_settle_wager_does_not_track_winning_wagers_as_losses(tmp_path, monkeypatch) -> None:
+    from config.settings import settings
+    from storage.migrations.v023_gambling_loss_totals import migrate
+
+    monkeypatch.setattr(settings, "BOT_ID", "ratsboombot")
+    async with asqlite.create_pool(str(tmp_path / "points.db")) as database:
+        async with database.acquire() as connection:
+            await migrate(connection)
+
+        service = PointsService(bot=None, db=database)
+        await service.setup()
+        await service.add_points("channel-1", "viewer-1", "viewer", 100)
+
+        await service.settle_wager("channel-1", "viewer-1", "viewer", bet=40, payout=80)
+
+        assert await service.get_gambling_loss_total("channel-1") == 0
+        assert await service.get_points("channel-1", "ratsboombot") == 0
