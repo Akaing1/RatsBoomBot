@@ -24,6 +24,7 @@ from storage.migrations.v019_custom_bot_authorization_links import migrate as mi
 from storage.migrations.v020_raid_crafting_progression import migrate as migrate_raid_crafting_progression
 from storage.migrations.v021_patch_notes import migrate as migrate_patch_notes
 from storage.migrations.v022_seed_crafting_patch_note import migrate as migrate_seed_crafting_patch_note
+from storage.migrations.v023_gambling_loss_totals import migrate as migrate_gambling_loss_totals
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -58,4 +59,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=20, name="raid_crafting_progression", run=migrate_raid_crafting_progression)
     , Migration(version=21, name="patch_notes", run=migrate_patch_notes)
     , Migration(version=22, name="seed_crafting_patch_note", run=migrate_seed_crafting_patch_note)
+    , Migration(version=23, name="gambling_loss_totals", run=migrate_gambling_loss_totals)
 )
