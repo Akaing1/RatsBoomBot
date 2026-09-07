@@ -157,7 +157,9 @@ class RaidBossCommands(commands.Component):
             return
 
         config = context[1]
-        await ctx.send(f"Raid shop: {config.weapon_names.basic_sword} — {config.weapon_cost:,} points (!raid buy sword) | {config.weapon_names.basic_bow} — {config.weapon_cost:,} (!raid buy bow) | {config.weapon_names.apprentice_tome} — {config.weapon_cost:,} (!raid buy tome) | Power Potion — {config.potion_cost:,} (!raid buy potion). Use !raid help for full raid details.")
+        await ctx.send(f"Raid shop — Weapons: {config.weapon_names.basic_sword}, {config.weapon_names.basic_bow}, and {config.weapon_names.apprentice_tome} — {config.weapon_cost:,} points each. Use !raid buy sword, bow, or tome.")
+        await ctx.send(f"Consumables: Power Potion — {config.potion_cost:,}; Second Wind — {config.second_wind_cost:,}; Berserk — {config.berserk_cost:,} points. Use !raid buy <item>.")
+        await ctx.send(f"Buffs: Blessing of the Gods — {config.blessing_cost:,} points. One per stream; grants all subsequent attacks +{(config.blessing_multiplier - 1):.0%} damage. Use !raid buy blessing. Full details: !raid help.")
 
     @raid.command(name="help")
     async def raid_help(self, ctx: commands.Context) -> None:
