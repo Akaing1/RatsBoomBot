@@ -127,6 +127,14 @@ class RaidBossService:
         return 1.0
 
     @staticmethod
+    def weapon_max_durability(weapon: str, config: RaidBossConfig) -> int:
+        return config.overclocked_weapon_durability if weapon in OVERCLOCKED_WEAPON_TYPES else config.weapon_durability
+
+    @staticmethod
+    def weapon_repair_cost(weapon: str, config: RaidBossConfig) -> int:
+        return config.overclocked_repair_cost if weapon in OVERCLOCKED_WEAPON_TYPES else config.repair_cost
+
+    @staticmethod
     def apply_damage_multipliers(damage: int, multipliers: tuple[float, ...]) -> int:
         bonus = sum(multiplier - 1.0 for multiplier in multipliers)
         return round(damage * (1.0 + bonus))
@@ -723,7 +731,7 @@ class RaidBossService:
                 durability_cost = config.berserk_durability_cost if berserk_used else 1
 
                 if shattered_weapon:
-                    await connection.execute("UPDATE raid_boss_inventory SET quantity = MAX(quantity - 1, 0), durability = ? WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (config.weapon_durability, broadcaster_id, user_id, weapon_used))
+                    await connection.execute("UPDATE raid_boss_inventory SET quantity = MAX(quantity - 1, 0), durability = ? WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (self.weapon_max_durability(weapon_used, config), broadcaster_id, user_id, weapon_used))
                     await connection.execute("UPDATE raid_boss_players SET equipped_weapon = NULL WHERE broadcaster_id = ? AND user_id = ? AND NOT EXISTS (SELECT 1 FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ? AND quantity > 0)", (broadcaster_id, user_id, broadcaster_id, user_id, weapon_used))
                 else:
                     await connection.execute("UPDATE raid_boss_inventory SET durability = MAX(durability - ?, 0) WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (durability_cost, broadcaster_id, user_id, weapon_used))
@@ -784,9 +792,9 @@ class RaidBossService:
     async def buy(self, broadcaster_id: str, user_id: str, username: str, item_id: str, config: RaidBossConfig, stream_id: str | None = None) -> str | None:
         item_id = self.normalize_item(item_id)
         costs = {"potion": config.potion_cost, "second_wind": config.second_wind_cost, "berserk": config.berserk_cost, "lucky_dice": config.lucky_dice_cost, "fools_card": config.fools_card_cost, "blessing": config.blessing_cost, "ancient_pact": config.ancient_pact_cost, "flag_bearer": config.flag_bearer_cost}
-        cost = costs.get(item_id, config.weapon_cost)
+        cost = config.overclocked_weapon_cost if item_id in OVERCLOCKED_WEAPON_TYPES else costs.get(item_id, config.weapon_cost)
 
-        if item_id not in (*BASIC_WEAPON_TYPES, *costs):
+        if item_id not in (*BASIC_WEAPON_TYPES, *OVERCLOCKED_WEAPON_TYPES, *costs):
             return None
 
         if self.is_buff(item_id) and stream_id is None:
@@ -891,7 +899,7 @@ class RaidBossService:
                     VALUES (?, ?, ?, 1, ?)
                     ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET quantity = quantity + 1
                     """,
-                    (str(broadcaster_id), str(user_id), item_id, config.weapon_durability)
+                    (str(broadcaster_id), str(user_id), item_id, self.weapon_max_durability(item_id, config))
                 )
 
         return "purchased"
@@ -1013,7 +1021,10 @@ class RaidBossService:
             if owned is None:
                 return "not_owned"
 
-            if int(owned["durability"]) >= config.weapon_durability:
+            max_durability = self.weapon_max_durability(weapon, config)
+            repair_cost = self.weapon_repair_cost(weapon, config)
+
+            if int(owned["durability"]) >= max_durability:
                 return "full"
 
             balance = await connection.fetchone(
@@ -1021,16 +1032,16 @@ class RaidBossService:
                 (str(broadcaster_id), str(user_id))
             )
 
-            if balance is None or int(balance["points"]) < config.repair_cost:
+            if balance is None or int(balance["points"]) < repair_cost:
                 return "insufficient"
 
             await connection.execute(
                 "UPDATE viewers SET points = points - ? WHERE broadcaster_id = ? AND user_id = ?",
-                (config.repair_cost, str(broadcaster_id), str(user_id))
+                (repair_cost, str(broadcaster_id), str(user_id))
             )
             await connection.execute(
                 "UPDATE raid_boss_inventory SET durability = ? WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?",
-                (config.weapon_durability, str(broadcaster_id), str(user_id), weapon)
+                (max_durability, str(broadcaster_id), str(user_id), weapon)
             )
 
         return "repaired"
