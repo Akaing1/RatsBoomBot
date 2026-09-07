@@ -23,6 +23,7 @@ class PendingDuel:
 
 class PointsService:
     LEGACY_BROADCASTER_ID = "shared"
+    BOT_USERNAME = "RatsBoomBot"
 
     def __init__(self, bot, db, chatter_stats=None):
         self.bot = bot
@@ -248,6 +249,12 @@ class PointsService:
 
         return int(row["points"])
 
+    async def get_gambling_loss_total(self, broadcaster_id: str) -> int:
+        async with self.db.acquire() as connection:
+            row = await connection.fetchone("SELECT points_lost FROM gambling_loss_totals WHERE broadcaster_id = ?", (str(broadcaster_id),))
+
+        return int(row["points_lost"]) if row else 0
+
     async def add_points(self, broadcaster_id: str, user_id: str, username: str, amount: int, earned: bool = True) -> None:
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
@@ -388,6 +395,32 @@ class PointsService:
                             """,
                             (username, payout, broadcaster_id, user_id)
                         )
+
+                    loss = max(bet - payout, 0)
+
+                    if loss:
+                        await connection.execute(
+                            """
+                            INSERT INTO gambling_loss_totals (broadcaster_id, points_lost)
+                            VALUES (?, ?)
+                            ON CONFLICT(broadcaster_id) DO UPDATE SET
+                                points_lost = points_lost + excluded.points_lost,
+                                updated_at = CURRENT_TIMESTAMP
+                            """,
+                            (broadcaster_id, loss)
+                        )
+
+                        if settings.BOT_ID:
+                            await connection.execute(
+                                """
+                                INSERT INTO viewers (broadcaster_id, user_id, username, points, messages)
+                                VALUES (?, ?, ?, ?, 0)
+                                ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
+                                    username = excluded.username,
+                                    points = points + excluded.points
+                                """,
+                                (broadcaster_id, str(settings.BOT_ID), self.BOT_USERNAME, loss)
+                            )
 
                     profit = max(payout - bet, 0)
 
