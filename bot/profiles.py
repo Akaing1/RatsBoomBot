@@ -111,6 +111,14 @@ class GlobalCommandDefaults:
 
 
 @dataclass(frozen=True)
+class TimedAnnouncement:
+    message: str
+    interval_seconds: int
+    required_messages: int
+    color: str = "primary"
+
+
+@dataclass(frozen=True)
 class CommunityMessages:
     follow: str | None = None
     subscription: str | None = None
@@ -378,6 +386,9 @@ class RaidWeaponNames:
     enchanted_tome: str = "Enchanted Tome"
     archmage_grimoire: str = "Archmage's Grimoire"
     mythical_grimoire: str = "Mythical Grimoire"
+    overclocked_sword: str = "Overclocked Sword"
+    overclocked_bow: str = "Overclocked Bow"
+    overclocked_tome: str = "Overclocked Tome"
 
     def display(self, item_id: str) -> str:
         return str(getattr(self, item_id, item_id.replace("_", " ").title()))
@@ -404,15 +415,27 @@ class RaidBossConfig:
     base_damage_min: int = 390
     base_damage_max: int = 430
     weapon_cost: int = 25000
+    overclocked_weapon_cost: int = 100000
     potion_cost: int = 1500
+    lucky_dice_cost: int = 1000
+    fools_card_cost: int = 500
+    lucky_dice_floor_multiplier: float = 0.5
+    lucky_dice_ceiling_multiplier: float = 2.0
+    fools_card_points_min: int = -500
+    fools_card_points_max: int = 1500
     weapon_attack: int = 40
     refined_weapon_attack: int = 80
     masterwork_weapon_attack: int = 150
+    overclocked_weapon_attack: int = 150
     refined_crafting_cost: int = 5000
     masterwork_crafting_cost: int = 25000
     weapon_durability: int = 15
     repair_cost: int = 1500
+    overclocked_weapon_durability: int = 25
+    overclocked_repair_cost: int = 2500
+    overdrive_chance: float = 0.50
     weapon_multiplier: float = 2.0
+    all_weapon_multiplier: float = 1.5
     potion_multiplier: float = 2.0
     potion_attacks: int = 3
     critical_chance: float = 0.05
@@ -428,6 +451,11 @@ class RaidBossConfig:
     second_wind_cost: int = 1000
     berserk_cost: int = 3000
     blessing_cost: int = 500
+    ancient_pact_cost: int = 1500
+    ancient_pact_ceiling_bonus: int = 100
+    flag_bearer_cost: int = 5000
+    flag_bearer_multiplier: float = 1.30
+    flag_bearer_charges: int = 10
     berserk_multiplier: float = 5.0
     berserk_durability_cost: int = 5
     berserk_shatter_chance: float = 0.10
@@ -449,6 +477,7 @@ class ChannelProfile:
     globals: GlobalCommandDefaults = GlobalCommandDefaults()
     ad_announcement_message: str = DEFAULT_AD_ANNOUNCEMENT_MESSAGE
     timer_messages: tuple[str, ...] = ()
+    timed_announcements: tuple[TimedAnnouncement, ...] = ()
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
     shoutout_messages: ShoutoutMessages = ShoutoutMessages()

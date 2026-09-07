@@ -21,6 +21,8 @@ class TimerService:
         self.message_counts: dict[str, int] = {}
         self.last_announcements: dict[str, float] = {}
         self.message_indexes: dict[str, int] = {}
+        self.timed_message_counts: dict[str, int] = {}
+        self.timed_last_announcements: dict[str, float] = {}
         self.last_check = 0
 
     async def start(self) -> None:
@@ -66,8 +68,16 @@ class TimerService:
         if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.TIMERS):
             return
 
+        now = time.time()
         self.message_counts[broadcaster_id] = self.message_counts.get(broadcaster_id, 0) + 1
-        self.last_announcements.setdefault(broadcaster_id, time.time())
+        self.last_announcements.setdefault(broadcaster_id, now)
+        profile = get_active_profile(broadcaster_id)
+
+        if profile is not None:
+            for index, _ in enumerate(profile.timed_announcements):
+                key = self._timed_announcement_key(broadcaster_id, index)
+                self.timed_message_counts[key] = self.timed_message_counts.get(key, 0) + 1
+                self.timed_last_announcements.setdefault(key, now)
 
         LOGGER.debug(
             "[Timers] Tracked message for %s (%s). Count: %d/%d.",
@@ -138,6 +148,7 @@ class TimerService:
                 )
                 continue
 
+            await self.check_timed_announcements(broadcaster_id, broadcaster_name, now)
             last_announcement = self.last_announcements.get(broadcaster_id, now)
             message_count = self.message_counts.get(broadcaster_id, 0)
             elapsed = now - last_announcement
@@ -161,6 +172,41 @@ class TimerService:
 
             self.message_counts[broadcaster_id] = 0
             self.last_announcements[broadcaster_id] = now
+
+    async def check_timed_announcements(self, broadcaster_id: str, broadcaster_name: str, now: float) -> None:
+        profile = get_active_profile(broadcaster_id)
+
+        if profile is None:
+            return
+
+        for index, announcement in enumerate(profile.timed_announcements):
+            key = self._timed_announcement_key(broadcaster_id, index)
+            elapsed = now - self.timed_last_announcements.get(key, now)
+            message_count = self.timed_message_counts.get(key, 0)
+
+            if elapsed < announcement.interval_seconds or message_count < announcement.required_messages:
+                continue
+
+            channel = self.bot.create_partialuser(str(broadcaster_id))
+
+            try:
+                await self.bot.services.chat_identity.send_announcement(channel, announcement.message, announcement.color)
+            except Exception:
+                LOGGER.warning("[Timers] Timed announcement failed for %s (%s); falling back to chat.", broadcaster_name, broadcaster_id, exc_info=True)
+
+                try:
+                    await self.bot.services.chat_identity.send_message(channel, announcement.message)
+                except Exception:
+                    LOGGER.exception("[Timers] Timed announcement fallback failed for %s (%s).", broadcaster_name, broadcaster_id)
+                    continue
+
+            self.timed_message_counts[key] = 0
+            self.timed_last_announcements[key] = now
+            LOGGER.info("[Timers] Sent %s timed announcement to %s (%s).", announcement.color, broadcaster_name, broadcaster_id)
+
+    @staticmethod
+    def _timed_announcement_key(broadcaster_id: str, index: int) -> str:
+        return f"{broadcaster_id}:{index}"
 
     async def send_next_announcement(self, broadcaster_id: str, broadcaster_name: str) -> bool:
         broadcaster_id = str(broadcaster_id)

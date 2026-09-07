@@ -83,8 +83,21 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
     assert config.repair_cost == 1500
     assert config.weapon_cost == 25000
     assert config.potion_cost == 1500
+    assert config.ancient_pact_cost == 1500
+    assert config.ancient_pact_ceiling_bonus == 100
+    assert config.flag_bearer_cost == 5000
+    assert config.flag_bearer_multiplier == 1.30
+    assert config.flag_bearer_charges == 10
+    assert config.lucky_dice_cost == 1000
+    assert config.fools_card_cost == 500
+    assert config.all_weapon_multiplier == 1.5
     assert config.refined_weapon_attack == 80
     assert config.masterwork_weapon_attack == 150
+    assert config.overclocked_weapon_cost == 100000
+    assert config.overclocked_weapon_attack == 150
+    assert config.overclocked_weapon_durability == 25
+    assert config.overclocked_repair_cost == 2500
+    assert config.overdrive_chance == 0.50
     assert config.unique_weapon_attack == 225
     assert config.potion_multiplier == 2.0
     assert config.critical_chance == 0.05
@@ -244,8 +257,10 @@ async def test_active_raid_reminds_after_45_minutes_then_waits_60_minutes(tmp_pa
 
         assert len(deadlines) == 2
         assert (deadlines[1] - deadlines[0]).total_seconds() == pytest.approx(60 * 60, abs=0.01)
-        assert len(bot.messages) == 1
-        assert bot.messages[0].startswith("Raid reminder:")
+        assert bot.messages == []
+        assert len(bot.announcements) == 1
+        assert bot.announcements[0]["color"] == "purple"
+        assert bot.announcements[0]["message"].startswith("Raid reminder:")
 
 
 @pytest.mark.asyncio
@@ -334,6 +349,17 @@ def test_common_matching_weapon_supports_three_stream_mini_boss_clear() -> None:
 
     assert minimum_matching_damage * 20 * 3 >= 20000
     assert (config.base_damage_max + round(config.weapon_attack * config.weapon_multiplier)) * 50 * config.duration_streams < config.max_hp
+
+
+def test_damage_multipliers_are_additive() -> None:
+    assert RaidBossService.apply_damage_multipliers(100, (2.0, 1.25, 1.5)) == 275
+
+
+def test_all_weapon_bonus_applies_to_every_boss_type() -> None:
+    config = RaidBossConfig()
+
+    for boss_type in ("melee", "ranged", "magic"):
+        assert RaidBossService.weapon_bonus_multiplier("all", boss_type, config) == 1.5
 
 
 @pytest.mark.asyncio
@@ -597,6 +623,29 @@ async def test_berserk_takes_priority_preserves_power_and_cannot_crit(tmp_path, 
         assert result.critical_hit is False
         assert result.shattered_weapon == "basic_sword"
         assert consumables["power"] == config.potion_attacks
+
+
+@pytest.mark.asyncio
+async def test_power_blessing_and_critical_damage_are_additive(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: 0.0)
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, potion_cost=100, blessing_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "potion", config, "stream-1")
+        await service.buy("channel-1", "user-1", "alice", "blessing", config, "stream-1")
+
+        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+
+        assert result.damage == 275
+        assert result.potion_used is True
+        assert result.blessing_active is True
+        assert result.critical_hit is True
 
 
 @pytest.mark.asyncio
@@ -1032,5 +1081,223 @@ async def test_get_recent_events_uses_production_raid_schema(tmp_path) -> None:
             "reward_pool": 5000,
             "spawned_at": "2026-08-30T12:00:00+00:00",
             "unique_attackers": 0,
-            "total_damage": 0
+            "total_damage": 0,
+            "contributors": []
         }]
+
+
+@pytest.mark.asyncio
+async def test_lucky_dice_expands_next_base_damage_roll(tmp_path, monkeypatch) -> None:
+    ranges = []
+
+    def capture_roll(minimum, maximum):
+        ranges.append((minimum, maximum))
+        return maximum
+
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.randint", capture_roll)
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, lucky_dice_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "lucky dice", config, "stream-1")
+
+        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        _, _, _, consumables = await service.get_inventory("channel-1", "user-1")
+
+        assert ranges == [(50, 200)]
+        assert result.damage == 200
+        assert result.lucky_dice_used is True
+        assert consumables["lucky_dice"] == 0
+
+
+@pytest.mark.asyncio
+async def test_fools_card_applies_point_roll_on_next_successful_attack(tmp_path, monkeypatch) -> None:
+    rolls = iter((100, 1500))
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.randint", lambda minimum, maximum: next(rolls))
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, fools_card_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "fool", config, "stream-1")
+
+        result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        _, _, _, consumables = await service.get_inventory("channel-1", "user-1")
+
+        assert result.fools_card_points == 1500
+        assert await points.get_points("channel-1", "user-1") == 2400
+        assert consumables["fools_card"] == 0
+
+
+@pytest.mark.asyncio
+async def test_ancient_pact_increases_stream_base_damage_ceiling(tmp_path, monkeypatch) -> None:
+    ranges = []
+
+    def capture_roll(minimum, maximum):
+        ranges.append((minimum, maximum))
+        return maximum
+
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.randint", capture_roll)
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, ancient_pact_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await points.add_points("channel-1", "user-2", "bob", 1000)
+        await service.spawn("channel-1", "melee", config)
+        assert await service.buy("channel-1", "user-1", "alice", "pact", config, "stream-1") == "purchased"
+
+        result = await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+
+        assert ranges == [(100, 200)]
+        assert result.damage == 200
+        assert result.ancient_pact_active is True
+
+
+@pytest.mark.asyncio
+async def test_same_chatter_cannot_claim_blessing_and_ancient_pact(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(blessing_cost=100, ancient_pact_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+
+        assert await service.buy("channel-1", "user-1", "alice", "blessing", config, "stream-1") == "purchased"
+        assert await service.buy("channel-1", "user-1", "alice", "pact", config, "stream-1") == "global_buff_limit"
+        assert await points.get_points("channel-1", "user-1") == 900
+
+
+@pytest.mark.asyncio
+async def test_flag_bearer_sacrifices_attack_and_receives_bonus_credit(tmp_path, monkeypatch) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, weapon_cost=100, flag_bearer_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "sword", config)
+        await service.equip("channel-1", "user-1", "alice", "sword")
+        await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1")
+        monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: values[0])
+
+        activated = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        empowered = await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+        contributors = await service.get_contributors("channel-1")
+        _, _, durability, _ = await service.get_inventory("channel-1", "user-1")
+
+        async with database.acquire() as connection:
+            flag = await connection.fetchone("SELECT charges_remaining FROM raid_boss_flag_bearers WHERE event_id = 1")
+
+        assert activated.damage == 0
+        assert activated.flag_bearer_activated is True
+        assert empowered.damage == 130
+        assert empowered.flag_bearer_bonus_damage == 30
+        assert empowered.flag_bearer_username == "alice"
+        assert contributors == [("bob", 100), ("alice", 30)]
+        assert durability == config.weapon_durability - 1
+        assert flag["charges_remaining"] == 9
+
+
+@pytest.mark.asyncio
+async def test_flag_bearer_charge_waits_without_usable_weapon(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, flag_bearer_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1")
+        await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+
+        result = await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+
+        async with database.acquire() as connection:
+            flag = await connection.fetchone("SELECT charges_remaining FROM raid_boss_flag_bearers WHERE event_id = 1")
+
+        assert result.damage == 100
+        assert result.flag_bearer_bonus_damage == 0
+        assert flag["charges_remaining"] == 10
+
+@pytest.mark.asyncio
+async def test_reserved_flag_bearer_blocks_same_chatters_other_global_buff(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(flag_bearer_cost=100, blessing_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+
+        assert await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1") == "purchased"
+        assert await service.buy("channel-1", "user-1", "alice", "blessing", config, "stream-1") == "global_buff_limit"
+        assert await points.get_points("channel-1", "user-1") == 900
+
+@pytest.mark.asyncio
+async def test_overclocked_weapon_purchase_and_repair_use_tier_values(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(overclocked_weapon_cost=1000, overclocked_repair_cost=250)
+        await points.add_points("channel-1", "user-1", "alice", 2000)
+
+        assert await service.buy("channel-1", "user-1", "alice", "overclocked sword", config) == "purchased"
+        assert await service.equip("channel-1", "user-1", "alice", "overclocked sword") is True
+
+        async with database.acquire() as connection:
+            item = await connection.fetchone("SELECT durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", ("channel-1", "user-1", "overclocked_sword"))
+            await connection.execute("UPDATE raid_boss_inventory SET durability = 1 WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", ("channel-1", "user-1", "overclocked_sword"))
+
+        assert item["durability"] == 25
+        assert await service.repair("channel-1", "user-1", "overclocked sword", config) == "repaired"
+        assert await points.get_points("channel-1", "user-1") == 750
+
+
+@pytest.mark.asyncio
+async def test_overdrive_consumes_an_owned_charge_only_once_per_stream(tmp_path, monkeypatch) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=10000, overclocked_weapon_cost=100, potion_cost=100, second_wind_cost=100, overdrive_chance=1.0)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "overclocked sword", config)
+        await service.equip("channel-1", "user-1", "alice", "overclocked sword")
+        await service.buy("channel-1", "user-1", "alice", "potion", config, "stream-1")
+        await service.buy("channel-1", "user-1", "alice", "second wind", config, "stream-1")
+        rolls = iter((0.0, 1.0, 1.0))
+        monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: next(rolls))
+        monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: values[0])
+
+        first = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        second = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        _, _, _, consumables = await service.get_inventory("channel-1", "user-1")
+
+        assert first.overdrive_attempted is True
+        assert first.overdrive_consumable == "potion"
+        assert first.damage == 1200
+        assert second.overdrive_attempted is False
+        assert consumables["power"] == 0
+

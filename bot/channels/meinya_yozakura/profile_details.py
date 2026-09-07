@@ -9,7 +9,8 @@ from bot.profiles import (
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
-    SocialMessages
+    SocialMessages,
+    TimedAnnouncement
 )
 
 
@@ -45,6 +46,16 @@ MEINYA_RAID_BOSSES = RaidBossConfig(
     mini_hp_step=15000,
     weapon_cost=5000,
     potion_cost=1500
+)
+
+
+MEINYA_TIMED_ANNOUNCEMENTS = (
+    TimedAnnouncement(
+        message="Mei is trying to reach YouTube partnership! If you would like to help support, please leave a lurk on YouTube here as well :3 https://www.youtube.com/watch?v=rWu1z5iWo5k",
+        interval_seconds=60 * 60,
+        required_messages=30,
+        color="red"
+    ),
 )
 
 

@@ -46,7 +46,8 @@ class FakeRaidBossService:
             "spawned_at": "2026-08-30T12:00:00+00:00",
             "ended_at": "2026-08-30T13:00:00+00:00",
             "unique_attackers": 4,
-            "total_damage": 10000
+            "total_damage": 10000,
+            "contributors": [("viewer-1", 4000), ("viewer-2", 3000)]
         }]
 
 
@@ -118,9 +119,13 @@ def test_public_raid_page_shows_live_shop_mechanics_commands_and_history(monkeyp
 
     assert response.status_code == 200
     assert "Raid shop" in response.text
+    assert "Weapons" in response.text
+    assert "Consumables" in response.text
+    assert "Buffs" in response.text
     assert "!raid buy potion" in response.text
     assert "How raids work" in response.text
     assert "Raid rewards" in response.text
+    assert "View leaderboard" in response.text
     assert "Training Dummy" in response.text
     assert "Show all 12 contributors" in response.text
     assert state_response.status_code == 200

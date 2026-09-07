@@ -5,6 +5,7 @@ from twitchio import User
 from twitchio.ext import commands
 
 from bot.profiles import FeatureName, GlobalCommandGroup, PointsConfig, get_active_profile, render_profile_message
+from config.settings import settings
 from bot.shared.commands.converters import LocalizedUser
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled, is_global_group_enabled
 
@@ -109,6 +110,16 @@ class PointsCommandHandler:
             user_id = str(target.id)
             username = target.name
             template = config.messages.balance_other
+
+        if target is not None and settings.BOT_ID and user_id == str(settings.BOT_ID):
+            try:
+                points = await services.points.get_gambling_loss_total(broadcaster_id)
+            except Exception:
+                LOGGER.exception("[Points] Failed to load the gambling-loss total for broadcaster %s.", broadcaster_id)
+                return
+
+            await ctx.reply(f"{points} points have been lost gambling in {ctx.broadcaster.name}'s channel! Gamble responsibly.")
+            return
 
         try:
             points = await services.points.get_points(broadcaster_id, user_id)
@@ -354,10 +365,13 @@ class PointsCommandHandler:
         won = random.random() < config.gamble_win_chance
 
         try:
-            if won:
-                await services.points.add_points(broadcaster_id=broadcaster_id, user_id=user_id, username=username, amount=gamble_amount)
-            else:
-                await services.points.remove_points(broadcaster_id=broadcaster_id, user_id=user_id, amount=gamble_amount)
+            new_balance = await services.points.settle_wager(
+                broadcaster_id=broadcaster_id,
+                user_id=user_id,
+                username=username,
+                bet=gamble_amount,
+                payout=gamble_amount * 2 if won else 0
+            )
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to resolve %d-point gamble for %s in broadcaster %s.",
@@ -367,8 +381,12 @@ class PointsCommandHandler:
             )
             return
 
+        if new_balance is None:
+            current_points = await services.points.get_points(broadcaster_id, user_id)
+            await self.send_message(ctx, config.messages.gamble_insufficient, username=username, points=current_points, amount=gamble_amount, command=command_name)
+            return
+
         if won:
-            new_balance = current_points + gamble_amount
 
             if all_in:
                 template = config.messages.gamble_all_win
@@ -722,7 +740,7 @@ class PointsCommands(commands.Component):
         self.bot = bot
         self.handler = PointsCommandHandler(bot)
 
-    @commands.group(name="points", invoke_fallback=True)
+    @commands.group(name="points", invoke_fallback=True, case_insensitive=True)
     async def points(self, ctx: commands.Context, target: LocalizedUser = None) -> None:
         await self.handler.show_balance(ctx, target, "points")
 
@@ -746,7 +764,7 @@ class PointsCommands(commands.Component):
     async def points_gamble(self, ctx: commands.Context, amount: str) -> None:
         await self.handler.gamble(ctx, amount, "points")
 
-    @points.group(name="duel", invoke_fallback=True)
+    @points.group(name="duel", invoke_fallback=True, case_insensitive=True)
     async def points_duel(self, ctx: commands.Context, opponent: LocalizedUser = None, amount: str = None) -> None:
         await self.handler.create_duel(ctx, opponent, amount, "points")
 

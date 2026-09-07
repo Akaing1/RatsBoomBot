@@ -159,6 +159,7 @@ async def channel_dashboard(request: Request):
     channel_settings = await services.broadcaster_settings.get_settings(broadcaster_id)
     viewer_queue = services.viewer_queue
     redemption_activity = await get_redemption_dashboard_data(services, broadcaster_id)
+    gambling_loss_total = await services.points.get_gambling_loss_total(broadcaster_id)
 
     return templates.TemplateResponse(
         request=request,
@@ -172,6 +173,7 @@ async def channel_dashboard(request: Request):
             "queue_users": viewer_queue.list_queue(broadcaster_id),
             "queue_size": viewer_queue.size(broadcaster_id),
             "redemption_activity": redemption_activity,
+            "gambling_loss_total": gambling_loss_total,
             "queue_result": request.query_params.get("queue_result"),
             "queue_message": request.query_params.get("queue_message"),
             "csrf_token": get_csrf_token(request)

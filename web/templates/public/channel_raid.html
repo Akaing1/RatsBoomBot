@@ -101,37 +101,50 @@
                 </summary>
 
                 <div class="public-raid-section-content">
-                    <div class="public-raid-shop-grid">
-                        {% for item in shop_items %}
-                            <article>
-                                <span class="public-raid-item-type">{{ item.type }}</span>
-                                <h3>{{ item.name }}</h3>
-                                <strong>{{ "{:,}".format(item.cost) }} points</strong>
-                                <p>+{{ config.weapon_attack }} attack and {{ config.weapon_durability }} durability. Matching {{ item.type | lower }} bosses doubles the weapon bonus.</p>
-                                <code>!raid buy {{ item.item_id }}</code>
-                            </article>
-                        {% endfor %}
+                    <section class="public-raid-shop-category">
+                        <h3>Weapons</h3>
+                        <div class="public-raid-shop-grid">
+                            {% for item in shop_items %}
+                                <article>
+                                    <span class="public-raid-item-type">{{ item.type }}</span>
+                                    <h3>{{ item.name }}</h3>
+                                    <strong>{{ "{:,}".format(item.cost) }} points</strong>
+                                    <p>+{{ config.weapon_attack }} attack and {{ config.weapon_durability }} durability. Matching {{ item.type | lower }} bosses doubles the weapon bonus.</p>
+                                    <code>!raid buy {{ item.item_id }}</code>
+                                </article>
+                            {% endfor %}
+                            <article><span class="public-raid-item-type">Melee</span><h3>{{ config.weapon_names.overclocked_sword }}</h3><strong>{{ "{:,}".format(config.overclocked_weapon_cost) }} points</strong><p>+{{ config.overclocked_weapon_attack }} attack and {{ config.overclocked_weapon_durability }} durability. Once per stream, Overdrive has a {{ "{:.0%}".format(config.overdrive_chance) }} chance to consume and activate another owned non-Berserk consumable. Repairs cost {{ "{:,}".format(config.overclocked_repair_cost) }} points.</p><code>!raid buy overclocked sword</code></article>
+                            <article><span class="public-raid-item-type">Ranged</span><h3>{{ config.weapon_names.overclocked_bow }}</h3><strong>{{ "{:,}".format(config.overclocked_weapon_cost) }} points</strong><p>+{{ config.overclocked_weapon_attack }} attack and {{ config.overclocked_weapon_durability }} durability. Once per stream, Overdrive has a {{ "{:.0%}".format(config.overdrive_chance) }} chance to consume and activate another owned non-Berserk consumable. Repairs cost {{ "{:,}".format(config.overclocked_repair_cost) }} points.</p><code>!raid buy overclocked bow</code></article>
+                            <article><span class="public-raid-item-type">Magic</span><h3>{{ config.weapon_names.overclocked_tome }}</h3><strong>{{ "{:,}".format(config.overclocked_weapon_cost) }} points</strong><p>+{{ config.overclocked_weapon_attack }} attack and {{ config.overclocked_weapon_durability }} durability. Once per stream, Overdrive has a {{ "{:.0%}".format(config.overdrive_chance) }} chance to consume and activate another owned non-Berserk consumable. Repairs cost {{ "{:,}".format(config.overclocked_repair_cost) }} points.</p><code>!raid buy overclocked tome</code></article>
+                        </div>
+                    </section>
 
-                        <article>
-                            <span class="public-raid-item-type">Consumable</span>
-                            <h3>Power potion</h3>
-                            <strong>{{ "{:,}".format(config.potion_cost) }} points</strong>
-                            <p>Adds {{ config.potion_attacks }} automatic attacks at {{ config.potion_multiplier | int }}&times; total damage. Additional purchases stack.</p>
-                            <code>!raid buy potion</code>
-                        </article>
+                    <section class="public-raid-shop-category">
+                        <h3>Consumables</h3>
+                        <div class="public-raid-shop-grid">
+                            <article><span class="public-raid-item-type">Consumable</span><h3>Power potion</h3><strong>{{ "{:,}".format(config.potion_cost) }} points</strong><p>Adds {{ config.potion_attacks }} automatic attacks at {{ config.potion_multiplier | int }}&times; total damage. Additional purchases stack.</p><code>!raid buy potion</code></article>
+                            <article><span class="public-raid-item-type">Consumable</span><h3>Second Wind</h3><strong>{{ "{:,}".format(config.second_wind_cost) }} points</strong><p>Grants one additional attack in a stream and is consumed only by that successful second attack.</p><code>!raid buy second wind</code></article>
+                            <article><span class="public-raid-item-type">Consumable</span><h3>Berserk</h3><strong>{{ "{:,}".format(config.berserk_cost) }} points</strong><p>Your next eligible attack deals {{ config.berserk_multiplier | int }}&times; damage, costs {{ config.berserk_durability_cost }} durability, cannot crit, and has a {{ (config.berserk_shatter_chance * 100) | int }}% standard-weapon shatter chance. Once per viewer each stream.</p><code>!raid buy berserk</code></article>
+                        <article><span class="public-raid-item-type">Consumable</span><h3>Lucky Dice</h3><strong>{{ "{:,}".format(config.lucky_dice_cost) }} points</strong><p>Your next attack lowers the base-damage floor by 50% and raises its ceiling by 100%.</p><code>!raid buy lucky dice</code></article>
+                        <article><span class="public-raid-item-type">Consumable</span><h3>The Fool's Card</h3><strong>{{ "{:,}".format(config.fools_card_cost) }} points</strong><p>Your next attack rolls a point result from {{ "{:,}".format(config.fools_card_points_min) }} to +{{ "{:,}".format(config.fools_card_points_max) }}.</p><code>!raid buy fool</code></article>
+                        </div>
+                    </section>
 
-                        <article><span class="public-raid-item-type">Consumable</span><h3>Second Wind</h3><strong>{{ "{:,}".format(config.second_wind_cost) }} points</strong><p>Grants one additional attack in a stream and is consumed only by that successful second attack.</p><code>!raid buy second wind</code></article>
-                        <article><span class="public-raid-item-type">Consumable</span><h3>Berserk</h3><strong>{{ "{:,}".format(config.berserk_cost) }} points</strong><p>Your next eligible attack deals {{ config.berserk_multiplier | int }}&times; damage, costs {{ config.berserk_durability_cost }} durability, cannot crit, and has a {{ (config.berserk_shatter_chance * 100) | int }}% standard-weapon shatter chance. Once per viewer each stream.</p><code>!raid buy berserk</code></article>
-                        <article><span class="public-raid-item-type">Stream-wide</span><h3>Blessing of the Gods</h3><strong>{{ "{:,}".format(config.blessing_cost) }} points</strong><p>The first buyer each stream grants everyone +{{ ((config.blessing_multiplier - 1) * 100) | int }}% damage on subsequent attacks that stream.</p><code>!raid buy blessing</code></article>
+                    <section class="public-raid-shop-category">
+                        <h3>Buffs</h3>
+                        <div class="public-raid-shop-grid">
+                            <article><span class="public-raid-item-type">Stream-wide</span><h3>Blessing of the Gods</h3><strong>{{ "{:,}".format(config.blessing_cost) }} points</strong><p>The first buyer each stream grants everyone +{{ ((config.blessing_multiplier - 1) * 100) | int }}% damage on subsequent attacks that stream.</p><code>!raid buy blessing</code></article>
+                        <article><span class="public-raid-item-type">Stream-wide</span><h3>Ancient Pact</h3><strong>{{ "{:,}".format(config.ancient_pact_cost) }} points</strong><p>The first buyer each stream raises everyone's base attack ceiling by {{ config.ancient_pact_ceiling_bonus }}. A chatter cannot claim both Ancient Pact and Blessing in the same stream.</p><code>!raid buy pact</code></article>
+                        <article><span class="public-raid-item-type">Encounter-wide</span><h3>Flag Bearer's Will</h3><strong>{{ "{:,}".format(config.flag_bearer_cost) }} points</strong><p>Sacrifice your next attack. The next {{ config.flag_bearer_charges }} eligible attacks from other players gain +{{ ((config.flag_bearer_multiplier - 1) * 100) | int }}% damage credited to you. Each empowered attack removes one durability from a random usable weapon in your inventory; without one, charges wait and do not apply.</p><code>!raid buy flag</code></article>
+                        </div>
+                    </section>
 
-                        <article>
-                            <span class="public-raid-item-type">Service</span>
-                            <h3>Full repair</h3>
-                            <strong>{{ "{:,}".format(config.repair_cost) }} points</strong>
-                            <p>Restores one owned weapon to its full {{ config.weapon_durability }} durability.</p>
-                            <code>!raid repair &lt;weapon&gt;</code>
-                        </article>
-                    </div>
+                    <section class="public-raid-shop-category">
+                        <h3>Services</h3>
+                        <div class="public-raid-shop-grid">
+                            <article><span class="public-raid-item-type">Service</span><h3>Full repair</h3><strong>{{ "{:,}".format(config.repair_cost) }} points</strong><p>Restores one owned weapon to its full {{ config.weapon_durability }} durability.</p><code>!raid repair &lt;weapon&gt;</code></article>
+                        </div>
+                    </section>
                 </div>
             </details>
 
@@ -162,8 +175,8 @@
 
                 <div class="public-raid-section-content public-raid-rule-grid">
                     <article><strong>Attack once per stream</strong><span>Second Wind permits one additional attack</span></article>
-                    <article><strong>Type matching</strong><span>Melee, ranged, and magic weapons double their attack bonus against the matching boss type</span></article>
-                    <article><strong>Buy items to grow stronger!</strong><span>Buy weapons and buffs to improve damage</span></article>
+                    <article><strong>Type matching</strong><span>Melee, ranged, and magic weapons double their attack bonus against the matching boss type; special ALL weapons gain +50% weapon damage against every boss type</span></article>
+                    <article><strong>Additive bonuses</strong><span>Power, Berserk, Blessing, critical, and future passive bonuses add together instead of multiplying each other</span></article>
                 </div>
             </details>
 
@@ -208,6 +221,12 @@
                                     <div><span>{{ event.boss_tier | title }} {{ event.boss_type | title }} boss</span><h3>{{ event.boss_name }}</h3><p>{{ event.spawned_at[:10] }}</p></div>
                                     <div><strong>{{ "{:,}".format(event.total_damage) }} damage</strong><span>{{ event.unique_attackers }} attackers</span></div>
                                     <b class="channel-state {% if event.status == 'defeated' %}live{% endif %}">{{ event.status | title }}</b>
+                                    {% if event.contributors %}
+                                        <details class="public-raid-history-leaderboard">
+                                            <summary>View leaderboard</summary>
+                                            <ol>{% for username, damage in event.contributors %}<li><span>{{ username }}</span><strong>{{ "{:,}".format(damage) }} damage</strong></li>{% endfor %}</ol>
+                                        </details>
+                                    {% endif %}
                                 </article>
                             {% endfor %}
                         </div>
@@ -219,81 +238,5 @@
         </section>
     </main>
 
-    {% if broadcaster.login %}
-    <script>
-    (() => {
-        const endpoint = "/api/raid/{{ broadcaster.login }}";
-        const panel = document.getElementById("public-raid-live-panel");
-
-        if (!panel) {
-            return;
-        }
-
-        const number = new Intl.NumberFormat();
-
-        function contributorRow(contributor) {
-            const row = document.createElement("li");
-            const identity = document.createElement("span");
-            const rank = document.createElement("strong");
-            const username = document.createTextNode(contributor.username);
-            const damage = document.createElement("b");
-
-            rank.textContent = `#${contributor.rank}`;
-            damage.textContent = `${number.format(contributor.damage)} damage`;
-            identity.append(rank, username);
-            row.append(identity, damage);
-            return row;
-        }
-
-        function render(data) {
-            const metrics = data.metrics;
-
-            if (!metrics || metrics.status !== "active" || !document.getElementById("public-raid-boss-name")) {
-                window.location.reload();
-                return;
-            }
-
-            document.getElementById("public-raid-boss-name").textContent = metrics.boss_name;
-            document.getElementById("public-raid-boss-details").textContent = `${metrics.boss_tier} boss · ${metrics.boss_type} · Stream ${metrics.streams_used} of ${metrics.stream_limit}`;
-            document.getElementById("public-raid-hp-text").textContent = `${number.format(metrics.current_hp)}/${number.format(metrics.max_hp)} HP`;
-            document.getElementById("public-raid-hp-bar").style.width = `${metrics.hp_percent}%`;
-            document.getElementById("public-raid-damage").textContent = number.format(metrics.total_damage);
-            document.getElementById("public-raid-attackers").textContent = number.format(metrics.unique_attackers);
-            document.getElementById("public-raid-attacks").textContent = number.format(metrics.total_attacks);
-            document.getElementById("public-raid-reward").textContent = number.format(metrics.max_hp);
-
-            const contributors = Array.isArray(data.contributors) ? data.contributors : [];
-            const top = document.getElementById("public-raid-top-contributors");
-            const extra = document.getElementById("public-raid-extra-contributors");
-            const more = document.getElementById("public-raid-more-contributors");
-            const summary = document.getElementById("public-raid-more-summary");
-            const empty = document.getElementById("public-raid-contributors-empty");
-
-            top.replaceChildren(...contributors.slice(0, 10).map(contributorRow));
-            extra.replaceChildren(...contributors.slice(10).map(contributorRow));
-            more.hidden = contributors.length <= 10;
-            more.classList.toggle("public-raid-is-hidden", contributors.length <= 10);
-            summary.textContent = `Show all ${contributors.length} contributors`;
-            empty.hidden = contributors.length > 0;
-            empty.classList.toggle("public-raid-is-hidden", contributors.length > 0);
-            document.getElementById("public-raid-fighter-count").textContent = `${contributors.length} fighters`;
-        }
-
-        async function refresh() {
-            try {
-                const response = await fetch(endpoint, {headers: {"Accept": "application/json"}, cache: "no-store"});
-
-                if (response.ok) {
-                    render(await response.json());
-                }
-            } catch (_error) {
-                // Keep the most recent successful state visible during a transient refresh failure.
-            }
-        }
-
-        window.setInterval(refresh, 15000);
-    })();
-    </script>
-    {% endif %}
 </body>
 </html>

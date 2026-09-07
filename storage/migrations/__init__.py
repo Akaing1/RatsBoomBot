@@ -24,6 +24,11 @@ from storage.migrations.v019_custom_bot_authorization_links import migrate as mi
 from storage.migrations.v020_raid_crafting_progression import migrate as migrate_raid_crafting_progression
 from storage.migrations.v021_patch_notes import migrate as migrate_patch_notes
 from storage.migrations.v022_seed_crafting_patch_note import migrate as migrate_seed_crafting_patch_note
+from storage.migrations.v023_gambling_loss_totals import migrate as migrate_gambling_loss_totals
+from storage.migrations.v024_raid_gamble_consumables import migrate as migrate_raid_gamble_consumables
+from storage.migrations.v025_ancient_pact import migrate as migrate_ancient_pact
+from storage.migrations.v026_flag_bearers_will import migrate as migrate_flag_bearers_will
+from storage.migrations.v027_overclocked_weapons import migrate as migrate_overclocked_weapons
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -58,4 +63,9 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=20, name="raid_crafting_progression", run=migrate_raid_crafting_progression)
     , Migration(version=21, name="patch_notes", run=migrate_patch_notes)
     , Migration(version=22, name="seed_crafting_patch_note", run=migrate_seed_crafting_patch_note)
+    , Migration(version=23, name="gambling_loss_totals", run=migrate_gambling_loss_totals)
+    , Migration(version=24, name="raid_gamble_consumables", run=migrate_raid_gamble_consumables)
+    , Migration(version=25, name="ancient_pact", run=migrate_ancient_pact)
+    , Migration(version=26, name="flag_bearers_will", run=migrate_flag_bearers_will)
+    , Migration(version=27, name="overclocked_weapons", run=migrate_overclocked_weapons)
 )
