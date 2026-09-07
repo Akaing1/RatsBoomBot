@@ -12,7 +12,7 @@ class MeinyaPointsCommands(ChannelComponent):
         super().__init__(bot, profile, broadcaster_id)
         self.handler = PointsCommandHandler(bot)
 
-    @commands.group(name="petals", invoke_fallback=True)
+    @commands.group(name="petals", invoke_fallback=True, case_insensitive=True)
     async def petals(self, ctx: commands.Context, target: LocalizedUser = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
@@ -61,7 +61,7 @@ class MeinyaPointsCommands(ChannelComponent):
 
         await self.handler.roulette(ctx, color, amount, "petals")
 
-    @petals.group(name="duel", invoke_fallback=True)
+    @petals.group(name="duel", invoke_fallback=True, case_insensitive=True)
     async def petals_duel(self, ctx: commands.Context, opponent: LocalizedUser = None, amount: str = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
