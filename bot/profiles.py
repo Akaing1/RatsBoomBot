@@ -111,6 +111,14 @@ class GlobalCommandDefaults:
 
 
 @dataclass(frozen=True)
+class TimedAnnouncement:
+    message: str
+    interval_seconds: int
+    required_messages: int
+    color: str = "primary"
+
+
+@dataclass(frozen=True)
 class CommunityMessages:
     follow: str | None = None
     subscription: str | None = None
@@ -469,6 +477,7 @@ class ChannelProfile:
     globals: GlobalCommandDefaults = GlobalCommandDefaults()
     ad_announcement_message: str = DEFAULT_AD_ANNOUNCEMENT_MESSAGE
     timer_messages: tuple[str, ...] = ()
+    timed_announcements: tuple[TimedAnnouncement, ...] = ()
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
     shoutout_messages: ShoutoutMessages = ShoutoutMessages()
