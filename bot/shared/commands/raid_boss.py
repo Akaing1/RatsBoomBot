@@ -142,6 +142,10 @@ class RaidBossCommands(commands.Component):
         if result.flag_bearer_bonus_damage:
             bonuses.append(f"Flag Bearer's Will +{result.flag_bearer_bonus_damage:,} for {result.flag_bearer_username}")
 
+        if result.overdrive_attempted:
+            overdrive_result = result.overdrive_consumable.replace("_", " ").title() if result.overdrive_consumable else "no consumable activated"
+            bonuses.append(f"Overdrive: {overdrive_result}")
+
         if result.fools_card_points is not None:
             card_result = f"gained {result.fools_card_points:,}" if result.fools_card_points >= 0 else f"lost {abs(result.fools_card_points):,}"
             bonuses.append(f"The Fool's Card: {card_result} points")
@@ -174,7 +178,7 @@ class RaidBossCommands(commands.Component):
             return
 
         config = context[1]
-        await ctx.send(f"Raid shop — Weapons: {config.weapon_names.basic_sword}, {config.weapon_names.basic_bow}, and {config.weapon_names.apprentice_tome} — {config.weapon_cost:,} points each. Use !raid buy sword, bow, or tome.")
+        await ctx.send(f"Raid shop — Basic Weapons: {config.weapon_names.basic_sword}, {config.weapon_names.basic_bow}, and {config.weapon_names.apprentice_tome} — {config.weapon_cost:,} points each. Overclocked Weapons: {config.weapon_names.overclocked_sword}, {config.weapon_names.overclocked_bow}, and {config.weapon_names.overclocked_tome} — {config.overclocked_weapon_cost:,} points each. Use !raid buy <item>.")
         await ctx.send(f"Consumables: Power Potion — {config.potion_cost:,}; Second Wind — {config.second_wind_cost:,}; Berserk — {config.berserk_cost:,}; Lucky Dice — {config.lucky_dice_cost:,}; The Fool's Card — {config.fools_card_cost:,} points. Use !raid buy <item>.")
         await ctx.send(f"Buffs: Blessing of the Gods — {config.blessing_cost:,}; Ancient Pact — {config.ancient_pact_cost:,}; Flag Bearer's Will — {config.flag_bearer_cost:,} points. Global buffs are first-come and cannot overlap on the same chatter. Use !raid buy blessing, pact, or flag. Full details: !raid help.")
 
@@ -226,10 +230,9 @@ class RaidBossCommands(commands.Component):
             item_id = self.bot.services.raid_bosses.normalize_item(item)
             config = context[1]
 
-            if item_id in {"basic_sword", "basic_bow", "apprentice_tome"}:
+            if item_id in {"basic_sword", "basic_bow", "apprentice_tome", "overclocked_sword", "overclocked_bow", "overclocked_tome"}:
                 purchased_item = config.weapon_names.display(item_id)
-                equip_name = {"basic_sword": "sword", "basic_bow": "bow", "apprentice_tome": "tome"}[item_id]
-                await ctx.reply(f"You purchased {purchased_item}! It was added to your raid inventory. Use !raid equip {equip_name} before attacking.")
+                await ctx.reply(f"You purchased {purchased_item}! It was added to your raid inventory. Use !raid equip {item_id.replace('_', ' ')} before attacking.")
             elif item_id == "potion":
                 await ctx.reply(f"Power Potion acquired! Your next {config.potion_attacks} raid attacks will deal {config.potion_multiplier:g}× damage automatically.")
             elif item_id == "second_wind":
@@ -302,7 +305,8 @@ class RaidBossCommands(commands.Component):
         chatter = ctx.chatter
         weapons, equipped, durability, consumables = await self.bot.services.raid_bosses.get_inventory(context[0], str(chatter.id))
         weapon_text = ", ".join(f"{context[1].weapon_names.display(weapon)} x{quantity}" for weapon, quantity in weapons) if weapons else "none"
-        durability_text = f"{durability}/{context[1].weapon_durability}" if equipped else "none"
+        max_durability = self.bot.services.raid_bosses.weapon_max_durability(equipped, context[1]) if equipped else 0
+        durability_text = f"{durability}/{max_durability}" if equipped else "none"
         equipped_text = context[1].weapon_names.display(equipped) if equipped else "none"
         await ctx.reply(f"Weapons: {weapon_text}. Equipped: {equipped_text}. Durability: {durability_text}. Power attacks: {consumables['power']}; Second Winds: {consumables['second_wind']}; Berserks: {consumables['berserk']}; Lucky Dice: {consumables['lucky_dice']}; Fool's Cards: {consumables['fools_card']}.")
 
@@ -344,8 +348,11 @@ class RaidBossCommands(commands.Component):
         elif result == "insufficient":
             await ctx.reply("You do not have enough loyalty points for that repair.")
         else:
-            repaired_item = context[1].weapon_names.display(self.bot.services.raid_bosses.normalize_item(weapon))
-            await ctx.reply(f"Your {repaired_item} was repaired to {context[1].weapon_durability} durability for {context[1].repair_cost:,} points.")
+            weapon_id = self.bot.services.raid_bosses.normalize_item(weapon)
+            repaired_item = context[1].weapon_names.display(weapon_id)
+            durability = self.bot.services.raid_bosses.weapon_max_durability(weapon_id, context[1])
+            repair_cost = self.bot.services.raid_bosses.weapon_repair_cost(weapon_id, context[1])
+            await ctx.reply(f"Your {repaired_item} was repaired to {durability} durability for {repair_cost:,} points.")
 
     @raid.command(name="leaderboard")
     async def leaderboard(self, ctx: commands.Context) -> None:
