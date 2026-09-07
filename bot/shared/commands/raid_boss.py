@@ -146,6 +146,18 @@ class RaidBossCommands(commands.Component):
             overdrive_result = result.overdrive_consumable.replace("_", " ").title() if result.overdrive_consumable else "no consumable activated"
             bonuses.append(f"Overdrive: {overdrive_result}")
 
+        if result.weapon_passive:
+            passive_details = []
+
+            if result.weapon_passive_damage:
+                passive_details.append(f"+{result.weapon_passive_damage:,} damage")
+
+            if result.weapon_passive_points:
+                passive_details.append(f"+{result.weapon_passive_points:,} points")
+
+            passive_text = f" ({', '.join(passive_details)})" if passive_details else ""
+            bonuses.append(f"{result.weapon_passive}{passive_text}")
+
         if result.fools_card_points is not None:
             card_result = f"gained {result.fools_card_points:,}" if result.fools_card_points >= 0 else f"lost {abs(result.fools_card_points):,}"
             bonuses.append(f"The Fool's Card: {card_result} points")
