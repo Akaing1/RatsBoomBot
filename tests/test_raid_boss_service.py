@@ -1287,7 +1287,8 @@ async def test_overdrive_consumes_an_owned_charge_only_once_per_stream(tmp_path,
         await service.equip("channel-1", "user-1", "alice", "overclocked sword")
         await service.buy("channel-1", "user-1", "alice", "potion", config, "stream-1")
         await service.buy("channel-1", "user-1", "alice", "second wind", config, "stream-1")
-        monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: 0.0)
+        rolls = iter((0.0, 1.0, 1.0))
+        monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: next(rolls))
         monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: values[0])
 
         first = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
