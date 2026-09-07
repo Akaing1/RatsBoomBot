@@ -921,7 +921,7 @@ class RaidBossService:
 
     async def get_recent_events(self, broadcaster_id: str, limit: int = 5) -> list[dict[str, object]]:
         query = """
-        SELECT events.boss_name, events.boss_type, events.boss_tier, events.status,
+        SELECT events.id, events.boss_name, events.boss_type, events.boss_tier, events.status,
                events.max_hp, events.current_hp, events.reward_pool, events.spawned_at,
                (SELECT COUNT(DISTINCT user_id) FROM raid_boss_attacks WHERE event_id = events.id) AS unique_attackers,
                (SELECT COALESCE(SUM(damage), 0) FROM raid_boss_attacks WHERE event_id = events.id) AS total_damage
@@ -931,25 +931,36 @@ class RaidBossService:
         ORDER BY events.id DESC
         LIMIT ?
         """
+        contributor_query = """
+        SELECT username, SUM(damage) AS total_damage
+        FROM raid_boss_attacks
+        WHERE event_id = ?
+        GROUP BY user_id, username
+        ORDER BY total_damage DESC, username COLLATE NOCASE
+        LIMIT 10
+        """
 
         async with self.db.acquire() as connection:
             rows = await connection.fetchall(query, (str(broadcaster_id), max(1, limit)))
+            events = []
 
-        return [
-            {
-                "boss_name": str(row["boss_name"]),
-                "boss_type": str(row["boss_type"]),
-                "boss_tier": str(row["boss_tier"]),
-                "status": str(row["status"]),
-                "max_hp": int(row["max_hp"]),
-                "current_hp": int(row["current_hp"]),
-                "reward_pool": int(row["reward_pool"]),
-                "spawned_at": str(row["spawned_at"]),
-                "unique_attackers": int(row["unique_attackers"]),
-                "total_damage": int(row["total_damage"])
-            }
-            for row in rows
-        ]
+            for row in rows:
+                contributors = await connection.fetchall(contributor_query, (int(row["id"]),))
+                events.append({
+                    "boss_name": str(row["boss_name"]),
+                    "boss_type": str(row["boss_type"]),
+                    "boss_tier": str(row["boss_tier"]),
+                    "status": str(row["status"]),
+                    "max_hp": int(row["max_hp"]),
+                    "current_hp": int(row["current_hp"]),
+                    "reward_pool": int(row["reward_pool"]),
+                    "spawned_at": str(row["spawned_at"]),
+                    "unique_attackers": int(row["unique_attackers"]),
+                    "total_damage": int(row["total_damage"]),
+                    "contributors": [(str(contributor["username"]), int(contributor["total_damage"])) for contributor in contributors]
+                })
+
+        return events
 
     async def get_contributors(self, broadcaster_id: str) -> list[tuple[str, int]]:
         event = await self.get_active_event(broadcaster_id)
