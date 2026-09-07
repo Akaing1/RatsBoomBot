@@ -131,6 +131,7 @@
                         <h3>Buffs</h3>
                         <div class="public-raid-shop-grid">
                             <article><span class="public-raid-item-type">Stream-wide</span><h3>Blessing of the Gods</h3><strong>{{ "{:,}".format(config.blessing_cost) }} points</strong><p>The first buyer each stream grants everyone +{{ ((config.blessing_multiplier - 1) * 100) | int }}% damage on subsequent attacks that stream.</p><code>!raid buy blessing</code></article>
+                        <article><span class="public-raid-item-type">Stream-wide</span><h3>Ancient Pact</h3><strong>{{ "{:,}".format(config.ancient_pact_cost) }} points</strong><p>The first buyer each stream raises everyone's base attack ceiling by {{ config.ancient_pact_ceiling_bonus }}. A chatter cannot claim both Ancient Pact and Blessing in the same stream.</p><code>!raid buy pact</code></article>
                         </div>
                     </section>
 
