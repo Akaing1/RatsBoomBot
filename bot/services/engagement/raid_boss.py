@@ -277,7 +277,7 @@ class RaidBossService:
                 if event is None:
                     return
 
-                await self._send_message(broadcaster_id, self._reminder_message(event))
+                await self.send_announcement(broadcaster_id, self._reminder_message(event), "purple")
                 self.reminder_message_counts[broadcaster_id] = 0
                 self.reminder_activity_events[broadcaster_id].clear()
                 next_reminder_at = datetime.now(UTC) + timedelta(seconds=self.REPEAT_REMINDER_SECONDS)
