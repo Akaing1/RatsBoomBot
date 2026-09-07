@@ -389,6 +389,11 @@ class RaidWeaponNames:
     overclocked_sword: str = "Overclocked Sword"
     overclocked_bow: str = "Overclocked Bow"
     overclocked_tome: str = "Overclocked Tome"
+    heavens_judgement: str = "Heaven's Judgement"
+    fools_dagger: str = "The Fool's Dagger"
+    obsidian_brutalizer: str = "Obsidian Brutalizer"
+    forgotten_daggers: str = "Forgotten Daggers of the Faithless"
+    branch_of_yggdrasil: str = "Branch of Yggdrasil"
 
     def display(self, item_id: str) -> str:
         return str(getattr(self, item_id, item_id.replace("_", " ").title()))
@@ -434,6 +439,21 @@ class RaidBossConfig:
     overclocked_weapon_durability: int = 25
     overclocked_repair_cost: int = 2500
     overdrive_chance: float = 0.50
+    blessed_unique_drop_chance: float = 0.01
+    blessed_unique_durability: int = 35
+    blessed_unique_repair_cost: int = 5000
+    heavens_judgement_attack: int = 200
+    fools_dagger_attack: int = 80
+    fools_dagger_critical_bonus: float = 0.50
+    fools_dagger_points_min: float = 0.10
+    fools_dagger_points_max: float = 0.50
+    obsidian_brutalizer_attack: int = 150
+    obsidian_brutalizer_stack_damage: int = 25
+    forgotten_daggers_attack: int = 50
+    forgotten_daggers_max_hp_damage: float = 0.0025
+    branch_of_yggdrasil_attack: int = 100
+    branch_of_yggdrasil_chatter_damage: int = 2
+    branch_of_yggdrasil_chatter_cap: int = 200
     weapon_multiplier: float = 2.0
     all_weapon_multiplier: float = 1.5
     potion_multiplier: float = 2.0
@@ -445,7 +465,7 @@ class RaidBossConfig:
     tutorial_complete_collection_points: int = 5000
     reward_points_per_hp: float = 1.0
     final_hit_unique_drop_chance: float = 0.03
-    top_contributor_unique_drop_chance: float = 0.01
+    top_contributor_unique_drop_chance: float = 0.03
     top_contributor_percent: float = 0.10
     unique_weapon_attack: int = 225
     second_wind_cost: int = 1000

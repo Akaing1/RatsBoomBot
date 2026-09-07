@@ -146,6 +146,18 @@ class RaidBossCommands(commands.Component):
             overdrive_result = result.overdrive_consumable.replace("_", " ").title() if result.overdrive_consumable else "no consumable activated"
             bonuses.append(f"Overdrive: {overdrive_result}")
 
+        if result.weapon_passive:
+            passive_details = []
+
+            if result.weapon_passive_damage:
+                passive_details.append(f"+{result.weapon_passive_damage:,} damage")
+
+            if result.weapon_passive_points:
+                passive_details.append(f"+{result.weapon_passive_points:,} points")
+
+            passive_text = f" ({', '.join(passive_details)})" if passive_details else ""
+            bonuses.append(f"{result.weapon_passive}{passive_text}")
+
         if result.fools_card_points is not None:
             card_result = f"gained {result.fools_card_points:,}" if result.fools_card_points >= 0 else f"lost {abs(result.fools_card_points):,}"
             bonuses.append(f"The Fool's Card: {card_result} points")
@@ -178,9 +190,10 @@ class RaidBossCommands(commands.Component):
             return
 
         config = context[1]
-        await ctx.send(f"Raid shop — Basic Weapons: {config.weapon_names.basic_sword}, {config.weapon_names.basic_bow}, and {config.weapon_names.apprentice_tome} — {config.weapon_cost:,} points each. Overclocked Weapons: {config.weapon_names.overclocked_sword}, {config.weapon_names.overclocked_bow}, and {config.weapon_names.overclocked_tome} — {config.overclocked_weapon_cost:,} points each. Use !raid buy <item>.")
-        await ctx.send(f"Consumables: Power Potion — {config.potion_cost:,}; Second Wind — {config.second_wind_cost:,}; Berserk — {config.berserk_cost:,}; Lucky Dice — {config.lucky_dice_cost:,}; The Fool's Card — {config.fools_card_cost:,} points. Use !raid buy <item>.")
-        await ctx.send(f"Buffs: Blessing of the Gods — {config.blessing_cost:,}; Ancient Pact — {config.ancient_pact_cost:,}; Flag Bearer's Will — {config.flag_bearer_cost:,} points. Global buffs are first-come and cannot overlap on the same chatter. Use !raid buy blessing, pact, or flag. Full details: !raid help.")
+        profile = get_active_profile(context[0])
+        channel_name = profile.channel_name if profile is not None else context[0]
+        raid_page_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/raid/{quote(channel_name)}"
+        await ctx.send(f"Raid shop — Weapons: {config.weapon_cost:,} points | Power Potion: {config.potion_cost:,} points | Blessing of the Gods: {config.blessing_cost:,} points | Full item list: {raid_page_url}")
 
     @raid.command(name="help")
     async def raid_help(self, ctx: commands.Context) -> None:
