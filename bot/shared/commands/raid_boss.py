@@ -190,9 +190,10 @@ class RaidBossCommands(commands.Component):
             return
 
         config = context[1]
-        await ctx.send(f"Raid shop — Basic Weapons: {config.weapon_names.basic_sword}, {config.weapon_names.basic_bow}, and {config.weapon_names.apprentice_tome} — {config.weapon_cost:,} points each. Overclocked Weapons: {config.weapon_names.overclocked_sword}, {config.weapon_names.overclocked_bow}, and {config.weapon_names.overclocked_tome} — {config.overclocked_weapon_cost:,} points each. Use !raid buy <item>.")
-        await ctx.send(f"Consumables: Power Potion — {config.potion_cost:,}; Second Wind — {config.second_wind_cost:,}; Berserk — {config.berserk_cost:,}; Lucky Dice — {config.lucky_dice_cost:,}; The Fool's Card — {config.fools_card_cost:,} points. Use !raid buy <item>.")
-        await ctx.send(f"Buffs: Blessing of the Gods — {config.blessing_cost:,}; Ancient Pact — {config.ancient_pact_cost:,}; Flag Bearer's Will — {config.flag_bearer_cost:,} points. Global buffs are first-come and cannot overlap on the same chatter. Use !raid buy blessing, pact, or flag. Full details: !raid help.")
+        profile = get_active_profile(context[0])
+        channel_name = profile.channel_name if profile is not None else context[0]
+        raid_page_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/raid/{quote(channel_name)}"
+        await ctx.send(f"Raid shop — Weapons: {config.weapon_cost:,} points | Power Potion: {config.potion_cost:,} points | Blessing of the Gods: {config.blessing_cost:,} points | Full item list: {raid_page_url}")
 
     @raid.command(name="help")
     async def raid_help(self, ctx: commands.Context) -> None:
