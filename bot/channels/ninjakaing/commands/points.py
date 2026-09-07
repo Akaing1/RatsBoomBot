@@ -12,7 +12,7 @@ class NinjakaingPointsCommands(ChannelComponent):
         super().__init__(bot, profile, broadcaster_id)
         self.handler = PointsCommandHandler(bot)
 
-    @commands.group(name="bread", invoke_fallback=True)
+    @commands.group(name="bread", invoke_fallback=True, case_insensitive=True)
     async def bread(self, ctx: commands.Context, target: LocalizedUser = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
@@ -54,7 +54,7 @@ class NinjakaingPointsCommands(ChannelComponent):
 
         await self.handler.gamble(ctx, amount, "bread")
 
-    @bread.group(name="duel", invoke_fallback=True)
+    @bread.group(name="duel", invoke_fallback=True, case_insensitive=True)
     async def bread_duel(self, ctx: commands.Context, opponent: LocalizedUser = None, amount: str = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
             return
