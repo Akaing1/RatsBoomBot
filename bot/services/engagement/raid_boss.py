@@ -97,6 +97,9 @@ class RaidAttackResult:
     flag_bearer_username: str | None = None
     overdrive_attempted: bool = False
     overdrive_consumable: str | None = None
+    weapon_passive: str | None = None
+    weapon_passive_damage: int = 0
+    weapon_passive_points: int = 0
 
 
 class RaidBossService:
@@ -367,6 +370,18 @@ class RaidBossService:
         session = active_sessions.get(str(broadcaster_id))
         return str(session.stream_id) if session is not None else None
 
+    async def _live_chatter_count(self, broadcaster_id: str) -> int:
+        if self.bot is None:
+            return 0
+
+        try:
+            broadcaster = self.bot.create_partialuser(str(broadcaster_id))
+            chatters = broadcaster.fetch_chatters(moderator=str(self.bot.user.id), first=1000, max_results=None)
+            return sum(1 async for _ in chatters)
+        except Exception:
+            LOGGER.warning("[Raid Bosses] Could not fetch live chatter count for broadcaster %s.", broadcaster_id, exc_info=True)
+            return 0
+
     async def _get_schedule(self, broadcaster_id: str):
         async with self.db.acquire() as connection:
             return await connection.fetchone("SELECT * FROM raid_boss_schedules WHERE broadcaster_id = ?", (str(broadcaster_id),))
@@ -562,7 +577,7 @@ class RaidBossService:
 
         async with self.db.acquire() as connection:
             prior = await connection.fetchone(
-                "SELECT COUNT(*) AS attacks, COALESCE(SUM(CASE WHEN buff_used = 'berserk' THEN 1 ELSE 0 END), 0) AS berserks, COALESCE(SUM(overdrive_attempted), 0) AS overdrive_attempts, COALESCE(SUM(CASE WHEN overdrive_consumable = 'second_wind' THEN 1 ELSE 0 END), 0) AS overdrive_second_winds FROM raid_boss_attacks WHERE event_id = ? AND stream_id = ? AND user_id = ?",
+                "SELECT COUNT(*) AS attacks, COALESCE(SUM(CASE WHEN buff_used = 'berserk' THEN 1 ELSE 0 END), 0) AS berserks, COALESCE(SUM(overdrive_attempted), 0) AS overdrive_attempts, COALESCE(SUM(CASE WHEN overdrive_consumable = 'second_wind' THEN 1 ELSE 0 END), 0) AS overdrive_second_winds, COALESCE(SUM(CASE WHEN weapon = 'obsidian_brutalizer' THEN 1 ELSE 0 END), 0) AS brutalizer_attacks FROM raid_boss_attacks WHERE event_id = ? AND stream_id = ? AND user_id = ?",
                 (event.id, stream_id, user_id)
             )
             effects = await connection.fetchone("SELECT blessing_username, ancient_pact_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (broadcaster_id, stream_id))
@@ -638,10 +653,28 @@ class RaidBossService:
         base_damage_min = round(config.base_damage_min * config.lucky_dice_floor_multiplier ** lucky_dice_uses)
         base_damage_max = round(standard_base_damage_max * config.lucky_dice_ceiling_multiplier ** lucky_dice_uses)
         damage = random.randint(base_damage_min, base_damage_max)
+        weapon_passive = None
+        weapon_passive_damage = 0
+        weapon_passive_points = 0
         fools_card_points = sum(random.randint(config.fools_card_points_min, config.fools_card_points_max) for _ in range(fools_card_uses)) if fools_card_uses else None
 
         if weapon_used:
-            if weapon_used in OVERCLOCKED_WEAPON_TYPES:
+            if weapon_used == "heavens_judgement":
+                weapon_attack = config.heavens_judgement_attack
+                weapon_passive = "Slayer of the Mighty"
+            elif weapon_used == "fools_dagger":
+                weapon_attack = config.fools_dagger_attack
+                weapon_passive = "Gambler's Fervor"
+            elif weapon_used == "obsidian_brutalizer":
+                weapon_attack = config.obsidian_brutalizer_attack + int(prior["brutalizer_attacks"]) * config.obsidian_brutalizer_stack_damage
+                weapon_passive = "Blunt Force"
+            elif weapon_used == "forgotten_daggers":
+                weapon_attack = config.forgotten_daggers_attack
+                weapon_passive = "Corrosive Edge"
+            elif weapon_used == "branch_of_yggdrasil":
+                weapon_attack = config.branch_of_yggdrasil_attack
+                weapon_passive = "Hymn of the Spirits"
+            elif weapon_used in OVERCLOCKED_WEAPON_TYPES:
                 weapon_attack = config.overclocked_weapon_attack
             elif weapon_used in UNIQUE_WEAPON_TYPES:
                 weapon_attack = config.unique_weapon_attack
@@ -655,8 +688,17 @@ class RaidBossService:
             weapon_multiplier = self.weapon_bonus_multiplier(WEAPON_TYPES.get(weapon_used), event.boss_type, config)
             damage += round(weapon_attack * weapon_multiplier)
 
+            if weapon_used == "forgotten_daggers":
+                weapon_passive_damage = round(event.max_hp * config.forgotten_daggers_max_hp_damage)
+                damage += weapon_passive_damage
+            elif weapon_used == "branch_of_yggdrasil":
+                chatter_bonus = min(await self._live_chatter_count(broadcaster_id) * config.branch_of_yggdrasil_chatter_damage, config.branch_of_yggdrasil_chatter_cap)
+                weapon_passive_damage = chatter_bonus * (2 if event.boss_type == "magic" else 1)
+                damage += weapon_passive_damage
+
         blessing_active = effects is not None and effects["blessing_username"] is not None
-        critical_hit = not berserk_used and random.random() < config.critical_chance
+        critical_chance = config.critical_chance + (config.fools_dagger_critical_bonus if weapon_used == "fools_dagger" else 0.0)
+        critical_hit = not berserk_used and random.random() < critical_chance
         damage_multipliers: list[float] = []
 
         if berserk_used:
@@ -667,12 +709,19 @@ class RaidBossService:
         if blessing_active:
             damage_multipliers.append(config.blessing_multiplier)
 
+        if weapon_used == "heavens_judgement" and event.current_hp > event.max_hp * 0.50:
+            damage_multipliers.append(1.50)
+
         if critical_hit:
             damage_multipliers.append(config.critical_multiplier)
 
         damage = self.apply_damage_multipliers(damage, tuple(damage_multipliers))
         flag_weapon = random.choice(flag_weapons)["item_id"] if flag_weapons else None
         credited_damage = min(damage, event.current_hp)
+
+        if weapon_used == "fools_dagger":
+            weapon_passive_points = round(credited_damage * random.uniform(config.fools_dagger_points_min, config.fools_dagger_points_max))
+
         flag_bearer_bonus_damage = min(round(damage * (config.flag_bearer_multiplier - 1.0)), max(event.current_hp - credited_damage, 0)) if flag_weapon else 0
         damage = credited_damage + flag_bearer_bonus_damage
         now = datetime.now(UTC).isoformat()
@@ -708,6 +757,9 @@ class RaidBossService:
                 """,
                 (damage, event.id)
             )
+
+            if weapon_passive_points:
+                await self._add_points(connection, broadcaster_id, user_id, username, weapon_passive_points)
 
             if flag_bearer_bonus_damage and flag_bearer is not None and flag_weapon:
                 await connection.execute(
@@ -764,7 +816,7 @@ class RaidBossService:
 
         LOGGER.info("[Raid Bosses] %s dealt %d damage to %s in broadcaster %s.", username, damage, event.boss_name, broadcaster_id)
         broken_weapon = weapon if weapon and not weapon_used else None
-        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops, buff_used=buff_used, blessing_active=blessing_active, shattered_weapon=shattered_weapon, lucky_dice_used=lucky_dice_used, fools_card_points=fools_card_points, ancient_pact_active=ancient_pact_active, flag_bearer_bonus_damage=flag_bearer_bonus_damage, flag_bearer_username=str(flag_bearer["username"]) if flag_bearer_bonus_damage and flag_bearer is not None else None, overdrive_attempted=overdrive_attempted, overdrive_consumable=overdrive_consumable)
+        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops, buff_used=buff_used, blessing_active=blessing_active, shattered_weapon=shattered_weapon, lucky_dice_used=lucky_dice_used, fools_card_points=fools_card_points, ancient_pact_active=ancient_pact_active, flag_bearer_bonus_damage=flag_bearer_bonus_damage, flag_bearer_username=str(flag_bearer["username"]) if flag_bearer_bonus_damage and flag_bearer is not None else None, overdrive_attempted=overdrive_attempted, overdrive_consumable=overdrive_consumable, weapon_passive=weapon_passive, weapon_passive_damage=weapon_passive_damage, weapon_passive_points=weapon_passive_points)
 
     async def register_stream(self, broadcaster_id: str, stream_id: str) -> tuple[RaidBossEvent | None, int]:
         event = await self.get_active_event(broadcaster_id)
