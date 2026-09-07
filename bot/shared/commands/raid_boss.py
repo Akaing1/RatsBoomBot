@@ -139,6 +139,9 @@ class RaidBossCommands(commands.Component):
         if result.lucky_dice_used:
             bonuses.append("Lucky Dice")
 
+        if result.flag_bearer_bonus_damage:
+            bonuses.append(f"Flag Bearer's Will +{result.flag_bearer_bonus_damage:,} for {result.flag_bearer_username}")
+
         if result.fools_card_points is not None:
             card_result = f"gained {result.fools_card_points:,}" if result.fools_card_points >= 0 else f"lost {abs(result.fools_card_points):,}"
             bonuses.append(f"The Fool's Card: {card_result} points")
@@ -150,6 +153,10 @@ class RaidBossCommands(commands.Component):
             bonuses.append(f"{config.weapon_names.display(result.shattered_weapon)} shattered")
 
         bonus_text = f" using {' + '.join(bonuses)}" if bonuses else ""
+
+        if result.flag_bearer_activated:
+            await self.bot.services.raid_bosses.send_announcement(broadcaster_id, f"@{chatter.name} sacrificed their attack and raised Flag Bearer's Will! The next {config.flag_bearer_charges} eligible attacks from other players gain +{(config.flag_bearer_multiplier - 1):.0%} damage credited to @{chatter.name}.", "purple")
+            return
 
         if result.defeated:
             drop_text = " Loot: " + ", ".join(f"{username} received {int(item_id.removesuffix('_points')):,} points" if item_id.endswith("_points") else f"{username} found {config.weapon_names.display(item_id)}" for username, item_id in result.drops) + "!" if result.drops else ""
@@ -169,7 +176,7 @@ class RaidBossCommands(commands.Component):
         config = context[1]
         await ctx.send(f"Raid shop — Weapons: {config.weapon_names.basic_sword}, {config.weapon_names.basic_bow}, and {config.weapon_names.apprentice_tome} — {config.weapon_cost:,} points each. Use !raid buy sword, bow, or tome.")
         await ctx.send(f"Consumables: Power Potion — {config.potion_cost:,}; Second Wind — {config.second_wind_cost:,}; Berserk — {config.berserk_cost:,}; Lucky Dice — {config.lucky_dice_cost:,}; The Fool's Card — {config.fools_card_cost:,} points. Use !raid buy <item>.")
-        await ctx.send(f"Buffs: Blessing of the Gods — {config.blessing_cost:,}; Ancient Pact — {config.ancient_pact_cost:,} points. Each is first-come, once per stream, and one chatter cannot claim both. Use !raid buy blessing or pact. Full details: !raid help.")
+        await ctx.send(f"Buffs: Blessing of the Gods — {config.blessing_cost:,}; Ancient Pact — {config.ancient_pact_cost:,}; Flag Bearer's Will — {config.flag_bearer_cost:,} points. Global buffs are first-come and cannot overlap on the same chatter. Use !raid buy blessing, pact, or flag. Full details: !raid help.")
 
     @raid.command(name="help")
     async def raid_help(self, ctx: commands.Context) -> None:
@@ -209,8 +216,12 @@ class RaidBossCommands(commands.Component):
             await ctx.reply(f"Blessing of the Gods is out of stock for this stream—it was purchased by {result.split(':', 1)[1]}!")
         elif result.startswith("ancient_out_of_stock:"):
             await ctx.reply(f"Ancient Pact is out of stock for this stream—it was purchased by {result.split(':', 1)[1]}!")
+        elif result.startswith("flag_out_of_stock:"):
+            await ctx.reply(f"Flag Bearer's Will is already claimed for this raid by {result.split(':', 1)[1]}!")
+        elif result == "active_raid_required":
+            await ctx.reply("Flag Bearer's Will can only be purchased while a raid boss is active.")
         elif result == "global_buff_limit":
-            await ctx.reply("You already claimed a global raid buff this stream. Another chatter must claim this one.")
+            await ctx.reply("You already control an active global raid buff. Another chatter must claim this one.")
         else:
             item_id = self.bot.services.raid_bosses.normalize_item(item)
             config = context[1]
@@ -233,6 +244,8 @@ class RaidBossCommands(commands.Component):
                 await self.bot.services.raid_bosses.send_announcement(context[0], f"@{chatter.name} purchased Blessing of the Gods! Everyone's subsequent raid attacks this stream deal +{(config.blessing_multiplier - 1):.0%} damage.", "purple")
             elif item_id == "ancient_pact":
                 await self.bot.services.raid_bosses.send_announcement(context[0], f"@{chatter.name} formed an Ancient Pact! Everyone's base attack ceiling increases by {config.ancient_pact_ceiling_bonus:,} for the rest of this stream.", "purple")
+            elif item_id == "flag_bearer":
+                await ctx.reply(f"Flag Bearer's Will acquired! Your next raid attack will be sacrificed to empower the next {config.flag_bearer_charges} eligible attacks from other players.")
 
     @raid.command(name="craft")
     async def craft(self, ctx: commands.Context, *, item: str | None = None) -> None:
