@@ -722,7 +722,7 @@ class PointsCommands(commands.Component):
         self.bot = bot
         self.handler = PointsCommandHandler(bot)
 
-    @commands.group(name="points", invoke_fallback=True)
+    @commands.group(name="points", invoke_fallback=True, case_insensitive=True)
     async def points(self, ctx: commands.Context, target: LocalizedUser = None) -> None:
         await self.handler.show_balance(ctx, target, "points")
 
@@ -746,7 +746,7 @@ class PointsCommands(commands.Component):
     async def points_gamble(self, ctx: commands.Context, amount: str) -> None:
         await self.handler.gamble(ctx, amount, "points")
 
-    @points.group(name="duel", invoke_fallback=True)
+    @points.group(name="duel", invoke_fallback=True, case_insensitive=True)
     async def points_duel(self, ctx: commands.Context, opponent: LocalizedUser = None, amount: str = None) -> None:
         await self.handler.create_duel(ctx, opponent, amount, "points")
 
