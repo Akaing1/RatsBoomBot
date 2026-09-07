@@ -667,14 +667,20 @@ class RaidBossService:
                 weapon_attack = config.fools_dagger_attack
                 weapon_passive = "Gambler's Fervor"
             elif weapon_used == "obsidian_brutalizer":
-                weapon_attack = config.obsidian_brutalizer_attack + int(brutalizer["attacks"]) * config.obsidian_brutalizer_stack_damage
+                stack_damage = int(brutalizer["attacks"]) * config.obsidian_brutalizer_stack_damage
+                weapon_attack = config.obsidian_brutalizer_attack + stack_damage
                 weapon_passive = "Blunt Force"
+                weapon_passive_damage = round(stack_damage * config.all_weapon_multiplier)
             elif weapon_used == "forgotten_daggers":
                 weapon_attack = config.forgotten_daggers_attack
                 weapon_passive = "Corrosive Edge"
+                weapon_passive_damage = round(event.max_hp * config.forgotten_daggers_max_hp_damage)
             elif weapon_used == "branch_of_yggdrasil":
-                weapon_attack = config.branch_of_yggdrasil_attack
+                chatter_bonus = min(await self._live_chatter_count(broadcaster_id) * config.branch_of_yggdrasil_chatter_damage, config.branch_of_yggdrasil_chatter_cap)
+                chatter_bonus *= 2 if event.boss_type == "magic" else 1
+                weapon_attack = config.branch_of_yggdrasil_attack + chatter_bonus
                 weapon_passive = "Hymn of the Spirits"
+                weapon_passive_damage = round(chatter_bonus * config.all_weapon_multiplier)
             elif weapon_used in OVERCLOCKED_WEAPON_TYPES:
                 weapon_attack = config.overclocked_weapon_attack
             elif weapon_used in UNIQUE_WEAPON_TYPES:
@@ -689,13 +695,6 @@ class RaidBossService:
             weapon_multiplier = self.weapon_bonus_multiplier(WEAPON_TYPES.get(weapon_used), event.boss_type, config)
             damage += round(weapon_attack * weapon_multiplier)
 
-            if weapon_used == "forgotten_daggers":
-                weapon_passive_damage = round(event.max_hp * config.forgotten_daggers_max_hp_damage)
-                damage += weapon_passive_damage
-            elif weapon_used == "branch_of_yggdrasil":
-                chatter_bonus = min(await self._live_chatter_count(broadcaster_id) * config.branch_of_yggdrasil_chatter_damage, config.branch_of_yggdrasil_chatter_cap)
-                weapon_passive_damage = chatter_bonus * (2 if event.boss_type == "magic" else 1)
-                damage += weapon_passive_damage
 
         blessing_active = effects is not None and effects["blessing_username"] is not None
         critical_chance = config.critical_chance + (config.fools_dagger_critical_bonus if weapon_used == "fools_dagger" else 0.0)
@@ -717,6 +716,10 @@ class RaidBossService:
             damage_multipliers.append(config.critical_multiplier)
 
         damage = self.apply_damage_multipliers(damage, tuple(damage_multipliers))
+
+        if weapon_used == "forgotten_daggers":
+            damage += weapon_passive_damage
+
         flag_weapon = random.choice(flag_weapons)["item_id"] if flag_weapons else None
         credited_damage = min(damage, event.current_hp)
 
