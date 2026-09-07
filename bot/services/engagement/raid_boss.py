@@ -34,8 +34,15 @@ UNIQUE_WEAPON_TYPES = {
     "mythical_longbow": "ranged",
     "mythical_grimoire": "magic"
 }
+BLESSED_UNIQUE_WEAPON_TYPES = {
+    "heavens_judgement": "all",
+    "fools_dagger": "all",
+    "obsidian_brutalizer": "all",
+    "forgotten_daggers": "all",
+    "branch_of_yggdrasil": "all"
+}
 STANDARD_WEAPON_TYPES = BASIC_WEAPON_TYPES | REFINED_WEAPON_TYPES | MASTERWORK_WEAPON_TYPES
-WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES | OVERCLOCKED_WEAPON_TYPES
+WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES | OVERCLOCKED_WEAPON_TYPES | BLESSED_UNIQUE_WEAPON_TYPES
 BOSS_TYPES = frozenset({"melee", "ranged", "magic"})
 ALL_WEAPON_TYPE = "all"
 ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "lucky": "lucky_dice", "dice": "lucky_dice", "fool": "fools_card", "fool_card": "fools_card", "the_fools_card": "fools_card", "ancient": "ancient_pact", "pact": "ancient_pact", "flag": "flag_bearer", "flag_bearer": "flag_bearer", "flag_bearers_will": "flag_bearer", "blessing_of_the_gods": "blessing", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
@@ -128,10 +135,16 @@ class RaidBossService:
 
     @staticmethod
     def weapon_max_durability(weapon: str, config: RaidBossConfig) -> int:
+        if weapon in BLESSED_UNIQUE_WEAPON_TYPES:
+            return config.blessed_unique_durability
+
         return config.overclocked_weapon_durability if weapon in OVERCLOCKED_WEAPON_TYPES else config.weapon_durability
 
     @staticmethod
     def weapon_repair_cost(weapon: str, config: RaidBossConfig) -> int:
+        if weapon in BLESSED_UNIQUE_WEAPON_TYPES:
+            return config.blessed_unique_repair_cost
+
         return config.overclocked_repair_cost if weapon in OVERCLOCKED_WEAPON_TYPES else config.repair_cost
 
     @staticmethod
@@ -1342,8 +1355,13 @@ class RaidBossService:
                 top_count = max(1, math.ceil(contributor_count * config.top_contributor_percent)) if contributor_count else 0
 
                 for contributor in contributors[:top_count]:
+                    recipient = (str(contributor["user_id"]), str(contributor["username"]))
+
                     if random.random() < config.top_contributor_unique_drop_chance:
-                        awards.append((str(contributor["user_id"]), str(contributor["username"]), mythical_weapon))
+                        awards.append((*recipient, mythical_weapon))
+
+                    if event.boss_tier == "main" and random.random() < config.blessed_unique_drop_chance:
+                        awards.append((*recipient, random.choice(tuple(BLESSED_UNIQUE_WEAPON_TYPES))))
 
             for recipient_id, recipient_name, item_id in awards:
                 if item_id.endswith("_points"):
@@ -1366,7 +1384,7 @@ class RaidBossService:
                     VALUES (?, ?, ?, 1, ?)
                     ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET quantity = 1, durability = MAX(durability, excluded.durability)
                     """,
-                    (str(broadcaster_id), recipient_id, item_id, config.weapon_durability)
+                    (str(broadcaster_id), recipient_id, item_id, self.weapon_max_durability(item_id, config))
                 )
                 await connection.execute(
                     "INSERT OR IGNORE INTO raid_boss_reward_items (event_id, broadcaster_id, user_id, item_id) VALUES (?, ?, ?, ?)",
