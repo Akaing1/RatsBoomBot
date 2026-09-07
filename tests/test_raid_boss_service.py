@@ -1230,3 +1230,19 @@ async def test_flag_bearer_charge_waits_without_usable_weapon(tmp_path) -> None:
         assert result.damage == 100
         assert result.flag_bearer_bonus_damage == 0
         assert flag["charges_remaining"] == 10
+
+@pytest.mark.asyncio
+async def test_reserved_flag_bearer_blocks_same_chatters_other_global_buff(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(flag_bearer_cost=100, blessing_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+
+        assert await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1") == "purchased"
+        assert await service.buy("channel-1", "user-1", "alice", "blessing", config, "stream-1") == "global_buff_limit"
+        assert await points.get_points("channel-1", "user-1") == 900
+
