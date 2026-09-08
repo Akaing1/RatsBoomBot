@@ -1,0 +1,54 @@
+name: UAT validation and deployment
+
+on:
+  pull_request:
+    branches:
+      - uat
+  push:
+    branches:
+      - uat
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-uat:
+    name: Validate UAT
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: local
+      SESSION_SECRET: uat-ci-session-secret
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Compile Python
+        run: python -m compileall app bot config storage web main.py
+
+      - name: Run tests
+        run: python -m pytest
+
+  deploy-uat:
+    name: Deploy UAT
+    if: github.event_name != 'pull_request' && vars.UAT_DEPLOY_ENABLED == 'true'
+    needs: validate-uat
+    runs-on:
+      - self-hosted
+      - linux
+      - ratsboombot
+    concurrency:
+      group: uat-deployment
+      cancel-in-progress: false
+    steps:
+      - name: Deploy isolated UAT instance
+        run: /opt/ratsboombot-uat/deploy/linux/deploy-uat.sh

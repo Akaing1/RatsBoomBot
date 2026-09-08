@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **9.0.5**
+Current version: **9.1.0**
 
 ## Highlights
 
@@ -346,6 +346,19 @@ TRUST_PROXY_HEADERS=true
 
 Use public HTTPS callback URLs, restrict `.env` and database permissions, retain backups, and monitor `/health` after deployment.
 
+## UAT Deployment
+
+The UAT instance runs independently beside production from the permanent `uat` branch:
+
+- Production: `/opt/ratsboombot`, port `4345`, `ratsboombot.service`, production Twitch accounts and databases
+- UAT: `/opt/ratsboombot-uat`, port `4346`, `ratsboombot-uat.service`, test Twitch accounts and separate databases
+
+UAT uses `https://uat.ratsboombot.com`, an independent Twitch application, the `akaing1` test bot, and the `developer_ninjakaing` broadcaster. Never copy the production `.env` or SQLite databases into UAT.
+
+Pull requests targeting `uat` run the complete test suite. Pushes and merges to `uat` deploy automatically after validation when the repository variable `UAT_DEPLOY_ENABLED` is set to `true`. UAT deployments do not publish GitHub releases or restart the production service.
+
+Complete the one-time Raspberry Pi, Twitch, Cloudflare, and GitHub setup in [`deploy/linux/UAT.md`](deploy/linux/UAT.md). Develop features against `uat`, verify them with the test accounts, and then open the final release pull request from `uat` into `master`.
+
 ## Testing
 
 Run the suite from the repository root:
@@ -365,6 +378,8 @@ RatsBoomBot uses a practical three-part version number:
 - Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
 
 The home page’s **What’s New** panel is intentionally updated only for minor and major releases. Patch releases remain available in the full GitHub release history.
+
+Version **9.1.0** adds an isolated UAT deployment environment for testing changes before production.
 
 Version **9.0.5** adds independent 5% Basic weapon drops for every successful raid participant and fixed 50% resale values for standard and Overclocked weapons.
 
