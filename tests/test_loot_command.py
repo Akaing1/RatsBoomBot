@@ -84,7 +84,7 @@ async def test_defeated_raid_uses_green_announcement() -> None:
 
     await command.attack.callback(command, context)
 
-    assert announcements == [("channel-1", "@alice dealt the final 100 damage and defeated Striking Dummy! The 5,000-point reward pool has been distributed by contribution!", "green")]
+    assert announcements == [("channel-1", "@alice dealt the final 100 damage and defeated Striking Dummy! 5,000 contribution points have been awarded by raid rank!", "green")]
 
 
 @pytest.mark.asyncio
