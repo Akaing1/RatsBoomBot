@@ -2,7 +2,7 @@ import logging
 
 from twitchio.ext import commands
 
-from bot.shared.events.community import award_cheer_points
+from bot.shared.events.community import award_cheer_points, award_sound_alert_points
 from config.settings import settings
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -51,6 +51,14 @@ class ChatEvents(commands.Component):
             LOGGER.exception(
                 "[Points] Failed to award cheer points to %s in broadcaster %s.",
                 chatter_name,
+                broadcaster_id
+            )
+
+        try:
+            await award_sound_alert_points(self.bot, payload)
+        except Exception:
+            LOGGER.exception(
+                "[Points] Failed to process Sound Alerts purchase in broadcaster %s.",
                 broadcaster_id
             )
 

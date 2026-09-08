@@ -112,3 +112,31 @@ async def test_settle_wager_does_not_track_winning_wagers_as_losses(tmp_path, mo
 
         assert await service.get_gambling_loss_total("channel-1") == 0
         assert await service.get_points("channel-1", "ratsboombot") == 0
+
+
+@pytest.mark.asyncio
+async def test_add_points_once_deduplicates_reward_events(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "points.db")) as database:
+        service = PointsService(bot=None, db=database)
+        await service.setup()
+
+        first = await service.add_points_once(
+            "channel-1",
+            "viewer-1",
+            "viewer",
+            100,
+            source="sound_alerts",
+            event_id="message-1"
+        )
+        duplicate = await service.add_points_once(
+            "channel-1",
+            "viewer-1",
+            "viewer",
+            100,
+            source="sound_alerts",
+            event_id="message-1"
+        )
+
+        assert first is True
+        assert duplicate is False
+        assert await service.get_points("channel-1", "viewer-1") == 100

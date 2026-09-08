@@ -1,10 +1,18 @@
 import logging
+import re
 
 from twitchio.ext import commands
 
 from bot.profiles import FeatureName, get_active_profile, render_profile_message
 
 LOGGER = logging.getLogger("RatBoomBot")
+
+SOUND_ALERTS_BOT_LOGIN = "soundalerts"
+SOUND_ALERTS_PURCHASE_PATTERN = re.compile(
+    r"^@?(?P<username>.+?) played .+? for (?P<bits>\d[\d,]*) Bits\b",
+    re.IGNORECASE
+)
+SOUND_ALERTS_ANONYMOUS_NAMES = {"anonymous", "anonymous user", "an anonymous user"}
 
 
 async def award_subscription_points(bot, payload) -> int:
@@ -63,6 +71,81 @@ async def award_cheer_points(bot, payload) -> int:
 
     await services.points.add_points(broadcaster_id, user_id, username, amount)
     services.stream_logs.write(broadcaster_id, "POINTS", f"Awarded {amount} cheer points to {username} ({user_id}) for {bits} Bits.")
+    return amount
+
+
+async def award_sound_alert_points(bot, payload) -> int:
+    sender_login = str(payload.chatter.name).casefold()
+
+    if sender_login != SOUND_ALERTS_BOT_LOGIN:
+        return 0
+
+    match = SOUND_ALERTS_PURCHASE_PATTERN.match(str(payload.text).strip())
+
+    if match is None:
+        return 0
+
+    broadcaster_id = str(payload.broadcaster.id)
+    services = bot.services
+    profile = get_active_profile(broadcaster_id)
+
+    if services is None or profile is None:
+        return 0
+
+    if not services.features.is_enabled(broadcaster_id, FeatureName.POINTS):
+        return 0
+
+    purchaser_name = match.group("username").strip().removeprefix("@").strip()
+    bits = int(match.group("bits").replace(",", ""))
+    reward_per_minimum = int(profile.points.cheer_reward)
+    minimum_bits = int(profile.points.cheer_minimum_bits)
+
+    if purchaser_name.casefold() in SOUND_ALERTS_ANONYMOUS_NAMES:
+        services.stream_logs.write(broadcaster_id, "POINTS", f"Skipped anonymous Sound Alerts purchase for {bits} Bits.")
+        return 0
+
+    if reward_per_minimum <= 0 or minimum_bits <= 0 or bits < minimum_bits:
+        return 0
+
+    message_id = str(getattr(payload, "id", None) or "")
+
+    if not message_id:
+        LOGGER.warning(
+            "[Points] Skipped Sound Alerts purchase in broadcaster %s because the chat message had no event ID.",
+            broadcaster_id
+        )
+        return 0
+
+    purchaser = await services.chatters.resolve(broadcaster_id, purchaser_name)
+
+    if purchaser is None:
+        services.stream_logs.write(
+            broadcaster_id,
+            "POINTS",
+            f"Skipped Sound Alerts purchase for {bits} Bits because purchaser {purchaser_name} could not be resolved."
+        )
+        return 0
+
+    amount = bits * reward_per_minimum // minimum_bits
+    user_id = str(purchaser.id)
+    username = str(purchaser.name)
+    awarded = await services.points.add_points_once(
+        broadcaster_id,
+        user_id,
+        username,
+        amount,
+        source="sound_alerts",
+        event_id=message_id
+    )
+
+    if not awarded:
+        return 0
+
+    services.stream_logs.write(
+        broadcaster_id,
+        "POINTS",
+        f"Awarded {amount} Sound Alerts points to {username} ({user_id}) for {bits} Bits."
+    )
     return amount
 
 
