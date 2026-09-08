@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **8.10.3**
+Current version: **9.0.5**
 
 ## Highlights
 
@@ -365,6 +365,8 @@ RatsBoomBot uses a practical three-part version number:
 - Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
 
 The home page’s **What’s New** panel is intentionally updated only for minor and major releases. Patch releases remain available in the full GitHub release history.
+
+Version **9.0.5** adds independent 5% Basic weapon drops for every successful raid participant and fixed 50% resale values for standard and Overclocked weapons.
 
 Version **8.10.3** improves the Patch Notes composer layout.
 

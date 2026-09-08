@@ -42,7 +42,8 @@ BLESSED_UNIQUE_WEAPON_TYPES = {
     "branch_of_yggdrasil": "all"
 }
 STANDARD_WEAPON_TYPES = BASIC_WEAPON_TYPES | REFINED_WEAPON_TYPES | MASTERWORK_WEAPON_TYPES
-WEAPON_TYPES = STANDARD_WEAPON_TYPES | UNIQUE_WEAPON_TYPES | OVERCLOCKED_WEAPON_TYPES | BLESSED_UNIQUE_WEAPON_TYPES
+SELLABLE_WEAPON_TYPES = STANDARD_WEAPON_TYPES | OVERCLOCKED_WEAPON_TYPES
+WEAPON_TYPES = SELLABLE_WEAPON_TYPES | UNIQUE_WEAPON_TYPES | BLESSED_UNIQUE_WEAPON_TYPES
 BOSS_TYPES = frozenset({"melee", "ranged", "magic"})
 ALL_WEAPON_TYPE = "all"
 ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "lucky": "lucky_dice", "dice": "lucky_dice", "fool": "fools_card", "fool_card": "fools_card", "the_fools_card": "fools_card", "ancient": "ancient_pact", "pact": "ancient_pact", "flag": "flag_bearer", "flag_bearer": "flag_bearer", "flag_bearers_will": "flag_bearer", "blessing_of_the_gods": "blessing", "heaven": "heavens_judgement", "heavens_judgement": "heavens_judgement", "heaven's_judgement": "heavens_judgement", "fools_dagger": "fools_dagger", "the_fool's_dagger": "fools_dagger", "brutalizer": "obsidian_brutalizer", "faithless": "forgotten_daggers", "forgotten_daggers_of_the_faithless": "forgotten_daggers", "yggdrasil": "branch_of_yggdrasil", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
@@ -149,6 +150,22 @@ class RaidBossService:
             return config.blessed_unique_repair_cost
 
         return config.overclocked_repair_cost if weapon in OVERCLOCKED_WEAPON_TYPES else config.repair_cost
+
+    @staticmethod
+    def weapon_sale_value(weapon: str, config: RaidBossConfig) -> int | None:
+        if weapon in BASIC_WEAPON_TYPES:
+            value = config.weapon_cost
+        elif weapon in REFINED_WEAPON_TYPES:
+            value = (config.weapon_cost * 2) + config.refined_crafting_cost
+        elif weapon in MASTERWORK_WEAPON_TYPES:
+            refined_value = (config.weapon_cost * 2) + config.refined_crafting_cost
+            value = (refined_value * 2) + config.masterwork_crafting_cost
+        elif weapon in OVERCLOCKED_WEAPON_TYPES:
+            value = config.overclocked_weapon_cost
+        else:
+            return None
+
+        return value // 2
 
     @staticmethod
     def apply_damage_multipliers(damage: int, multipliers: tuple[float, ...]) -> int:
@@ -1052,6 +1069,60 @@ class RaidBossService:
 
         return row is not None
 
+    async def sell(self, broadcaster_id: str, user_id: str, username: str, weapon: str, config: RaidBossConfig) -> str:
+        weapon = self.normalize_item(weapon)
+
+        if weapon not in WEAPON_TYPES:
+            return "invalid"
+
+        sale_value = self.weapon_sale_value(weapon, config)
+
+        if sale_value is None:
+            return "unsellable"
+
+        async with self.db.acquire() as connection:
+            await connection.execute("BEGIN")
+
+            try:
+                owned = await connection.fetchone(
+                    """
+                    SELECT inventory.quantity, players.equipped_weapon
+                    FROM raid_boss_inventory AS inventory
+                    LEFT JOIN raid_boss_players AS players
+                      ON players.broadcaster_id = inventory.broadcaster_id
+                     AND players.user_id = inventory.user_id
+                    WHERE inventory.broadcaster_id = ?
+                      AND inventory.user_id = ?
+                      AND inventory.item_id = ?
+                      AND inventory.quantity > 0
+                    """,
+                    (str(broadcaster_id), str(user_id), weapon)
+                )
+
+                if owned is None:
+                    await connection.rollback()
+                    return "not_owned"
+
+                if owned["equipped_weapon"] == weapon and int(owned["quantity"]) == 1:
+                    await connection.rollback()
+                    return "equipped"
+
+                await connection.execute(
+                    "UPDATE raid_boss_inventory SET quantity = quantity - 1 WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?",
+                    (str(broadcaster_id), str(user_id), weapon)
+                )
+                await self._add_points(connection, broadcaster_id, user_id, username, sale_value)
+                balance = await connection.fetchone(
+                    "SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?",
+                    (str(broadcaster_id), str(user_id))
+                )
+                await connection.commit()
+            except Exception:
+                await connection.rollback()
+                raise
+
+        return f"sold:{weapon}:{sale_value}:{int(balance['points'])}"
+
     async def get_inventory(self, broadcaster_id: str, user_id: str) -> tuple[list[tuple[str, int]], str | None, int, dict[str, int]]:
         async with self.db.acquire() as connection:
             rows = await connection.fetchall(
@@ -1419,6 +1490,14 @@ class RaidBossService:
                     if event.boss_tier == "main" and random.random() < config.blessed_unique_drop_chance:
                         awards.append((*recipient, random.choice(tuple(BLESSED_UNIQUE_WEAPON_TYPES))))
 
+                for contributor in contributors:
+                    if random.random() < config.basic_weapon_drop_chance:
+                        awards.append((
+                            str(contributor["user_id"]),
+                            str(contributor["username"]),
+                            random.choice(tuple(BASIC_WEAPON_TYPES))
+                        ))
+
             for recipient_id, recipient_name, item_id in awards:
                 if item_id.endswith("_points"):
                     bonus_points = int(item_id.removesuffix("_points"))
@@ -1434,14 +1513,29 @@ class RaidBossService:
                     continue
 
                 await self._ensure_player(connection, broadcaster_id, recipient_id, recipient_name)
-                await connection.execute(
-                    """
-                    INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability)
-                    VALUES (?, ?, ?, 1, ?)
-                    ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET quantity = 1, durability = MAX(durability, excluded.durability)
-                    """,
-                    (str(broadcaster_id), recipient_id, item_id, self.weapon_max_durability(item_id, config))
-                )
+
+                if item_id in BASIC_WEAPON_TYPES:
+                    await connection.execute(
+                        """
+                        INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability)
+                        VALUES (?, ?, ?, 1, ?)
+                        ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET
+                            quantity = quantity + 1,
+                            durability = MAX(durability, excluded.durability)
+                        """,
+                        (str(broadcaster_id), recipient_id, item_id, self.weapon_max_durability(item_id, config))
+                    )
+                else:
+                    await connection.execute(
+                        """
+                        INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability)
+                        VALUES (?, ?, ?, 1, ?)
+                        ON CONFLICT(broadcaster_id, user_id, item_id) DO UPDATE SET
+                            quantity = 1,
+                            durability = MAX(durability, excluded.durability)
+                        """,
+                        (str(broadcaster_id), recipient_id, item_id, self.weapon_max_durability(item_id, config))
+                    )
                 await connection.execute(
                     "INSERT OR IGNORE INTO raid_boss_reward_items (event_id, broadcaster_id, user_id, item_id) VALUES (?, ?, ?, ?)",
                     (event.id, str(broadcaster_id), recipient_id, item_id)

@@ -467,6 +467,7 @@ class RaidBossConfig:
     final_hit_unique_drop_chance: float = 0.03
     top_contributor_unique_drop_chance: float = 0.03
     top_contributor_percent: float = 0.10
+    basic_weapon_drop_chance: float = 0.05
     unique_weapon_attack: int = 225
     second_wind_cost: int = 1000
     berserk_cost: int = 3000

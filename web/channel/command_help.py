@@ -132,6 +132,7 @@ RAID_BOSS_COMMANDS = CommandGroupDefinition(
         CommandDefinition("!raid shop", "Show Basic weapons and the Power Potion in Twitch chat.", feature=FeatureName.RAID_BOSSES),
         CommandDefinition("!raid buy <item>", "Buy a Basic weapon, Power Potion, Second Wind, Berserk, or Blessing of the Gods.", feature=FeatureName.RAID_BOSSES),
         CommandDefinition("!raid craft <sword|bow|tome>", "Automatically craft the highest available tier from two matching weapons and points.", feature=FeatureName.RAID_BOSSES),
+        CommandDefinition("!raid sell <weapon>", "Sell one Basic, Refined, Masterwork, or Overclocked weapon for half its value.", feature=FeatureName.RAID_BOSSES),
         CommandDefinition("!raid equip <weapon>", "Equip an owned raid weapon for future attacks.", feature=FeatureName.RAID_BOSSES),
         CommandDefinition("!raid unequip", "Unequip your current weapon and use base damage instead.", feature=FeatureName.RAID_BOSSES),
         CommandDefinition("!raid inventory", "Show owned weapons, equipped durability, and stored consumables.", feature=FeatureName.RAID_BOSSES),

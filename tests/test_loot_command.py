@@ -85,3 +85,23 @@ async def test_defeated_raid_uses_green_announcement() -> None:
     await command.attack.callback(command, context)
 
     assert announcements == [("channel-1", "@alice dealt the final 100 damage and defeated Striking Dummy! The 5,000-point reward pool has been distributed by contribution!", "green")]
+
+
+@pytest.mark.asyncio
+async def test_sell_command_reports_item_value_and_new_balance() -> None:
+    class FakeSellService:
+
+        async def sell(self, broadcaster_id, user_id, username, weapon, config):
+            return "sold:basic_sword:2500:7500"
+
+    features = SimpleNamespace(is_enabled=lambda broadcaster_id, feature: True)
+    bot = SimpleNamespace(services=SimpleNamespace(features=features, raid_bosses=FakeSellService()))
+    profile = ChannelProfile(channel_name="channel", features=FeatureDefaults(points=True, raid_bosses=True), raid_bosses=RaidBossConfig(enabled=True))
+    activate_profile("channel-1", profile)
+    command = RaidBossCommands(bot)
+    context = FakeContext()
+
+    await command.sell.callback(command, context, weapon="basic sword")
+
+    item_name = profile.raid_bosses.weapon_names.display("basic_sword")
+    assert context.replies == [f"You sold {item_name} for 2,500 points. New balance: 7,500 points."]
