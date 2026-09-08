@@ -54,7 +54,7 @@ MEINYA_TIMED_ANNOUNCEMENTS = (
         message="Mei is trying to reach YouTube partnership! If you would like to help support, please leave a lurk on YouTube here as well :3 https://www.youtube.com/watch?v=rWu1z5iWo5k",
         interval_seconds=60 * 60,
         required_messages=30,
-        color="red"
+        color="orange"
     ),
 )
 
