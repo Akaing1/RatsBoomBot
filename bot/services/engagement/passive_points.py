@@ -9,7 +9,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 
 class PassivePointsService:
-    POINTS_PER_INTERVAL = 10
+    POINTS_PER_INTERVAL = 15
     INTERVAL_SECONDS = 120
 
     def __init__(self, bot, db, points, chat_identity, features):

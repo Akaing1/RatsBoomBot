@@ -58,6 +58,17 @@ class PointsService:
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """)
+                await connection.execute("""
+                CREATE TABLE IF NOT EXISTS point_reward_events (
+                    broadcaster_id TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    event_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    points INTEGER NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (broadcaster_id, source, event_id)
+                )
+                """)
         except Exception:
             LOGGER.exception("[Points] Failed to prepare points storage.")
             raise
@@ -303,6 +314,75 @@ class PointsService:
             username,
             broadcaster_id
         )
+
+
+    async def add_points_once(self, broadcaster_id: str, user_id: str, username: str, amount: int, *, source: str, event_id: str, earned: bool = True) -> bool:
+        broadcaster_id = str(broadcaster_id)
+        user_id = str(user_id)
+
+        if amount <= 0 or not source or not event_id:
+            return False
+
+        try:
+            async with self.db.acquire() as connection:
+                await connection.execute("BEGIN")
+
+                try:
+                    await connection.execute(
+                        """
+                        INSERT OR IGNORE INTO point_reward_events (
+                            broadcaster_id,
+                            source,
+                            event_id,
+                            user_id,
+                            points
+                        )
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (broadcaster_id, source, event_id, user_id, amount)
+                    )
+                    changed = await connection.fetchone("SELECT changes() AS count")
+
+                    if int(changed["count"]) == 0:
+                        await connection.rollback()
+                        return False
+
+                    await connection.execute(
+                        """
+                        INSERT INTO viewers (broadcaster_id, user_id, username, points, messages)
+                        VALUES (?, ?, ?, ?, 0)
+                        ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
+                            username = excluded.username,
+                            points = points + excluded.points
+                        """,
+                        (broadcaster_id, user_id, username, amount)
+                    )
+
+                    if earned and self.chatter_stats is not None:
+                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, amount, connection)
+
+                    await connection.commit()
+                except Exception:
+                    await connection.rollback()
+                    raise
+        except Exception:
+            LOGGER.exception(
+                "[Points] Failed to add a one-time %s reward of %d points to %s for broadcaster %s.",
+                source,
+                amount,
+                username,
+                broadcaster_id
+            )
+            raise
+
+        LOGGER.info(
+            "[Points] Added a one-time %s reward of %d points to %s for broadcaster %s.",
+            source,
+            amount,
+            username,
+            broadcaster_id
+        )
+        return True
 
     async def transfer_points(self, broadcaster_id: str, sender_id: str, recipient_id: str, recipient_name: str, amount: int) -> int | None:
         broadcaster_id = str(broadcaster_id)

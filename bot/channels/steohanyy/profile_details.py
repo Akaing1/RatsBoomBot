@@ -78,7 +78,7 @@ STEOHANYY_REDEEMS = RedeemConfig(
 
 STEOHANYY_POINTS = PointsConfig(
     command_name="drinks",
-    points_per_message=10,
+    points_per_message=25,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,
     duel_expiration_seconds=60,

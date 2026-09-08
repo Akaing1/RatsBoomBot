@@ -29,6 +29,7 @@ from storage.migrations.v024_raid_gamble_consumables import migrate as migrate_r
 from storage.migrations.v025_ancient_pact import migrate as migrate_ancient_pact
 from storage.migrations.v026_flag_bearers_will import migrate as migrate_flag_bearers_will
 from storage.migrations.v027_overclocked_weapons import migrate as migrate_overclocked_weapons
+from storage.migrations.v028_point_reward_events import migrate as migrate_point_reward_events
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -68,4 +69,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=25, name="ancient_pact", run=migrate_ancient_pact)
     , Migration(version=26, name="flag_bearers_will", run=migrate_flag_bearers_will)
     , Migration(version=27, name="overclocked_weapons", run=migrate_overclocked_weapons)
+    , Migration(version=28, name="point_reward_events", run=migrate_point_reward_events)
 )
