@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -12,7 +12,8 @@ async def test_profile_timed_announcement_requires_interval_and_message_count(mo
     announcement = TimedAnnouncement(message="Support Mei on YouTube!", interval_seconds=3600, required_messages=30, color="red")
     profile = SimpleNamespace(timed_announcements=(announcement,))
     chat_identity = SimpleNamespace(send_announcement=AsyncMock(), send_message=AsyncMock())
-    bot = SimpleNamespace(create_partialuser=lambda broadcaster_id: SimpleNamespace(id=broadcaster_id), services=SimpleNamespace(chat_identity=chat_identity))
+    stream_logs = SimpleNamespace(write=MagicMock())
+    bot = SimpleNamespace(create_partialuser=lambda broadcaster_id: SimpleNamespace(id=broadcaster_id), services=SimpleNamespace(chat_identity=chat_identity, stream_logs=stream_logs))
     service = TimerService(bot, broadcasters=None, broadcaster_settings=None)
     key = service._timed_announcement_key("channel-1", 0)
     service.timed_last_announcements[key] = 0
@@ -29,3 +30,4 @@ async def test_profile_timed_announcement_requires_interval_and_message_count(mo
     assert chat_identity.send_announcement.await_args.args[1:] == ("Support Mei on YouTube!", "red")
     assert service.timed_message_counts[key] == 0
     assert service.timed_last_announcements[key] == 3600
+    stream_logs.write.assert_called_once_with("channel-1", "TIMER", "Sent red timed announcement: Support Mei on YouTube!")
