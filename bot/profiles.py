@@ -324,7 +324,7 @@ class PointsMessages:
 @dataclass(frozen=True)
 class PointsConfig:
     command_name: str = "points"
-    points_per_message: int = 10
+    points_per_message: int = 25
     message_cooldown_seconds: int = 60
     gamble_win_chance: float = 0.45
     roulette_max_bet: int = 1000

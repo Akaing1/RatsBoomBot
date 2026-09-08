@@ -79,7 +79,7 @@ async def test_passive_points_awards_once_per_stream_interval(monkeypatch, tmp_p
             )
             payouts = await connection.fetchone("SELECT COUNT(*) AS count FROM passive_point_payouts")
 
-        assert int(row["points"]) == 20
+        assert int(row["points"]) == 30
         assert int(payouts["count"]) == 2
         assert chatter_stats.record_points_earned.await_count == 2
         assert broadcaster.fetch_chatter_calls == [
