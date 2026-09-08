@@ -175,7 +175,11 @@ class RaidBossCommands(commands.Component):
             return
 
         if result.defeated:
-            drop_text = " Loot: " + ", ".join(f"{username} received {int(item_id.removesuffix('_points')):,} points" if item_id.endswith("_points") else f"{username} found {config.weapon_names.display(item_id)}" for username, item_id in result.drops) + "!" if result.drops else ""
+            drop_summaries = [f"{username} received {int(item_id.removesuffix('_points')):,} points" if item_id.endswith("_points") else f"{username} found {config.weapon_names.display(item_id)}" for username, item_id in result.drops]
+            visible_drops = drop_summaries[:3]
+            remaining_drops = len(drop_summaries) - len(visible_drops)
+            more_text = f", and {remaining_drops} more—use !raid loot" if remaining_drops else ""
+            drop_text = f" Loot: {', '.join(visible_drops)}{more_text}!" if visible_drops else ""
             message = f"@{chatter.name} dealt the final {result.damage:,} damage{bonus_text} and defeated {result.boss_name}! {result.reward:,} contribution points have been awarded by raid rank!{drop_text}"
             await self.bot.services.raid_bosses.send_announcement(broadcaster_id, message, "green")
             return
@@ -307,6 +311,33 @@ class RaidBossCommands(commands.Component):
 
         equipped_item = context[1].weapon_names.display(self.bot.services.raid_bosses.normalize_item(weapon))
         await ctx.reply(f"You equipped your {equipped_item}.")
+
+    @raid.command(name="sell")
+    async def sell(self, ctx: commands.Context, *, weapon: str | None = None) -> None:
+        context = self.get_context(ctx)
+
+        if context is None:
+            return
+
+        if not weapon:
+            await ctx.reply("Use !raid sell <weapon> to sell one unequipped copy for half its value.")
+            return
+
+        chatter = ctx.chatter
+        result = await self.bot.services.raid_bosses.sell(context[0], str(chatter.id), chatter.name, weapon, context[1])
+
+        if result == "invalid":
+            await ctx.reply("That is not a recognized raid weapon.")
+        elif result == "unsellable":
+            await ctx.reply("Mythical and Blessed Unique weapons cannot be sold.")
+        elif result == "not_owned":
+            await ctx.reply("You do not own that weapon.")
+        elif result == "equipped":
+            await ctx.reply("That is your last copy and it is equipped. Unequip it before selling.")
+        else:
+            _, weapon_id, sale_value, balance = result.split(":", 3)
+            sold_item = context[1].weapon_names.display(weapon_id)
+            await ctx.reply(f"You sold {sold_item} for {int(sale_value):,} points. New balance: {int(balance):,} points.")
 
     @raid.command(name="inventory")
     async def inventory(self, ctx: commands.Context) -> None:

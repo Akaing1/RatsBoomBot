@@ -235,6 +235,7 @@ async def public_channel_raid_page(request: Request, channel_name: str):
         {"syntax": "!raid shop", "description": "Show Basic weapons and the Power Potion in chat."},
         {"syntax": "!raid buy <item>", "description": "Purchase a weapon or consumable with loyalty points."},
         {"syntax": "!raid craft <sword|bow|tome>", "description": "Craft the highest available next tier using two matching weapons and the crafting fee."},
+        {"syntax": "!raid sell <weapon>", "description": "Sell one Basic, Refined, Masterwork, or Overclocked weapon for half its value."},
         {"syntax": "!raid inventory", "description": "View your weapons, equipped item, durability, and potion attacks."},
         {"syntax": "!raid equip <weapon>", "description": "Equip an owned weapon."},
         {"syntax": "!raid unequip", "description": "Remove your equipped weapon and return to base attack damage."},

@@ -98,6 +98,7 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
     assert config.overclocked_weapon_durability == 25
     assert config.overclocked_repair_cost == 2500
     assert config.overdrive_chance == 0.50
+    assert config.basic_weapon_drop_chance == 0.05
     assert config.top_contributor_unique_drop_chance == 0.03
     assert config.blessed_unique_drop_chance == 0.01
     assert config.blessed_unique_durability == 35
@@ -1410,7 +1411,7 @@ async def test_blessed_unique_drop_is_a_separate_main_boss_roll(tmp_path, monkey
         async with database.acquire() as connection:
             await connection.execute("INSERT INTO raid_boss_attacks (event_id, broadcaster_id, stream_id, user_id, username, damage, attack_number, attacked_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)", (event.id, "channel-1", "stream-1", "user-1", "alice", 1000, "2026-09-07T00:00:00+00:00"))
 
-        rolls = iter((0.50, 0.0))
+        rolls = iter((0.50, 0.0, 1.0))
         monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: next(rolls))
         monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: values[0])
         drops = await service._award_victory_drops("channel-1", event, config)
@@ -1424,3 +1425,90 @@ async def test_blessed_unique_drop_is_a_separate_main_boss_roll(tmp_path, monkey
 
         assert item["durability"] == 35
 
+
+
+@pytest.mark.asyncio
+async def test_every_participant_gets_an_independent_basic_weapon_drop_roll(tmp_path, monkeypatch) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
+        config = build_config(top_contributor_unique_drop_chance=0.0, basic_weapon_drop_chance=0.05)
+        event = await service.spawn("channel-1", "melee", config, "mini")
+
+        async with database.acquire() as connection:
+            for index, username in enumerate(("alice", "bob", "carol"), start=1):
+                await connection.execute(
+                    "INSERT INTO raid_boss_attacks (event_id, broadcaster_id, stream_id, user_id, username, damage, attack_number, attacked_at) VALUES (?, ?, ?, ?, ?, 100, 1, ?)",
+                    (event.id, "channel-1", "stream-1", f"user-{index}", username, "2026-09-08T00:00:00+00:00")
+                )
+
+            await connection.execute(
+                "INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES ('channel-1', 'user-1', 'basic_sword', 1, 1)"
+            )
+
+        rolls = iter((1.0, 0.0, 1.0, 0.0))
+        monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: next(rolls))
+        monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: values[0])
+
+        drops = await service._award_victory_drops("channel-1", event, config)
+        alice_weapons, _, _, _ = await service.get_inventory("channel-1", "user-1")
+        bob_weapons, _, _, _ = await service.get_inventory("channel-1", "user-2")
+        carol_weapons, _, _, _ = await service.get_inventory("channel-1", "user-3")
+
+        assert drops == (("alice", "basic_sword"), ("carol", "basic_sword"))
+        assert alice_weapons == [("basic_sword", 2)]
+        assert bob_weapons == []
+        assert carol_weapons == [("basic_sword", 1)]
+
+
+def test_weapon_sale_values_are_half_of_each_tiers_total_value() -> None:
+    config = build_config(
+        weapon_cost=5000,
+        refined_crafting_cost=5000,
+        masterwork_crafting_cost=25000,
+        overclocked_weapon_cost=100000
+    )
+
+    assert RaidBossService.weapon_sale_value("basic_sword", config) == 2500
+    assert RaidBossService.weapon_sale_value("refined_sword", config) == 7500
+    assert RaidBossService.weapon_sale_value("masterwork_sword", config) == 27500
+    assert RaidBossService.weapon_sale_value("overclocked_sword", config) == 50000
+    assert RaidBossService.weapon_sale_value("mythical_blade", config) is None
+    assert RaidBossService.weapon_sale_value("heavens_judgement", config) is None
+
+
+@pytest.mark.asyncio
+async def test_selling_ignores_durability_and_preserves_an_equipped_copy(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(weapon_cost=5000)
+
+        async with database.acquire() as connection:
+            await connection.execute(
+                "INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES ('channel-1', 'user-1', 'basic_sword', 2, 1)"
+            )
+
+        await service.equip("channel-1", "user-1", "alice", "basic_sword")
+        sold = await service.sell("channel-1", "user-1", "alice", "basic_sword", config)
+        blocked = await service.sell("channel-1", "user-1", "alice", "basic_sword", config)
+        weapons, equipped, _, _ = await service.get_inventory("channel-1", "user-1")
+
+        assert sold == "sold:basic_sword:2500:2500"
+        assert blocked == "equipped"
+        assert weapons == [("basic_sword", 1)]
+        assert equipped == "basic_sword"
+        assert await points.get_points("channel-1", "user-1") == 2500
+
+
+@pytest.mark.asyncio
+async def test_mythical_and_blessed_unique_weapons_cannot_be_sold(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
+        config = build_config()
+
+        assert await service.sell("channel-1", "user-1", "alice", "mythical_blade", config) == "unsellable"
+        assert await service.sell("channel-1", "user-1", "alice", "heavens_judgement", config) == "unsellable"
