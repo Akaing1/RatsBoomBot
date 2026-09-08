@@ -192,6 +192,7 @@ class TimerService:
             try:
                 await self.bot.services.chat_identity.send_announcement(channel, announcement.message, announcement.color)
                 LOGGER.info("[Timers] Sent %s timed announcement to %s (%s).", announcement.color, broadcaster_name, broadcaster_id)
+                self.bot.services.stream_logs.write(broadcaster_id, "TIMER", f"Sent {announcement.color} timed announcement: {announcement.message}")
             except Exception:
                 LOGGER.warning("[Timers] Timed announcement failed for %s (%s); falling back to chat.", broadcaster_name, broadcaster_id, exc_info=True)
 
@@ -199,9 +200,11 @@ class TimerService:
                     await self.bot.services.chat_identity.send_message(channel, announcement.message)
                 except Exception:
                     LOGGER.exception("[Timers] Timed announcement fallback failed for %s (%s).", broadcaster_name, broadcaster_id)
+                    self.bot.services.stream_logs.write(broadcaster_id, "TIMER", f"Failed to send timed announcement and chat fallback: {announcement.message}")
                     continue
 
                 LOGGER.info("[Timers] Sent timed message to %s (%s) using normal chat fallback.", broadcaster_name, broadcaster_id)
+                self.bot.services.stream_logs.write(broadcaster_id, "TIMER", f"Sent timed message using normal chat fallback: {announcement.message}")
 
             self.timed_message_counts[key] = 0
             self.timed_last_announcements[key] = now
@@ -264,6 +267,7 @@ class TimerService:
             broadcaster_id,
             message
         )
+        self.bot.services.stream_logs.write(broadcaster_id, "TIMER", f"Sent timer message: {message}")
 
         return True
 
