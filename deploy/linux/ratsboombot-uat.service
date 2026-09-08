@@ -1,0 +1,19 @@
+[Unit]
+Description=RatsBoomBot UAT Twitch Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rats-bot
+Group=rats-bot
+WorkingDirectory=/opt/ratsboombot-uat
+EnvironmentFile=/opt/ratsboombot-uat/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ratsboombot-uat/.venv/bin/python /opt/ratsboombot-uat/main.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

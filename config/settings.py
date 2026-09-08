@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 VALID_BOT_DETECTION_MODES = {"learning", "shadow", "active"}
-VALID_ENVIRONMENTS = {"local", "production"}
+VALID_ENVIRONMENTS = {"local", "uat", "production"}
 DEFAULT_CHANNEL_SCOPES = (
     "channel:bot "
     "moderator:manage:banned_users "
@@ -90,7 +90,7 @@ if settings.BOT_DETECTION_MODE not in VALID_BOT_DETECTION_MODES:
     raise ValueError("BOT_DETECTION_MODE must be learning, shadow, or active.")
 
 if settings.ENVIRONMENT not in VALID_ENVIRONMENTS:
-    raise ValueError("ENVIRONMENT must be local or production.")
+    raise ValueError("ENVIRONMENT must be local, uat, or production.")
 
-if settings.ENVIRONMENT == "production" and not settings.SESSION_HTTPS_ONLY:
-    raise ValueError("SESSION_HTTPS_ONLY must be true in production.")
+if settings.ENVIRONMENT in {"uat", "production"} and not settings.SESSION_HTTPS_ONLY:
+    raise ValueError("SESSION_HTTPS_ONLY must be true in UAT and production.")

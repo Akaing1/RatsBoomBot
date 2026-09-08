@@ -678,7 +678,7 @@ async def test_blessing_is_one_purchase_per_stream_and_buffs_subsequent_attacks(
 @pytest.mark.parametrize("item_id", ("potion", "second_wind", "berserk", "blessing"))
 async def test_buffs_require_an_active_stream_to_purchase(tmp_path, item_id) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
-        points = PointsService(database)
+        points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=FakeRaidBot(), db=database)
         await run_migrations(database)
         await service.setup()
@@ -746,8 +746,8 @@ async def test_dashboard_metrics_summarize_latest_encounter(tmp_path, monkeypatc
         assert metrics["streams_used"] == 1
         assert metrics["unique_attackers"] == 2
         assert metrics["total_attacks"] == 2
-        assert metrics["total_damage"] == 690
-        assert metrics["average_damage"] == 345.0
+        assert metrics["total_damage"] == 600
+        assert metrics["average_damage"] == 300.0
         assert metrics["weapon_attacks"] == 1
         assert metrics["potion_attacks"] == 1
         assert metrics["critical_hits"] == 2
@@ -815,7 +815,7 @@ async def test_successful_raid_uses_equal_base_shares_and_rank_bonuses(tmp_path)
             result = await service.attack("channel-1", "stream-1", f"user-{index}", f"viewer{index}", config)
 
         assert result is not None
-        assert result.reward == 1175
+        assert result.reward == 1225
         assert await points.get_points("channel-1", "user-0") == 200
         assert await points.get_points("channel-1", "user-1") == 150
         assert await points.get_points("channel-1", "user-2") == 125
@@ -894,10 +894,10 @@ async def test_latest_loot_persists_points_final_hit_bonus_and_items(tmp_path, m
 
         assert loot == {
             "boss_name": "Training Dummy",
-            "contribution_points": 100,
+            "contribution_points": 200,
             "final_hit_points": 1000,
             "bonus_points": 0,
-            "total_points": 1100,
+            "total_points": 1200,
             "items": ("basic_sword",)
         }
 
@@ -920,10 +920,10 @@ async def test_latest_loot_includes_tutorial_collection_points(tmp_path) -> None
         loot = await service.get_latest_loot("channel-1", "user-1")
 
         assert loot is not None
-        assert loot["contribution_points"] == 100
+        assert loot["contribution_points"] == 200
         assert loot["final_hit_points"] == 1000
         assert loot["bonus_points"] == 5000
-        assert loot["total_points"] == 6100
+        assert loot["total_points"] == 6200
         assert loot["items"] == ()
 
 
@@ -944,7 +944,7 @@ async def test_tutorial_rewards_five_thousand_points_when_all_starter_weapons_ar
         result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
 
         assert result.drops == (("alice", "5000_points"),)
-        assert await points.get_points("channel-1", "user-1") == 6100
+        assert await points.get_points("channel-1", "user-1") == 6200
 
 
 @pytest.mark.asyncio

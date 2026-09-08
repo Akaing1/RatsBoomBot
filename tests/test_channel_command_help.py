@@ -2,7 +2,7 @@ import pytest
 from twitchio.ext import commands
 
 from bot.component_loader import GLOBAL_COMPONENTS
-from bot.profiles import ChannelProfile, FeatureName, GlobalCommandDefaults, LeagueConfig, OverwatchConfig, PointsConfig, ProfileFeatureName, RaidBossConfig, activate_profile, clear_profiles
+from bot.profiles import ChannelProfile, FeatureDefaults, FeatureName, GlobalCommandDefaults, LeagueConfig, OverwatchConfig, PointsConfig, ProfileFeatureName, RaidBossConfig, activate_profile, clear_profiles
 from bot.services.channels.feature_toggle import FeatureToggleService
 from web.channel.command_help import build_command_help_groups, build_enabled_command_help_groups
 
@@ -93,7 +93,7 @@ def test_profile_feature_toggle_disables_integration_command_help() -> None:
 
 def test_command_help_includes_raid_boss_commands_for_raid_enabled_channels() -> None:
     broadcaster_id = "channel-1"
-    profile = ChannelProfile(channel_name="channel", raid_bosses=RaidBossConfig(enabled=True))
+    profile = ChannelProfile(channel_name="channel", features=FeatureDefaults(raid_bosses=True), raid_bosses=RaidBossConfig(enabled=True))
     activate_profile(broadcaster_id, profile)
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
     raid_bosses = get_group(groups, "Raid Bosses")
