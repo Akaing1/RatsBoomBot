@@ -29,14 +29,17 @@ def test_uat_service_is_isolated_from_production() -> None:
     repository_root = Path(__file__).resolve().parents[1]
     service = (repository_root / "deploy" / "linux" / "ratsboombot-uat.service").read_text(encoding="utf-8")
     environment = (repository_root / ".env.uat.example").read_text(encoding="utf-8")
+    bot = (repository_root / "bot" / "bot.py").read_text(encoding="utf-8")
 
     assert "WorkingDirectory=/opt/ratsboombot-uat" in service
     assert "EnvironmentFile=/opt/ratsboombot-uat/.env" in service
     assert "ADMIN_PORT=4346" in environment
+    assert "TWITCH_ADAPTER_PORT=4344" in environment
     assert "DATABASE_PATH=.data/tokens.db" in environment
     assert "ENVIRONMENT=uat" in environment
     assert "SESSION_COOKIE_DOMAIN=" in environment
     assert "https://uat.ratsboombot.com" in environment
+    assert "adapter=web.AiohttpAdapter(host=settings.ADMIN_HOST, port=settings.TWITCH_ADAPTER_PORT)" in bot
 
 
 def test_uat_deploy_script_only_targets_uat_instance() -> None:
