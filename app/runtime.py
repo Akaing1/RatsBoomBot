@@ -11,12 +11,13 @@ from aiohttp.web_runner import GracefulExit
 import asqlite
 import uvicorn
 from rich.logging import RichHandler
+from twitchio.exceptions import InvalidTokenException
 
 from bot.bot import TwitchBot
 from app.runtime_logs import runtime_log_buffer
 from config.settings import settings
 from config.version import APP_NAME, APP_VERSION
-from storage.database import setup_database
+from storage.database import delete_token, setup_database
 from web.app import app as admin_app
 from web.state import clear_runtime, set_runtime
 
@@ -57,6 +58,20 @@ async def run_services(bot: TwitchBot, admin_server: uvicorn.Server) -> None:
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
+async def load_stored_tokens(bot: TwitchBot, database, tokens) -> tuple[str, ...]:
+    invalid_user_ids = []
+
+    for user_id, token, refresh_token in tokens:
+        try:
+            await bot.add_token(token, refresh_token)
+        except InvalidTokenException:
+            LOGGER.warning("[OAuth] Stored token for user %s is invalid and will be removed. Reauthorization is required.", user_id)
+            await delete_token(database, user_id)
+            invalid_user_ids.append(user_id)
+
+    return tuple(invalid_user_ids)
+
+
 async def run_runtime() -> None:
     startup_started_at = perf_counter()
     database_path = Path(settings.DATABASE_PATH)
@@ -78,58 +93,63 @@ async def run_runtime() -> None:
         async with asqlite.create_pool(str(database_path)) as database, asqlite.create_pool(str(league_database_path)) as league_database:
             LOGGER.info("[Database] SQLite connection pool opened.")
 
-            setup_started_at = perf_counter()
-            tokens, subscriptions, broadcaster_ids = await setup_database(database)
+            while True:
+                setup_started_at = perf_counter()
+                tokens, subscriptions, broadcaster_ids = await setup_database(database)
 
-            LOGGER.info(
-                "[Database] Startup data loaded in %.3f seconds: "
-                "%d tokens, %d broadcasters, %d EventSub subscriptions.",
-                perf_counter() - setup_started_at,
-                len(tokens),
-                len(broadcaster_ids),
-                len(subscriptions)
-            )
-
-            LOGGER.info("[Runtime] Creating Twitch bot instance.")
-
-            async with TwitchBot(token_database=database, league_database=league_database, subs=subscriptions, broadcaster_ids=broadcaster_ids) as bot:
-                LOGGER.info("[OAuth] Loading %d stored OAuth tokens.", len(tokens))
-
-                for token, refresh_token in tokens:
-                    await bot.add_token(token, refresh_token)
-
-                LOGGER.info("[OAuth] Stored OAuth tokens loaded.")
-
-                set_runtime(twitch_bot=bot, token_database=database)
-
-                LOGGER.info("[Runtime] Shared runtime state initialized.")
-
-                admin_config = uvicorn.Config(
-                    admin_app,
-                    host=settings.ADMIN_HOST,
-                    port=settings.ADMIN_PORT,
-                    log_level="info",
-                    proxy_headers=settings.TRUST_PROXY_HEADERS,
-                    forwarded_allow_ips="127.0.0.1" if settings.TRUST_PROXY_HEADERS else None
-                )
-
-                admin_server = uvicorn.Server(admin_config)
-
-                LOGGER.info("[Runtime] Starting Twitch bot.")
                 LOGGER.info(
-                    "[Dashboard] Starting admin dashboard at %s.",
-                    settings.ADMIN_BASE_URL
-                )
-                LOGGER.info(
-                    "[Startup] Runtime initialization completed in %.3f seconds.",
-                    perf_counter() - startup_started_at
+                    "[Database] Startup data loaded in %.3f seconds: "
+                    "%d tokens, %d broadcasters, %d EventSub subscriptions.",
+                    perf_counter() - setup_started_at,
+                    len(tokens),
+                    len(broadcaster_ids),
+                    len(subscriptions)
                 )
 
-                try:
-                    await run_services(bot, admin_server)
-                finally:
-                    clear_runtime()
-                    LOGGER.info("[Runtime] Shared runtime state cleared.")
+                LOGGER.info("[Runtime] Creating Twitch bot instance.")
+
+                async with TwitchBot(token_database=database, league_database=league_database, subs=subscriptions, broadcaster_ids=broadcaster_ids) as bot:
+                    LOGGER.info("[OAuth] Loading %d stored OAuth tokens.", len(tokens))
+                    invalid_user_ids = await load_stored_tokens(bot, database, tokens)
+
+                    if invalid_user_ids:
+                        LOGGER.warning("[OAuth] Removed %d invalid stored token(s); rebuilding runtime state.", len(invalid_user_ids))
+                        continue
+
+                    LOGGER.info("[OAuth] Stored OAuth tokens loaded.")
+
+                    set_runtime(twitch_bot=bot, token_database=database)
+
+                    LOGGER.info("[Runtime] Shared runtime state initialized.")
+
+                    admin_config = uvicorn.Config(
+                        admin_app,
+                        host=settings.ADMIN_HOST,
+                        port=settings.ADMIN_PORT,
+                        log_level="info",
+                        proxy_headers=settings.TRUST_PROXY_HEADERS,
+                        forwarded_allow_ips="127.0.0.1" if settings.TRUST_PROXY_HEADERS else None
+                    )
+
+                    admin_server = uvicorn.Server(admin_config)
+
+                    LOGGER.info("[Runtime] Starting Twitch bot.")
+                    LOGGER.info(
+                        "[Dashboard] Starting admin dashboard at %s.",
+                        settings.ADMIN_BASE_URL
+                    )
+                    LOGGER.info(
+                        "[Startup] Runtime initialization completed in %.3f seconds.",
+                        perf_counter() - startup_started_at
+                    )
+
+                    try:
+                        await run_services(bot, admin_server)
+                    finally:
+                        clear_runtime()
+                        LOGGER.info("[Runtime] Shared runtime state cleared.")
+
+                break
     except asyncio.CancelledError:
         LOGGER.info("[Shutdown] Runtime tasks were cancelled.")
     except Exception:
