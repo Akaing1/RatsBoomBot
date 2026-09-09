@@ -4,9 +4,16 @@ on:
   pull_request:
     branches:
       - uat
+      - "release/**"
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
   push:
     branches:
       - uat
+      - "release/**"
   workflow_dispatch:
 
 permissions:
@@ -40,7 +47,12 @@ jobs:
 
   deploy-uat:
     name: Deploy UAT
-    if: github.event_name != 'pull_request' && vars.UAT_DEPLOY_ENABLED == 'true'
+    if: >-
+      vars.UAT_DEPLOY_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' ||
+      (startsWith(github.base_ref, 'release/') &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository))
     needs: validate-uat
     runs-on:
       - self-hosted
@@ -49,6 +61,8 @@ jobs:
     concurrency:
       group: uat-deployment
       cancel-in-progress: false
+    env:
+      UAT_DEPLOY_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
     steps:
-      - name: Deploy isolated UAT instance
-        run: /opt/ratsboombot-uat/deploy/linux/deploy-uat.sh
+      - name: Deploy validated commit to isolated UAT instance
+        run: /opt/ratsboombot-uat/deploy/linux/deploy-uat.sh "$UAT_DEPLOY_SHA"
