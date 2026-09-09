@@ -12,16 +12,21 @@ def test_master_release_workflow_deploys_with_raspberry_pi_runner() -> None:
     assert "run: /opt/ratsboombot/deploy/linux/deploy.sh" in workflow
 
 
-
 def test_uat_workflow_validates_before_guarded_deployment() -> None:
     repository_root = Path(__file__).resolve().parents[1]
     workflow = (repository_root / ".github" / "workflows" / "uat.yml").read_text(encoding="utf-8")
 
     assert "- uat" in workflow
+    assert '- "release/**"' in workflow
     assert "python -m pytest" in workflow
     assert "needs: validate-uat" in workflow
     assert "vars.UAT_DEPLOY_ENABLED == 'true'" in workflow
-    assert "run: /opt/ratsboombot-uat/deploy/linux/deploy-uat.sh" in workflow
+    assert "startsWith(github.base_ref, 'release/')" in workflow
+    assert "github.event.pull_request.draft == false" in workflow
+    assert "github.event.pull_request.head.repo.full_name == github.repository" in workflow
+    assert "github.event.pull_request.head.sha || github.sha" in workflow
+    assert 'run: /opt/ratsboombot-uat/deploy/linux/deploy-uat.sh "$UAT_DEPLOY_SHA"' in workflow
+    assert "cancel-in-progress: false" in workflow
     assert "gh release" not in workflow
 
 
@@ -48,6 +53,9 @@ def test_uat_deploy_script_only_targets_uat_instance() -> None:
 
     assert 'APP_DIR="/opt/ratsboombot-uat"' in script
     assert 'SERVICE_NAME="ratsboombot-uat"' in script
-    assert 'DEPLOY_BRANCH="uat"' in script
+    assert 'DEPLOY_REF="${1:-uat}"' in script
+    assert '[[ ! "$DEPLOY_REF" =~ ^[0-9a-f]{40}$ ]]' in script
+    assert 'git fetch --no-tags origin "$DEPLOY_REF"' in script
+    assert 'git checkout --detach "$NEW_COMMIT"' in script
     assert 'HEALTH_URL="http://127.0.0.1:4346/health"' in script
     assert 'systemctl restart "$SERVICE_NAME"' in script
