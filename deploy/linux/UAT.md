@@ -7,7 +7,8 @@ UAT runs beside production on the Raspberry Pi without sharing code, processes, 
 | Git branch | `master` | `uat` |
 | Checkout | `/opt/ratsboombot` | `/opt/ratsboombot-uat` |
 | Service | `ratsboombot.service` | `ratsboombot-uat.service` |
-| Local port | `4345` | `4346` |
+| Dashboard port | `4345` | `4346` |
+| Twitch adapter port | `4343` | `4344` |
 | Public URL | `https://ratsboombot.com` | `https://uat.ratsboombot.com` |
 | Bot account | RatsBoomBot | akaing1 |
 | Broadcaster | Production channels | developer_ninjakaing |

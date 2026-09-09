@@ -45,6 +45,7 @@ class Settings:
 
     ADMIN_HOST = os.getenv("ADMIN_HOST", "127.0.0.1")
     ADMIN_PORT = int(os.getenv("ADMIN_PORT", "4345"))
+    TWITCH_ADAPTER_PORT = int(os.getenv("TWITCH_ADAPTER_PORT", "4343"))
     ADMIN_BASE_URL = os.getenv("ADMIN_BASE_URL", f"http://{ADMIN_HOST}:{ADMIN_PORT}")
     PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", ADMIN_BASE_URL)
     DASHBOARD_BASE_URL = os.getenv("DASHBOARD_BASE_URL", ADMIN_BASE_URL)
