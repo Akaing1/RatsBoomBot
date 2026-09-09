@@ -80,7 +80,7 @@ Create the UAT owner account against its empty database:
 
 ```bash
 cd /opt/ratsboombot-uat
-sudo -u rats-bot .venv/bin/python scripts/create_owner.py
+sudo -u rats-bot .venv/bin/python -m scripts.create_owner
 ```
 
 Then open `https://uat.ratsboombot.com/admin`:
