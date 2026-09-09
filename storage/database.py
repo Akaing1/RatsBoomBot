@@ -89,7 +89,7 @@ def create_broadcaster_subscriptions(broadcaster_user_id: str) -> list[Any]:
     return subscriptions
 
 
-async def setup_database(db: asqlite.Pool) -> tuple[list[tuple[Any, Any]], list[Any], list[str]]:
+async def setup_database(db: asqlite.Pool) -> tuple[list[tuple[str, Any, Any]], list[Any], list[str]]:
     LOGGER.info("[Database] Running database migrations.")
     await run_migrations(db)
 
@@ -108,13 +108,13 @@ async def setup_database(db: asqlite.Pool) -> tuple[list[tuple[Any, Any]], list[
 
     custom_bot_ids = {str(row["bot_user_id"]) for row in custom_bot_rows}
 
-    tokens: list[tuple[Any, Any]] = []
+    tokens: list[tuple[str, Any, Any]] = []
     subscriptions: list[Any] = []
     broadcasters: list[str] = []
 
     for row in rows:
         user_id = str(row["user_id"])
-        tokens.append((row["token"], row["refresh"]))
+        tokens.append((user_id, row["token"], row["refresh"]))
 
         if user_id == str(settings.BOT_ID) or user_id in custom_bot_ids:
             LOGGER.debug(
