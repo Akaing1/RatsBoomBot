@@ -51,7 +51,7 @@ MEINYA_RAID_BOSSES = RaidBossConfig(
 
 MEINYA_TIMED_ANNOUNCEMENTS = (
     TimedAnnouncement(
-        message="Mei is trying to reach YouTube partnership! If you would like to help support, please leave a lurk on YouTube here as well :3 https://www.youtube.com/watch?v=rWu1z5iWo5k",
+        message="Mei is trying to reach YouTube partnership! If you would like to help support, please leave a lurk on YouTube here as well :3 https://www.youtube.com/@MeinyaYozakura",
         interval_seconds=60 * 60,
         required_messages=30,
         color="orange"
