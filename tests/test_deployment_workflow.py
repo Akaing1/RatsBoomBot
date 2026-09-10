@@ -12,16 +12,21 @@ def test_master_release_workflow_deploys_with_raspberry_pi_runner() -> None:
     assert "run: /opt/ratsboombot/deploy/linux/deploy.sh" in workflow
 
 
-
 def test_uat_workflow_validates_before_guarded_deployment() -> None:
     repository_root = Path(__file__).resolve().parents[1]
     workflow = (repository_root / ".github" / "workflows" / "uat.yml").read_text(encoding="utf-8")
 
     assert "- uat" in workflow
+    assert '- "release/**"' in workflow
     assert "python -m pytest" in workflow
     assert "needs: validate-uat" in workflow
     assert "vars.UAT_DEPLOY_ENABLED == 'true'" in workflow
-    assert "run: /opt/ratsboombot-uat/deploy/linux/deploy-uat.sh" in workflow
+    assert "startsWith(github.base_ref, 'release/')" in workflow
+    assert "github.event.pull_request.draft == false" in workflow
+    assert "github.event.pull_request.head.repo.full_name == github.repository" in workflow
+    assert "github.event.pull_request.head.sha || github.sha" in workflow
+    assert 'run: /opt/ratsboombot-uat/deploy/linux/deploy-uat.sh "$UAT_DEPLOY_SHA"' in workflow
+    assert "cancel-in-progress: false" in workflow
     assert "gh release" not in workflow
 
 
@@ -29,14 +34,17 @@ def test_uat_service_is_isolated_from_production() -> None:
     repository_root = Path(__file__).resolve().parents[1]
     service = (repository_root / "deploy" / "linux" / "ratsboombot-uat.service").read_text(encoding="utf-8")
     environment = (repository_root / ".env.uat.example").read_text(encoding="utf-8")
+    bot = (repository_root / "bot" / "bot.py").read_text(encoding="utf-8")
 
     assert "WorkingDirectory=/opt/ratsboombot-uat" in service
     assert "EnvironmentFile=/opt/ratsboombot-uat/.env" in service
     assert "ADMIN_PORT=4346" in environment
+    assert "TWITCH_ADAPTER_PORT=4344" in environment
     assert "DATABASE_PATH=.data/tokens.db" in environment
     assert "ENVIRONMENT=uat" in environment
     assert "SESSION_COOKIE_DOMAIN=" in environment
     assert "https://uat.ratsboombot.com" in environment
+    assert "adapter=web.AiohttpAdapter(host=settings.ADMIN_HOST, port=settings.TWITCH_ADAPTER_PORT)" in bot
 
 
 def test_uat_deploy_script_only_targets_uat_instance() -> None:
@@ -45,6 +53,9 @@ def test_uat_deploy_script_only_targets_uat_instance() -> None:
 
     assert 'APP_DIR="/opt/ratsboombot-uat"' in script
     assert 'SERVICE_NAME="ratsboombot-uat"' in script
-    assert 'DEPLOY_BRANCH="uat"' in script
+    assert 'DEPLOY_REF="${1:-uat}"' in script
+    assert '[[ ! "$DEPLOY_REF" =~ ^[0-9a-f]{40}$ ]]' in script
+    assert 'git fetch --no-tags origin "$DEPLOY_REF"' in script
+    assert 'git checkout --detach "$NEW_COMMIT"' in script
     assert 'HEALTH_URL="http://127.0.0.1:4346/health"' in script
     assert 'systemctl restart "$SERVICE_NAME"' in script

@@ -89,7 +89,7 @@
                             <article>
                                 <div><strong>{{ raid.boss_name }}</strong><span>{{ raid.channel.display_name }} &middot; {{ raid.date }}</span></div>
                                 <div><strong>{{ "{:,}".format(raid.damage) }} damage</strong><span>{{ "{:,}".format(raid.reward_points) }} points earned</span></div>
-                                <div class="chatter-raid-result"><span class="{{ raid.status }}">{{ raid.status | title }}</span>{% if raid.top_contributor %}<em>Top Contributor</em>{% endif %}</div>
+                                <div class="chatter-raid-result"><span class="{{ raid.status }}">{{ raid.status | title }}</span><em>#{{ raid.placement }} of {{ raid.participant_count }}{% if raid.top_contributor %} &middot; Top Contributor{% endif %}</em></div>
                             </article>
                         {% endfor %}
                     </div>

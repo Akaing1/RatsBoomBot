@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+from twitchio import web
 from twitchio.ext import commands
 
 from bot.component_loader import load_components
@@ -40,6 +41,7 @@ class TwitchBot(commands.AutoBot):
             bot_id=settings.BOT_ID,
             owner_id=settings.OWNER_ID,
             prefix=settings.PREFIX,
+            adapter=web.AiohttpAdapter(host=settings.ADMIN_HOST, port=settings.TWITCH_ADAPTER_PORT),
             case_insensitive=True,
             subscriptions=subs,
             force_subscribe=True

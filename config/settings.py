@@ -6,6 +6,7 @@ load_dotenv()
 
 VALID_BOT_DETECTION_MODES = {"learning", "shadow", "active"}
 VALID_ENVIRONMENTS = {"local", "uat", "production"}
+DEFAULT_BOT_SCOPES = "user:read:chat user:write:chat user:bot"
 DEFAULT_CHANNEL_SCOPES = (
     "channel:bot "
     "moderator:manage:banned_users "
@@ -45,6 +46,7 @@ class Settings:
 
     ADMIN_HOST = os.getenv("ADMIN_HOST", "127.0.0.1")
     ADMIN_PORT = int(os.getenv("ADMIN_PORT", "4345"))
+    TWITCH_ADAPTER_PORT = int(os.getenv("TWITCH_ADAPTER_PORT", "4343"))
     ADMIN_BASE_URL = os.getenv("ADMIN_BASE_URL", f"http://{ADMIN_HOST}:{ADMIN_PORT}")
     PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", ADMIN_BASE_URL)
     DASHBOARD_BASE_URL = os.getenv("DASHBOARD_BASE_URL", ADMIN_BASE_URL)
@@ -62,7 +64,7 @@ class Settings:
     CHANNEL_REDIRECT_URI = os.getenv("CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/admin/oauth/channel")
     PUBLIC_CHANNEL_REDIRECT_URI = os.getenv("PUBLIC_CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/channel/connect")
 
-    BOT_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('BOT_SCOPES', 'user:read:chat user:write:chat user:bot')} moderator:manage:announcements moderator:read:chatters".split()))
+    BOT_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('BOT_SCOPES') or DEFAULT_BOT_SCOPES} moderator:manage:announcements moderator:read:chatters".split()))
 
     CHANNEL_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('CHANNEL_SCOPES') or DEFAULT_CHANNEL_SCOPES} channel:manage:broadcast".split()))
 

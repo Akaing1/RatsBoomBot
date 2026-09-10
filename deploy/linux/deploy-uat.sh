@@ -5,7 +5,7 @@ set -euo pipefail
 APP_DIR="/opt/ratsboombot-uat"
 VENV_DIR="$APP_DIR/.venv"
 SERVICE_NAME="ratsboombot-uat"
-DEPLOY_BRANCH="uat"
+DEPLOY_REF="${1:-uat}"
 HEALTH_URL="http://127.0.0.1:4346/health"
 
 BACKUP_DIR="$APP_DIR/.data/backups"
@@ -14,7 +14,7 @@ DEPLOYMENT_STAMP_PATH="$APP_DIR/.data/deployment.txt"
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 MAX_BACKUPS=3
 
-echo "[UAT Deploy] Starting isolated RatsBoomBot UAT deployment."
+echo "[UAT Deploy] Starting isolated RatsBoomBot UAT deployment for $DEPLOY_REF."
 
 if [ ! -d "$APP_DIR/.git" ]; then
     echo "[UAT Deploy] ERROR: $APP_DIR is not initialized. Complete deploy/linux/UAT.md first."
@@ -23,6 +23,11 @@ fi
 
 if [ ! -f "$APP_DIR/.env" ]; then
     echo "[UAT Deploy] ERROR: $APP_DIR/.env is missing."
+    exit 1
+fi
+
+if [ "$DEPLOY_REF" != "uat" ] && [[ ! "$DEPLOY_REF" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "[UAT Deploy] ERROR: deployment ref must be uat or a full commit SHA."
     exit 1
 fi
 
@@ -43,14 +48,9 @@ if [ -f "$DATABASE_PATH" ]; then
     echo "[UAT Deploy] Database backup created."
 fi
 
-git fetch origin "$DEPLOY_BRANCH"
-
-if [ "$(git branch --show-current)" != "$DEPLOY_BRANCH" ]; then
-    git checkout "$DEPLOY_BRANCH"
-fi
-
-git pull --ff-only origin "$DEPLOY_BRANCH"
-NEW_COMMIT="$(git rev-parse HEAD)"
+git fetch --no-tags origin "$DEPLOY_REF"
+NEW_COMMIT="$(git rev-parse FETCH_HEAD)"
+git checkout --detach "$NEW_COMMIT"
 
 "$VENV_DIR/bin/python" -m pip install -r requirements.txt
 "$VENV_DIR/bin/python" -m compileall app bot config storage web main.py
@@ -76,7 +76,7 @@ for attempt in {1..15}; do
 done
 
 echo "[UAT Deploy] ERROR: UAT did not become healthy. Rolling back to $PREVIOUS_COMMIT."
-git reset --hard "$PREVIOUS_COMMIT"
+git checkout --detach "$PREVIOUS_COMMIT"
 
 if [ -n "$PREVIOUS_DEPLOYMENT_STAMP" ]; then
     printf '%s\n' "$PREVIOUS_DEPLOYMENT_STAMP" > "$DEPLOYMENT_STAMP_PATH"

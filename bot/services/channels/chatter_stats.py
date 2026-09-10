@@ -273,6 +273,14 @@ class ChatterStatsService:
                 """,
                 (broadcaster_id, user_id)
             )
+            consumables = await connection.fetchone(
+                """
+                SELECT potion_attacks_remaining, second_wind_charges, berserk_charges, lucky_dice_charges, fools_card_charges
+                FROM raid_boss_players
+                WHERE broadcaster_id = ? AND user_id = ?
+                """,
+                (broadcaster_id, user_id)
+            )
             rewards = await connection.fetchone(
                 """
                 SELECT COALESCE(SUM(contribution_points + final_hit_points + bonus_points), 0) AS points,
@@ -323,7 +331,8 @@ class ChatterStatsService:
             "daily_check_ins": claim_counts.get("daily", 0),
             "firsts": claim_counts.get("first", 0),
             "seconds": claim_counts.get("second", 0),
-            "inventory": [dict(row) | {"display_name": profile.raid_bosses.weapon_names.display(str(row["item_id"])) if profile else str(row["item_id"]).replace("_", " ").title()} for row in inventory]
+            "inventory": [dict(row) | {"display_name": profile.raid_bosses.weapon_names.display(str(row["item_id"])) if profile else str(row["item_id"]).replace("_", " ").title()} for row in inventory],
+            "consumables": self._consumable_inventory(consumables)
         }
 
     def _resolve_broadcaster(self, value: str):
@@ -356,13 +365,19 @@ class ChatterStatsService:
             SELECT event_id, user_id, SUM(damage) AS damage
             FROM raid_boss_contributions
             GROUP BY event_id, user_id
+        ),
+        ranked AS (
+            SELECT event_id, user_id, damage,
+                   RANK() OVER (PARTITION BY event_id ORDER BY damage DESC) AS placement,
+                   COUNT(*) OVER (PARTITION BY event_id) AS participant_count
+            FROM contributions
         )
         SELECT events.id, events.broadcaster_id, events.boss_name, events.boss_tier, events.status, events.spawned_at,
-               mine.damage,
+               mine.damage, mine.placement, mine.participant_count,
                COALESCE(summaries.contribution_points + summaries.final_hit_points + summaries.bonus_points, 0) AS reward_points,
-               CASE WHEN mine.damage = (SELECT MAX(others.damage) FROM contributions AS others WHERE others.event_id = events.id) THEN 1 ELSE 0 END AS top_contributor
+               CASE WHEN mine.placement = 1 THEN 1 ELSE 0 END AS top_contributor
         FROM raid_boss_events AS events
-        JOIN contributions AS mine ON mine.event_id = events.id
+        JOIN ranked AS mine ON mine.event_id = events.id
         LEFT JOIN raid_boss_reward_summaries AS summaries ON summaries.event_id = events.id AND summaries.user_id = ?
         WHERE mine.user_id = ? {channel_filter}
           AND events.status IN ('defeated', 'failed')
@@ -380,5 +395,21 @@ class ChatterStatsService:
             "date": str(row["spawned_at"])[:10],
             "damage": int(row["damage"]),
             "reward_points": int(row["reward_points"]),
+            "placement": int(row["placement"]),
+            "participant_count": int(row["participant_count"]),
             "top_contributor": bool(row["top_contributor"])
         }
+
+    @staticmethod
+    def _consumable_inventory(row) -> list[dict[str, Any]]:
+        if row is None:
+            return []
+
+        items = (
+            ("power_potion", "Power Potion", "potion_attacks_remaining"),
+            ("second_wind", "Second Wind", "second_wind_charges"),
+            ("berserk", "Berserk", "berserk_charges"),
+            ("lucky_dice", "Lucky Dice", "lucky_dice_charges"),
+            ("fools_card", "The Fool's Card", "fools_card_charges")
+        )
+        return [{"item_id": item_id, "display_name": display_name, "quantity": int(row[column])} for item_id, display_name, column in items if int(row[column]) > 0]

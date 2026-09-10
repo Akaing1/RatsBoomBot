@@ -90,8 +90,10 @@ async def test_chatter_profiles_aggregate_global_and_channel_activity(tmp_path) 
             await connection.execute("INSERT INTO imported_redeem_totals (broadcaster_id, user_id, username, redeem_type, claim_count) VALUES ('channel-1', 'user-1', 'alice', 'first', 2)")
             await connection.execute("INSERT INTO raid_boss_events (id, broadcaster_id, boss_name, boss_type, boss_tier, max_hp, current_hp, reward_pool, final_hit_reward, status, spawned_at, stream_limit, final_hitter_id, final_hitter_name) VALUES (1, 'channel-1', 'Test Boss', 'melee', 'main', 1000, 0, 500, 100, 'defeated', '2026-09-01T00:00:00+00:00', 3, 'user-1', 'alice')")
             await connection.execute("INSERT INTO raid_boss_attacks (event_id, broadcaster_id, stream_id, user_id, username, damage, attacked_at) VALUES (1, 'channel-1', 'stream-1', 'user-1', 'alice', 275, '2026-09-01T00:01:00+00:00')")
-            await connection.execute("INSERT INTO raid_boss_players (broadcaster_id, user_id, username, equipped_weapon) VALUES ('channel-1', 'user-1', 'alice', 'sword')")
+            await connection.execute("INSERT INTO raid_boss_attacks (event_id, broadcaster_id, stream_id, user_id, username, damage, attacked_at) VALUES (1, 'channel-1', 'stream-1', 'user-2', 'bob', 500, '2026-09-01T00:02:00+00:00')")
+            await connection.execute("INSERT INTO raid_boss_players (broadcaster_id, user_id, username, equipped_weapon, potion_attacks_remaining, second_wind_charges, berserk_charges, lucky_dice_charges, fools_card_charges) VALUES ('channel-1', 'user-1', 'alice', 'sword', 2, 1, 0, 3, 1)")
             await connection.execute("INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES ('channel-1', 'user-1', 'sword', 1, 12)")
+            await connection.execute("INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES ('channel-1', 'user-1', 'basic_bow', 2, 15)")
             await connection.execute("INSERT INTO raid_boss_reward_summaries (event_id, broadcaster_id, user_id, username, contribution_points, final_hit_points) VALUES (1, 'channel-1', 'user-1', 'alice', 140, 100)")
 
         service = ChatterStatsService(SimpleNamespace(bot_id="main-bot"), database, FakeBroadcasters())
@@ -105,16 +107,28 @@ async def test_chatter_profiles_aggregate_global_and_channel_activity(tmp_path) 
         assert global_profile["daily_check_ins"] == 4
         assert global_profile["favorite_channel"]["display_name"] == "TestChannel"
         assert global_profile["raid_reward_points"] == 240
-        assert global_profile["top_contributor_finishes"] == 1
+        assert global_profile["top_contributor_finishes"] == 0
         assert global_profile["recent_raids"][0]["boss_name"] == "Test Boss"
-        assert global_profile["recent_raids"][0]["top_contributor"] is True
+        assert global_profile["recent_raids"][0]["placement"] == 2
+        assert global_profile["recent_raids"][0]["participant_count"] == 2
+        assert global_profile["recent_raids"][0]["top_contributor"] is False
         assert channel_profile["current_points"] == 350
         assert channel_profile["daily_check_ins"] == 4
         assert channel_profile["firsts"] == 2
         assert channel_profile["raid_reward_points"] == 240
-        assert channel_profile["top_contributor_finishes"] == 1
+        assert channel_profile["top_contributor_finishes"] == 0
         assert channel_profile["recent_raids"][0]["reward_points"] == 240
+        assert channel_profile["recent_raids"][0]["placement"] == 2
+        assert channel_profile["recent_raids"][0]["participant_count"] == 2
         assert channel_profile["inventory"][0]["equipped"] == 1
+        assert channel_profile["inventory"][1]["item_id"] == "basic_bow"
+        assert channel_profile["inventory"][1]["quantity"] == 2
+        assert channel_profile["consumables"] == [
+            {"item_id": "power_potion", "display_name": "Power Potion", "quantity": 2},
+            {"item_id": "second_wind", "display_name": "Second Wind", "quantity": 1},
+            {"item_id": "lucky_dice", "display_name": "Lucky Dice", "quantity": 3},
+            {"item_id": "fools_card", "display_name": "The Fool's Card", "quantity": 1}
+        ]
 
 
 @pytest.mark.asyncio

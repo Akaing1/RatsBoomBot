@@ -28,7 +28,7 @@ class FakeChatterStats:
             "final_hits": 1,
             "raid_reward_points": 2000,
             "top_contributor_finishes": 2,
-            "recent_raids": [{"boss_name": "Test Boss", "channel": {"display_name": "TestChannel"}, "date": "2026-09-01", "damage": 3000, "reward_points": 2000, "status": "defeated", "top_contributor": True}],
+            "recent_raids": [{"boss_name": "Test Boss", "channel": {"display_name": "TestChannel"}, "date": "2026-09-01", "damage": 3000, "reward_points": 2000, "status": "defeated", "placement": 2, "participant_count": 12, "top_contributor": False}],
             "channels": [{"id": "channel-1", "login": "testchannel", "display_name": "TestChannel", "profile_image_url": None, "messages_sent": 1200, "raid_damage": 9000}]
         }
 
@@ -53,8 +53,15 @@ class FakeChatterStats:
             "final_hits": 1,
             "raids_rewarded": 3,
             "top_contributor_finishes": 2,
-            "recent_raids": [{"boss_name": "Test Boss", "channel": {"display_name": "TestChannel"}, "date": "2026-09-01", "damage": 3000, "reward_points": 2000, "status": "defeated", "top_contributor": True}],
-            "inventory": [{"item_id": "sword", "quantity": 1, "durability": 12, "equipped": 1}]
+            "recent_raids": [{"boss_name": "Test Boss", "channel": {"display_name": "TestChannel"}, "date": "2026-09-01", "damage": 3000, "reward_points": 2000, "status": "defeated", "placement": 2, "participant_count": 12, "top_contributor": False}],
+            "inventory": [
+                {"item_id": "sword", "display_name": "Sword", "quantity": 1, "durability": 12, "equipped": 1},
+                {"item_id": "basic_bow", "display_name": "Basic Bow", "quantity": 2, "durability": 15, "equipped": 0}
+            ],
+            "consumables": [
+                {"item_id": "power_potion", "display_name": "Power Potion", "quantity": 2},
+                {"item_id": "second_wind", "display_name": "Second Wind", "quantity": 1}
+            ]
         }
 
 
@@ -70,6 +77,7 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert "TestChannel" in response.text
     assert "Total daily check-ins" in response.text
     assert "Recent raid history" in response.text
+    assert "#2 of 12" in response.text
     assert 'data-chatter-tab="overview"' in response.text
     assert 'data-chatter-tab="raids"' in response.text
     assert 'data-chatter-panel="raids" hidden' in response.text
@@ -86,7 +94,12 @@ def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
     assert "Current cheese" in response.text
     assert "Daily check-ins" in response.text
     assert "Sword" in response.text
+    assert "Basic Bow" in response.text
+    assert "Power Potion" in response.text
+    assert "Second Wind" in response.text
+    assert "x2" in response.text
     assert "Equipped" in response.text
+    assert "#2 of 12" in response.text
     assert "Top Contributor finishes" in response.text
     assert "Recent raid history" in response.text
     assert 'data-chatter-tab="overview"' in response.text

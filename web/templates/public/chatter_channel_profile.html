@@ -63,15 +63,26 @@
             </article>
 
             <article class="panel chatter-detail-panel">
-                <div class="panel-header"><div><p class="eyebrow">Raid inventory</p><h3>Equipment</h3></div></div>
-                {% if profile.inventory %}
-                    <div class="chatter-inventory-list">
-                        {% for item in profile.inventory %}
-                            <div><span>{{ item.display_name or (item.item_id | replace('_', ' ') | title) }}{% if item.equipped %} <em>Equipped</em>{% endif %}</span><strong>{{ item.durability }} durability</strong></div>
-                        {% endfor %}
-                    </div>
+                <div class="panel-header"><div><p class="eyebrow">Raid inventory</p><h3>Current inventory</h3></div></div>
+                {% if profile.inventory or profile.consumables %}
+                    {% if profile.inventory %}
+                        <p class="eyebrow">Weapons</p>
+                        <div class="chatter-inventory-list">
+                            {% for item in profile.inventory %}
+                                <div><span>{{ item.display_name or (item.item_id | replace('_', ' ') | title) }}{% if item.equipped %} <em>Equipped</em>{% endif %}</span><strong>x{{ item.quantity }} &middot; {{ item.durability }} durability</strong></div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if profile.consumables %}
+                        <p class="eyebrow">Consumables</p>
+                        <div class="chatter-inventory-list">
+                            {% for item in profile.consumables %}
+                                <div><span>{{ item.display_name }}</span><strong>x{{ item.quantity }}</strong></div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 {% else %}
-                    <p class="chatter-empty-copy">No raid equipment collected in this channel yet.</p>
+                    <p class="chatter-empty-copy">No raid items collected in this channel yet.</p>
                 {% endif %}
             </article>
             </div>
@@ -83,7 +94,7 @@
                             <article>
                                 <div><strong>{{ raid.boss_name }}</strong><span>{{ raid.date }}</span></div>
                                 <div><strong>{{ "{:,}".format(raid.damage) }} damage</strong><span>{{ "{:,}".format(raid.reward_points) }} points earned</span></div>
-                                <div class="chatter-raid-result"><span class="{{ raid.status }}">{{ raid.status | title }}</span>{% if raid.top_contributor %}<em>Top Contributor</em>{% endif %}</div>
+                                <div class="chatter-raid-result"><span class="{{ raid.status }}">{{ raid.status | title }}</span><em>#{{ raid.placement }} of {{ raid.participant_count }}{% if raid.top_contributor %} &middot; Top Contributor{% endif %}</em></div>
                             </article>
                         {% endfor %}
                     </div>

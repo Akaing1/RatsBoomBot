@@ -4,10 +4,11 @@ UAT runs beside production on the Raspberry Pi without sharing code, processes, 
 
 | Setting | Production | UAT |
 | --- | --- | --- |
-| Git branch | `master` | `uat` |
+| Git source | `master` | Validated `release/**` PR commit or `uat` |
 | Checkout | `/opt/ratsboombot` | `/opt/ratsboombot-uat` |
 | Service | `ratsboombot.service` | `ratsboombot-uat.service` |
-| Local port | `4345` | `4346` |
+| Dashboard port | `4345` | `4346` |
+| Twitch adapter port | `4343` | `4344` |
 | Public URL | `https://ratsboombot.com` | `https://uat.ratsboombot.com` |
 | Bot account | RatsBoomBot | akaing1 |
 | Broadcaster | Production channels | developer_ninjakaing |
@@ -79,7 +80,7 @@ Create the UAT owner account against its empty database:
 
 ```bash
 cd /opt/ratsboombot-uat
-sudo -u rats-bot .venv/bin/python scripts/create_owner.py
+sudo -u rats-bot .venv/bin/python -m scripts.create_owner
 ```
 
 Then open `https://uat.ratsboombot.com/admin`:
@@ -97,16 +98,16 @@ Create the GitHub repository variable:
 UAT_DEPLOY_ENABLED=true
 ```
 
-The workflow is deliberately guarded by this variable. Until it is enabled, pushes to `uat` run validation but skip the Pi deployment.
+The workflow is guarded by this variable. When enabled, pushes to `uat` and `release/**` deploy to UAT after validation. A ready, same-repository pull request targeting `release/**` also deploys its exact validated head commit.
 
 ## Development flow
 
-1. Branch from `uat`.
-2. Open the feature PR back into `uat`.
-3. The UAT workflow compiles the project and runs all tests.
-4. Merge the PR to deploy it to `https://uat.ratsboombot.com`.
-5. Test with `akaing1` in `developer_ninjakaing`.
-6. When the release is ready, open a PR from `uat` into `master` with the final version bump.
-7. Never delete the permanent `uat` branch after merging a release.
+1. Create `release/x.y.z` from the current `uat` branch.
+2. Create feature branches from that release branch.
+3. Open each feature PR back into `release/x.y.z`.
+4. After validation passes, the exact PR commit deploys to `https://uat.ratsboombot.com`.
+5. Test with `akaing1` in `developer_ninjakaing`, then merge the feature PR.
+6. The resulting push deploys the integrated release branch to UAT again.
+7. When the release is verified, open a PR from `release/x.y.z` into `master` with the final version bump.
 
-UAT does not publish GitHub releases and cannot restart `ratsboombot.service`.
+UAT is shared, so deployments are serialized and the most recently completed release PR or release-branch push is the version available for testing. Draft PRs and PRs from forks never deploy to the self-hosted runner. UAT does not publish GitHub releases and cannot restart `ratsboombot.service`.
