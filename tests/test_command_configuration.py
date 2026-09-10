@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 from unittest.mock import patch
 
 from bot.bot import TwitchBot
@@ -16,6 +19,19 @@ def test_bot_commands_are_case_insensitive() -> None:
 
 def test_bot_authorization_includes_announcement_scope() -> None:
     assert "moderator:manage:announcements" in settings.BOT_SCOPES.split()
+
+
+def test_blank_bot_scope_configuration_uses_chat_defaults() -> None:
+    environment = os.environ | {"BOT_SCOPES": "", "SESSION_SECRET": "test-session-secret", "ENVIRONMENT": "local"}
+    result = subprocess.run(
+        [sys.executable, "-c", "from config.settings import settings; print(settings.BOT_SCOPES)"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=environment
+    )
+
+    assert {"user:read:chat", "user:write:chat", "user:bot"} <= set(result.stdout.split())
 
 
 def test_social_messages_are_configured_per_profile() -> None:
