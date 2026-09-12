@@ -26,7 +26,7 @@ class PointsCommandHandler:
 
         return profile.points
 
-    def get_context(self, ctx: commands.Context, command_name: str) -> tuple[str, PointsConfig] | None:
+    async def get_context(self, ctx: commands.Context, command_name: str) -> tuple[str, PointsConfig] | None:
         services = self.bot.services
 
         if services is None:
@@ -68,6 +68,7 @@ class PointsCommandHandler:
             )
             return None
 
+        await services.points.track_message(ctx)
         return broadcaster_id, config
 
     @staticmethod
@@ -94,7 +95,7 @@ class PointsCommandHandler:
     async def show_balance(self, ctx: commands.Context, target: User | None, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name}")
 
-        context = self.get_context(ctx, command_name)
+        context = await self.get_context(ctx, command_name)
 
         if context is None:
             return
@@ -136,7 +137,7 @@ class PointsCommandHandler:
     async def show_leaderboard(self, ctx: commands.Context, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} leaderboard")
 
-        context = self.get_context(ctx, command_name)
+        context = await self.get_context(ctx, command_name)
 
         if context is None:
             return
@@ -178,7 +179,7 @@ class PointsCommandHandler:
     async def reset_points(self, ctx: commands.Context, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} reset")
 
-        context = self.get_context(ctx, command_name)
+        context = await self.get_context(ctx, command_name)
 
         if context is None:
             return
@@ -215,7 +216,7 @@ class PointsCommandHandler:
     async def add_points(self, ctx: commands.Context, target: User, amount: int, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} add")
 
-        context = self.get_context(ctx, command_name)
+        context = await self.get_context(ctx, command_name)
 
         if context is None:
             return
@@ -263,7 +264,7 @@ class PointsCommandHandler:
     async def give_points(self, ctx: commands.Context, target: User, amount: int, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} give")
 
-        context = self.get_context(ctx, command_name)
+        context = await self.get_context(ctx, command_name)
 
         if context is None:
             return
@@ -319,7 +320,7 @@ class PointsCommandHandler:
     async def gamble(self, ctx: commands.Context, amount: str, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} gamble")
 
-        context = self.get_context(ctx, command_name)
+        context = await self.get_context(ctx, command_name)
 
         if context is None:
             return
@@ -422,7 +423,7 @@ class PointsCommandHandler:
     async def roulette(self, ctx: commands.Context, color: str | None, amount: str | None, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} roulette")
 
-        context = self.get_context(ctx, command_name)
+        context = await self.get_context(ctx, command_name)
 
         if context is None:
             return
@@ -526,7 +527,7 @@ class PointsCommandHandler:
     async def create_duel(self, ctx: commands.Context, opponent: User | None, amount: str | None, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} duel")
 
-        context = self.get_context(ctx, command_name)
+        context = await self.get_context(ctx, command_name)
 
         if context is None:
             return
@@ -618,7 +619,7 @@ class PointsCommandHandler:
     async def accept_duel(self, ctx: commands.Context, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} duel accept")
 
-        context = self.get_context(ctx, command_name)
+        context = await self.get_context(ctx, command_name)
 
         if context is None:
             return
@@ -700,7 +701,7 @@ class PointsCommandHandler:
     async def decline_duel(self, ctx: commands.Context, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} duel decline")
 
-        context = self.get_context(ctx, command_name)
+        context = await self.get_context(ctx, command_name)
 
         if context is None:
             return
