@@ -73,6 +73,7 @@
 {% block title %}{{ broadcaster.name or "Channel" }} | RatsBoomBot{% endblock %}
 
 {% block content %}
+<nav class="header-actions" aria-label="Channel pages"><a class="button secondary" href="/admin/channels/{{ broadcaster.id }}" aria-current="page">Overview</a><a class="button secondary" href="/admin/channels/{{ broadcaster.id }}/customization">Customization</a></nav>
 <header class="page-header">
     <div class="channel-heading">
         {% if broadcaster.profile_image_url %}
@@ -142,15 +143,7 @@
         </p>
     </article>
 
-    <article class="status-card">
-        <p class="card-label">Social links</p>
-
-        <div class="metric">
-            {{ (1 if channel_settings.discord_url else 0) + (1 if channel_settings.youtube_url else 0) }}
-        </div>
-
-        <p class="card-detail">Configured Discord and YouTube links.</p>
-    </article>
+    <article class="status-card"><p class="card-label">Lost to RatsBoomBot</p><div class="metric">{{ gambling_loss_total }}</div><p class="card-detail">Points lost to gambling in this channel.</p></article>
 </section>
 
 {% if toggle_message %}
@@ -166,12 +159,12 @@
 {% if raid_configured %}
     <section class="panel raid-monitor-panel">
         <div class="panel-header">
-            <div><p class="eyebrow">Pilot metrics</p><h3>Raid encounter monitor</h3></div>
+            <div><p class="eyebrow">Raid activity</p><h3>Raid encounter monitor</h3></div>
             <span id="raid-monitor-status" class="channel-state {% if raid_metrics and raid_metrics.status == 'active' %}live{% endif %}">{% if raid_metrics %}{{ raid_metrics.status | title }}{% else %}Waiting{% endif %}</span>
         </div>
 
         <div id="raid-monitor-empty" class="compact-empty-state" {% if raid_metrics %}hidden{% endif %}>
-            <h4>No raid encounter recorded</h4><p>Spawn a mini or main boss to begin collecting pilot data.</p>
+            <h4>No raid encounter recorded</h4><p>Spawn a mini or main boss to begin tracking raid activity.</p>
         </div>
 
         <div id="raid-monitor-details" {% if not raid_metrics %}hidden{% endif %}>
@@ -285,19 +278,7 @@
             </div>
         </section>
 
-        <section class="panel">
-            <div class="panel-header"><div><p class="eyebrow">Community</p><h3>Social links</h3></div></div>
-            <div class="social-link-list">
-                <article class="social-link-row">
-                    <div><strong>Discord</strong><p>{% if channel_settings.discord_url %}{{ channel_settings.discord_url }}{% else %}No Discord link configured.{% endif %}</p></div>
-                    {% if channel_settings.discord_url %}<a class="button secondary" href="{{ channel_settings.discord_url }}" target="_blank" rel="noopener noreferrer">Open</a>{% endif %}
-                </article>
-                <article class="social-link-row">
-                    <div><strong>YouTube</strong><p>{% if channel_settings.youtube_url %}{{ channel_settings.youtube_url }}{% else %}No YouTube link configured.{% endif %}</p></div>
-                    {% if channel_settings.youtube_url %}<a class="button secondary" href="{{ channel_settings.youtube_url }}" target="_blank" rel="noopener noreferrer">Open</a>{% endif %}
-                </article>
-            </div>
-        </section>
+
     </div>
 </div>
 
