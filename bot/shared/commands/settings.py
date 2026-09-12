@@ -104,10 +104,10 @@ class SettingsCommands(commands.Component):
             return
 
         if not self.has_permission(ctx, "set"):
-            await ctx.reply("Only the broadcaster or mods can change the stream game or title.")
+            await ctx.reply("Only the broadcaster or mods can change channel settings.")
             return
 
-        await ctx.reply("Use !set game <game name> or !set title <stream title>.")
+        await ctx.reply("Use !set game <game name>, !set title <stream title>, !set discord <url>, or !set youtube <url>.")
 
     @set_channel.command(name="game")
     async def set_game(self, ctx: commands.Context, *, game_name: str | None = None) -> None:
@@ -189,9 +189,9 @@ class SettingsCommands(commands.Component):
 
         await ctx.reply(f"Twitch could not update the stream {field_name}. Please try again later.")
 
-    @commands.command(name="setdiscord")
+    @set_channel.command(name="discord")
     async def set_discord(self, ctx: commands.Context, url: str | None = None) -> None:
-        broadcaster_id = self.get_context(ctx, "setdiscord")
+        broadcaster_id = self.get_context(ctx, "set discord")
 
         if broadcaster_id is None:
             return
@@ -200,22 +200,22 @@ class SettingsCommands(commands.Component):
         username = get_chatter_name(ctx)
 
         LOGGER.debug(
-            "[Commands] User %s invoked !setdiscord in broadcaster %s.",
+            "[Commands] User %s invoked !set discord in broadcaster %s.",
             username,
             broadcaster_id
         )
 
-        if not self.has_permission(ctx, "setdiscord"):
+        if not self.has_permission(ctx, "set discord"):
             await ctx.reply("Only the broadcaster or mods can set the Discord link.")
             return
 
         if not url:
             LOGGER.debug(
-                "[Commands] !setdiscord was invoked without a URL in broadcaster %s.",
+                "[Commands] !set discord was invoked without a URL in broadcaster %s.",
                 broadcaster_id
             )
 
-            await ctx.reply("Use it like this: !setdiscord https://discord.gg/yourlink")
+            await ctx.reply("Use it like this: !set discord https://discord.gg/yourlink")
             return
 
         try:
@@ -235,9 +235,9 @@ class SettingsCommands(commands.Component):
 
         await ctx.reply("Discord link updated for this channel.")
 
-    @commands.command(name="setyoutube")
+    @set_channel.command(name="youtube")
     async def set_youtube(self, ctx: commands.Context, url: str | None = None) -> None:
-        broadcaster_id = self.get_context(ctx, "setyoutube")
+        broadcaster_id = self.get_context(ctx, "set youtube")
 
         if broadcaster_id is None:
             return
@@ -246,22 +246,22 @@ class SettingsCommands(commands.Component):
         username = get_chatter_name(ctx)
 
         LOGGER.debug(
-            "[Commands] User %s invoked !setyoutube in broadcaster %s.",
+            "[Commands] User %s invoked !set youtube in broadcaster %s.",
             username,
             broadcaster_id
         )
 
-        if not self.has_permission(ctx, "setyoutube"):
+        if not self.has_permission(ctx, "set youtube"):
             await ctx.reply("Only the broadcaster or mods can set the YouTube link.")
             return
 
         if not url:
             LOGGER.debug(
-                "[Commands] !setyoutube was invoked without a URL in broadcaster %s.",
+                "[Commands] !set youtube was invoked without a URL in broadcaster %s.",
                 broadcaster_id
             )
 
-            await ctx.reply("Use it like this: !setyoutube https://youtube.com/@yourchannel")
+            await ctx.reply("Use it like this: !set youtube https://youtube.com/@yourchannel")
             return
 
         try:
