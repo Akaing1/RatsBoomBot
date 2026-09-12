@@ -191,8 +191,30 @@ class FakeContext:
 
 
 @pytest.mark.asyncio
+async def test_dashboard_override_enables_default_disabled_league(monkeypatch) -> None:
+    profile = ChannelProfile(channel_name="uat", league=LeagueConfig(enabled=False))
+    features = FakeFeatures()
+    bot = SimpleNamespace(services=SimpleNamespace(features=features))
+    activate_profile("channel-1", profile)
+    component = LeagueCommands(bot)
+    context = FakeContext()
+    service = LeagueService(bot, None)
+
+    try:
+        assert component.get_context(context) == ("channel-1", profile.league)
+        assert service.configured_profiles() == (("channel-1", profile.league),)
+        await component.champions.callback(component, context, champion=None)
+        assert "not configured yet" in context.messages[0]
+        monkeypatch.setattr(features, "is_profile_feature_enabled", lambda *args: False)
+        assert component.get_context(context) is None
+        assert service.configured_profiles() == ()
+    finally:
+        clear_profiles()
+
+
+@pytest.mark.asyncio
 async def test_champs_command_formats_season_and_recent_build_messages() -> None:
-    config = LeagueConfig(enabled=True, display_name="Steohany")
+    config = LeagueConfig(enabled=True, display_name="Steohany", game_name="Steohany", tag_line="NA1")
     profile = ChannelProfile(channel_name="steohanyy", league=config)
     bot = SimpleNamespace(services=SimpleNamespace(features=FakeFeatures(), league=FakeLeagueService()))
     activate_profile("channel-1", profile)

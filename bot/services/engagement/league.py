@@ -10,7 +10,7 @@ from itertools import combinations
 
 import httpx
 
-from bot.profiles import ACTIVE_CHANNEL_PROFILES, LeagueConfig
+from bot.profiles import ACTIVE_CHANNEL_PROFILES, LeagueConfig, ProfileFeatureName
 
 LOGGER = logging.getLogger("RatBoomBot")
 OPGG_MCP_URL = "https://mcp-api.op.gg/mcp"
@@ -506,14 +506,13 @@ class LeagueService:
             except TimeoutError:
                 await self.refresh_all(force_season=False)
 
-    @staticmethod
-    def configured_profiles() -> tuple[tuple[str, LeagueConfig], ...]:
+    def configured_profiles(self) -> tuple[tuple[str, LeagueConfig], ...]:
         profiles = []
 
         for broadcaster_id, profile in ACTIVE_CHANNEL_PROFILES.items():
             config = profile.league
 
-            if config.enabled and config.game_name and config.tag_line:
+            if self.bot.services.features.is_profile_feature_enabled(str(broadcaster_id), ProfileFeatureName.LEAGUE):
                 profiles.append((str(broadcaster_id), config))
 
         return tuple(profiles)
@@ -534,6 +533,9 @@ class LeagueService:
                         LOGGER.exception("[League] Failed to refresh the OP.GG item catalog.")
 
                 for index, (broadcaster_id, config) in enumerate(profiles):
+                    if not config.game_name or not config.tag_line:
+                        continue
+
                     if index:
                         await asyncio.sleep(2)
 
