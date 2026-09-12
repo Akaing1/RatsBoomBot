@@ -100,11 +100,11 @@ class PassivePointsService:
 
         moderator_id = str(self.chat_identity.sender_id(broadcaster_id))
         broadcaster = self.bot.create_partialuser(broadcaster_id)
-        chatters = broadcaster.fetch_chatters(moderator=moderator_id, first=1000, max_results=None)
+        chatters = await broadcaster.fetch_chatters(moderator=moderator_id, first=1000, max_results=None)
         excluded_ids = {broadcaster_id, str(self.bot.bot_id)}
         eligible = []
 
-        async for chatter in chatters:
+        async for chatter in chatters.users:
             user_id = str(chatter.id)
             username = str(chatter.name)
 
