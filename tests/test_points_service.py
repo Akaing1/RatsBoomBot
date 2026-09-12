@@ -1,3 +1,6 @@
+import asyncio
+from types import SimpleNamespace
+
 import asqlite
 import pytest
 
@@ -140,3 +143,47 @@ async def test_add_points_once_deduplicates_reward_events(tmp_path) -> None:
         assert first is True
         assert duplicate is False
         assert await service.get_points("channel-1", "viewer-1") == 100
+
+
+@pytest.mark.asyncio
+async def test_concurrent_message_tracking_waits_for_in_progress_award(monkeypatch) -> None:
+    import bot.services.engagement.points as points_module
+
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    class Connection:
+        async def execute(self, query, values) -> None:
+            started.set()
+            await release.wait()
+
+    class Acquisition:
+        async def __aenter__(self):
+            return Connection()
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+    class Database:
+        def acquire(self):
+            return Acquisition()
+
+    profile = SimpleNamespace(points=SimpleNamespace(points_per_message=25, message_cooldown_seconds=60))
+    features = SimpleNamespace(is_enabled=lambda broadcaster_id, feature: True)
+    bot = SimpleNamespace(services=SimpleNamespace(features=features))
+    payload = SimpleNamespace(
+        broadcaster=SimpleNamespace(id="channel-1"),
+        chatter=SimpleNamespace(id="viewer-1", name="viewer")
+    )
+    monkeypatch.setattr(points_module, "get_active_profile", lambda broadcaster_id: profile)
+    service = PointsService(bot=bot, db=Database())
+
+    first = asyncio.create_task(service.track_message(payload))
+    await started.wait()
+    second = asyncio.create_task(service.track_message(payload))
+    await asyncio.sleep(0)
+
+    assert second.done() is False
+
+    release.set()
+    await asyncio.gather(first, second)
