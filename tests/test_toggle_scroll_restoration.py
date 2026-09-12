@@ -44,6 +44,8 @@ def test_admin_feature_page_lists_unique_profile_integrations() -> None:
 def test_streamer_dashboard_has_profile_customization_page() -> None:
     layout = (PROJECT_ROOT / "web/templates/channel/layout.html").read_text(encoding="utf-8")
     template = (PROJECT_ROOT / "web/templates/channel/customization.html").read_text(encoding="utf-8")
+    template += (PROJECT_ROOT / "web/templates/shared/profile_inputs.html").read_text(encoding="utf-8")
+    template += (PROJECT_ROOT / "web/templates/shared/timer_editor.html").read_text(encoding="utf-8")
 
     assert "/channel/customization" in layout
     assert "Save Changes" in template

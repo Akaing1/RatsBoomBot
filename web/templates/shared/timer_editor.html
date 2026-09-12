@@ -1,0 +1,50 @@
+<template id="timer-message-template">
+    <div class="timer-message-row">
+        <textarea class="profile-setting-input" rows="3" maxlength="500" data-timer-message aria-label="Timer message"></textarea>
+        <button class="button danger timer-remove-button" type="button" data-remove-timer>Remove</button>
+    </div>
+</template>
+
+<script>
+    (() => {
+        const editor = document.querySelector("[data-timer-editor]");
+        const template = document.getElementById("timer-message-template");
+
+        if (!editor || !template) return;
+
+        const list = editor.querySelector("[data-timer-list]");
+        const hiddenValue = editor.querySelector("[data-timer-value]");
+        const updateLabels = () => {
+            list.querySelectorAll("[data-timer-message]").forEach((input, index) => {
+                input.setAttribute("aria-label", `Timer message ${index + 1}`);
+            });
+        };
+        const addTimer = () => {
+            list.appendChild(template.content.cloneNode(true));
+            updateLabels();
+            list.lastElementChild.querySelector("[data-timer-message]").focus();
+        };
+
+        editor.querySelector("[data-add-timer]").addEventListener("click", addTimer);
+        list.addEventListener("input", (event) => {
+            if (event.target.matches("[data-timer-message]")) {
+                event.target.value = event.target.value.replace(/[\r\n]+/g, " ");
+            }
+        });
+        list.addEventListener("click", (event) => {
+            const removeButton = event.target.closest("[data-remove-timer]");
+
+            if (!removeButton) return;
+            removeButton.closest(".timer-message-row").remove();
+            updateLabels();
+        });
+        editor.closest("form").addEventListener("submit", () => {
+            hiddenValue.value = Array.from(list.querySelectorAll("[data-timer-message]"))
+                .map((input) => input.value.trim())
+                .filter(Boolean)
+                .join("\n");
+        });
+
+        if (!list.children.length) addTimer();
+    })();
+</script>

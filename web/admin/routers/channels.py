@@ -13,6 +13,68 @@ from web.state import get_bot, get_db
 router = APIRouter(prefix="/channels")
 
 
+@router.get("/{broadcaster_id}/customization", response_class=HTMLResponse)
+async def admin_channel_customization(request: Request, broadcaster_id: str):
+    admin_redirect = await require_admin(request)
+    if admin_redirect:
+        return admin_redirect
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return await get_runtime_error(request)
+    broadcaster = get_broadcaster(runtime_bot, broadcaster_id)
+    if broadcaster is None:
+        return await get_channel_error(request)
+    services = runtime_bot.services
+    return templates.TemplateResponse(
+        request=request, name="admin/channel_customization.html",
+        context=build_admin_context(
+            request, active_page="channels", broadcaster=broadcaster,
+            customization_action=f"/admin/channels/{broadcaster_id}/customization",
+            channel_settings=await services.broadcaster_settings.get_settings(broadcaster_id),
+            setting_groups=services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)}),
+            setting_result=request.query_params.get("setting_result"),
+            setting_message=request.query_params.get("setting_message")
+        )
+    )
+
+
+@router.post("/{broadcaster_id}/customization")
+async def save_admin_channel_customization(request: Request, broadcaster_id: str, setting_name: str = Form(...), value: str = Form(""), action: str = Form(...), csrf_token: str = Form(...)):
+    admin_redirect = await require_admin(request)
+    if admin_redirect:
+        return admin_redirect
+    validate_csrf_token(request, csrf_token)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return await get_runtime_error(request)
+    if get_broadcaster(runtime_bot, broadcaster_id) is None:
+        return await get_channel_error(request)
+    services = runtime_bot.services
+    result = "success"
+    try:
+        if action not in {"save", "reset"}:
+            raise ValueError("Unknown customization action.")
+        if setting_name in {"social.discord_url", "social.youtube_url"}:
+            if action != "save":
+                raise ValueError("Use Save Changes to update or clear a social link.")
+            setter = services.broadcaster_settings.set_discord_url if setting_name == "social.discord_url" else services.broadcaster_settings.set_youtube_url
+            await setter(broadcaster_id, value.strip())
+            message = "Social link updated."
+        else:
+            definition = services.profile_settings.get_definition(setting_name)
+            actor = f"admin:{request.state.administrator.id}"
+            if action == "save":
+                await services.profile_settings.set_override(broadcaster_id, setting_name, value, actor)
+                message = f"{definition.label} was updated."
+            else:
+                await services.profile_settings.clear_override(broadcaster_id, setting_name, actor)
+                message = f"{definition.label} was reset to its channel default."
+    except (TypeError, ValueError) as error:
+        result, message = "error", str(error)
+    query = urlencode({"setting_result": result, "setting_message": message})
+    return RedirectResponse(url=f"/admin/channels/{broadcaster_id}/customization?{query}", status_code=303)
+
+
 async def get_runtime_error(request: Request):
     return await render_error(
         request,
@@ -120,6 +182,7 @@ async def channel_details_page(request: Request, broadcaster_id: str):
     channel_settings = await services.broadcaster_settings.get_settings(broadcaster_id)
     viewer_queue = services.viewer_queue
     redemption_activity = await get_redemption_dashboard_data(services, broadcaster_id)
+    gambling_loss_total = await services.points.get_gambling_loss_total(broadcaster_id)
     channel_features = services.features.get_channel_features(broadcaster_id)
     profile_features = services.features.get_admin_profile_features(broadcaster_id)
     raid_configured = FeatureName.RAID_BOSSES in channel_features
@@ -140,6 +203,7 @@ async def channel_details_page(request: Request, broadcaster_id: str):
             queue_users=viewer_queue.list_queue(broadcaster_id),
             queue_size=viewer_queue.size(broadcaster_id),
             redemption_activity=redemption_activity,
+            gambling_loss_total=gambling_loss_total,
             raid_configured=raid_configured,
             raid_metrics=raid_metrics,
             channel_features=channel_features,
@@ -171,7 +235,7 @@ async def update_custom_bot_premium(request: Request, broadcaster_id: str, actio
         return await get_runtime_error(request)
 
     if get_broadcaster(runtime_bot, broadcaster_id) is None:
-        return get_channel_error(request)
+        return await get_channel_error(request)
 
     if action not in {"enable", "disable"}:
         return redirect_to_channel(broadcaster_id, identity_result="error", identity_message="Unknown premium identity action.")
