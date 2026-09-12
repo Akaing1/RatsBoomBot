@@ -1,0 +1,21 @@
+<section class="panel" id="dashboard-raid" data-channel="{{ broadcaster.login or broadcaster.name }}">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Raid activity</p>
+            <h3 id="dashboard-raid-title">{{ raid_metrics.boss_name if raid_metrics else 'No raids yet' }}</h3>
+        </div>
+        <a class="button secondary" href="/raid/{{ broadcaster.login or broadcaster.name }}">Full raid details</a>
+    </div>
+    <p id="dashboard-raid-status" class="card-detail">{% if raid_metrics %}{{ raid_metrics.status | capitalize }} · {{ raid_metrics.boss_tier | capitalize }} · {{ raid_metrics.boss_type | capitalize }}{% else %}The next encounter will appear here when a raid spawns.{% endif %}</p>
+    <div id="dashboard-raid-details" {% if not raid_metrics %}hidden{% endif %}>
+        <strong id="dashboard-raid-hp">{% if raid_metrics %}{{ '{:,}'.format(raid_metrics.current_hp) }} / {{ '{:,}'.format(raid_metrics.max_hp) }} HP{% endif %}</strong>
+        <div class="progress-track raid-hp-track"><span id="dashboard-raid-bar" style="width: {{ raid_metrics.hp_percent if raid_metrics else 0 }}%"></span></div>
+        <div class="raid-metric-grid">
+            {% for key, label in [('unique_attackers', 'Participants'), ('total_attacks', 'Attacks'), ('total_damage', 'Total damage'), ('streams_used', 'Streams used')] %}
+            <article><span>{{ label }}</span><strong id="dashboard-raid-{{ key }}">{{ '{:,}'.format(raid_metrics[key]) if raid_metrics else '0' }}</strong></article>
+            {% endfor %}
+        </div>
+    </div>
+    <p id="dashboard-raid-refresh" class="card-detail" role="status">Updates automatically every 15 seconds.</p>
+</section>
+<script src="/static/js/dashboard-raid.js" defer></script>
