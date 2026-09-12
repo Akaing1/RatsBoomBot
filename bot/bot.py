@@ -26,6 +26,7 @@ class TwitchBot(commands.AutoBot):
         self.services: ServiceContainer | None = None
 
         self._close_lock = asyncio.Lock()
+        self._token_save_lock = asyncio.Lock()
         self._closed = False
 
         LOGGER.info(
@@ -126,9 +127,19 @@ class TwitchBot(commands.AutoBot):
             response.user_id
         )
 
-        await save_token(self.token_database, response.user_id, token, refresh)
+        await self._save_managed_token(response.user_id)
 
         return response
+
+    async def _save_managed_token(self, user_id: str) -> None:
+        # Read inside the lock so delayed refresh events cannot overwrite a newer authorization.
+        async with self._token_save_lock:
+            current = self.tokens.get(user_id)
+            if current is not None:
+                await save_token(self.token_database, user_id, current["token"], current["refresh"])
+
+    async def event_token_refreshed(self, payload) -> None:
+        await self._save_managed_token(payload.user_id)
 
     async def onboard_bot_account(self, token: str, user_id: str, refresh: str) -> None:
         user_id = str(user_id)
@@ -301,8 +312,9 @@ class TwitchBot(commands.AutoBot):
         exception = getattr(payload, "exception", None)
         context = getattr(payload, "context", None)
         command = getattr(context, "command", None)
-        author = getattr(context, "author", None)
-        channel = getattr(context, "channel", None)
+        author = getattr(context, "chatter", None) or getattr(context, "author", None)
+        channel = getattr(context, "broadcaster", None) or getattr(context, "channel", None)
+        broadcaster_id = getattr(channel, "id", None)
 
         command_name = getattr(command, "name", "unknown")
         author_name = getattr(author, "name", "unknown")
@@ -313,12 +325,7 @@ class TwitchBot(commands.AutoBot):
             command_name,
             channel_name,
             author_name,
-            exception
+            exception,
+            extra={"broadcaster_id": str(broadcaster_id) if broadcaster_id is not None else None},
+            exc_info=(type(exception), exception, exception.__traceback__) if exception is not None else None
         )
-
-        if exception is not None:
-            LOGGER.debug(
-                "[Commands] Command failure payload: %r",
-                payload,
-                exc_info=(type(exception), exception, exception.__traceback__)
-            )

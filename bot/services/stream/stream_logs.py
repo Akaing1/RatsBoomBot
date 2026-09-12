@@ -48,7 +48,7 @@ class StreamLogSession:
 
 class StreamLogService:
 
-    MAX_SAVED_SESSIONS_PER_CHANNEL = 10
+    MAX_SAVED_SESSIONS = 10
 
     def __init__(self, bot, broadcaster_service, logs_path: str):
         self.bot = bot
@@ -76,7 +76,11 @@ class StreamLogService:
         if self.log_handler not in LOGGER.handlers:
             LOGGER.addHandler(self.log_handler)
 
-        await self.start_live_sessions()
+        self._discovering_live_sessions = True
+        try:
+            await self.start_live_sessions()
+        finally:
+            self._discovering_live_sessions = False
         self.prune_all_channels()
 
         LOGGER.info(
@@ -250,7 +254,7 @@ class StreamLogService:
             log_path
         )
 
-        self.prune_channel_logs(channel_directory)
+        self.prune_all_channels()
 
         return session
 
@@ -272,6 +276,7 @@ class StreamLogService:
 
         self.write(broadcaster_id, "SYSTEM", message)
         self.active_sessions.pop(broadcaster_id, None)
+        self.prune_all_channels()
 
         LOGGER.info(
             "[Stream Logs] Stopped stream logging for %s.",
@@ -320,38 +325,18 @@ class StreamLogService:
         return self.active_sessions.get(str(broadcaster_id))
 
     def prune_all_channels(self) -> int:
-        deleted_count = 0
-
+        if getattr(self, "_discovering_live_sessions", False):
+            return 0
         try:
-            channel_directories = [path for path in self.logs_path.iterdir() if path.is_dir()]
+            session_directories = [
+                session
+                for channel in self.logs_path.iterdir() if channel.is_dir() and not channel.is_symlink()
+                for session in channel.iterdir()
+                if session.is_dir() and not session.is_symlink() and (session / "log.txt").is_file()
+            ]
+            session_directories.sort(key=lambda path: ((path / "log.txt").stat().st_mtime, str(path)), reverse=True)
         except OSError:
             LOGGER.exception("[Stream Logs] Failed to inspect log directory %s.", self.logs_path)
-            return 0
-
-        for channel_directory in channel_directories:
-            deleted_count += self.prune_channel_logs(channel_directory)
-
-        return deleted_count
-
-    def prune_channel_logs(self, channel_directory: Path) -> int:
-        channel_directory = channel_directory.resolve()
-
-        try:
-            channel_directory.relative_to(self.logs_path.resolve())
-            session_directories = [
-                path
-                for path in channel_directory.iterdir()
-                if path.is_dir() and (path / "log.txt").is_file()
-            ]
-            session_directories.sort(
-                key=lambda path: (path / "log.txt").stat().st_mtime,
-                reverse=True
-            )
-        except (OSError, ValueError):
-            LOGGER.exception(
-                "[Stream Logs] Failed to inspect channel log directory %s",
-                channel_directory
-            )
             return 0
 
         active_directories = {
@@ -366,7 +351,7 @@ class StreamLogService:
         }
 
         for session_directory in session_directories:
-            if len(retained_directories) >= self.MAX_SAVED_SESSIONS_PER_CHANNEL:
+            if len(retained_directories) >= self.MAX_SAVED_SESSIONS:
                 break
 
             retained_directories.add(session_directory.resolve())
@@ -382,9 +367,8 @@ class StreamLogService:
 
         if deleted_count:
             LOGGER.info(
-                "[Stream Logs] Removed %d expired stream logs from %s.",
-                deleted_count,
-                channel_directory.name
+                "[Stream Logs] Removed %d expired stream logs across all channels.",
+                deleted_count
             )
 
         return deleted_count
@@ -439,6 +423,9 @@ class StreamLogService:
                 "[Stream logs] Failed to delete stream log directory %s.",
                 resolved_directory
             )
+            return False
+
+        return True
 
     @staticmethod
     def get_stream_id(stream) -> str | None:

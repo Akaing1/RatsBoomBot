@@ -1,0 +1,7 @@
+{% extends "admin/layout.html" %}
+{% block title %}Channel customization | RatsBoomBot{% endblock %}
+{% block content %}
+<header class="page-header"><div><p class="eyebrow">Channel profile</p><h2>{{ broadcaster.name }} — Customization</h2><p class="page-description">Edit channel inputs or restore their defaults. Changes also appear in the channel dashboard.</p></div>{% set customization_active = true %}{% include "admin/channel_page_switch.html" %}</header>
+{% include "shared/profile_inputs.html" %}
+{% include "shared/timer_editor.html" %}
+{% endblock %}

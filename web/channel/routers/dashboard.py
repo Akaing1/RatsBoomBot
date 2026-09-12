@@ -160,6 +160,8 @@ async def channel_dashboard(request: Request):
     viewer_queue = services.viewer_queue
     redemption_activity = await get_redemption_dashboard_data(services, broadcaster_id)
     gambling_loss_total = await services.points.get_gambling_loss_total(broadcaster_id)
+    raid_enabled = services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
+    raid_metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_enabled else None
 
     return templates.TemplateResponse(
         request=request,
@@ -174,6 +176,8 @@ async def channel_dashboard(request: Request):
             "queue_size": viewer_queue.size(broadcaster_id),
             "redemption_activity": redemption_activity,
             "gambling_loss_total": gambling_loss_total,
+            "raid_enabled": raid_enabled,
+            "raid_metrics": raid_metrics,
             "queue_result": request.query_params.get("queue_result"),
             "queue_message": request.query_params.get("queue_message"),
             "csrf_token": get_csrf_token(request)
