@@ -27,9 +27,9 @@ class FakeBroadcaster:
         self.chatters = chatters
         self.fetch_chatter_calls = []
 
-    def fetch_chatters(self, **values):
+    async def fetch_chatters(self, **values):
         self.fetch_chatter_calls.append(values)
-        return self._iterate_chatters()
+        return SimpleNamespace(users=self._iterate_chatters(), total=len(self.chatters))
 
     async def _iterate_chatters(self):
         for chatter in self.chatters:

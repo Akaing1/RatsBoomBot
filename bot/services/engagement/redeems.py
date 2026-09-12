@@ -583,21 +583,25 @@ class RedeemService:
         broadcaster = self.bot.create_partialuser(broadcaster_id)
 
         if await self.is_moderator(broadcaster, broadcaster_id, user_id, username):
+            LOGGER.info("[Redeems] VIP grant rejected for moderator %s in broadcaster %s.", username, broadcaster_id, extra={"broadcaster_id": broadcaster_id, "category": "REDEEM"})
             message = render_profile_message(config.messages.vip_failed, username=username)
             return RedeemResult(handled=True, message=message)
 
         if await self.is_vip(broadcaster, broadcaster_id, user_id, username):
+            LOGGER.info("[Redeems] User %s is already a VIP in broadcaster %s.", username, broadcaster_id, extra={"broadcaster_id": broadcaster_id, "category": "REDEEM"})
             message = render_profile_message(config.messages.vip_already_granted, username=username)
             return RedeemResult(handled=True, message=message)
 
         try:
             await broadcaster.add_vip(user=user_id)
-        except Exception:
-            LOGGER.exception("[Redeems] Failed to grant VIP status to %s in broadcaster %s.", username, broadcaster_id)
-            message = render_profile_message(config.messages.vip_failed, username=username)
+        except Exception as error:
+            status = getattr(error, "status", None)
+            LOGGER.exception("[Redeems] Failed to grant VIP status to %s in broadcaster %s (HTTP status: %s).", username, broadcaster_id, status, extra={"broadcaster_id": broadcaster_id, "category": "REDEEM"})
+            template = config.messages.vip_auth_failed if status in (401, 403) else config.messages.vip_failed
+            message = render_profile_message(template, username=username)
             return RedeemResult(handled=True, message=message)
 
-        LOGGER.info("[Redeems] Granted permanent VIP status to %s in broadcaster %s.", username, broadcaster_id)
+        LOGGER.info("[Redeems] Granted permanent VIP status to %s in broadcaster %s.", username, broadcaster_id, extra={"broadcaster_id": broadcaster_id, "category": "REDEEM"})
         message = render_profile_message(config.messages.vip_success, username=username)
         return RedeemResult(handled=True, message=message)
 
@@ -609,7 +613,7 @@ class RedeemService:
                 if str(vip.id) == str(user_id):
                     return True
         except Exception:
-            LOGGER.exception("[Redeems] Failed to check VIP status for %s in broadcaster %s.", username, broadcaster_id)
+            LOGGER.exception("[Redeems] Failed to check VIP status for %s in broadcaster %s.", username, broadcaster_id, extra={"broadcaster_id": broadcaster_id, "category": "REDEEM"})
 
         return False
 
@@ -650,7 +654,7 @@ class RedeemService:
                 if str(moderator.id) == str(user_id):
                     return True
         except Exception:
-            LOGGER.exception("[Redeems] Failed to check moderator status for %s in broadcaster %s.", username, broadcaster_id)
+            LOGGER.exception("[Redeems] Failed to check moderator status for %s in broadcaster %s.", username, broadcaster_id, extra={"broadcaster_id": broadcaster_id, "category": "REDEEM"})
 
         return False
 

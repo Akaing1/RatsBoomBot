@@ -234,6 +234,7 @@ class RedeemMessages:
     vip_success: str = "@{username} is now a VIP! Welcome to the very important rat club!"
     vip_already_granted: str = "@{username}, you are already a VIP in this channel."
     vip_failed: str = "@{username}, VIP could not be granted. You may be a moderator or the channel may have no VIP slots available."
+    vip_auth_failed: str = "@{username}, VIP could not be granted because Twitch authorization failed. The broadcaster should reconnect their channel account with the required VIP permission."
 
 
 @dataclass(frozen=True)
