@@ -73,7 +73,6 @@
 {% block title %}{{ broadcaster.name or "Channel" }} | RatsBoomBot{% endblock %}
 
 {% block content %}
-<nav class="header-actions" aria-label="Channel pages"><a class="button secondary" href="/admin/channels/{{ broadcaster.id }}" aria-current="page">Overview</a><a class="button secondary" href="/admin/channels/{{ broadcaster.id }}/customization">Customization</a></nav>
 <header class="page-header">
     <div class="channel-heading">
         {% if broadcaster.profile_image_url %}
@@ -102,20 +101,8 @@
         </div>
     </div>
 
-    <div class="header-actions">
-        <a class="button secondary" href="/admin/channels">Back to Channels</a>
-
-        {% if broadcaster.login %}
-            <a
-                class="button primary"
-                href="https://twitch.tv/{{ broadcaster.login }}"
-                target="_blank"
-                rel="noopener noreferrer"
-            >
-                Open Twitch
-            </a>
-        {% endif %}
-    </div>
+    {% set customization_active = false %}
+    {% include "admin/channel_page_switch.html" %}
 </header>
 
 <section class="status-grid channel-status-grid">

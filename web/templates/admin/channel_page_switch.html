@@ -1,0 +1,14 @@
+<div class="channel-page-controls">
+    <div class="header-actions">
+        <a class="button secondary" href="/admin/channels">Back to Channels</a>
+        {% if broadcaster.login %}
+        <a class="button primary" href="https://twitch.tv/{{ broadcaster.login }}" target="_blank" rel="noopener noreferrer">Open Twitch</a>
+        {% endif %}
+    </div>
+    <form method="get" action="/admin/channels/{{ broadcaster.id }}{% if not customization_active %}/customization{% endif %}">
+        <button type="submit" class="channel-page-switch" role="switch" aria-checked="{{ 'true' if customization_active else 'false' }}" aria-label="Customization">
+            <span class="channel-page-switch-track" aria-hidden="true"><span></span></span>
+            <span>Customization</span>
+        </button>
+    </form>
+</div>
