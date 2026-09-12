@@ -1439,3 +1439,15 @@ body.landing-page {
 @media (max-width: 700px) {
     .custom-bot-link-controls { align-items: stretch; flex-direction: column; }
 }
+
+.channel-page-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; flex-shrink: 0; }
+.channel-page-controls form { margin: 0; }
+.channel-page-switch { display: inline-flex; align-items: center; gap: 9px; padding: 4px 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.channel-page-switch-track { display: inline-flex; align-items: center; width: 38px; height: 22px; padding: 3px; box-sizing: border-box; border-radius: 999px; background: var(--border); }
+.channel-page-switch-track span { width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+.channel-page-switch[aria-checked="true"] .channel-page-switch-track { background: #8b5cf6; }
+.channel-page-switch[aria-checked="true"] .channel-page-switch-track span { transform: translateX(16px); }
+.channel-page-switch:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 5px; border-radius: 4px; }
+@media (max-width: 700px) {
+    .channel-page-controls { align-items: flex-start; }
+}
