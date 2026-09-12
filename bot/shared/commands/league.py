@@ -25,7 +25,7 @@ class LeagueCommands(commands.Component):
 
         profile = get_active_profile(broadcaster_id)
 
-        if profile is None or not profile.league.enabled:
+        if profile is None:
             return None
 
         return broadcaster_id, profile.league
@@ -38,6 +38,10 @@ class LeagueCommands(commands.Component):
             return
 
         broadcaster_id, config = context
+
+        if not config.game_name or not config.tag_line:
+            await ctx.send("This channel's League account is not configured yet. Community commands !register, !rank, and !ladder are available.")
+            return
 
         if champion:
             await self.send_core_build(ctx, broadcaster_id, config, champion)
@@ -121,11 +125,11 @@ class LeagueCommunityCommandHandler:
             await ctx.reply(str(error))
             return
         except LeagueProviderError:
-            LOGGER.exception("[League] OP.GG could not register Riot ID %s for Twitch user %s.", riot_id, chatter.id)
+            LOGGER.exception("[League] OP.GG could not register Riot ID %s for Twitch user %s.", riot_id, chatter.id, extra={"broadcaster_id": broadcaster_id})
             await ctx.reply("I couldn't find that Riot ID. Check the name, tag, and region, then try again.")
             return
         except Exception:
-            LOGGER.exception("[League] Failed to register Riot ID %s for Twitch user %s.", riot_id, chatter.id)
+            LOGGER.exception("[League] Failed to register Riot ID %s for Twitch user %s.", riot_id, chatter.id, extra={"broadcaster_id": broadcaster_id})
             await ctx.reply("I couldn't register that Riot ID right now. Please try again later.")
             return
 

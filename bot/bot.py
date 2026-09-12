@@ -312,8 +312,9 @@ class TwitchBot(commands.AutoBot):
         exception = getattr(payload, "exception", None)
         context = getattr(payload, "context", None)
         command = getattr(context, "command", None)
-        author = getattr(context, "author", None)
-        channel = getattr(context, "channel", None)
+        author = getattr(context, "chatter", None) or getattr(context, "author", None)
+        channel = getattr(context, "broadcaster", None) or getattr(context, "channel", None)
+        broadcaster_id = getattr(channel, "id", None)
 
         command_name = getattr(command, "name", "unknown")
         author_name = getattr(author, "name", "unknown")
@@ -324,12 +325,7 @@ class TwitchBot(commands.AutoBot):
             command_name,
             channel_name,
             author_name,
-            exception
+            exception,
+            extra={"broadcaster_id": str(broadcaster_id) if broadcaster_id is not None else None},
+            exc_info=(type(exception), exception, exception.__traceback__) if exception is not None else None
         )
-
-        if exception is not None:
-            LOGGER.debug(
-                "[Commands] Command failure payload: %r",
-                payload,
-                exc_info=(type(exception), exception, exception.__traceback__)
-            )

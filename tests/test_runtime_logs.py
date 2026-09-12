@@ -31,3 +31,19 @@ def test_runtime_log_buffer_excludes_channel_activity() -> None:
     buffer.emit(create_record("[Redeems] User alice claimed Daily Check-in."))
 
     assert buffer.get_entries() == []
+
+
+def test_runtime_logs_keep_channel_failures_and_tracebacks() -> None:
+    buffer = RuntimeLogBuffer()
+    try:
+        raise ValueError("provider unavailable")
+    except ValueError as error:
+        record = logging.LogRecord("RatBoomBot", logging.ERROR, "", 0, "[League] Failed in UAT", (), (type(error), error, error.__traceback__))
+    record.broadcaster_id = "123"
+    buffer.emit(record)
+    warning = logging.LogRecord("RatBoomBot", logging.WARNING, "", 0, "[League] Request timed out", (), None)
+    buffer.emit(warning)
+    entries = buffer.get_entries()
+    assert len(entries) == 2
+    assert "ValueError: provider unavailable" in entries[0]["message"]
+    assert entries[1]["level"] == "WARNING"

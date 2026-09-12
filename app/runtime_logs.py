@@ -21,6 +21,9 @@ RUNTIME_HEALTH_CATEGORIES = frozenset({
 
 
 def is_runtime_health_record(record: logging.LogRecord) -> bool:
+    if record.levelno >= logging.WARNING:
+        return True
+
     if getattr(record, "broadcaster_id", None) is not None:
         return False
 
