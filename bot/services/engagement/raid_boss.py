@@ -393,8 +393,11 @@ class RaidBossService:
 
         try:
             broadcaster = self.bot.create_partialuser(str(broadcaster_id))
-            chatters = broadcaster.fetch_chatters(moderator=str(self.bot.user.id), first=1000, max_results=None)
-            return sum(1 async for _ in chatters)
+            chatters = await broadcaster.fetch_chatters(moderator=str(self.bot.user.id), first=1000, max_results=None)
+            count = 0
+            async for _ in chatters.users:
+                count += 1
+            return count
         except Exception:
             LOGGER.warning("[Raid Bosses] Could not fetch live chatter count for broadcaster %s.", broadcaster_id, exc_info=True)
             return 0
