@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from dataclasses import dataclass
@@ -30,6 +31,7 @@ class PointsService:
         self.db = db
         self.chatter_stats = chatter_stats
         self.cooldowns: dict[str, float] = {}
+        self.message_locks: dict[str, asyncio.Lock] = {}
         self.pending_duels: dict[str, PendingDuel] = {}
 
     async def setup(self) -> None:
@@ -188,50 +190,53 @@ class PointsService:
             return
 
         points_config = profile.points
-        now = time.time()
         cooldown_key = self._user_key(broadcaster_id, user_id)
-        last_message = self.cooldowns.get(cooldown_key, 0)
+        message_lock = self.message_locks.setdefault(cooldown_key, asyncio.Lock())
 
-        if now - last_message < points_config.message_cooldown_seconds:
-            return
+        async with message_lock:
+            now = time.time()
+            last_message = self.cooldowns.get(cooldown_key, 0)
 
-        self.cooldowns[cooldown_key] = now
+            if now - last_message < points_config.message_cooldown_seconds:
+                return
 
-        query = """
-        INSERT INTO viewers (
-            broadcaster_id,
-            user_id,
-            username,
-            points,
-            messages
-        )
-        VALUES (?, ?, ?, ?, 1)
-        ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
-            username = excluded.username,
-            points = points + excluded.points,
-            messages = messages + 1
-        """
-
-        values = (
-            broadcaster_id,
-            user_id,
-            username,
-            points_config.points_per_message
-        )
-
-        try:
-            async with self.db.acquire() as connection:
-                await connection.execute(query, values)
-
-                if self.chatter_stats is not None:
-                    await self.chatter_stats.record_points_earned(broadcaster_id, user_id, points_config.points_per_message, connection)
-        except Exception:
-            LOGGER.exception(
-                "[Points] Failed to award message points to %s for broadcaster %s.",
+            query = """
+            INSERT INTO viewers (
+                broadcaster_id,
+                user_id,
                 username,
-                broadcaster_id
+                points,
+                messages
             )
-            raise
+            VALUES (?, ?, ?, ?, 1)
+            ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
+                username = excluded.username,
+                points = points + excluded.points,
+                messages = messages + 1
+            """
+
+            values = (
+                broadcaster_id,
+                user_id,
+                username,
+                points_config.points_per_message
+            )
+
+            try:
+                async with self.db.acquire() as connection:
+                    await connection.execute(query, values)
+
+                    if self.chatter_stats is not None:
+                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, points_config.points_per_message, connection)
+            except Exception:
+                LOGGER.exception(
+                    "[Points] Failed to award message points to %s for broadcaster %s.",
+                    username,
+                    broadcaster_id
+                )
+                raise
+
+            self.cooldowns[cooldown_key] = now
 
         LOGGER.debug(
             "[Points] Awarded %d message points to %s for broadcaster %s.",
