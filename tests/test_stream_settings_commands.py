@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -48,6 +49,26 @@ class FakeContext:
 
 def test_channel_authorization_includes_broadcast_management_scope() -> None:
     assert "channel:manage:broadcast" in settings.CHANNEL_SCOPES.split()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name", ["discord", "youtube"])
+async def test_set_social_subcommand_updates_channel_and_rejects_viewers(name):
+    bot = FakeBot()
+    setter = AsyncMock()
+    bot.services.broadcaster_settings = SimpleNamespace(**{f"set_{name}_url": setter})
+    component = SettingsCommands(bot)
+    command = component.set_channel.get_command(name)
+    assert command is not None
+    context = FakeContext()
+    url = "https://discord.gg/test" if name == "discord" else "https://youtube.com/@test"
+    await command.callback(component, context, url=url)
+    setter.assert_awaited_once_with(broadcaster_id="channel-1", **{f"{name}_url": url})
+    setter.reset_mock()
+    await command.callback(component, FakeContext(moderator=False), url=url)
+    setter.assert_not_awaited()
+    await command.callback(component, context)
+    assert f"!set {name}" in context.replies[-1]
 
 
 @pytest.mark.asyncio
