@@ -16,7 +16,7 @@ async def test_secret_loss_threshold_global_totals_and_no_leak(tmp_path):
         async def collection():
             return await achievements.get_collection('u', lambda channel: {})
         before = await collection()
-        assert before['available'] == 16
+        assert before['available'] == 32
         assert 'The House Always Wins' not in str(before)
         for channel in ('a', 'b'):
             await points.add_points(channel, 'u', 'viewer', 600000, earned=False)
@@ -29,7 +29,7 @@ async def test_secret_loss_threshold_global_totals_and_no_leak(tmp_path):
         assert card['tier'] == 'Platinum'
         assert len(card['steps']) == 1
         assert card['progress'] == 500000
-        assert (await collection())['available'] == 17
+        assert (await collection())['available'] == 33
         await points.settle_wager('a', 'u', 'renamed', 5000, 10000)
         cards = (await collection())['cards']
         assert next(c for c in cards if c['title'] == 'Lucky Break')['progress'] == 5000
