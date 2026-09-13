@@ -1471,8 +1471,8 @@ body.landing-page {
 .tier-locked .achievement-badge { opacity: .5; border-style: dashed; }
 .achievement-card progress { width: 100%; accent-color: var(--badge-color); margin-bottom: 16px; }
 .achievement-tiers { list-style: none; padding: 0; margin: 10px 0 0; }
-.achievement-tiers li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--border); }
-.achievement-tier-label { display: flex; align-items: baseline; gap: 10px; }
-.achievement-tier-label span, .achievement-tier-status { color: var(--muted); font-size: .85rem; }
+.achievement-tiers li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(40px, .7fr) minmax(0, 1fr); gap: 4px 12px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--border); }
+.achievement-tier-requirement { text-align: center; font-variant-numeric: tabular-nums; }
+.achievement-tier-requirement, .achievement-tier-status { color: var(--muted); font-size: .85rem; }
 .achievement-tier-status { max-width: 170px; text-align: right; overflow-wrap: anywhere; }
 .achievement-card summary { cursor: pointer; }
