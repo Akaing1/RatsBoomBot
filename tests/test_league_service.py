@@ -9,6 +9,34 @@ from bot.services.engagement.league import CoreBuild, LeagueService, OpggMcpClie
 from bot.shared.commands.league import LeagueCommands
 
 
+@pytest.mark.asyncio
+async def test_null_ranked_summary_is_confirmed_before_returning_empty(monkeypatch) -> None:
+    from bot.services.engagement.league import LeagueProviderError
+    client = OpggMcpClient()
+    calls = []
+    parent_response = "LolGetSummonerProfile(Data(Summoner(null)))"
+
+    async def fake_call(name, arguments):
+        calls.append(arguments)
+        if arguments["desired_output_fields"] == ["data.summoner.ranked_most_champions"]:
+            return parent_response
+        return 'LolGetSummonerProfile(FieldDiagnostics(["ranked_most_champions"],"unmatched fields"))'
+
+    monkeypatch.setattr(client, "call_tool", fake_call)
+    config = LeagueConfig(game_name="Rat Pee", tag_line="Boom")
+    assert await client.fetch_season_summary(config) == SeasonSummary("", "RANKED", ())
+    assert len(calls) == 2
+    parent_response = 'LolGetSummonerProfile(FieldDiagnostics(["ranked_most_champions"],"schema changed"))'
+    with pytest.raises(LeagueProviderError, match="schema changed"):
+        await client.fetch_season_summary(config)
+
+
+def test_response_data_accepts_diagnostics_before_data() -> None:
+    from bot.services.engagement.league import response_data, unwrap_typed
+    root = parse_typed_response('LolGetSummonerProfile(FieldDiagnostics([],"hint"),Data(Summoner(null)))')
+    assert unwrap_typed(response_data(root, "LolGetSummonerProfile"), "Data")[0].name == "Summoner"
+
+
 def test_typed_response_parser_rejects_executable_python() -> None:
     with pytest.raises(Exception):
         parse_typed_response("__import__('os').system('echo unsafe')")
