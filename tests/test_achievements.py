@@ -53,10 +53,11 @@ async def test_live_claim_unlock_timestamp_and_rollback(tmp_path):
             assert not await c.fetchone("SELECT 1 FROM achievement_unlocks WHERE achievement_id='familiar'")
         collection = await AchievementService(db).get_collection("viewer", lambda channel: {"display_name": channel})
         assert collection["unlocked"] == 1
-        familiar = next(card for card in collection["cards"] if card["scope"] == "channel")
+        familiar = next(card for card in collection["cards"] if card["title"] == "Familiar Face")
+        assert familiar["scope"] == "global"
         assert familiar["progress"] == 9
         assert familiar["tier"] == "Locked"
         assert familiar["next_tier"]["threshold"] == 10
         empty = await AchievementService(db).get_collection("unknown", lambda channel: {})
-        assert len(empty["cards"]) == 8
+        assert len(empty["cards"]) == 9
         assert empty["unlocked"] == 0

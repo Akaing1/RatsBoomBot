@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from bot.profiles import RaidBossConfig
+from storage.transactions import immediate_transaction
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -894,7 +895,7 @@ class RaidBossService:
         if item_id == "flag_bearer" and event is None:
             return "active_raid_required"
 
-        async with self.db.acquire() as connection, connection.transaction():
+        async with self.db.acquire() as connection, immediate_transaction(connection):
             if item_id in {"blessing", "ancient_pact"}:
                 existing = await connection.fetchone("SELECT blessing_user_id, blessing_username, ancient_pact_user_id, ancient_pact_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (str(broadcaster_id), str(stream_id)))
 
