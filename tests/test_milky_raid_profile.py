@@ -7,7 +7,7 @@ def test_milky_raid_profile_uses_overwatch_loadout() -> None:
 
     assert MILKY_GALAXYVT_PROFILE.features.raid_bosses is True
     assert config.enabled is True
-    assert config.weapon_cost == 25000
+    assert config.weapon_cost == 5000
     assert config.refined_crafting_cost == 5000
     assert config.masterwork_crafting_cost == 25000
     assert config.weapon_names.basic_sword == "Whip Flail"
@@ -30,7 +30,7 @@ def test_milky_custom_item_names_are_valid_purchase_aliases() -> None:
     assert RaidBossService.normalize_item("Pocket Mercy", config) == "potion"
     assert RaidBossService.normalize_item("Cooldown Refresh", config) == "second_wind"
     assert RaidBossService.normalize_item("Pocket Nano", config) == "berserk"
-    assert RaidBossService.normalize_item("Guardian Angel", config) == "blessing"
+    assert RaidBossService.normalize_item("Valkyrie Boost", config) == "blessing"
     assert RaidBossService.normalize_item("Dmon Limit Break", config) == "ancient_pact"
     assert RaidBossService.normalize_item("Orisa Drum", config) == "flag_bearer"
 
