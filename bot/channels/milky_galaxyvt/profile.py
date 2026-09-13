@@ -5,6 +5,7 @@ from bot.channels.milky_galaxyvt.profile_details import (
     MILKY_GALAXYVT_OVERWATCH,
     MILKY_GALAXYVT_POINTS,
     MILKY_GALAXYVT_RAID_MESSAGES,
+    MILKY_GALAXYVT_RAID_BOSSES,
     MILKY_GALAXYVT_REDEEMS,
     MILKY_GALAXYVT_TIMER_MESSAGES,
     MILKY_GALAXYVT_SHOUTOUT_MESSAGES,
@@ -23,7 +24,8 @@ MILKY_GALAXYVT_PROFILE = ChannelProfile(
         points=True,
         redeems=True,
         community_events=False,
-        raid_responses=True
+        raid_responses=True,
+        raid_bosses=True
     ),
     globals=GlobalCommandDefaults(
         enabled=True,
@@ -53,5 +55,6 @@ MILKY_GALAXYVT_PROFILE = ChannelProfile(
     shoutout_messages=MILKY_GALAXYVT_SHOUTOUT_MESSAGES,
     social_messages=MILKY_GALAXYVT_SOCIAL_MESSAGES,
     first_chat_shoutouts=MILKY_GALAXYVT_FIRST_CHAT_SHOUTOUTS,
-    overwatch=MILKY_GALAXYVT_OVERWATCH
+    overwatch=MILKY_GALAXYVT_OVERWATCH,
+    raid_bosses=MILKY_GALAXYVT_RAID_BOSSES
 )
