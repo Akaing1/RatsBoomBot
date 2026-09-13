@@ -1451,3 +1451,22 @@ body.landing-page {
 @media (max-width: 700px) {
     .channel-page-controls { align-items: flex-start; }
 }
+/* Viewer achievement collection */
+.achievement-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px; margin: 24px 0; }
+.achievement-card { --badge-color: #b4b7c2; border-top: 3px solid var(--badge-color); }
+.achievement-card[hidden] { display: none; }
+.achievement-heading { display: flex; align-items: center; gap: 18px; }
+.achievement-heading h3 { margin: 4px 0; }
+.achievement-badge { color: var(--badge-color); border: 3px double currentColor; border-radius: 22%; padding: 8px; width: 72px; flex-shrink: 0; }
+.achievement-badge svg { display: block; width: 100%; }
+.tier-bronze { --badge-color: #d49a6a; }
+.tier-silver { --badge-color: #d0d8e5; }
+.tier-gold { --badge-color: #f3cd65; }
+.tier-platinum { --badge-color: #9ce7ef; }
+.tier-gold .achievement-badge, .tier-platinum .achievement-badge { border-width: 5px; }
+.tier-platinum .achievement-badge { box-shadow: 0 0 14px #9ce7ef33; }
+.tier-locked .achievement-badge { opacity: .5; border-style: dashed; }
+.achievement-card progress { width: 100%; accent-color: var(--badge-color); margin-bottom: 16px; }
+.achievement-tiers { padding-left: 20px; }
+.achievement-tiers li { margin: 12px 0; }
+.achievement-tiers span { display: block; font-size: .85rem; }

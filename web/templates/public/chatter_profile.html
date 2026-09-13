@@ -36,9 +36,11 @@
         <nav class="chatter-tabs" aria-label="Chatter profile sections">
             <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
             <button type="button" data-chatter-tab="raids" aria-selected="false">Raids</button>
+            <button type="button" data-chatter-tab="achievements" aria-selected="false">Achievements</button>
         </nav>
 
         <section data-chatter-panel="overview">
+            <p><strong>{{ profile.achievements.unlocked if profile.achievements else 0 }} achievement tiers unlocked</strong> · Explore the Achievements tab for badges and progress.</p>
             <div class="chatter-stat-grid" aria-label="Global chatter statistics">
                 <article><span>Messages sent</span><strong>{{ "{:,}".format(profile.messages_sent) }}</strong></article>
                 <article><span>Channels visited</span><strong>{{ profile.channels_interacted }}</strong></article>
@@ -100,6 +102,7 @@
         </section>
 
         <p class="chatter-history-note">Message totals before September 2026 are based on previously recorded point-eligible activity. New messages are counted exactly.</p>
+        {% if profile.achievements %}{% include 'public/achievements.html' %}{% endif %}
     </main>
     <script src="{{ url_for('static', path='/js/chatter-tabs.js') }}?v={{ deployment_stamp() }}" defer></script>
 </body>
