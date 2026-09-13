@@ -1,0 +1,45 @@
+<section data-chatter-panel="achievements" hidden>
+    <header class="panel-header">
+        <div><p class="eyebrow">Your milestones</p><h2>Achievements</h2>
+        <p>{{ profile.achievements.unlocked }} / {{ profile.achievements.available }} available tiers unlocked. Earn badges through daily check-ins.</p></div>
+    </header>
+    <label for="achievement-scope">Show achievements</label>
+    <select id="achievement-scope">
+        <option value="all">All achievements</option>
+        <option value="global">Global</option>
+        <option value="channel">Channel</option>
+    </select>
+    <div class="achievement-grid">
+    {% for card in profile.achievements.cards %}
+        <article class="panel achievement-card tier-{{ card.tier | lower }}" data-achievement-scope="{{ card.scope }}">
+            <div class="achievement-heading">
+                <div class="achievement-badge" aria-hidden="true">
+                    {% include "public/achievement_icons/" ~ card.icon ~ ".svg" %}
+                </div>
+                <div><p class="eyebrow">{{ card.channel.display_name if card.channel else "Global" }}</p>
+                <h3>{{ card.title }}</h3><strong>{{ card.tier }}</strong></div>
+            </div>
+            <p>{{ card.description }}</p>
+            {% if card.next_tier %}
+                <p>{{ card.progress }} / {{ card.target }} toward {{ card.next_tier.name }}</p>
+            {% else %}
+                <p>All tiers unlocked · {{ card.progress }} check-ins{% if card.icon == "compass" %} in unique channels{% endif %}</p>
+            {% endif %}
+            <progress value="{{ card.percent }}" max="100" aria-label="{{ card.title }} progress"></progress>
+            <details><summary>Tier milestones and unlocks</summary>
+                <ul class="achievement-tiers">
+                {% for step in card.steps %}
+                    <li><strong>{{ step.name }}</strong> · {{ step.threshold }}
+                    {% if step.earned %}
+                        <span>Unlocked{% if step.date %} · {{ step.date }} UTC{% else %} from historical totals · date unknown{% endif %}</span>
+                    {% else %}<span>Locked</span>{% endif %}</li>
+                {% endfor %}
+                </ul>
+            </details>
+        </article>
+    {% endfor %}
+    </div>
+    <p id="achievement-empty" hidden>No channel achievements yet. Check into a channel to start your collection.</p>
+</section>
+<script src="{{ url_for('static', path='/js/achievements.js') }}?v={{ deployment_stamp() }}" defer></script>
+
