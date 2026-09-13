@@ -4,7 +4,11 @@ ACHIEVEMENTS = {
     "regular": ("Daily Regular", "Complete daily check-ins across all channels.", "calendar"),
     "familiar": ("Familiar Face", "Complete daily check-ins in a single channel.", "home"),
     "collector": ("Point Collector", "Earn loyalty points across all channels.", "coins"),
-    "winner": ("Lucky Break", "Earn gambling profit across all channels, excluding returned stakes.", "dice"),
+    "winner": ("Lucky Break", "Earn gambling profit across all channels.", "dice"),
+    "damage": ("Damage Dealer", "Deal raid damage across all channels.", "swords"),
+    "weapons": ("Weapons Master", "Purchase weapons across all channels.", "swords"),
+    "buffs": ("Team Player", "Purchase raid buffs across all channels.", "banner"),
+    "consumables": ("Well Stocked", "Purchase raid consumables across all channels.", "potion"),
     "house": ("The House Always Wins", "Lose 500,000 loyalty points gambling across all channels. Thank you for your generous donation.", "house"),
 }
 
@@ -19,6 +23,7 @@ class AchievementService:
             tiers = await connection.fetchall("SELECT * FROM achievement_tiers ORDER BY achievement_id, tier")
             progress = await connection.fetchall("SELECT * FROM achievement_progress WHERE user_id = ?", (str(user_id),))
             progress += await connection.fetchall("SELECT * FROM achievement_chat_progress WHERE user_id = ?", (str(user_id),))
+            progress += await connection.fetchall("SELECT * FROM achievement_raid_progress WHERE user_id = ?", (str(user_id),))
             unlocks = await connection.fetchall("SELECT * FROM achievement_unlocks WHERE user_id = ? ORDER BY tier", (str(user_id),))
             observations = await connection.fetchall("SELECT broadcaster_id FROM chatter_channel_observations WHERE user_id = ?", (str(user_id),))
 
@@ -28,7 +33,7 @@ class AchievementService:
         channels.update(str(row["broadcaster_id"]) for row in progress if row["broadcaster_id"])
         channels.update(str(row["broadcaster_id"]) for row in unlocks if row["broadcaster_id"])
         cards = []
-        for name, channel in [("explorer", ""), ("regular", ""), ("collector", ""), ("winner", ""), ("house", "")] + [("familiar", channel) for channel in sorted(channels)]:
+        for name, channel in [(name, "") for name in ACHIEVEMENTS if name != "familiar"] + [("familiar", channel) for channel in sorted(channels)]:
             if name == "house" and (name, channel, 4) not in earned:
                 continue
             title, description, icon = ACHIEVEMENTS[name]
@@ -45,8 +50,8 @@ class AchievementService:
             target = next_tier["threshold"] if next_tier else steps[-1]["threshold"]
             cards.append({
                 "title": title, "description": description, "icon": icon,
-                "category": "chat" if name in {"collector", "winner", "house"} else "check_ins",
-                "unit": "loyalty points" if name in {"collector", "winner", "house"} else "unique channels" if name == "explorer" else "check-ins",
+                "category": "raids" if name in {"damage", "weapons", "buffs", "consumables"} else "chat" if name in {"collector", "winner", "house"} else "check_ins",
+                "unit": {"damage": "damage", "weapons": "weapons purchased", "buffs": "buffs purchased", "consumables": "consumables purchased", "explorer": "unique channels", "collector": "loyalty points", "winner": "loyalty points", "house": "loyalty points"}.get(name, "check-ins"),
                 "standalone": name == "house",
                 "scope": "channel" if channel else "global",
                 "channel": channel_metadata(channel) if channel else None,
