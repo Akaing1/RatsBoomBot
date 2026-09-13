@@ -4,7 +4,10 @@ from bot.profiles import (
     PointsConfig,
     PointsMessages,
     OverwatchConfig,
+    RaidBossConfig,
+    RaidItemNames,
     RaidMessages,
+    RaidWeaponNames,
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
@@ -169,4 +172,31 @@ MILKY_GALAXYVT_OVERWATCH = OverwatchConfig(
     player_id="Galaxy-17159",
     platform="pc",
     display_name="Milky"
+)
+
+
+MILKY_GALAXYVT_RAID_BOSSES = RaidBossConfig(
+    enabled=True,
+    weapon_names=RaidWeaponNames(
+        basic_sword="Whip Flail",
+        refined_sword="Dragon Blade",
+        masterwork_sword="Reinhardt Hammer",
+        mythical_blade="The Doomfist Gauntlet",
+        basic_bow="Mercy's Blaster",
+        refined_bow="Dragon Bow",
+        masterwork_bow="Junkrat's Launcher",
+        mythical_longbow="Dual Miniguns",
+        apprentice_tome="Zenyatta's Balls",
+        enchanted_tome="Wuyangs Water Staff",
+        archmage_grimoire="Anran's Fire Fans",
+        mythical_grimoire="Sigma's Black Holes"
+    ),
+    item_names=RaidItemNames(
+        potion="Pocket Mercy",
+        second_wind="Cooldown Refresh",
+        berserk="Pocket Nano",
+        blessing="Guardian Angel",
+        ancient_pact="Dmon Limit Break",
+        flag_bearer="Orisa Drum"
+    )
 )

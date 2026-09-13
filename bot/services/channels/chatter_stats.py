@@ -334,7 +334,7 @@ class ChatterStatsService:
             "firsts": claim_counts.get("first", 0),
             "seconds": claim_counts.get("second", 0),
             "inventory": [dict(row) | {"display_name": profile.raid_bosses.weapon_names.display(str(row["item_id"])) if profile else str(row["item_id"]).replace("_", " ").title()} for row in inventory],
-            "consumables": self._consumable_inventory(consumables)
+            "consumables": self._consumable_inventory(consumables, profile)
         }
 
     def _resolve_broadcaster(self, value: str):
@@ -403,15 +403,16 @@ class ChatterStatsService:
         }
 
     @staticmethod
-    def _consumable_inventory(row) -> list[dict[str, Any]]:
+    def _consumable_inventory(row, profile=None) -> list[dict[str, Any]]:
         if row is None:
             return []
 
+        names = profile.raid_bosses.item_names if profile is not None else None
         items = (
-            ("power_potion", "Power Potion", "potion_attacks_remaining"),
-            ("second_wind", "Second Wind", "second_wind_charges"),
-            ("berserk", "Berserk", "berserk_charges"),
-            ("lucky_dice", "Lucky Dice", "lucky_dice_charges"),
-            ("fools_card", "The Fool's Card", "fools_card_charges")
+            ("power_potion", names.potion if names else "Power Potion", "potion_attacks_remaining"),
+            ("second_wind", names.second_wind if names else "Second Wind", "second_wind_charges"),
+            ("berserk", names.berserk if names else "Berserk", "berserk_charges"),
+            ("lucky_dice", names.lucky_dice if names else "Lucky Dice", "lucky_dice_charges"),
+            ("fools_card", names.fools_card if names else "The Fool's Card", "fools_card_charges")
         )
         return [{"item_id": item_id, "display_name": display_name, "quantity": int(row[column])} for item_id, display_name, column in items if int(row[column]) > 0]

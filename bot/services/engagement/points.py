@@ -659,13 +659,14 @@ class PointsService:
         SELECT username, points
         FROM viewers
         WHERE broadcaster_id = ?
+          AND user_id != ?
         ORDER BY points DESC
         LIMIT ?
         """
 
         try:
             async with self.db.acquire() as connection:
-                rows = await connection.fetchall(query, (broadcaster_id, limit))
+                rows = await connection.fetchall(query, (broadcaster_id, str(settings.BOT_ID or ""), limit))
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to load leaderboard for broadcaster %s.",

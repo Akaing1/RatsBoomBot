@@ -327,7 +327,7 @@ class PointsConfig:
     command_name: str = "points"
     points_per_message: int = 25
     message_cooldown_seconds: int = 60
-    gamble_win_chance: float = 0.45
+    gamble_win_chance: float = 0.5
     roulette_max_bet: int = 1000
     subscription_reward: int = 0
     cheer_reward: int = 0
@@ -401,6 +401,21 @@ class RaidWeaponNames:
 
 
 @dataclass(frozen=True)
+class RaidItemNames:
+    potion: str = "Power Potion"
+    second_wind: str = "Second Wind"
+    berserk: str = "Berserk"
+    lucky_dice: str = "Lucky Dice"
+    fools_card: str = "The Fool's Card"
+    blessing: str = "Blessing of the Gods"
+    ancient_pact: str = "Ancient Pact"
+    flag_bearer: str = "Flag Bearer's Will"
+
+    def display(self, item_id: str) -> str:
+        return str(getattr(self, item_id, item_id.replace("_", " ").title()))
+
+
+@dataclass(frozen=True)
 class RaidBossConfig:
     enabled: bool = False
     offline_testing_enabled: bool = False
@@ -408,6 +423,7 @@ class RaidBossConfig:
     names: RaidBossNames = RaidBossNames()
     mini_names: RaidBossNames = RaidBossNames()
     weapon_names: RaidWeaponNames = RaidWeaponNames()
+    item_names: RaidItemNames = RaidItemNames()
     max_hp: int = 150000
     duration_streams: int = 5
     reward_pool: int = 100000

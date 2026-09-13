@@ -2,6 +2,7 @@ import asyncio
 import logging
 import math
 import random
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -641,7 +642,7 @@ class RaidBossService:
         berserk_used = berserk_charges > 0 and int(prior["berserks"]) == 0
 
         if berserk_used and (weapon_used is None or weapon_durability < config.berserk_durability_cost):
-            return RaidAttackResult(0, event.current_hp, event.boss_name, weapon, False, False, error=f"Berserk requires an equipped weapon with at least {config.berserk_durability_cost} durability.")
+            return RaidAttackResult(0, event.current_hp, event.boss_name, weapon, False, False, error=f"{config.item_names.berserk} requires an equipped weapon with at least {config.berserk_durability_cost} durability.")
 
         overdrive_attempted = weapon_used in OVERCLOCKED_WEAPON_TYPES and int(prior["overdrive_attempts"]) == 0
         overdrive_consumable = None
@@ -880,7 +881,7 @@ class RaidBossService:
         return await self.get_active_event(broadcaster_id), 0
 
     async def buy(self, broadcaster_id: str, user_id: str, username: str, item_id: str, config: RaidBossConfig, stream_id: str | None = None) -> str | None:
-        item_id = self.normalize_item(item_id)
+        item_id = self.normalize_item(item_id, config)
         costs = {"potion": config.potion_cost, "second_wind": config.second_wind_cost, "berserk": config.berserk_cost, "lucky_dice": config.lucky_dice_cost, "fools_card": config.fools_card_cost, "blessing": config.blessing_cost, "ancient_pact": config.ancient_pact_cost, "flag_bearer": config.flag_bearer_cost}
         cost = config.overclocked_weapon_cost if item_id in OVERCLOCKED_WEAPON_TYPES else costs.get(item_id, config.weapon_cost)
 
@@ -1004,7 +1005,7 @@ class RaidBossService:
     async def craft(self, broadcaster_id: str, user_id: str, username: str, item_id: str, config: RaidBossConfig) -> str:
         requested_item = "_".join(item_id.lower().strip().split())
         family = CRAFTING_FAMILIES.get(requested_item)
-        item_id = self.normalize_item(item_id) if family is None else ""
+        item_id = self.normalize_item(item_id, config) if family is None else ""
         ingredient = CRAFTING_RECIPES.get(item_id)
 
         if family is None and ingredient is None:
@@ -1044,9 +1045,21 @@ class RaidBossService:
         return f"crafted:{item_id}"
 
     @staticmethod
-    def normalize_item(item_id: str) -> str:
-        normalized = "_".join(item_id.lower().strip().split())
-        return ITEM_ALIASES.get(normalized, normalized)
+    def normalize_item(item_id: str, config: RaidBossConfig | None = None) -> str:
+        normalized = re.sub(r"[^a-z0-9]+", "_", item_id.casefold().replace("’", "'")).strip("_")
+        canonical = ITEM_ALIASES.get(normalized, normalized)
+
+        if canonical in WEAPON_TYPES or canonical in BUFF_ITEMS:
+            return canonical
+
+        if config is not None:
+            for candidate in (*WEAPON_TYPES, *BUFF_ITEMS):
+                names = config.weapon_names if candidate in WEAPON_TYPES else config.item_names
+                configured = re.sub(r"[^a-z0-9]+", "_", names.display(candidate).casefold().replace("’", "'")).strip("_")
+                if normalized == configured:
+                    return candidate
+
+        return canonical
 
     async def equip(self, broadcaster_id: str, user_id: str, username: str, weapon: str) -> bool:
         weapon = self.normalize_item(weapon)
@@ -1081,7 +1094,7 @@ class RaidBossService:
         return row is not None
 
     async def sell(self, broadcaster_id: str, user_id: str, username: str, weapon: str, config: RaidBossConfig) -> str:
-        weapon = self.normalize_item(weapon)
+        weapon = self.normalize_item(weapon, config)
 
         if weapon not in WEAPON_TYPES:
             return "invalid"
@@ -1158,7 +1171,7 @@ class RaidBossService:
         return weapons, equipped, equipped_durability, potions
 
     async def repair(self, broadcaster_id: str, user_id: str, weapon: str, config: RaidBossConfig) -> str:
-        weapon = self.normalize_item(weapon)
+        weapon = self.normalize_item(weapon, config)
 
         if weapon not in WEAPON_TYPES:
             return "invalid"

@@ -118,6 +118,27 @@ async def test_settle_wager_does_not_track_winning_wagers_as_losses(tmp_path, mo
 
 
 @pytest.mark.asyncio
+async def test_leaderboard_excludes_bot_house_balance(tmp_path, monkeypatch) -> None:
+    from config.settings import settings
+
+    monkeypatch.setattr(settings, "BOT_ID", "ratsboombot")
+    async with asqlite.create_pool(str(tmp_path / "points.db")) as database:
+        service = PointsService(bot=None, db=database)
+        await service.setup()
+        await service.add_points("channel-1", "ratsboombot", "RatsBoomBot", 1_000_000)
+        await service.add_points("channel-1", "viewer-1", "first_viewer", 500)
+        await service.add_points("channel-1", "viewer-2", "second_viewer", 250)
+
+        leaderboard = await service.get_leaderboard("channel-1")
+
+        assert [(row["username"], row["points"]) for row in leaderboard] == [
+            ("first_viewer", 500),
+            ("second_viewer", 250)
+        ]
+        assert await service.get_points("channel-1", "ratsboombot") == 1_000_000
+
+
+@pytest.mark.asyncio
 async def test_add_points_once_deduplicates_reward_events(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "points.db")) as database:
         service = PointsService(bot=None, db=database)

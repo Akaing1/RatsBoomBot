@@ -50,11 +50,19 @@ PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("league.display_name", "League of Legends", "League display name", "Name used when presenting broadcaster League statistics.", maximum_length=100, rows=1),
     ProfileSettingDefinition("overwatch.player_id", "Overwatch", "BattleTag", "The broadcaster's Overwatch BattleTag.", maximum_length=100, rows=1),
     ProfileSettingDefinition("overwatch.platform", "Overwatch", "Platform", "The OverFast platform code, such as pc.", maximum_length=20, rows=1),
-    ProfileSettingDefinition("overwatch.display_name", "Overwatch", "Display name", "Name used in Overwatch command responses.", maximum_length=100, rows=1)
+    ProfileSettingDefinition("overwatch.display_name", "Overwatch", "Display name", "Name used in Overwatch command responses.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("raid_bosses.item_names.potion", "Raid item names", "Power Potion name", "Custom display and purchase name for Power Potion.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("raid_bosses.item_names.second_wind", "Raid item names", "Second Wind name", "Custom display and purchase name for Second Wind.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("raid_bosses.item_names.berserk", "Raid item names", "Berserk name", "Custom display and purchase name for Berserk.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("raid_bosses.item_names.lucky_dice", "Raid item names", "Lucky Dice name", "Custom display and purchase name for Lucky Dice.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("raid_bosses.item_names.fools_card", "Raid item names", "Fool's Card name", "Custom display and purchase name for The Fool's Card.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("raid_bosses.item_names.blessing", "Raid item names", "Blessing name", "Custom display and purchase name for Blessing of the Gods.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("raid_bosses.item_names.ancient_pact", "Raid item names", "Ancient Pact name", "Custom display and purchase name for Ancient Pact.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("raid_bosses.item_names.flag_bearer", "Raid item names", "Flag Bearer name", "Custom display and purchase name for Flag Bearer's Will.", maximum_length=100, rows=1)
 )
 
 PROFILE_SETTINGS_BY_KEY = {definition.key: definition for definition in PROFILE_SETTING_DEFINITIONS}
-DEVELOPER_PROFILE_MIGRATION_VERSION = 1
+DEVELOPER_PROFILE_MIGRATION_VERSION = 2
 
 
 class ProfileSettingsService:
@@ -262,15 +270,18 @@ class ProfileSettingsService:
     def replace_profile_value(cls, profile: ChannelProfile, setting_name: str, value) -> ChannelProfile:
         parts = setting_name.split(".")
 
-        if len(parts) == 1:
-            stored_value = tuple(line.strip() for line in str(value).splitlines() if line.strip()) if setting_name == "timer_messages" else value
-            return replace(profile, **{setting_name: stored_value})
+        if setting_name == "timer_messages":
+            value = tuple(line.strip() for line in str(value).splitlines() if line.strip())
 
-        if len(parts) == 2:
-            section = getattr(profile, parts[0])
-            return replace(profile, **{parts[0]: replace(section, **{parts[1]: value})})
+        def replace_nested(current, remaining: list[str]):
+            field = remaining[0]
 
-        raise ValueError(f"Unsupported profile setting path: {setting_name}")
+            if len(remaining) == 1:
+                return replace(current, **{field: value})
+
+            return replace(current, **{field: replace_nested(getattr(current, field), remaining[1:])})
+
+        return replace_nested(profile, parts)
 
     @staticmethod
     def validate_value(definition: ProfileSettingDefinition, raw_value: str) -> str | int:

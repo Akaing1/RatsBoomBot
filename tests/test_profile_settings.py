@@ -1,7 +1,7 @@
 import asqlite
 import pytest
 
-from bot.profiles import ChannelProfile, CommunityMessages, activate_profile, clear_profiles, create_generic_profile, get_active_profile
+from bot.profiles import ChannelProfile, CommunityMessages, RaidBossConfig, RaidItemNames, activate_profile, clear_profiles, create_generic_profile, get_active_profile
 from bot.services.channels.profile_settings import PROFILE_SETTINGS_BY_KEY, ProfileSettingsService
 
 
@@ -44,6 +44,25 @@ async def test_profile_override_updates_and_resets_active_profile(tmp_path) -> N
 
         await service.clear_override("channel-1", "community_messages.follow", "test")
         assert get_active_profile("channel-1").community_messages.follow == "Original follow"
+
+
+@pytest.mark.asyncio
+async def test_nested_raid_item_name_override_updates_active_profile(tmp_path) -> None:
+    database_path = tmp_path / "profiles.db"
+    base_profile = ChannelProfile(
+        channel_name="milky_galaxyvt",
+        raid_bosses=RaidBossConfig(item_names=RaidItemNames(potion="Pocket Mercy"))
+    )
+    activate_profile("channel-1", base_profile)
+
+    async with asqlite.create_pool(str(database_path)) as database:
+        service = ProfileSettingsService(database)
+        await service.setup()
+        service.apply_overrides("channel-1", base_profile)
+
+        await service.set_override("channel-1", "raid_bosses.item_names.potion", "Damage Boost", "test")
+
+        assert get_active_profile("channel-1").raid_bosses.item_names.potion == "Damage Boost"
 
 
 @pytest.mark.asyncio
