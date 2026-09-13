@@ -31,6 +31,7 @@ from storage.migrations.v026_flag_bearers_will import migrate as migrate_flag_be
 from storage.migrations.v027_overclocked_weapons import migrate as migrate_overclocked_weapons
 from storage.migrations.v028_point_reward_events import migrate as migrate_point_reward_events
 from storage.migrations.v029_achievements import migrate as migrate_achievements
+from storage.migrations.v030_chat_achievements import migrate as migrate_chat_achievements
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -72,4 +73,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=27, name="overclocked_weapons", run=migrate_overclocked_weapons)
     , Migration(version=28, name="point_reward_events", run=migrate_point_reward_events)
     , Migration(version=29, name="achievements", run=migrate_achievements)
+    , Migration(version=30, name="chat_achievements", run=migrate_chat_achievements)
 )
