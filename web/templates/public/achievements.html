@@ -1,14 +1,13 @@
 <section data-chatter-panel="achievements" hidden>
     <header class="panel-header">
         <div><p class="eyebrow">Your milestones</p><h2>Achievements</h2>
-        <p>{{ profile.achievements.unlocked }} / {{ profile.achievements.available }} available tiers unlocked. Earn badges through daily check-ins.</p></div>
+        <p>{{ profile.achievements.unlocked }} / {{ profile.achievements.available }} available tiers unlocked. Celebrate your milestones across RatsBoomBot communities.</p></div>
     </header>
-    <label for="achievement-scope">Show achievements</label>
-    <select id="achievement-scope">
-        <option value="all">All achievements</option>
-        <option value="global">Global</option>
-        <option value="channel">Channel</option>
-    </select>
+    <div class="chatter-tabs achievement-filters" role="group" aria-label="Filter achievements">
+        <button type="button" class="active" data-achievement-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-achievement-filter="global" aria-pressed="false">Global</button>
+        <button type="button" data-achievement-filter="channel" aria-pressed="false">Channel</button>
+    </div>
     <div class="achievement-grid">
     {% for card in profile.achievements.cards %}
         <article class="panel achievement-card tier-{{ card.tier | lower }}" data-achievement-scope="{{ card.scope }}">
@@ -19,7 +18,7 @@
                 <div><p class="eyebrow">{{ card.channel.display_name if card.channel else "Global" }}</p>
                 <h3>{{ card.title }}</h3><strong>{{ card.tier }}</strong></div>
             </div>
-            <p>{{ card.description }}</p>
+            <p class="achievement-description">{{ card.description }}</p>
             {% if card.next_tier %}
                 <p>{{ card.progress }} / {{ card.target }} toward {{ card.next_tier.name }}</p>
             {% else %}
@@ -29,10 +28,10 @@
             <details><summary>Tier milestones and unlocks</summary>
                 <ul class="achievement-tiers">
                 {% for step in card.steps %}
-                    <li><strong>{{ step.name }}</strong> · {{ step.threshold }}
+                    <li><div class="achievement-tier-label"><strong>{{ step.name }}</strong><span>{{ step.threshold }}</span></div>
                     {% if step.earned %}
-                        <span>Unlocked{% if step.date %} · {{ step.date }} UTC{% else %} from historical totals · date unknown{% endif %}</span>
-                    {% else %}<span>Locked</span>{% endif %}</li>
+                        <span class="achievement-tier-status">Unlocked{% if step.date %} · {{ step.date }} UTC{% else %} from historical totals · date unknown{% endif %}</span>
+                    {% else %}<span class="achievement-tier-status">Locked</span>{% endif %}</li>
                 {% endfor %}
                 </ul>
             </details>
@@ -42,4 +41,3 @@
     <p id="achievement-empty" hidden>No channel achievements yet. Check into a channel to start your collection.</p>
 </section>
 <script src="{{ url_for('static', path='/js/achievements.js') }}?v={{ deployment_stamp() }}" defer></script>
-

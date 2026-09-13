@@ -101,7 +101,6 @@
             </section>
         </section>
 
-        <p class="chatter-history-note">Message totals before September 2026 are based on previously recorded point-eligible activity. New messages are counted exactly.</p>
         {% if profile.achievements %}{% include 'public/achievements.html' %}{% endif %}
     </main>
     <script src="{{ url_for('static', path='/js/chatter-tabs.js') }}?v={{ deployment_stamp() }}" defer></script>
