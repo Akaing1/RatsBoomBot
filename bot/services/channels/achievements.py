@@ -2,7 +2,7 @@ TIER_NAMES = ("Bronze", "Silver", "Gold", "Platinum")
 ACHIEVEMENTS = {
     "explorer": ("Community Explorer", "Check into unique channels.", "compass"),
     "regular": ("Daily Regular", "Complete daily check-ins across all channels.", "calendar"),
-    "familiar": ("Familiar Face", "Complete daily check-ins in this channel.", "home"),
+    "familiar": ("Familiar Face", "Complete daily check-ins in a single channel.", "home"),
 }
 
 
@@ -46,4 +46,3 @@ class AchievementService:
                 "percent": min(100, round(count * 100 / target)),
             })
         return {"cards": cards, "unlocked": len(unlocks), "available": len(cards) * 4}
-
