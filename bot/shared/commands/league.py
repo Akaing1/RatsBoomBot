@@ -50,7 +50,7 @@ class LeagueCommands(commands.Component):
         top_champions = await self.bot.services.league.get_top_champions(broadcaster_id)
 
         if not top_champions:
-            await ctx.send(f"{config.display_name}'s seasonal champion data is still warming up. Try again soon.")
+            await ctx.send(f"No ranked champion data is available for {config.display_name} yet. OP.GG may not have ranked games for this season, or the data may still be loading.")
             return
 
         entries = [f"{entry.name} ({entry.win_rate:.1f}% WR)" for entry in top_champions]

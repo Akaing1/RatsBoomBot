@@ -182,6 +182,16 @@ def normalize_timestamp(value: str) -> str:
     return parsed.astimezone(UTC).isoformat()
 
 
+def response_data(root: TypedValue, expected_name: str) -> TypedValue:
+    values = unwrap_typed(root, expected_name)
+    for value in values:
+        if isinstance(value, TypedValue) and value.name == "Data":
+            return value
+
+    diagnostics = next((value for value in values if isinstance(value, TypedValue) and value.name == "FieldDiagnostics"), None)
+    raise LeagueProviderError(f"OP.GG returned no Data for {expected_name}. Field diagnostics: {diagnostics!r}")
+
+
 class OpggMcpClient:
 
     def __init__(self, url: str = OPGG_MCP_URL, timeout_seconds: float = 30):
@@ -267,8 +277,24 @@ class OpggMcpClient:
             "desired_output_fields": list(fields)
         })
         root = parse_typed_response(text)
-        data = unwrap_typed(root, "LolGetSummonerProfile")[0]
+        values = unwrap_typed(root, "LolGetSummonerProfile")
+        if not any(isinstance(value, TypedValue) and value.name == "Data" for value in values) and any(isinstance(value, TypedValue) and value.name == "FieldDiagnostics" for value in values):
+            # Nested selection cannot traverse a null ranked summary. Confirm the
+            # parent is null before treating diagnostics as an empty season.
+            parent_text = await self.call_tool("lol_get_summoner_profile", {
+                "game_name": config.game_name, "tag_line": config.tag_line,
+                "region": config.region, "lang": "en_US",
+                "desired_output_fields": ["data.summoner.ranked_most_champions"]
+            })
+            parent_data = response_data(parse_typed_response(parent_text), "LolGetSummonerProfile")
+            parent = unwrap_typed(unwrap_typed(parent_data, "Data")[0], "Summoner")
+            if parent == (None,):
+                return SeasonSummary("", "RANKED", ())
+
+        data = response_data(root, "LolGetSummonerProfile")
         summoner = unwrap_typed(unwrap_typed(data, "Data")[0], "Summoner")
+        if summoner == (None,):
+            return SeasonSummary("", "RANKED", ())
         ranked = unwrap_typed(summoner[0], "RankedMostChampions")
         game_type, season_id, _play, _win, _lose, champion_values = ranked
         champions = []
@@ -295,7 +321,7 @@ class OpggMcpClient:
             "desired_output_fields": list(fields)
         })
         root = parse_typed_response(text)
-        data = unwrap_typed(root, "LolListSummonerMatches")[0]
+        data = response_data(root, "LolListSummonerMatches")
         history = unwrap_typed(data, "Data")[0]
         matches = []
 
@@ -334,7 +360,7 @@ class OpggMcpClient:
             "desired_output_fields": list(fields)
         })
         root = parse_typed_response(text)
-        data = unwrap_typed(root, "LolGetSummonerProfile")[0]
+        data = response_data(root, "LolGetSummonerProfile")
         returned_game_name, returned_tag_line, league_stats = unwrap_typed(unwrap_typed(data, "Data")[0], "Summoner")
         ranks = []
 
