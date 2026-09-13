@@ -39,6 +39,7 @@ class AchievementService:
             target = next_tier["threshold"] if next_tier else steps[-1]["threshold"]
             cards.append({
                 "title": title, "description": description, "icon": icon,
+                "category": "check_ins",
                 "scope": "channel" if channel else "global",
                 "channel": channel_metadata(channel) if channel else None,
                 "tier": highest["name"] if highest else "Locked", "steps": steps,
