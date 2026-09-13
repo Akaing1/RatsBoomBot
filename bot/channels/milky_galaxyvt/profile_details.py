@@ -177,6 +177,7 @@ MILKY_GALAXYVT_OVERWATCH = OverwatchConfig(
 
 MILKY_GALAXYVT_RAID_BOSSES = RaidBossConfig(
     enabled=True,
+    weapon_cost=5000,
     weapon_names=RaidWeaponNames(
         basic_sword="Whip Flail",
         refined_sword="Dragon Blade",
@@ -195,7 +196,7 @@ MILKY_GALAXYVT_RAID_BOSSES = RaidBossConfig(
         potion="Pocket Mercy",
         second_wind="Cooldown Refresh",
         berserk="Pocket Nano",
-        blessing="Guardian Angel",
+        blessing="Valkyrie Boost",
         ancient_pact="Dmon Limit Break",
         flag_bearer="Orisa Drum"
     )
