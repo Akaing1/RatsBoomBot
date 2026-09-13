@@ -25,15 +25,18 @@ class AchievementService:
             progress += await connection.fetchall("SELECT * FROM achievement_chat_progress WHERE user_id = ?", (str(user_id),))
             progress += await connection.fetchall("SELECT * FROM achievement_raid_progress WHERE user_id = ?", (str(user_id),))
             unlocks = await connection.fetchall("SELECT * FROM achievement_unlocks WHERE user_id = ? ORDER BY tier", (str(user_id),))
-            observations = await connection.fetchall("SELECT broadcaster_id FROM chatter_channel_observations WHERE user_id = ?", (str(user_id),))
 
         counts = {(row["achievement_id"], row["broadcaster_id"]): int(row["progress"]) for row in progress}
         earned = {(row["achievement_id"], row["broadcaster_id"], int(row["tier"])): dict(row) for row in unlocks}
-        channels = {str(row["broadcaster_id"]) for row in observations}
-        channels.update(str(row["broadcaster_id"]) for row in progress if row["broadcaster_id"])
-        channels.update(str(row["broadcaster_id"]) for row in unlocks if row["broadcaster_id"])
+        counts[("familiar", "")] = max((int(row["progress"]) for row in progress if row["achievement_id"] == "familiar"), default=0)
+        # A tier earned in any channel qualifies globally. Retain the original
+        # per-channel records so historical achievements are never revoked.
+        for tier in range(1, 5):
+            matches = [dict(row) for row in unlocks if row["achievement_id"] == "familiar" and int(row["tier"]) == tier]
+            if matches:
+                earned[("familiar", "", tier)] = min(matches, key=lambda row: row["unlocked_at"] or "")
         cards = []
-        for name, channel in [(name, "") for name in ACHIEVEMENTS if name != "familiar"] + [("familiar", channel) for channel in sorted(channels)]:
+        for name, channel in [(name, "") for name in ACHIEVEMENTS]:
             if name == "house" and (name, channel, 4) not in earned:
                 continue
             title, description, icon = ACHIEVEMENTS[name]
