@@ -3,6 +3,9 @@ ACHIEVEMENTS = {
     "explorer": ("Community Explorer", "Check into unique channels.", "compass"),
     "regular": ("Daily Regular", "Complete daily check-ins across all channels.", "calendar"),
     "familiar": ("Familiar Face", "Complete daily check-ins in a single channel.", "home"),
+    "collector": ("Point Collector", "Earn loyalty points across all channels.", "coins"),
+    "winner": ("Lucky Break", "Earn gambling profit across all channels, excluding returned stakes.", "dice"),
+    "house": ("The House Always Wins", "Lose 500,000 loyalty points gambling across all channels. Thank you for your generous donation.", "house"),
 }
 
 
@@ -15,6 +18,7 @@ class AchievementService:
         async with self.db.acquire() as connection:
             tiers = await connection.fetchall("SELECT * FROM achievement_tiers ORDER BY achievement_id, tier")
             progress = await connection.fetchall("SELECT * FROM achievement_progress WHERE user_id = ?", (str(user_id),))
+            progress += await connection.fetchall("SELECT * FROM achievement_chat_progress WHERE user_id = ?", (str(user_id),))
             unlocks = await connection.fetchall("SELECT * FROM achievement_unlocks WHERE user_id = ? ORDER BY tier", (str(user_id),))
             observations = await connection.fetchall("SELECT broadcaster_id FROM chatter_channel_observations WHERE user_id = ?", (str(user_id),))
 
@@ -24,7 +28,9 @@ class AchievementService:
         channels.update(str(row["broadcaster_id"]) for row in progress if row["broadcaster_id"])
         channels.update(str(row["broadcaster_id"]) for row in unlocks if row["broadcaster_id"])
         cards = []
-        for name, channel in [("explorer", ""), ("regular", "")] + [("familiar", channel) for channel in sorted(channels)]:
+        for name, channel in [("explorer", ""), ("regular", ""), ("collector", ""), ("winner", ""), ("house", "")] + [("familiar", channel) for channel in sorted(channels)]:
+            if name == "house" and (name, channel, 4) not in earned:
+                continue
             title, description, icon = ACHIEVEMENTS[name]
             steps = []
             for row in tiers:
@@ -39,11 +45,13 @@ class AchievementService:
             target = next_tier["threshold"] if next_tier else steps[-1]["threshold"]
             cards.append({
                 "title": title, "description": description, "icon": icon,
-                "category": "check_ins",
+                "category": "chat" if name in {"collector", "winner", "house"} else "check_ins",
+                "unit": "loyalty points" if name in {"collector", "winner", "house"} else "unique channels" if name == "explorer" else "check-ins",
+                "standalone": name == "house",
                 "scope": "channel" if channel else "global",
                 "channel": channel_metadata(channel) if channel else None,
                 "tier": highest["name"] if highest else "Locked", "steps": steps,
                 "progress": count, "target": target, "next_tier": next_tier,
                 "percent": min(100, round(count * 100 / target)),
             })
-        return {"cards": cards, "unlocked": len(unlocks), "available": len(cards) * 4}
+        return {"cards": cards, "unlocked": sum(step["earned"] for card in cards for step in card["steps"]), "available": sum(len(card["steps"]) for card in cards)}

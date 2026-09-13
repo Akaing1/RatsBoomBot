@@ -58,5 +58,5 @@ async def test_live_claim_unlock_timestamp_and_rollback(tmp_path):
         assert familiar["tier"] == "Locked"
         assert familiar["next_tier"]["threshold"] == 10
         empty = await AchievementService(db).get_collection("unknown", lambda channel: {})
-        assert len(empty["cards"]) == 2
+        assert len(empty["cards"]) == 4
         assert empty["unlocked"] == 0

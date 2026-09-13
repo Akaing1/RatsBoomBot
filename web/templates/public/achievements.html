@@ -20,10 +20,12 @@
                 <h3>{{ card.title }}</h3><strong>{{ card.tier }}</strong></div>
             </div>
             <p class="achievement-description">{{ card.description }}</p>
-            {% if card.next_tier %}
+            {% if card.standalone %}
+                <p>Secret achievement unlocked · Platinum</p>
+            {% elif card.next_tier %}
                 <p>{{ card.progress }} / {{ card.target }} toward {{ card.next_tier.name }}</p>
             {% else %}
-                <p>All tiers unlocked · {{ card.progress }} check-ins{% if card.icon == "compass" %} in unique channels{% endif %}</p>
+                <p>All tiers unlocked · {{ card.progress }} {{ card.unit }}</p>
             {% endif %}
             <progress value="{{ card.percent }}" max="100" aria-label="{{ card.title }} progress"></progress>
             <details><summary>Tier milestones and unlocks</summary>
