@@ -5,12 +5,13 @@
     </header>
     <div class="chatter-tabs achievement-filters" role="group" aria-label="Filter achievements">
         <button type="button" class="active" data-achievement-filter="all" aria-pressed="true">All</button>
-        <button type="button" data-achievement-filter="global" aria-pressed="false">Global</button>
-        <button type="button" data-achievement-filter="channel" aria-pressed="false">Channel</button>
+        <button type="button" data-achievement-filter="check_ins" aria-pressed="false">Check Ins</button>
+        <button type="button" data-achievement-filter="chat" aria-pressed="false">Chat</button>
+        <button type="button" data-achievement-filter="raids" aria-pressed="false">Raids</button>
     </div>
     <div class="achievement-grid">
     {% for card in profile.achievements.cards %}
-        <article class="panel achievement-card tier-{{ card.tier | lower }}" data-achievement-scope="{{ card.scope }}">
+        <article class="panel achievement-card tier-{{ card.tier | lower }}" data-achievement-category="{{ card.category }}">
             <div class="achievement-heading">
                 <div class="achievement-badge" aria-hidden="true">
                     {% include "public/achievement_icons/" ~ card.icon ~ ".svg" %}
@@ -28,7 +29,7 @@
             <details><summary>Tier milestones and unlocks</summary>
                 <ul class="achievement-tiers">
                 {% for step in card.steps %}
-                    <li><div class="achievement-tier-label"><strong>{{ step.name }}</strong><span>{{ step.threshold }}</span></div>
+                    <li><strong>{{ step.name }}</strong><span class="achievement-tier-requirement">{{ step.threshold }}</span>
                     {% if step.earned %}
                         <span class="achievement-tier-status">Unlocked{% if step.date %} · {{ step.date }} UTC{% else %} from historical totals · date unknown{% endif %}</span>
                     {% else %}<span class="achievement-tier-status">Locked</span>{% endif %}</li>
@@ -38,6 +39,6 @@
         </article>
     {% endfor %}
     </div>
-    <p id="achievement-empty" hidden>No channel achievements yet. Check into a channel to start your collection.</p>
+    <p id="achievement-empty" hidden>No achievements in this category yet. More milestones are coming.</p>
 </section>
 <script src="{{ url_for('static', path='/js/achievements.js') }}?v={{ deployment_stamp() }}" defer></script>
