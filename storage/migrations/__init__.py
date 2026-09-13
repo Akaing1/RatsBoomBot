@@ -30,6 +30,9 @@ from storage.migrations.v025_ancient_pact import migrate as migrate_ancient_pact
 from storage.migrations.v026_flag_bearers_will import migrate as migrate_flag_bearers_will
 from storage.migrations.v027_overclocked_weapons import migrate as migrate_overclocked_weapons
 from storage.migrations.v028_point_reward_events import migrate as migrate_point_reward_events
+from storage.migrations.v029_achievements import migrate as migrate_achievements
+from storage.migrations.v030_chat_achievements import migrate as migrate_chat_achievements
+from storage.migrations.v031_raid_achievements import migrate as migrate_raid_achievements
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -70,4 +73,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=26, name="flag_bearers_will", run=migrate_flag_bearers_will)
     , Migration(version=27, name="overclocked_weapons", run=migrate_overclocked_weapons)
     , Migration(version=28, name="point_reward_events", run=migrate_point_reward_events)
+    , Migration(version=29, name="achievements", run=migrate_achievements)
+    , Migration(version=30, name="chat_achievements", run=migrate_chat_achievements)
+    , Migration(version=31, name="raid_achievements", run=migrate_raid_achievements)
 )

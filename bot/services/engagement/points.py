@@ -54,6 +54,14 @@ class PointsService:
             async with self.db.acquire() as connection:
                 await connection.execute(query)
                 await connection.execute("""
+                    CREATE TABLE IF NOT EXISTS viewer_gambling_totals (
+                        broadcaster_id TEXT NOT NULL, user_id TEXT NOT NULL,
+                        winnings INTEGER NOT NULL DEFAULT 0 CHECK(winnings >= 0),
+                        losses INTEGER NOT NULL DEFAULT 0 CHECK(losses >= 0),
+                        PRIMARY KEY (broadcaster_id, user_id)
+                    )
+                """)
+                await connection.execute("""
                 CREATE TABLE IF NOT EXISTS gambling_loss_totals (
                     broadcaster_id TEXT PRIMARY KEY,
                     points_lost INTEGER NOT NULL DEFAULT 0,
@@ -515,6 +523,13 @@ class PointsService:
                             )
 
                     profit = max(payout - bet, 0)
+                    await connection.execute("""
+                        INSERT INTO viewer_gambling_totals (broadcaster_id, user_id, winnings, losses)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
+                            winnings = winnings + excluded.winnings,
+                            losses = losses + excluded.losses
+                    """, (broadcaster_id, user_id, profit, loss))
 
                     if profit and self.chatter_stats is not None:
                         await self.chatter_stats.record_points_earned(broadcaster_id, user_id, profit, connection)

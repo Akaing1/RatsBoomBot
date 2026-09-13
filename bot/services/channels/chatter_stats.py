@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from bot.profiles import get_active_profile
+from bot.services.channels.achievements import AchievementService
 from config.settings import settings
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -181,6 +182,7 @@ class ChatterStatsService:
 
         return {
             "identity": dict(identity),
+            "achievements": await AchievementService(self.db).get_collection(user_id, self._channel_metadata),
             "messages_sent": int(totals["messages_sent"]),
             "lifetime_points_earned": int(totals["lifetime_points_earned"]),
             "channels_interacted": int(totals["channels_interacted"]),

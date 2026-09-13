@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from bot.profiles import RaidBossConfig
+from storage.transactions import immediate_transaction
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -894,7 +895,7 @@ class RaidBossService:
         if item_id == "flag_bearer" and event is None:
             return "active_raid_required"
 
-        async with self.db.acquire() as connection:
+        async with self.db.acquire() as connection, immediate_transaction(connection):
             if item_id in {"blessing", "ancient_pact"}:
                 existing = await connection.fetchone("SELECT blessing_user_id, blessing_username, ancient_pact_user_id, ancient_pact_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (str(broadcaster_id), str(stream_id)))
 
@@ -990,6 +991,13 @@ class RaidBossService:
                     """,
                     (str(broadcaster_id), str(user_id), item_id, self.weapon_max_durability(item_id, config))
                 )
+
+            category = "weapons" if item_id in (*BASIC_WEAPON_TYPES, *OVERCLOCKED_WEAPON_TYPES) else "buffs" if item_id in {"blessing", "ancient_pact", "flag_bearer"} else "consumables"
+            await connection.execute("""
+                INSERT INTO raid_purchase_totals (user_id, broadcaster_id, category, purchases)
+                VALUES (?, ?, ?, 1)
+                ON CONFLICT(user_id, broadcaster_id, category) DO UPDATE SET purchases = purchases + 1
+            """, (str(user_id), str(broadcaster_id), category))
 
         return "purchased"
 
