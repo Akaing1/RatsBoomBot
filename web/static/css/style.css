@@ -930,7 +930,7 @@ body.landing-page {
 .profile-setting-actions { margin-top: auto; padding-top: 16px; }
 .timer-message-editor { display: grid; gap: 14px; }
 .timer-message-list { display: grid; gap: 12px; }
-.timer-message-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.timer-message-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: end; gap: 10px; }
 .timer-message-row .profile-setting-input { resize: vertical; }
 .timer-remove-button { min-height: 42px; }
 .timer-add-button { justify-self: start; }

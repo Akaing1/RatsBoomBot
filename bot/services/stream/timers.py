@@ -3,6 +3,7 @@ import logging
 import time
 
 from bot.profiles import FeatureName, get_active_profile
+from bot.timer_messages import TimerMessage, normalize_timer
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -21,8 +22,6 @@ class TimerService:
         self.message_counts: dict[str, int] = {}
         self.last_announcements: dict[str, float] = {}
         self.message_indexes: dict[str, int] = {}
-        self.timed_message_counts: dict[str, int] = {}
-        self.timed_last_announcements: dict[str, float] = {}
         self.last_check = 0
 
     async def start(self) -> None:
@@ -71,14 +70,6 @@ class TimerService:
         now = time.time()
         self.message_counts[broadcaster_id] = self.message_counts.get(broadcaster_id, 0) + 1
         self.last_announcements.setdefault(broadcaster_id, now)
-        profile = get_active_profile(broadcaster_id)
-
-        if profile is not None:
-            for index, _ in enumerate(profile.timed_announcements):
-                key = self._timed_announcement_key(broadcaster_id, index)
-                self.timed_message_counts[key] = self.timed_message_counts.get(key, 0) + 1
-                self.timed_last_announcements.setdefault(key, now)
-
         LOGGER.debug(
             "[Timers] Tracked message for %s (%s). Count: %d/%d.",
             broadcaster_name,
@@ -148,7 +139,6 @@ class TimerService:
                 )
                 continue
 
-            await self.check_timed_announcements(broadcaster_id, broadcaster_name, now)
             last_announcement = self.last_announcements.get(broadcaster_id, now)
             message_count = self.message_counts.get(broadcaster_id, 0)
             elapsed = now - last_announcement
@@ -172,46 +162,6 @@ class TimerService:
 
             self.message_counts[broadcaster_id] = 0
             self.last_announcements[broadcaster_id] = now
-
-    async def check_timed_announcements(self, broadcaster_id: str, broadcaster_name: str, now: float) -> None:
-        profile = get_active_profile(broadcaster_id)
-
-        if profile is None:
-            return
-
-        for index, announcement in enumerate(profile.timed_announcements):
-            key = self._timed_announcement_key(broadcaster_id, index)
-            elapsed = now - self.timed_last_announcements.get(key, now)
-            message_count = self.timed_message_counts.get(key, 0)
-
-            if elapsed < announcement.interval_seconds or message_count < announcement.required_messages:
-                continue
-
-            channel = self.bot.create_partialuser(str(broadcaster_id))
-
-            try:
-                await self.bot.services.chat_identity.send_announcement(channel, announcement.message, announcement.color)
-                LOGGER.info("[Timers] Sent %s timed announcement to %s (%s).", announcement.color, broadcaster_name, broadcaster_id)
-                self.bot.services.stream_logs.write(broadcaster_id, "TIMER", f"Sent {announcement.color} timed announcement: {announcement.message}")
-            except Exception:
-                LOGGER.warning("[Timers] Timed announcement failed for %s (%s); falling back to chat.", broadcaster_name, broadcaster_id, exc_info=True)
-
-                try:
-                    await self.bot.services.chat_identity.send_message(channel, announcement.message)
-                except Exception:
-                    LOGGER.exception("[Timers] Timed announcement fallback failed for %s (%s).", broadcaster_name, broadcaster_id)
-                    self.bot.services.stream_logs.write(broadcaster_id, "TIMER", f"Failed to send timed announcement and chat fallback: {announcement.message}")
-                    continue
-
-                LOGGER.info("[Timers] Sent timed message to %s (%s) using normal chat fallback.", broadcaster_name, broadcaster_id)
-                self.bot.services.stream_logs.write(broadcaster_id, "TIMER", f"Sent timed message using normal chat fallback: {announcement.message}")
-
-            self.timed_message_counts[key] = 0
-            self.timed_last_announcements[key] = now
-
-    @staticmethod
-    def _timed_announcement_key(broadcaster_id: str, index: int) -> str:
-        return f"{broadcaster_id}:{index}"
 
     async def send_next_announcement(self, broadcaster_id: str, broadcaster_name: str) -> bool:
         broadcaster_id = str(broadcaster_id)
@@ -250,7 +200,16 @@ class TimerService:
 
         try:
             channel = self.bot.create_partialuser(broadcaster_id)
-            await self.bot.services.chat_identity.send_message(channel, message)
+            delivery = message.kind
+            if message.kind == "announcement":
+                try:
+                    await self.bot.services.chat_identity.send_announcement(channel, message.message, message.color)
+                except Exception:
+                    LOGGER.warning("[Timers] Announcement failed for %s; falling back to chat.", broadcaster_id, exc_info=True)
+                    await self.bot.services.chat_identity.send_message(channel, message.message)
+                    delivery = "message (announcement fallback)"
+            else:
+                await self.bot.services.chat_identity.send_message(channel, message.message)
         except Exception:
             LOGGER.exception(
                 "[Timers] Failed to send announcement to %s (%s).",
@@ -267,16 +226,18 @@ class TimerService:
             broadcaster_id,
             message
         )
-        self.bot.services.stream_logs.write(broadcaster_id, "TIMER", f"Sent timer message: {message}")
+        self.bot.services.stream_logs.write(broadcaster_id, "TIMER", f"Sent timer {delivery}: {message.message}")
 
         return True
 
     @staticmethod
-    def get_messages(templates: tuple[str, ...], settings) -> list[str]:
-        messages: list[str] = []
+    def get_messages(templates, settings) -> list[TimerMessage]:
+        messages: list[TimerMessage] = []
         values = {"discord_url": settings.discord_url or "", "youtube_url": settings.youtube_url or ""}
 
-        for template in templates:
+        for entry in templates:
+            timer = normalize_timer(entry)
+            template = timer.message
             if "{discord_url}" in template and not settings.discord_url:
                 continue
 
@@ -294,6 +255,6 @@ class TimerService:
                 continue
 
             if message:
-                messages.append(message)
+                messages.append(TimerMessage(message, timer.kind, timer.color))
 
         return messages
