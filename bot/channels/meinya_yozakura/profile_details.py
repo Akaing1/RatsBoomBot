@@ -9,8 +9,7 @@ from bot.profiles import (
     RedeemConfig,
     RedeemMessages,
     ShoutoutMessages,
-    SocialMessages,
-    TimedAnnouncement
+    SocialMessages
 )
 
 
@@ -49,17 +48,8 @@ MEINYA_RAID_BOSSES = RaidBossConfig(
 )
 
 
-MEINYA_TIMED_ANNOUNCEMENTS = (
-    TimedAnnouncement(
-        message="Mei is trying to reach YouTube partnership! If you would like to help support, please leave a lurk on YouTube here as well :3 https://www.youtube.com/@MeinyaYozakura",
-        interval_seconds=60 * 60,
-        required_messages=30,
-        color="orange"
-    ),
-)
-
-
 MEINYA_TIMER_MESSAGES = (
+    ("Mei is trying to reach YouTube partnership! If you would like to help support, please leave a lurk on YouTube here as well :3 https://www.youtube.com/@MeinyaYozakura", "announcement", "orange"),
     "Still a regular stinky? Upgrade to premium stinky — get ad-free viewing, sub emotes, sub badge, and support the blood sakura garden 🩸",
     "2.0 MODEL RIGGING GOAL ON THRONE: https://throne.com/meinya/item/81c32121-0be2-44c6-b29f-be926b04b92b Help fund the Meinya model 🖤 Donating toward this is absolutely never expected — just lurking, chatting, and hanging out already supports me a ton ♡",
     "Still a wandering soul? Join the Blood Sakura Shrine by following before you get lost!",

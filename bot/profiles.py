@@ -4,6 +4,8 @@ from enum import Enum
 
 from twitchio.ext import commands
 
+from bot.timer_messages import TimerMessage
+
 LOGGER = logging.getLogger("RatBoomBot")
 
 DEFAULT_AD_ANNOUNCEMENT_MESSAGE = "Hide! The humans are coming! Ads starting in ~{time}!"
@@ -108,14 +110,6 @@ class GlobalCommandDefaults:
 
     def commands_as_dict(self) -> dict[GlobalCommandName, bool]:
         return {command: self.is_command_enabled(command) for command in GlobalCommandName}
-
-
-@dataclass(frozen=True)
-class TimedAnnouncement:
-    message: str
-    interval_seconds: int
-    required_messages: int
-    color: str = "primary"
 
 
 @dataclass(frozen=True)
@@ -514,8 +508,7 @@ class ChannelProfile:
     features: FeatureDefaults = FeatureDefaults()
     globals: GlobalCommandDefaults = GlobalCommandDefaults()
     ad_announcement_message: str = DEFAULT_AD_ANNOUNCEMENT_MESSAGE
-    timer_messages: tuple[str, ...] = ()
-    timed_announcements: tuple[TimedAnnouncement, ...] = ()
+    timer_messages: tuple[str | TimerMessage | tuple[str, str] | tuple[str, str, str], ...] = ()
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
     shoutout_messages: ShoutoutMessages = ShoutoutMessages()

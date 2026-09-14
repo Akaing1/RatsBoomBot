@@ -3,6 +3,7 @@ import logging
 from dataclasses import dataclass, replace
 
 from bot.profiles import ChannelProfile
+from bot.timer_messages import format_timers, parse_timers
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -26,6 +27,10 @@ class ProfileSettingState:
     default_value: str | int
     override_value: str | int | None
     effective_value: str | int
+
+    @property
+    def timer_entries(self):
+        return parse_timers(str(self.effective_value))
 
 
 PROFILE_SETTING_DEFINITIONS = (
@@ -261,6 +266,9 @@ class ProfileSettingsService:
         for part in setting_name.split("."):
             value = getattr(value, part)
 
+        if setting_name == "timer_messages":
+            return format_timers(value)
+
         if isinstance(value, tuple):
             return "\n".join(str(item) for item in value)
 
@@ -271,7 +279,7 @@ class ProfileSettingsService:
         parts = setting_name.split(".")
 
         if setting_name == "timer_messages":
-            value = tuple(line.strip() for line in str(value).splitlines() if line.strip())
+            value = parse_timers(str(value))
 
         def replace_nested(current, remaining: list[str]):
             field = remaining[0]
@@ -294,6 +302,18 @@ class ProfileSettingsService:
             if definition.maximum is not None and value > definition.maximum:
                 raise ValueError(f"{definition.label} must be at most {definition.maximum}.")
 
+            return value
+
+        if definition.key == "timer_messages":
+            entries = parse_timers(raw_value)
+            for entry in entries:
+                if not isinstance(entry.message, str) or len(entry.message) > 500:
+                    raise ValueError("Each timer message must be 500 characters or fewer.")
+                if "\n" in entry.message or "\r" in entry.message:
+                    raise ValueError("Each timer must contain a single message.")
+            value = format_timers(tuple(type(entry)(entry.message.strip(), entry.kind, entry.color) for entry in entries if entry.message.strip()))
+            if len(value) > definition.maximum_length:
+                raise ValueError("Timer messages are too long.")
             return value
 
         value = raw_value.strip()

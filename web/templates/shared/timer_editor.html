@@ -1,5 +1,7 @@
 <template id="timer-message-template">
     <div class="timer-message-row">
+        <select class="profile-setting-input" data-timer-kind aria-label="Timer type"><option value="message">Message</option><option value="announcement">Announcement</option></select>
+        <select class="profile-setting-input" data-timer-color aria-label="Announcement color">{% for color in ['primary', 'blue', 'green', 'orange', 'purple'] %}<option value="{{ color }}">{{ color | title }}</option>{% endfor %}</select>
         <textarea class="profile-setting-input" rows="3" maxlength="500" data-timer-message aria-label="Timer message"></textarea>
         <button class="button danger timer-remove-button" type="button" data-remove-timer>Remove</button>
     </div>
@@ -39,10 +41,9 @@
             updateLabels();
         });
         editor.closest("form").addEventListener("submit", () => {
-            hiddenValue.value = Array.from(list.querySelectorAll("[data-timer-message]"))
-                .map((input) => input.value.trim())
-                .filter(Boolean)
-                .join("\n");
+            hiddenValue.value = JSON.stringify(Array.from(list.querySelectorAll(".timer-message-row"))
+                .map((row) => [row.querySelector("[data-timer-message]").value.trim(), row.querySelector("[data-timer-kind]").value, row.querySelector("[data-timer-color]").value])
+                .filter((entry) => entry[0]));
         });
 
         if (!list.children.length) addTimer();

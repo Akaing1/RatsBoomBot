@@ -58,9 +58,11 @@
                             <div class="timer-message-editor" data-timer-editor>
                                 <input type="hidden" name="value" data-timer-value>
                                 <div class="timer-message-list" data-timer-list>
-                                    {% for message in setting.effective_value.split('\n') if message %}
+                                    {% for entry in setting.timer_entries %}
                                         <div class="timer-message-row">
-                                            <textarea class="profile-setting-input" rows="3" maxlength="500" data-timer-message aria-label="Timer message {{ loop.index }}">{{ message }}</textarea>
+                                            <select class="profile-setting-input" data-timer-kind aria-label="Timer type">{% for kind in ['message', 'announcement'] %}<option value="{{ kind }}" {% if entry.kind == kind %}selected{% endif %}>{{ kind | title }}</option>{% endfor %}</select>
+                                            <select class="profile-setting-input" data-timer-color aria-label="Announcement color">{% for color in ['primary', 'blue', 'green', 'orange', 'purple'] %}<option value="{{ color }}" {% if entry.color == color %}selected{% endif %}>{{ color | title }}</option>{% endfor %}</select>
+                                            <textarea class="profile-setting-input" rows="3" maxlength="500" data-timer-message aria-label="Timer message {{ loop.index }}">{{ entry.message }}</textarea>
                                             <button class="button danger timer-remove-button" type="button" data-remove-timer>Remove</button>
                                         </div>
                                     {% endfor %}
