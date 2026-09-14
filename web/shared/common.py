@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from config.version import get_deployment_stamp
+from web.shared.markdown import render_markdown
 from web.admin.auth import get_csrf_token, is_admin_authenticated
 
 WEB_DIRECTORY = Path(__file__).resolve().parents[1]
@@ -13,6 +14,7 @@ TEMPLATES_DIRECTORY = WEB_DIRECTORY / "templates"
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIRECTORY))
 templates.env.globals["deployment_stamp"] = get_deployment_stamp
+templates.env.filters["markdown"] = render_markdown
 
 
 def build_admin_context(request: Request, *, active_page: str, **values: Any) -> dict[str, Any]:
