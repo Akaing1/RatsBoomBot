@@ -177,7 +177,8 @@ class ChatterStatsService:
                 (user_id,)
             )
 
-        channel_summaries = [self._channel_summary(row) for row in channels]
+        connected_channels = self.broadcasters.get_broadcasters()
+        channel_summaries = [self._channel_summary(row) for row in channels if str(row["broadcaster_id"]) in connected_channels]
         favorite_channel = max(channel_summaries, key=lambda channel: channel["messages_sent"], default=None)
 
         return {

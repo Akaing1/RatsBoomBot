@@ -162,3 +162,24 @@ async def test_stats_command_links_to_public_profile(monkeypatch) -> None:
 def test_chatter_profile_templates_compile() -> None:
     for template_name in ("public/chatter_profile.html", "public/chatter_channel_profile.html", "public/chatter_not_found.html"):
         assert templates.env.get_template(template_name) is not None
+
+
+@pytest.mark.asyncio
+async def test_disconnected_channel_hidden_without_losing_history(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "disconnected.db")) as database:
+        await run_migrations(database)
+        await seed_identity(database)
+        async with database.acquire() as connection:
+            await connection.execute("INSERT INTO chatter_channel_stats (broadcaster_id, user_id, messages_sent) VALUES ('channel-1', 'user-1', 76)")
+        broadcasters = FakeBroadcasters()
+        service = ChatterStatsService(SimpleNamespace(bot_id="main-bot"), database, broadcasters)
+        connected = await service.get_global_profile("alice")
+        assert len(connected["channels"]) == 1
+        saved = broadcasters.items.pop("channel-1")
+        disconnected = await service.get_global_profile("alice")
+        assert disconnected["channels"] == []
+        assert disconnected["favorite_channel"] is None
+        assert disconnected["messages_sent"] == connected["messages_sent"] == 76
+        broadcasters.items["channel-1"] = saved
+        reconnected = await service.get_global_profile("alice")
+        assert reconnected["channels"] == connected["channels"]

@@ -463,6 +463,9 @@ async def delete_broadcaster(request: Request, broadcaster_id: str, csrf_token: 
     if services.stream_logs.is_active(broadcaster_id):
         await services.stream_logs.end_session(broadcaster_id)
 
+    await services.raid_bosses.cancel_announcements(broadcaster_id)
+    await services.passive_points.stop_for_stream(broadcaster_id)
+
     custom_bot_user_id = await services.chat_identity.remove_channel(broadcaster_id)
 
     if custom_bot_user_id and not services.chat_identity.is_custom_bot(custom_bot_user_id):
