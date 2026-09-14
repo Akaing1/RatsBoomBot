@@ -8,9 +8,9 @@ MEINYA_PROFILE = ChannelProfile(
     components=(MeinyaCommands, MeinyaPointsCommands),
     protected_user_ids=(
         "1251948863",  # Ninjakaing
-        "486983829",  # WxlfiiX
-        "104646528",  # Brlp39
-        "123061475" # UDoubleT
+        "486983829",   # WxlfiiX
+        "104646528",   # Brlp39
+        "123061475"    # UDoubleT
     ),
     shared_counters_enabled=True,
     features=FeatureDefaults(
