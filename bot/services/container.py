@@ -6,6 +6,7 @@ from bot.services.engagement import ClipService, CounterService, LeagueService, 
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
 from config.settings import settings
+from bot.services.channels.achievements import AchievementService
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -22,6 +23,7 @@ class ServiceContainer:
         self.broadcaster_settings = BroadcasterSettingsService(db)
         self.chat_identity = ChatIdentityService(bot, db)
         self.chatters = ChatterIdentityService(bot, db)
+        self.achievements = AchievementService(db)
         self.chatter_stats = ChatterStatsService(bot, db, self.broadcasters)
         self.profile_settings = ProfileSettingsService(db)
         self.features = FeatureToggleService(db, self.profile_settings)

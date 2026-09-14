@@ -269,11 +269,11 @@ class ChatterStatsService:
                        CASE WHEN players.equipped_weapon = inventory.item_id THEN 1 ELSE 0 END AS equipped
                 FROM raid_boss_inventory AS inventory
                 LEFT JOIN raid_boss_players AS players
-                  ON players.broadcaster_id = inventory.broadcaster_id AND players.user_id = inventory.user_id
-                WHERE inventory.broadcaster_id = ? AND inventory.user_id = ? AND inventory.quantity > 0
+                  ON players.broadcaster_id = ? AND players.user_id = inventory.user_id
+                WHERE inventory.broadcaster_id IN (?, '') AND inventory.user_id = ? AND inventory.quantity > 0
                 ORDER BY equipped DESC, inventory.item_id
                 """,
-                (broadcaster_id, user_id)
+                (broadcaster_id, broadcaster_id, user_id)
             )
             consumables = await connection.fetchone(
                 """

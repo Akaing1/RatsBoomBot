@@ -10,6 +10,8 @@ ACHIEVEMENTS = {
     "buffs": ("Team Player", "Purchase raid buffs across all channels.", "banner"),
     "consumables": ("Well Stocked", "Purchase raid consumables across all channels.", "potion"),
     "house": ("The House Always Wins", "Lose 500,000 loyalty points gambling across all channels. Thank you for your generous donation.", "house"),
+    "stones": ("Collecting the Stones", "Collect all five Blessed Unique weapons across all channels.", "stones"),
+    "exterminator": ("Rat Exterminator", "Successfully blow up another chatter with !kamikaze 100 times across all channels.", "bomb"),
 }
 
 
@@ -18,12 +20,22 @@ class AchievementService:
     def __init__(self, db):
         self.db = db
 
+    async def record_kamikaze_success(self, broadcaster_id: str, message_id: str, user_id: str, target_id: str) -> None:
+        if str(user_id) == str(target_id):
+            return
+        async with self.db.acquire() as connection:
+            await connection.execute(
+                "INSERT OR IGNORE INTO kamikaze_successes (broadcaster_id,message_id,user_id,target_id) VALUES (?,?,?,?)",
+                (str(broadcaster_id),str(message_id),str(user_id),str(target_id))
+            )
+
     async def get_collection(self, user_id: str, channel_metadata) -> dict:
         async with self.db.acquire() as connection:
             tiers = await connection.fetchall("SELECT * FROM achievement_tiers ORDER BY achievement_id, tier")
             progress = await connection.fetchall("SELECT * FROM achievement_progress WHERE user_id = ?", (str(user_id),))
             progress += await connection.fetchall("SELECT * FROM achievement_chat_progress WHERE user_id = ?", (str(user_id),))
             progress += await connection.fetchall("SELECT * FROM achievement_raid_progress WHERE user_id = ?", (str(user_id),))
+            progress += await connection.fetchall("SELECT * FROM achievement_hidden_progress WHERE user_id = ?", (str(user_id),))
             unlocks = await connection.fetchall("SELECT * FROM achievement_unlocks WHERE user_id = ? ORDER BY tier", (str(user_id),))
 
         counts = {(row["achievement_id"], row["broadcaster_id"]): int(row["progress"]) for row in progress}
@@ -37,7 +49,7 @@ class AchievementService:
                 earned[("familiar", "", tier)] = min(matches, key=lambda row: row["unlocked_at"] or "")
         cards = []
         for name, channel in [(name, "") for name in ACHIEVEMENTS]:
-            if name == "house" and (name, channel, 4) not in earned:
+            if name in {"house", "stones", "exterminator"} and (name, channel, 4) not in earned:
                 continue
             title, description, icon = ACHIEVEMENTS[name]
             steps = []
@@ -53,9 +65,9 @@ class AchievementService:
             target = next_tier["threshold"] if next_tier else steps[-1]["threshold"]
             cards.append({
                 "title": title, "description": description, "icon": icon,
-                "category": "raids" if name in {"damage", "weapons", "buffs", "consumables"} else "chat" if name in {"collector", "winner", "house"} else "check_ins",
-                "unit": {"damage": "damage", "weapons": "weapons purchased", "buffs": "buffs purchased", "consumables": "consumables purchased", "explorer": "unique channels", "collector": "loyalty points", "winner": "loyalty points", "house": "loyalty points"}.get(name, "check-ins"),
-                "standalone": name == "house",
+                "category": "raids" if name in {"damage", "weapons", "buffs", "consumables", "stones"} else "chat" if name in {"collector", "winner", "house", "exterminator"} else "check_ins",
+                "unit": {"stones": "unique blessed weapons", "exterminator": "successful kamikazes", "damage": "damage", "weapons": "weapons purchased", "buffs": "buffs purchased", "consumables": "consumables purchased", "explorer": "unique channels", "collector": "loyalty points", "winner": "loyalty points", "house": "loyalty points"}.get(name, "check-ins"),
+                "standalone": name in {"house", "stones", "exterminator"},
                 "scope": "channel" if channel else "global",
                 "channel": channel_metadata(channel) if channel else None,
                 "tier": highest["name"] if highest else "Locked", "steps": steps,

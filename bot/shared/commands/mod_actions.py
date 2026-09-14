@@ -316,6 +316,8 @@ class ModActionCommands(commands.Component):
             if not timed_out:
                 return
 
+            await services.achievements.record_kamikaze_success(broadcaster_id, ctx.payload.id, caller_id, target_id)
+
             LOGGER.info(
                 "[Mod Actions] Protected user %s guaranteed a !kamikaze hit against %s in broadcaster %s.",
                 caller.name,
@@ -345,6 +347,8 @@ class ModActionCommands(commands.Component):
 
             if not timed_out:
                 return
+
+            await services.achievements.record_kamikaze_success(broadcaster_id, ctx.payload.id, caller_id, target_id)
 
             LOGGER.info(
                 "[Mod Actions] User %s successfully timed out %s for %d seconds in broadcaster %s.",

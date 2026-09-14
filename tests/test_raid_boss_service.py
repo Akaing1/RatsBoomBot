@@ -1309,7 +1309,7 @@ async def test_overdrive_consumes_an_owned_charge_only_once_per_stream(tmp_path,
 async def equip_blessed_weapon(service, database, broadcaster_id: str, user_id: str, username: str, weapon: str, config) -> None:
     async with database.acquire() as connection:
         await service._ensure_player(connection, broadcaster_id, user_id, username)
-        await connection.execute("INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES (?, ?, ?, 1, ?)", (broadcaster_id, user_id, weapon, config.blessed_unique_durability))
+        await connection.execute("INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES (?, ?, ?, 1, ?)", ("", user_id, weapon, config.blessed_unique_durability))
 
     assert await service.equip(broadcaster_id, user_id, username, weapon) is True
 
@@ -1421,7 +1421,7 @@ async def test_blessed_unique_drop_is_a_separate_main_boss_roll(tmp_path, monkey
         assert weapons == [("heavens_judgement", 1)]
 
         async with database.acquire() as connection:
-            item = await connection.fetchone("SELECT durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", ("channel-1", "user-1", "heavens_judgement"))
+            item = await connection.fetchone("SELECT durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", ("", "user-1", "heavens_judgement"))
 
         assert item["durability"] == 35
 

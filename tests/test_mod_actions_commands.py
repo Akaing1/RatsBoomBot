@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -7,6 +8,23 @@ from bot.shared.commands.mod_actions import ModActionCommands
 
 def create_commands() -> ModActionCommands:
     return ModActionCommands(SimpleNamespace())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('protected,roll,timed_out,expected', [(True,1,True,1),(False,100,True,1),(False,1,True,0),(False,100,False,0),(True,100,False,0)])
+async def test_kamikaze_achievement_counts_only_confirmed_target_hits(monkeypatch, protected, roll, timed_out, expected):
+    bot = FakeKamikazeBot()
+    command = ModActionCommands(bot)
+    context = FakeContext('caller')
+    target = SimpleNamespace(id='target', name='target')
+    monkeypatch.setattr(command, 'is_protected_target', lambda user, channel: protected and user == 'caller')
+    monkeypatch.setattr(command, 'timeout_with_moderator_restore', AsyncMock(return_value=timed_out))
+    monkeypatch.setattr('bot.shared.commands.mod_actions.random.randint', lambda *_: roll)
+    await command.kamikaze.callback(command, context, target)
+    recorder = bot.services.achievements.record_kamikaze_success
+    assert recorder.await_count == expected
+    if expected:
+        recorder.assert_awaited_once_with('channel-1', 'command-message', 'caller', 'target')
 
 
 def test_kamikaze_cooldown_notice_is_sent_once_per_window() -> None:
@@ -49,7 +67,7 @@ class FakeFeatures:
 class FakeKamikazeBot:
 
     def __init__(self):
-        self.services = SimpleNamespace(features=FakeFeatures())
+        self.services = SimpleNamespace(features=FakeFeatures(), achievements=SimpleNamespace(record_kamikaze_success=AsyncMock()))
         self.channel = SimpleNamespace()
 
     def create_partialuser(self, broadcaster_id: str):
@@ -60,6 +78,7 @@ class FakeContext:
 
     def __init__(self, caller_id: str = "protected-user"):
         self.broadcaster = SimpleNamespace(id="channel-1")
+        self.payload = SimpleNamespace(id="command-message")
         self.chatter = SimpleNamespace(id=caller_id, name="protected")
         self.messages = []
         self.replies = []
