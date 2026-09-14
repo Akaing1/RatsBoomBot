@@ -117,10 +117,15 @@ class RaidBossService:
         self.bot = bot
         self.db = db
         self.chatter_stats = chatter_stats
+        self._shared_inventory_lock = asyncio.Lock()
         self.spawn_tasks: dict[str, asyncio.Task] = {}
         self.reminder_tasks: dict[str, asyncio.Task] = {}
         self.reminder_message_counts: dict[str, int] = {}
         self.reminder_activity_events: dict[str, asyncio.Event] = {}
+
+    @staticmethod
+    def inventory_scope(broadcaster_id: str, weapon: str) -> str:
+        return "" if weapon in BLESSED_UNIQUE_WEAPON_TYPES else str(broadcaster_id)
 
     async def setup(self) -> None:
         LOGGER.info("[Raid Bosses] Raid boss storage is managed by database migrations.")
@@ -579,6 +584,12 @@ class RaidBossService:
         return self._event_from_row(row)
 
     async def attack(self, broadcaster_id: str, stream_id: str, user_id: str, username: str, config: RaidBossConfig) -> RaidAttackResult:
+        # Shared weapons may be equipped in multiple live channels. Serialize
+        # damage reads and durability consumption, including flag-bearer weapons.
+        async with self._shared_inventory_lock:
+            return await self._attack(broadcaster_id, stream_id, user_id, username, config)
+
+    async def _attack(self, broadcaster_id: str, stream_id: str, user_id: str, username: str, config: RaidBossConfig) -> RaidAttackResult:
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
         event = await self.get_active_event(broadcaster_id)
@@ -608,7 +619,7 @@ class RaidBossService:
             flag_weapons = []
 
             if flag_bearer is not None and int(flag_bearer["activated"]) and int(flag_bearer["charges_remaining"]) > 0 and str(flag_bearer["user_id"]) != user_id:
-                flag_weapons = await connection.fetchall("SELECT item_id FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND quantity > 0 AND durability > 0", (broadcaster_id, str(flag_bearer["user_id"])))
+                flag_weapons = await connection.fetchall("SELECT item_id FROM raid_boss_inventory WHERE broadcaster_id IN (?, '') AND user_id = ? AND quantity > 0 AND durability > 0", (broadcaster_id, str(flag_bearer["user_id"])))
 
         attack_number = int(prior["attacks"]) + 1
 
@@ -793,7 +804,7 @@ class RaidBossService:
                     (event.id, stream_id, user_id, attack_number, broadcaster_id, str(flag_bearer["user_id"]), str(flag_bearer["username"]), flag_bearer_bonus_damage)
                 )
                 await connection.execute("UPDATE raid_boss_flag_bearers SET charges_remaining = MAX(charges_remaining - 1, 0) WHERE event_id = ?", (event.id,))
-                await connection.execute("UPDATE raid_boss_inventory SET durability = MAX(durability - 1, 0) WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (broadcaster_id, str(flag_bearer["user_id"]), str(flag_weapon)))
+                await connection.execute("UPDATE raid_boss_inventory SET durability = MAX(durability - 1, 0) WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (self.inventory_scope(broadcaster_id, str(flag_weapon)), str(flag_bearer["user_id"]), str(flag_weapon)))
 
             if potion_uses:
                 await connection.execute("UPDATE raid_boss_players SET potion_attacks_remaining = MAX(potion_attacks_remaining - ?, 0) WHERE broadcaster_id = ? AND user_id = ?", (potion_uses, broadcaster_id, user_id))
@@ -825,7 +836,7 @@ class RaidBossService:
                     await connection.execute("UPDATE raid_boss_inventory SET quantity = MAX(quantity - 1, 0), durability = ? WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (self.weapon_max_durability(weapon_used, config), broadcaster_id, user_id, weapon_used))
                     await connection.execute("UPDATE raid_boss_players SET equipped_weapon = NULL WHERE broadcaster_id = ? AND user_id = ? AND NOT EXISTS (SELECT 1 FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ? AND quantity > 0)", (broadcaster_id, user_id, broadcaster_id, user_id, weapon_used))
                 else:
-                    await connection.execute("UPDATE raid_boss_inventory SET durability = MAX(durability - ?, 0) WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (durability_cost, broadcaster_id, user_id, weapon_used))
+                    await connection.execute("UPDATE raid_boss_inventory SET durability = MAX(durability - ?, 0) WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (durability_cost, self.inventory_scope(broadcaster_id, weapon_used), user_id, weapon_used))
 
         if row is None:
             return RaidAttackResult(0, 0, event.boss_name, weapon, potion_used, False, error="The raid ended before your attack landed.")
@@ -1070,7 +1081,7 @@ class RaidBossService:
         async with self.db.acquire() as connection:
             owned = await connection.fetchone(
                 "SELECT quantity FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ? AND quantity > 0",
-                (str(broadcaster_id), str(user_id), weapon)
+                (self.inventory_scope(broadcaster_id, weapon), str(user_id), weapon)
             )
 
             if owned is None:
@@ -1150,7 +1161,7 @@ class RaidBossService:
     async def get_inventory(self, broadcaster_id: str, user_id: str) -> tuple[list[tuple[str, int]], str | None, int, dict[str, int]]:
         async with self.db.acquire() as connection:
             rows = await connection.fetchall(
-                "SELECT item_id, quantity, durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND quantity > 0 ORDER BY item_id",
+                "SELECT item_id, quantity, durability FROM raid_boss_inventory WHERE broadcaster_id IN (?, '') AND user_id = ? AND quantity > 0 ORDER BY item_id",
                 (str(broadcaster_id), str(user_id))
             )
             player = await connection.fetchone(
@@ -1171,15 +1182,19 @@ class RaidBossService:
         return weapons, equipped, equipped_durability, potions
 
     async def repair(self, broadcaster_id: str, user_id: str, weapon: str, config: RaidBossConfig) -> str:
+        async with self._shared_inventory_lock:
+            return await self._repair(broadcaster_id, user_id, weapon, config)
+
+    async def _repair(self, broadcaster_id: str, user_id: str, weapon: str, config: RaidBossConfig) -> str:
         weapon = self.normalize_item(weapon, config)
 
         if weapon not in WEAPON_TYPES:
             return "invalid"
 
-        async with self.db.acquire() as connection:
+        async with self.db.acquire() as connection, immediate_transaction(connection):
             owned = await connection.fetchone(
                 "SELECT durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ? AND quantity > 0",
-                (str(broadcaster_id), str(user_id), weapon)
+                (self.inventory_scope(broadcaster_id, weapon), str(user_id), weapon)
             )
 
             if owned is None:
@@ -1205,7 +1220,7 @@ class RaidBossService:
             )
             await connection.execute(
                 "UPDATE raid_boss_inventory SET durability = ? WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?",
-                (max_durability, str(broadcaster_id), str(user_id), weapon)
+                (max_durability, self.inventory_scope(broadcaster_id, weapon), str(user_id), weapon)
             )
 
         return "repaired"
@@ -1547,7 +1562,7 @@ class RaidBossService:
                             quantity = quantity + 1,
                             durability = MAX(durability, excluded.durability)
                         """,
-                        (str(broadcaster_id), recipient_id, item_id, self.weapon_max_durability(item_id, config))
+                        (self.inventory_scope(broadcaster_id, item_id), recipient_id, item_id, self.weapon_max_durability(item_id, config))
                     )
                 else:
                     await connection.execute(
@@ -1558,7 +1573,7 @@ class RaidBossService:
                             quantity = 1,
                             durability = MAX(durability, excluded.durability)
                         """,
-                        (str(broadcaster_id), recipient_id, item_id, self.weapon_max_durability(item_id, config))
+                        (self.inventory_scope(broadcaster_id, item_id), recipient_id, item_id, self.weapon_max_durability(item_id, config))
                     )
                 await connection.execute(
                     "INSERT OR IGNORE INTO raid_boss_reward_items (event_id, broadcaster_id, user_id, item_id) VALUES (?, ?, ?, ?)",
@@ -1578,7 +1593,7 @@ class RaidBossService:
                        COALESCE(inventory.durability, 0) AS weapon_durability
                 FROM raid_boss_players AS players
                 LEFT JOIN raid_boss_inventory AS inventory
-                  ON inventory.broadcaster_id = players.broadcaster_id
+                  ON inventory.broadcaster_id IN (players.broadcaster_id, '')
                  AND inventory.user_id = players.user_id
                  AND inventory.item_id = players.equipped_weapon
                 WHERE players.broadcaster_id = ? AND players.user_id = ?
