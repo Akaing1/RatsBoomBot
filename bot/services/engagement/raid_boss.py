@@ -181,14 +181,14 @@ class RaidBossService:
 
     @staticmethod
     def contribution_reward_multiplier(rank: int, contributor_count: int) -> float:
-        if rank <= max(1, math.ceil(contributor_count * 0.10)):
-            return 2.0
-
-        if rank <= math.ceil(contributor_count * 0.20):
+        if rank <= max(1, math.ceil(contributor_count * 0.15)):
             return 1.5
 
-        if rank <= math.ceil(contributor_count * 0.50):
+        if rank <= math.ceil(contributor_count * 0.30):
             return 1.25
+
+        if rank <= math.ceil(contributor_count * 0.50):
+            return 1.10
 
         return 1.0
 
