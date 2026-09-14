@@ -68,9 +68,9 @@ async def test_passive_points_awards_once_per_stream_interval(monkeypatch, tmp_p
         service = PassivePointsService(bot, database, points, FakeChatIdentity(), FakeFeatures())
         await service.setup()
 
-        assert await service.award_interval("channel-1", "stream-1", interval_started_at=120) == 1
+        assert await service.award_interval("channel-1", "stream-1", interval_started_at=120) == 2
         assert await service.award_interval("channel-1", "stream-1", interval_started_at=120) == 0
-        assert await service.award_interval("channel-1", "stream-1", interval_started_at=240) == 1
+        assert await service.award_interval("channel-1", "stream-1", interval_started_at=240) == 2
 
         async with database.acquire() as connection:
             row = await connection.fetchone(
@@ -80,8 +80,13 @@ async def test_passive_points_awards_once_per_stream_interval(monkeypatch, tmp_p
             payouts = await connection.fetchone("SELECT COUNT(*) AS count FROM passive_point_payouts")
 
         assert int(row["points"]) == 30
-        assert int(payouts["count"]) == 2
-        assert chatter_stats.record_points_earned.await_count == 2
+        async with database.acquire() as connection:
+            balances = await connection.fetchall("SELECT user_id, points FROM viewers ORDER BY user_id")
+
+        assert {str(balance["user_id"]): int(balance["points"]) for balance in balances} == {"channel-1": 30, "viewer-1": 30}
+        assert int(payouts["count"]) == 4
+        assert chatter_stats.record_points_earned.await_count == 4
+        assert sum(call.args[:3] == ("channel-1", "channel-1", 15) for call in chatter_stats.record_points_earned.await_args_list) == 2
         assert broadcaster.fetch_chatter_calls == [
             {"moderator": "bot-1", "first": 1000, "max_results": None},
             {"moderator": "bot-1", "first": 1000, "max_results": None},
