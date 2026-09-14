@@ -83,8 +83,8 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
     assert config.repair_cost == 1500
     assert config.weapon_cost == 25000
     assert config.potion_cost == 1500
-    assert config.ancient_pact_cost == 1500
-    assert config.ancient_pact_ceiling_bonus == 100
+    assert config.ancient_pact_cost == 750
+    assert config.ancient_pact_ceiling_bonus == 200
     assert config.flag_bearer_cost == 5000
     assert config.flag_bearer_multiplier == 1.30
     assert config.flag_bearer_charges == 10
@@ -1166,8 +1166,8 @@ async def test_ancient_pact_increases_stream_base_damage_ceiling(tmp_path, monke
 
         result = await service.attack("channel-1", "stream-1", "user-2", "bob", config)
 
-        assert ranges == [(100, 200)]
-        assert result.damage == 200
+        assert ranges == [(100, 300)]
+        assert result.damage == 300
         assert result.ancient_pact_active is True
 
 

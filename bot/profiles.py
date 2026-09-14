@@ -483,8 +483,8 @@ class RaidBossConfig:
     second_wind_cost: int = 1000
     berserk_cost: int = 3000
     blessing_cost: int = 500
-    ancient_pact_cost: int = 1500
-    ancient_pact_ceiling_bonus: int = 100
+    ancient_pact_cost: int = 750
+    ancient_pact_ceiling_bonus: int = 200
     flag_bearer_cost: int = 5000
     flag_bearer_multiplier: float = 1.30
     flag_bearer_charges: int = 10
