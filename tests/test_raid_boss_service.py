@@ -792,8 +792,8 @@ async def test_final_hit_uses_rank_multiplier_and_finisher_reward(tmp_path) -> N
         result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
 
         assert result.defeated is True
-        assert result.reward == 200
-        assert await points.get_points("channel-1", "user-1") == 300
+        assert result.reward == 150
+        assert await points.get_points("channel-1", "user-1") == 250
         assert await service.get_active_event("channel-1") is None
 
 
@@ -815,10 +815,11 @@ async def test_successful_raid_uses_equal_base_shares_and_rank_bonuses(tmp_path)
             result = await service.attack("channel-1", "stream-1", f"user-{index}", f"viewer{index}", config)
 
         assert result is not None
-        assert result.reward == 1225
-        assert await points.get_points("channel-1", "user-0") == 200
+        assert result.reward == 1145
+        assert await points.get_points("channel-1", "user-0") == 150
         assert await points.get_points("channel-1", "user-1") == 150
         assert await points.get_points("channel-1", "user-2") == 125
+        assert await points.get_points("channel-1", "user-3") == 110
         assert await points.get_points("channel-1", "user-5") == 100
 
 
