@@ -481,7 +481,7 @@ async def test_matching_weapon_and_power_potion_stack(tmp_path) -> None:
         assert saved_attack["weapon"] == "basic_sword"
         assert saved_attack["potion_used"] == 1
         assert saved_attack["critical_hit"] == 0
-        assert await points.get_points("channel-1", "user-1") == 500
+        assert await points.get_points("channel-1", "user-1") == 1000
 
 
 @pytest.mark.asyncio
@@ -519,7 +519,7 @@ async def test_crafting_consumes_two_weapons_and_fees_then_auto_equips(tmp_path)
 
         assert weapons == [("refined_sword", 1)]
         assert equipped == "refined_sword"
-        assert await points.get_points("channel-1", "user-1") == 4300
+        assert await points.get_points("channel-1", "user-1") == 4800
 
 
 @pytest.mark.asyncio
@@ -715,7 +715,7 @@ async def test_weapon_durability_disables_bonus_until_repaired(tmp_path) -> None
         assert broken.broken_weapon == "basic_sword"
         assert repair == "repaired"
         assert repaired.damage == 180
-        assert await points.get_points("channel-1", "user-1") == 650
+        assert await points.get_points("channel-1", "user-1") == 1150
 
 
 @pytest.mark.asyncio
@@ -793,7 +793,7 @@ async def test_final_hit_uses_rank_multiplier_and_finisher_reward(tmp_path) -> N
 
         assert result.defeated is True
         assert result.reward == 150
-        assert await points.get_points("channel-1", "user-1") == 250
+        assert await points.get_points("channel-1", "user-1") == 750
         assert await service.get_active_event("channel-1") is None
 
 
@@ -816,11 +816,11 @@ async def test_successful_raid_uses_equal_base_shares_and_rank_bonuses(tmp_path)
 
         assert result is not None
         assert result.reward == 1145
-        assert await points.get_points("channel-1", "user-0") == 150
-        assert await points.get_points("channel-1", "user-1") == 150
-        assert await points.get_points("channel-1", "user-2") == 125
-        assert await points.get_points("channel-1", "user-3") == 110
-        assert await points.get_points("channel-1", "user-5") == 100
+        assert await points.get_points("channel-1", "user-0") == 650
+        assert await points.get_points("channel-1", "user-1") == 650
+        assert await points.get_points("channel-1", "user-2") == 625
+        assert await points.get_points("channel-1", "user-3") == 610
+        assert await points.get_points("channel-1", "user-5") == 600
 
 
 @pytest.mark.asyncio
@@ -895,10 +895,10 @@ async def test_latest_loot_persists_points_final_hit_bonus_and_items(tmp_path, m
 
         assert loot == {
             "boss_name": "Training Dummy",
-            "contribution_points": 200,
+            "contribution_points": 150,
             "final_hit_points": 1000,
             "bonus_points": 0,
-            "total_points": 1200,
+            "total_points": 1150,
             "items": ("basic_sword",)
         }
 
@@ -921,10 +921,10 @@ async def test_latest_loot_includes_tutorial_collection_points(tmp_path) -> None
         loot = await service.get_latest_loot("channel-1", "user-1")
 
         assert loot is not None
-        assert loot["contribution_points"] == 200
+        assert loot["contribution_points"] == 150
         assert loot["final_hit_points"] == 1000
         assert loot["bonus_points"] == 5000
-        assert loot["total_points"] == 6200
+        assert loot["total_points"] == 6150
         assert loot["items"] == ()
 
 
@@ -945,7 +945,7 @@ async def test_tutorial_rewards_five_thousand_points_when_all_starter_weapons_ar
         result = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
 
         assert result.drops == (("alice", "5000_points"),)
-        assert await points.get_points("channel-1", "user-1") == 6200
+        assert await points.get_points("channel-1", "user-1") == 6650
 
 
 @pytest.mark.asyncio
@@ -1184,7 +1184,7 @@ async def test_same_chatter_cannot_claim_blessing_and_ancient_pact(tmp_path) -> 
 
         assert await service.buy("channel-1", "user-1", "alice", "blessing", config, "stream-1") == "purchased"
         assert await service.buy("channel-1", "user-1", "alice", "pact", config, "stream-1") == "global_buff_limit"
-        assert await points.get_points("channel-1", "user-1") == 900
+        assert await points.get_points("channel-1", "user-1") == 1400
 
 
 @pytest.mark.asyncio
@@ -1255,7 +1255,7 @@ async def test_reserved_flag_bearer_blocks_same_chatters_other_global_buff(tmp_p
 
         assert await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1") == "purchased"
         assert await service.buy("channel-1", "user-1", "alice", "blessing", config, "stream-1") == "global_buff_limit"
-        assert await points.get_points("channel-1", "user-1") == 900
+        assert await points.get_points("channel-1", "user-1") == 1400
 
 @pytest.mark.asyncio
 async def test_overclocked_weapon_purchase_and_repair_use_tier_values(tmp_path) -> None:
@@ -1276,7 +1276,7 @@ async def test_overclocked_weapon_purchase_and_repair_use_tier_values(tmp_path) 
 
         assert item["durability"] == 25
         assert await service.repair("channel-1", "user-1", "overclocked sword", config) == "repaired"
-        assert await points.get_points("channel-1", "user-1") == 750
+        assert await points.get_points("channel-1", "user-1") == 1250
 
 
 @pytest.mark.asyncio

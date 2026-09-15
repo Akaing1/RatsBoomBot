@@ -1,4 +1,5 @@
 from bot.profiles import (
+    ChannelAchievementNames,
     ClipConfig,
     ClipMessages,
     CommunityMessages,
@@ -10,6 +11,19 @@ from bot.profiles import (
     RedeemMessages,
     ShoutoutMessages,
     SocialMessages
+)
+
+
+TEMPLATE_ACHIEVEMENT_NAMES = ChannelAchievementNames(
+    check_ins="Familiar Face",
+    messages="Chatterbox",
+    points="Local Legend",
+    gambling="Hot Hand",
+    damage="Raid Vanguard",
+    bosses="Boss Hunter",
+    weapons="Arsenal Builder",
+    buffs="Rallying Cry",
+    consumables="Well Stocked"
 )
 
 

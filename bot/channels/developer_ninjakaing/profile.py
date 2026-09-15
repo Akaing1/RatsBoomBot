@@ -1,6 +1,7 @@
 from bot.channels.developer_ninjakaing.commands.general import DeveloperNinjakaingCommands
 from bot.channels.developer_ninjakaing.commands.points import DeveloperPointsCommands
 from bot.channels.developer_ninjakaing.profile_details import (
+    DEVELOPER_NINJAKAING_ACHIEVEMENT_NAMES,
     DEVELOPER_NINJAKAING_CLIPS,
     DEVELOPER_NINJAKAING_COMMUNITY_MESSAGES,
     DEVELOPER_NINJAKAING_FIRST_CHAT_SHOUTOUTS,
@@ -58,5 +59,6 @@ DEVELOPER_NINJAKAING_PROFILE = ChannelProfile(
     clips=DEVELOPER_NINJAKAING_CLIPS,
     redeems=DEVELOPER_NINJAKAING_REDEEMS,
     points=DEVELOPER_NINJAKAING_POINTS,
-    raid_bosses=DEVELOPER_NINJAKAING_RAID_BOSSES
+    raid_bosses=DEVELOPER_NINJAKAING_RAID_BOSSES,
+    achievement_names=DEVELOPER_NINJAKAING_ACHIEVEMENT_NAMES
 )
