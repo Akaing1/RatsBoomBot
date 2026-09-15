@@ -77,6 +77,37 @@ async def test_chatter_stats_count_every_message_and_only_bot_earned_points(tmp_
 
 
 @pytest.mark.asyncio
+async def test_channel_message_achievement_counts_only_while_live(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "live-messages.db")) as database:
+        await run_migrations(database)
+        await seed_identity(database)
+        stream_logs = SimpleNamespace(active=False)
+        stream_logs.is_active = lambda broadcaster_id: stream_logs.active
+        bot = SimpleNamespace(bot_id="main-bot")
+        bot.services = SimpleNamespace(chat_identity=FakeChatIdentity(), stream_logs=stream_logs)
+        service = ChatterStatsService(bot, database, FakeBroadcasters())
+        payload = SimpleNamespace(
+            broadcaster=SimpleNamespace(id="channel-1"),
+            chatter=SimpleNamespace(id="user-1", name="alice")
+        )
+
+        await service.track_message(payload)
+        stream_logs.active = True
+        await service.track_message(payload)
+
+        async with database.acquire() as connection:
+            total = await connection.fetchone(
+                "SELECT messages_sent FROM chatter_channel_stats WHERE broadcaster_id='channel-1' AND user_id='user-1'"
+            )
+            live = await connection.fetchone(
+                "SELECT messages FROM channel_live_messages WHERE broadcaster_id='channel-1' AND user_id='user-1'"
+            )
+
+        assert int(total["messages_sent"]) == 2
+        assert int(live["messages"]) == 1
+
+
+@pytest.mark.asyncio
 async def test_chatter_profiles_aggregate_global_and_channel_activity(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "stats.db")) as database:
         await run_migrations(database)

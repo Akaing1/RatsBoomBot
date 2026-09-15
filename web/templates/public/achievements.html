@@ -1,7 +1,7 @@
 <section data-chatter-panel="achievements" hidden>
     <header class="panel-header">
         <div><p class="eyebrow">Your milestones</p><h2>Achievements</h2>
-        <p>{{ profile.achievements.unlocked }} / {{ profile.achievements.available }} available tiers unlocked. Celebrate your milestones across RatsBoomBot communities.</p></div>
+        <p>{{ profile.achievements.unlocked }} / {{ profile.achievements.available }} available tiers unlocked. {{ profile.achievements.summary }}</p></div>
     </header>
     <div class="chatter-tabs achievement-filters" role="group" aria-label="Filter achievements">
         <button type="button" class="active" data-achievement-filter="all" aria-pressed="true">All</button>
@@ -23,7 +23,7 @@
             {% if card.standalone %}
                 <p>Secret achievement unlocked · Platinum</p>
             {% elif card.next_tier %}
-                <p>{{ card.progress }} / {{ card.target }} toward {{ card.next_tier.name }}</p>
+                <p>{{ "{:,}".format(card.progress) }} / {{ "{:,}".format(card.target) }} toward {{ card.next_tier.name }}</p>
             {% else %}
                 <p>All tiers unlocked · {{ card.progress }} {{ card.unit }}</p>
             {% endif %}
@@ -31,7 +31,7 @@
             <details><summary>Tier milestones and unlocks</summary>
                 <ul class="achievement-tiers">
                 {% for step in card.steps %}
-                    <li><strong>{{ step.name }}</strong><span class="achievement-tier-requirement">{{ step.threshold }}</span>
+                    <li><strong>{{ step.name }}</strong><span class="achievement-tier-requirement"><span>{{ "{:,}".format(step.threshold) }}</span>{% if step.reward %}<small>+{{ "{:,}".format(step.reward) }} {{ profile.achievements.currency_name }}</small>{% endif %}</span>
                     {% if step.earned %}
                         <span class="achievement-tier-status">Unlocked{% if step.date %} · {{ step.date }} UTC{% else %} from historical totals · date unknown{% endif %}</span>
                     {% else %}<span class="achievement-tier-status">Locked</span>{% endif %}</li>

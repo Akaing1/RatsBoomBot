@@ -41,6 +41,17 @@ class ChatterStatsService:
 
         async with self.db.acquire() as connection:
             await connection.execute(query, (broadcaster_id, user_id))
+            stream_logs = getattr(services, "stream_logs", None) if services is not None else None
+            if stream_logs is not None and stream_logs.is_active(broadcaster_id):
+                await connection.execute(
+                    """
+                    INSERT INTO channel_live_messages (broadcaster_id,user_id,messages,updated_at)
+                    VALUES (?,?,1,CURRENT_TIMESTAMP)
+                    ON CONFLICT(broadcaster_id,user_id) DO UPDATE SET
+                        messages=messages+1,updated_at=CURRENT_TIMESTAMP
+                    """,
+                    (broadcaster_id, user_id)
+                )
 
     async def record_points_earned(self, broadcaster_id: str, user_id: str, amount: int, connection=None) -> None:
         if amount <= 0:
@@ -314,6 +325,14 @@ class ChatterStatsService:
 
         profile = get_active_profile(broadcaster_id)
         claim_counts = {str(row["redeem_type"]): int(row["claim_count"]) for row in claims}
+        currency_name = profile.points.command_name if profile and profile.points.command_name else "points"
+        achievements = await AchievementService(self.db).get_channel_collection(
+            user_id,
+            broadcaster_id,
+            profile.achievement_names if profile else None,
+            self._channel_metadata,
+            currency_name
+        ) if profile else None
 
         return {
             "identity": dict(identity),
@@ -321,7 +340,8 @@ class ChatterStatsService:
             "messages_sent": int(summary["messages_sent"]),
             "lifetime_points_earned": int(summary["lifetime_points_earned"]),
             "current_points": int(summary["current_points"]),
-            "currency_name": profile.points.command_name if profile and profile.points.command_name else "points",
+            "currency_name": currency_name,
+            "achievements": achievements,
             "damage_dealt": int(raid["damage_dealt"]),
             "highest_contribution": int(highest["highest_contribution"]),
             "bosses_attacked": int(raid["bosses_attacked"]),

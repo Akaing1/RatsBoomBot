@@ -2,6 +2,7 @@ from bot.channels.milky_galaxyvt.commands.general import MilkyGalaxyCommands
 from bot.channels.milky_galaxyvt.commands.points import MilkyGalaxyPointsCommands
 from bot.channels.milky_galaxyvt.profile_details import (
     MILKY_GALAXYVT_COMMUNITY_MESSAGES,
+    MILKY_GALAXYVT_ACHIEVEMENT_NAMES,
     MILKY_GALAXYVT_OVERWATCH,
     MILKY_GALAXYVT_POINTS,
     MILKY_GALAXYVT_RAID_MESSAGES,
@@ -56,5 +57,6 @@ MILKY_GALAXYVT_PROFILE = ChannelProfile(
     social_messages=MILKY_GALAXYVT_SOCIAL_MESSAGES,
     first_chat_shoutouts=MILKY_GALAXYVT_FIRST_CHAT_SHOUTOUTS,
     overwatch=MILKY_GALAXYVT_OVERWATCH,
-    raid_bosses=MILKY_GALAXYVT_RAID_BOSSES
+    raid_bosses=MILKY_GALAXYVT_RAID_BOSSES,
+    achievement_names=MILKY_GALAXYVT_ACHIEVEMENT_NAMES
 )

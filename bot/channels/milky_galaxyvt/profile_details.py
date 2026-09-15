@@ -1,4 +1,5 @@
 from bot.profiles import (
+    ChannelAchievementNames,
     CommunityMessages,
     FirstChatShoutout,
     PointsConfig,
@@ -14,6 +15,19 @@ from bot.profiles import (
     SocialMessages,
     TargetTimeoutRedeemConfig,
     TimeoutRedeemConfig
+)
+
+
+MILKY_GALAXYVT_ACHIEVEMENT_NAMES = ChannelAchievementNames(
+    check_ins="Hero on Call",
+    messages="Comms Online",
+    points="Stardust Collector",
+    gambling="Feeling Lucky?",
+    damage="Play of the Game",
+    bosses="Hero of the Hour",
+    weapons="Fully Loaded",
+    buffs="Support Main",
+    consumables="Payload Supplied"
 )
 
 
