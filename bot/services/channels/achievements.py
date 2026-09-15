@@ -1,6 +1,10 @@
 TIER_NAMES = ("Bronze", "Silver", "Gold", "Platinum")
 CHANNEL_TIER_REWARDS = {1: 500, 2: 2000, 3: 7500, 4: 25000}
 SECRET_CHANNEL_ACHIEVEMENTS = {
+    "whisker": ("By a Whisker", "Finish a main or mini boss that has exactly 1 HP remaining.", "swords", "raids", "finishing blows"),
+    "not_close": ("Not Even Close", "Leave a main or mini boss at exactly 1 HP with your attack.", "swords", "raids", "attacks"),
+    "average": ("Perfectly Average", "Get measured at 50% stinky, smart, and lucky in this channel.", "dice", "chat", "completed sets"),
+    "character_development": ("Character Development", "Earn both opposite measurement badges for one command in this channel.", "trophy", "chat", "completed pairs"),
     "shower": ("You Need a Shower", "Roll 100% stinky.", "house", "chat", "qualifying rolls"),
     "spotless": ("Squeaky Clean", "Roll 0% stinky.", "house", "chat", "qualifying rolls"),
     "lights_out": ("Lights On, but No One's Home", "Roll 0% smart.", "home", "chat", "qualifying rolls"),
@@ -30,6 +34,11 @@ ACHIEVEMENTS = {
     "win_streak_global": ("Quit While You're Ahead", "Win 10 consecutive settled !gamble bets in a single channel.", "dice"),
 }
 CHANNEL_ACHIEVEMENTS = {
+    "watch_time": ("watch_time", "Spend time connected to this channel's live chat (hours).", "home", "chat", "hours"),
+    "stream_regular": ("stream_regular", "Be present in chat during distinct live streams in this channel.", "calendar", "chat", "streams"),
+    "flag_support": ("flag_support", "Contribute Flag Bearer bonus damage against main and mini bosses in this channel.", "banner", "raids", "bonus damage"),
+    "crafts": ("crafts", "Craft Refined or Masterwork weapons in this channel.", "swords", "raids", "weapons crafted"),
+    "repairs": ("repairs", "Restore weapon durability with repairs in this channel.", "swords", "raids", "repairs"),
     "familiar": ("check_ins", "Complete daily check-ins in this channel.", "home", "check_ins", "check-ins"),
     "channel_messages": ("messages", "Send messages while this channel is live.", "chat", "chat", "live messages"),
     "collector": ("points", "Earn loyalty points in this channel.", "coins", "chat", "loyalty points"),
@@ -65,7 +74,7 @@ class AchievementService:
             )
 
     async def record_command_roll(self, broadcaster_id: str, message_id: str, command: str, user_id: str, value: int) -> None:
-        endpoints = {"stinky": (0, 100), "smart": (0, 100), "lucky": (0, 100), "height": (12, 96)}
+        endpoints = {"stinky": (0, 50, 100), "smart": (0, 50, 100), "lucky": (0, 50, 100), "height": (12, 96)}
         if command not in endpoints:
             raise ValueError("Unsupported achievement roll")
         if int(value) not in endpoints[command]:
@@ -143,6 +152,7 @@ class AchievementService:
             tiers = await connection.fetchall(f"SELECT * FROM achievement_tiers WHERE achievement_id IN ({placeholders}) ORDER BY achievement_id,tier", achievement_ids)
             progress = await connection.fetchall("SELECT * FROM achievement_channel_progress WHERE user_id=? AND broadcaster_id=?", (user_id, broadcaster_id))
             progress += await connection.fetchall("SELECT * FROM secret_channel_progress WHERE user_id=? AND broadcaster_id=?", (user_id, broadcaster_id))
+            progress += await connection.fetchall("SELECT * FROM community_achievement_progress WHERE user_id=? AND broadcaster_id=?", (user_id, broadcaster_id))
             unlocks = await connection.fetchall(
                 f"SELECT * FROM achievement_unlocks WHERE user_id=? AND broadcaster_id=? AND achievement_id IN ({placeholders}) ORDER BY tier",
                 (user_id, broadcaster_id, *achievement_ids)
@@ -161,13 +171,15 @@ class AchievementService:
                 tier = int(row["tier"])
                 unlock = earned.get((achievement_id, tier))
                 steps.append({
-                    "name": TIER_NAMES[tier - 1], "threshold": int(row["threshold"]),
+                    "name": TIER_NAMES[tier - 1], "threshold": int(row["threshold"]) // 60 if achievement_id == "watch_time" else int(row["threshold"]),
                     "earned": unlock is not None, "date": unlock["unlocked_at"] if unlock else None,
                     "reward": CHANNEL_TIER_REWARDS[tier]
                 })
             highest = next((step for step in reversed(steps) if step["earned"]), None)
             next_tier = next((step for step in steps if not step["earned"]), None)
             count = counts.get(achievement_id, 0)
+            if achievement_id == "watch_time":
+                count = round(count / 60, 2)
             target = next_tier["threshold"] if next_tier else steps[-1]["threshold"]
             cards.append({
                 "title": str(getattr(names, name_field)) if name_field else ("Nice Try" if achievement_id == "nice_try" else SECRET_CHANNEL_ACHIEVEMENTS[achievement_id][0]), "description": description, "icon": icon,

@@ -74,5 +74,5 @@ async def test_blessed_weapon_cross_channel_durability_and_repair(tmp_path, monk
         assert (await raid.get_inventory('b', 'u'))[2] == 0
         await points.add_points('b', 'u', 'viewer', 5000)
         assert await raid.repair('b', 'u', BLESSINGS[0], config) == 'repaired'
-        assert await points.get_points('b', 'u') == 0
+        assert await points.get_points('b', 'u') == 500  # first repair achievement
         assert (await raid.get_inventory('a', 'u'))[2] == 35

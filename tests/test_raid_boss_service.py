@@ -519,7 +519,7 @@ async def test_crafting_consumes_two_weapons_and_fees_then_auto_equips(tmp_path)
 
         assert weapons == [("refined_sword", 1)]
         assert equipped == "refined_sword"
-        assert await points.get_points("channel-1", "user-1") == 4800
+        assert await points.get_points("channel-1", "user-1") == 5300  # includes first craft reward
 
 
 @pytest.mark.asyncio
@@ -715,7 +715,7 @@ async def test_weapon_durability_disables_bonus_until_repaired(tmp_path) -> None
         assert broken.broken_weapon == "basic_sword"
         assert repair == "repaired"
         assert repaired.damage == 180
-        assert await points.get_points("channel-1", "user-1") == 1150
+        assert await points.get_points("channel-1", "user-1") == 1650  # includes first repair reward
 
 
 @pytest.mark.asyncio
@@ -1276,7 +1276,7 @@ async def test_overclocked_weapon_purchase_and_repair_use_tier_values(tmp_path) 
 
         assert item["durability"] == 25
         assert await service.repair("channel-1", "user-1", "overclocked sword", config) == "repaired"
-        assert await points.get_points("channel-1", "user-1") == 1250
+        assert await points.get_points("channel-1", "user-1") == 1750  # includes first repair reward
 
 
 @pytest.mark.asyncio

@@ -12,7 +12,7 @@ from storage.migrations import MIGRATIONS
 async def test_channel_achievement_backfill_and_rewards_are_idempotent(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "channel-achievements.db")) as database:
         async with database.acquire() as connection:
-            for migration in MIGRATIONS[:-1]:
+            for migration in MIGRATIONS[:32]:
                 await migration.run(connection)
 
             await connection.execute(
@@ -24,7 +24,7 @@ async def test_channel_achievement_backfill_and_rewards_are_idempotent(tmp_path)
             await connection.execute(
                 "INSERT INTO imported_redeem_totals (broadcaster_id,user_id,username,redeem_type,claim_count) VALUES ('channel-1','user-1','alice','daily',50)"
             )
-            await MIGRATIONS[-1].run(connection)
+            await MIGRATIONS[32].run(connection)
 
             balance = await connection.fetchone(
                 "SELECT points FROM viewers WHERE broadcaster_id='channel-1' AND user_id='user-1'"
@@ -56,6 +56,9 @@ async def test_channel_achievement_backfill_and_rewards_are_idempotent(tmp_path)
             )
             assert int(balance["points"]) == 13100
             assert int(reward_count["total"]) == 6
+
+            for migration in MIGRATIONS[33:]:
+                await migration.run(connection)
 
         names = ChannelAchievementNames(points="Breadwinner", messages="Sewer Socialite")
         collection = await AchievementService(database).get_channel_collection(

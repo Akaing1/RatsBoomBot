@@ -1,6 +1,6 @@
 # Global chat achievements (9.5.0)
 
-Point Collector: 10,000 / 100,000 / 500,000 / 1,000,000 recorded lifetime loyalty points earned.
+Point Collector (v11.2.0): 25,000 / 250,000 / 1,250,000 / 5,000,000 recorded lifetime loyalty points earned. Previously earned tiers remain unlocked.
 Lucky Break: 5,000 / 50,000 / 250,000 / 1,000,000 gambling profit. Profit excludes returned stakes.
 The House Always Wins: one permanent Platinum unlock at 500,000 cumulative gambling losses. Later wins do not reduce losses. The secret is excluded server-side from cards, progress, and available counts until unlocked. It appears on the public profile after unlocking.
 
