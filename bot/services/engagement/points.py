@@ -457,7 +457,7 @@ class PointsService:
 
         return remaining_points
 
-    async def settle_wager(self, broadcaster_id: str, user_id: str, username: str, bet: int, payout: int) -> int | None:
+    async def settle_wager(self, broadcaster_id: str, user_id: str, username: str, bet: int, payout: int, game: str | None = None, channel_name: str | None = None) -> int | None:
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
 
@@ -533,6 +533,17 @@ class PointsService:
 
                     if profit and self.chatter_stats is not None:
                         await self.chatter_stats.record_points_earned(broadcaster_id, user_id, profit, connection)
+
+                    if game == "gamble":
+                        outcome = "win" if payout > bet else "loss"
+                        await connection.execute("""
+                            INSERT INTO gamble_streaks (broadcaster_id,user_id,outcome,length,channel_name)
+                            VALUES (?,?,?,1,?)
+                            ON CONFLICT(broadcaster_id,user_id) DO UPDATE SET
+                                length=CASE WHEN outcome=excluded.outcome THEN MIN(length+1,10) ELSE 1 END,
+                                outcome=excluded.outcome,
+                                channel_name=excluded.channel_name
+                        """, (broadcaster_id,user_id,outcome,channel_name or broadcaster_id))
 
                     balance = await connection.fetchone(
                         "SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?",

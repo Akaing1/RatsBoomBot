@@ -67,7 +67,7 @@ class FakeFeatures:
 class FakeKamikazeBot:
 
     def __init__(self):
-        self.services = SimpleNamespace(features=FakeFeatures(), achievements=SimpleNamespace(record_kamikaze_success=AsyncMock()))
+        self.services = SimpleNamespace(features=FakeFeatures(), achievements=SimpleNamespace(record_kamikaze_success=AsyncMock(), record_kamikaze_failure=AsyncMock()))
         self.channel = SimpleNamespace()
 
     def create_partialuser(self, broadcaster_id: str):

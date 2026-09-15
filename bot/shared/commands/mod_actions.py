@@ -369,6 +369,8 @@ class ModActionCommands(commands.Component):
         if not timed_out:
             return
 
+        await services.achievements.record_kamikaze_failure(broadcaster_id, ctx.payload.id, caller_id)
+
         LOGGER.info(
             "[Mod Actions] User %s missed !kamikaze and was timed out for %d seconds in broadcaster %s.",
             caller.name,
