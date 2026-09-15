@@ -156,7 +156,6 @@ MEINYA_POINTS = PointsConfig(
     command_name="petals",
     points_per_message=25,
     message_cooldown_seconds=60,
-    gamble_win_chance=0.5,
     roulette_max_bet=1000,
     subscription_reward=500,
     cheer_reward=50,
