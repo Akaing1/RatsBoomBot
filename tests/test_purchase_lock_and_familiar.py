@@ -16,11 +16,11 @@ async def test_parallel_purchases(tmp_path):
         await run_migrations(db)
         points = PointsService(None, db)
         raid = RaidBossService(None, db)
-        await points.add_points('a', 'u', 'viewer', 200)
-        results = await asyncio.gather(*(raid.buy('a', 'u', 'viewer', 'sword', RaidBossConfig(weapon_cost=100)) for _ in range(3)))
+        await points.add_points('a', 'u', 'viewer', 2000)
+        results = await asyncio.gather(*(raid.buy('a', 'u', 'viewer', 'sword', RaidBossConfig(weapon_cost=1000)) for _ in range(3)))
         assert results.count('purchased') == 2
         assert results.count('insufficient') == 1
-        assert await points.get_points('a', 'u') == 0
+        assert await points.get_points('a', 'u') == 500
         async with db.acquire() as c:
             row = await c.fetchone("SELECT purchases FROM raid_purchase_totals WHERE user_id='u'")
             assert row['purchases'] == 2

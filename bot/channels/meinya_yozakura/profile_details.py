@@ -1,4 +1,5 @@
 from bot.profiles import (
+    ChannelAchievementNames,
     CommunityMessages,
     PointsConfig,
     PointsMessages,
@@ -10,6 +11,19 @@ from bot.profiles import (
     RedeemMessages,
     ShoutoutMessages,
     SocialMessages
+)
+
+
+MEINYA_ACHIEVEMENT_NAMES = ChannelAchievementNames(
+    check_ins="Garden Devotee",
+    messages="Whispers in the Garden",
+    points="Petal Collector",
+    gambling="Fortune in Bloom",
+    damage="Limit Breaker",
+    bosses="Warrior of Light",
+    weapons="Relic Hunter",
+    buffs="Party Support",
+    consumables="Prepared Adventurer"
 )
 
 

@@ -32,6 +32,7 @@
         <nav class="chatter-tabs" aria-label="Channel profile sections">
             <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
             <button type="button" data-chatter-tab="raids" aria-selected="false">Raids</button>
+            {% if profile.achievements %}<button type="button" data-chatter-tab="achievements" aria-selected="false">Achievements</button>{% endif %}
         </nav>
 
         <section data-chatter-panel="overview">
@@ -104,7 +105,9 @@
             </section>
         </section>
 
-        <p class="chatter-history-note">Lifetime earnings exclude moderator grants and viewer-to-viewer transfers. Historical totals begin with the balance recorded when chatter profiles launched.</p>
+        {% if profile.achievements %}{% include 'public/achievements.html' %}{% endif %}
+
+        <p class="chatter-history-note">Lifetime earnings exclude moderator grants and viewer-to-viewer transfers. Historical totals begin with the balance recorded when chatter profiles launched. Live-message achievement progress begins with v11.0.0.</p>
     </main>
     <script src="{{ url_for('static', path='/js/chatter-tabs.js') }}?v={{ deployment_stamp() }}" defer></script>
 </body>

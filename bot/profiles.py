@@ -410,6 +410,19 @@ class RaidItemNames:
 
 
 @dataclass(frozen=True)
+class ChannelAchievementNames:
+    check_ins: str = "Familiar Face"
+    messages: str = "Chatterbox"
+    points: str = "Local Legend"
+    gambling: str = "Hot Hand"
+    damage: str = "Raid Vanguard"
+    bosses: str = "Boss Hunter"
+    weapons: str = "Arsenal Builder"
+    buffs: str = "Rallying Cry"
+    consumables: str = "Well Stocked"
+
+
+@dataclass(frozen=True)
 class RaidBossConfig:
     enabled: bool = False
     offline_testing_enabled: bool = False
@@ -520,6 +533,7 @@ class ChannelProfile:
     overwatch: OverwatchConfig = OverwatchConfig()
     league: LeagueConfig = LeagueConfig()
     raid_bosses: RaidBossConfig = RaidBossConfig()
+    achievement_names: ChannelAchievementNames = ChannelAchievementNames()
     lurk_message: str = "{username} has been spotted by a human and scattered! See you soon!"
 
     def is_user_protected(self, user_id: str) -> bool:

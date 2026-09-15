@@ -1,4 +1,5 @@
 from bot.profiles import (
+    ChannelAchievementNames,
     ClipConfig,
     ClipMessages,
     CommunityMessages,
@@ -14,6 +15,19 @@ from bot.profiles import (
     SocialMessages,
     TargetTimeoutRedeemConfig,
     TimeoutRedeemConfig
+)
+
+
+DEVELOPER_NINJAKAING_ACHIEVEMENT_NAMES = ChannelAchievementNames(
+    check_ins="Rat Pack Regular",
+    messages="Sewer Socialite",
+    points="Breadwinner",
+    gambling="Cheese Chaser",
+    damage="Heavy Hitter",
+    bosses="Apex Rat",
+    weapons="Armed & Cheesy",
+    buffs="Pack Tactics",
+    consumables="Prepared Pack Rat"
 )
 
 
