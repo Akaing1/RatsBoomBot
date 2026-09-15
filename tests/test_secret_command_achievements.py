@@ -17,10 +17,11 @@ from storage.migration_runner import run_migrations
 async def test_roll_credits_measured_user_once_and_no_backfill(tmp_path):
     async with asqlite.create_pool(str(tmp_path / "rolls.db")) as db:
         async with db.acquire() as connection:
-            for migration in MIGRATIONS[:-1]:
+            for migration in MIGRATIONS[:33]:
                 await migration.run(connection)
             await connection.execute("INSERT INTO viewers (broadcaster_id,user_id,username,points,messages) VALUES ('channel','measured','measured',100,0)")
-            await MIGRATIONS[-1].run(connection)
+            for migration in MIGRATIONS[33:]:
+                await migration.run(connection)
             assert not await connection.fetchone("SELECT 1 FROM achievement_unlocks WHERE achievement_id='shower'")
 
         service = AchievementService(db)

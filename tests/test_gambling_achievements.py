@@ -45,7 +45,7 @@ async def test_earnings_and_unlocks_rollback_together(tmp_path):
         await run_migrations(db)
         async with db.acquire() as c:
             await c.execute('BEGIN')
-            await c.execute("INSERT INTO chatter_channel_stats (broadcaster_id,user_id,lifetime_points_earned) VALUES ('a','u',10000)")
+            await c.execute("INSERT INTO chatter_channel_stats (broadcaster_id,user_id,lifetime_points_earned) VALUES ('a','u',25000)")
             assert await c.fetchone("SELECT 1 FROM achievement_unlocks WHERE achievement_id='collector'")
             await c.rollback()
             assert not await c.fetchone("SELECT 1 FROM achievement_unlocks WHERE achievement_id='collector'")

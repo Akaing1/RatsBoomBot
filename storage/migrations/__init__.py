@@ -36,6 +36,7 @@ from storage.migrations.v031_raid_achievements import migrate as migrate_raid_ac
 from storage.migrations.v032_global_blessed_achievements import migrate as migrate_global_blessed_achievements
 from storage.migrations.v033_channel_achievements import migrate as migrate_channel_achievements
 from storage.migrations.v034_secret_command_achievements import migrate as migrate_secret_command_achievements
+from storage.migrations.v035_community_achievements import migrate as migrate_community_achievements
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -82,4 +83,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=32, name="global_blessed_achievements", run=migrate_global_blessed_achievements)
     , Migration(version=33, name="channel_achievements", run=migrate_channel_achievements)
     , Migration(version=34, name="secret_command_achievements", run=migrate_secret_command_achievements)
+    , Migration(version=35, name="community_achievements", run=migrate_community_achievements)
 )
