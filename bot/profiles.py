@@ -321,7 +321,7 @@ class PointsConfig:
     command_name: str = "points"
     points_per_message: int = 25
     message_cooldown_seconds: int = 60
-    gamble_win_chance: float = 0.5
+    gamble_win_chance: float = 0.8
     roulette_max_bet: int = 1000
     subscription_reward: int = 0
     cheer_reward: int = 0
