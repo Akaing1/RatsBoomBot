@@ -766,7 +766,10 @@ class RaidBossService:
         shattered_weapon = weapon_used if berserk_used and weapon_used in STANDARD_WEAPON_TYPES and random.random() < config.berserk_shatter_chance else None
         buff_used = "berserk" if berserk_used else "power_potion" if potion_used else None
 
-        async with self.db.acquire() as connection:
+        async with self.db.acquire() as connection, immediate_transaction(connection):
+            before = await connection.fetchone("SELECT current_hp FROM raid_boss_events WHERE id=? AND status='active'", (event.id,))
+            if before is None:
+                return RaidAttackResult(0, 0, event.boss_name, weapon, potion_used, False, error="The raid ended before your attack landed.")
             attack_row = await connection.fetchone(
                 """
                 INSERT INTO raid_boss_attacks (
@@ -794,6 +797,12 @@ class RaidBossService:
                 """,
                 (damage, event.id)
             )
+
+            if row is not None and credited_damage > 0 and event.boss_tier in {"main", "mini"}:
+                if int(before["current_hp"]) == 1 and int(row["current_hp"]) == 0:
+                    await self._record_community_progress(connection, broadcaster_id, user_id, "whisker")
+                elif int(before["current_hp"]) > 1 and int(row["current_hp"]) == 1:
+                    await self._record_community_progress(connection, broadcaster_id, user_id, "not_close")
 
             if weapon_passive_points:
                 await self._add_points(connection, broadcaster_id, user_id, username, weapon_passive_points)
@@ -1022,7 +1031,7 @@ class RaidBossService:
         if family is None and ingredient is None:
             return "invalid"
 
-        async with self.db.acquire() as connection:
+        async with self.db.acquire() as connection, immediate_transaction(connection):
             owned = None
 
             if family is not None:
@@ -1053,7 +1062,17 @@ class RaidBossService:
             if player and player["equipped_weapon"] == ingredient and int(owned["quantity"]) == 2:
                 await connection.execute("UPDATE raid_boss_players SET equipped_weapon = ? WHERE broadcaster_id = ? AND user_id = ?", (item_id, str(broadcaster_id), str(user_id)))
 
+            await self._record_community_progress(connection, broadcaster_id, user_id, "crafts")
+
         return f"crafted:{item_id}"
+
+    @staticmethod
+    async def _record_community_progress(connection, broadcaster_id: str, user_id: str, achievement_id: str) -> None:
+        await connection.execute(
+            "INSERT INTO community_achievement_progress VALUES (?,?,?,1) "
+            "ON CONFLICT(broadcaster_id,user_id,achievement_id) DO UPDATE SET progress=progress+1",
+            (str(broadcaster_id), str(user_id), achievement_id)
+        )
 
     @staticmethod
     def normalize_item(item_id: str, config: RaidBossConfig | None = None) -> str:
@@ -1222,6 +1241,8 @@ class RaidBossService:
                 "UPDATE raid_boss_inventory SET durability = ? WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?",
                 (max_durability, self.inventory_scope(broadcaster_id, weapon), str(user_id), weapon)
             )
+
+            await self._record_community_progress(connection, broadcaster_id, user_id, "repairs")
 
         return "repaired"
 

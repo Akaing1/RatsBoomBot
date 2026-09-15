@@ -6,7 +6,7 @@ Version 11.0.0 adds a channel-scoped Achievements tab to each connected channel 
 | --- | --- |
 | Daily check-ins | 10 / 50 / 100 / 365 |
 | Messages sent while live | 1,000 / 10,000 / 50,000 / 100,000 |
-| Lifetime points earned | 10,000 / 100,000 / 500,000 / 1,000,000 |
+| Lifetime points earned | 25,000 / 250,000 / 1,250,000 / 5,000,000 |
 | Gambling profit | 5,000 / 50,000 / 250,000 / 1,000,000 |
 | Raid damage | 10,000 / 100,000 / 1,000,000 / 10,000,000 |
 | Defeated bosses joined | 1 / 10 / 50 / 100 |

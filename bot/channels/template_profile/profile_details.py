@@ -15,6 +15,11 @@ from bot.profiles import (
 
 
 TEMPLATE_ACHIEVEMENT_NAMES = ChannelAchievementNames(
+    watch_time="Part of the Furniture",
+    stream_regular="See You Next Stream",
+    flag_support="Helping Hands",
+    crafts="Built, Not Bought",
+    repairs="A Little TLC",
     check_ins="Familiar Face",
     messages="Chatterbox",
     points="Local Legend",

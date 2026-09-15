@@ -321,7 +321,7 @@ class PointsConfig:
     command_name: str = "points"
     points_per_message: int = 25
     message_cooldown_seconds: int = 60
-    gamble_win_chance: float = 0.8
+    gamble_win_chance: float = 0.5
     roulette_max_bet: int = 1000
     subscription_reward: int = 0
     cheer_reward: int = 0
@@ -411,6 +411,11 @@ class RaidItemNames:
 
 @dataclass(frozen=True)
 class ChannelAchievementNames:
+    watch_time: str = "Part of the Furniture"
+    stream_regular: str = "See You Next Stream"
+    flag_support: str = "Helping Hands"
+    crafts: str = "Built, Not Bought"
+    repairs: str = "A Little TLC"
     check_ins: str = "Familiar Face"
     messages: str = "Chatterbox"
     points: str = "Local Legend"
