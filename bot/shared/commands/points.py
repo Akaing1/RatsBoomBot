@@ -371,7 +371,9 @@ class PointsCommandHandler:
                 user_id=user_id,
                 username=username,
                 bet=gamble_amount,
-                payout=gamble_amount * 2 if won else 0
+                payout=gamble_amount * 2 if won else 0,
+                game="gamble",
+                channel_name=str(getattr(ctx.broadcaster, "login", broadcaster_id))
             )
         except Exception:
             LOGGER.exception(
@@ -394,8 +396,6 @@ class PointsCommandHandler:
             else:
                 template = config.messages.gamble_win
         else:
-            new_balance = current_points - gamble_amount
-
             if all_in:
                 template = config.messages.gamble_all_loss
             else:
