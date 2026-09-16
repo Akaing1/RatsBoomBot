@@ -1075,7 +1075,7 @@ async def test_get_recent_events_uses_production_raid_schema(tmp_path) -> None:
             "boss_name": "Training Dummy",
             "boss_type": "melee",
             "boss_tier": "tutorial",
-            "status": "cleared",
+            "status": "defeated",
             "max_hp": 10000,
             "current_hp": 0,
             "reward_pool": 5000,

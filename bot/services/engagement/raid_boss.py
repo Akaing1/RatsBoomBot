@@ -17,6 +17,29 @@ HEALTH_CHECKPOINT_MESSAGES = {
     75: "{boss_name} is on the ropes! Only 25% HP remains—finish the fight!"
 }
 
+
+def public_raid_status(boss_tier: str, status: str) -> str:
+    """Use the extended main-boss outcomes without renaming smaller encounters."""
+    if boss_tier == "main":
+        return "cleared" if status == "defeated" else "concluded"
+
+    return status
+
+
+def raid_conclusion_message(event: "RaidBossEvent", damage_dealt: int, reward: int, *, expired: bool = False) -> str:
+    stream_text = f" after {event.stream_limit} streams" if expired else ""
+
+    if event.boss_tier == "main":
+        return (
+            f"{event.boss_name} has fled{stream_text} and will return again... "
+            f"Raiders dealt {damage_dealt:,} damage, and {reward:,} points will be distributed through raid rank."
+        )
+
+    return (
+        f"The raid against {event.boss_name} has failed{stream_text}. "
+        f"Raiders dealt {damage_dealt:,} damage and earned {reward:,} points through raid rank."
+    )
+
 BASIC_WEAPON_TYPES = {
     "basic_sword": "melee",
     "basic_bow": "ranged",
@@ -109,6 +132,7 @@ class RaidAttackResult:
     weapon_passive: str | None = None
     weapon_passive_damage: int = 0
     weapon_passive_points: int = 0
+    boss_tier: str | None = None
 
 
 class RaidBossService:
@@ -897,7 +921,7 @@ class RaidBossService:
 
         LOGGER.info("[Raid Bosses] %s dealt %d damage to %s in broadcaster %s.", username, damage, event.boss_name, broadcaster_id)
         broken_weapon = weapon if weapon and not weapon_used else None
-        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops, buff_used=buff_used, blessing_active=blessing_active, shattered_weapon=shattered_weapon, lucky_dice_used=lucky_dice_used, fools_card_points=fools_card_points, ancient_pact_active=ancient_pact_active, flag_bearer_bonus_damage=flag_bearer_bonus_damage, flag_bearer_username=str(flag_bearer["username"]) if flag_bearer_bonus_damage and flag_bearer is not None else None, overdrive_attempted=overdrive_attempted, overdrive_consumable=overdrive_consumable, weapon_passive=weapon_passive, weapon_passive_damage=weapon_passive_damage, weapon_passive_points=weapon_passive_points)
+        return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops, buff_used=buff_used, blessing_active=blessing_active, shattered_weapon=shattered_weapon, lucky_dice_used=lucky_dice_used, fools_card_points=fools_card_points, ancient_pact_active=ancient_pact_active, flag_bearer_bonus_damage=flag_bearer_bonus_damage, flag_bearer_username=str(flag_bearer["username"]) if flag_bearer_bonus_damage and flag_bearer is not None else None, overdrive_attempted=overdrive_attempted, overdrive_consumable=overdrive_consumable, weapon_passive=weapon_passive, weapon_passive_damage=weapon_passive_damage, weapon_passive_points=weapon_passive_points, boss_tier=event.boss_tier)
 
     @staticmethod
     async def _record_health_checkpoints(connection, event: RaidBossEvent, current_hp: int) -> int | None:
@@ -1379,7 +1403,7 @@ class RaidBossService:
                     "boss_name": str(row["boss_name"]),
                     "boss_type": str(row["boss_type"]),
                     "boss_tier": str(row["boss_tier"]),
-                    "status": "cleared" if str(row["status"]) == "defeated" else "concluded",
+                    "status": public_raid_status(str(row["boss_tier"]), str(row["status"])),
                     "max_hp": int(row["max_hp"]),
                     "current_hp": int(row["current_hp"]),
                     "reward_pool": int(row["reward_pool"]),
