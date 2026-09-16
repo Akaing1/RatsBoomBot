@@ -8,6 +8,7 @@ from bot.profiles import (
     RaidBossConfig,
     RaidItemNames,
     RaidMessages,
+    RaidBossNames,
     RaidWeaponNames,
     RedeemConfig,
     RedeemMessages,
@@ -192,6 +193,17 @@ MILKY_GALAXYVT_OVERWATCH = OverwatchConfig(
 MILKY_GALAXYVT_RAID_BOSSES = RaidBossConfig(
     enabled=True,
     weapon_cost=5000,
+    tutorial_name="Training Dummy",
+    names=RaidBossNames(
+        melee="Mauga's Left Nipple",
+        ranged="Mauga's Right Nipple",
+        magic="Mauga's Smile"
+    ),
+    mini_names=RaidBossNames(
+        melee=("Reinhardt", "Doomfist"),
+        ranged=("Tracer", "Reaper"),
+        magic=("Torbjorn", "Zenyatta")
+    ),
     weapon_names=RaidWeaponNames(
         basic_sword="Whip Flail",
         refined_sword="Dragon Blade",
