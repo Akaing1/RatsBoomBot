@@ -36,11 +36,14 @@ MEINYA_RAID_BOSSES = RaidBossConfig(
         magic="Bahamut Prime"
     ),
     mini_names=RaidBossNames(
-        melee="Behemoth",
-        ranged="Magitek Gunship",
-        magic="Ahriman"
+        melee=("Behemoth", "Garula"),
+        ranged=("Magitek Gunship", "Barreltender"),
+        magic=("Ahriman", "Chieftain Moglin")
     ),
     weapon_names=RaidWeaponNames(
+        overclocked_bow="Failnaught",
+        overclocked_sword="Galatyn",
+        overclocked_tome="Organum",
         basic_sword="Weathered Shortsword",
         refined_sword="Lost Allagan Saber",
         masterwork_sword="Burtgang",
