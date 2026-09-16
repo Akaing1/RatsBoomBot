@@ -57,10 +57,9 @@ class StreamEvents(commands.Component):
         profile = get_active_profile(broadcaster_id)
         raids_enabled = profile is not None and profile.raid_bosses.enabled and services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
 
-        if active_event is not None and event is None and failed_reward:
-            remaining_ratio = active_event.current_hp / active_event.max_hp
-            fraction = "half" if remaining_ratio <= 0.25 else "one quarter of"
-            await services.raid_bosses.send_announcement(broadcaster_id, f"The subjugation of {active_event.boss_name} has failed after {active_event.stream_limit} streams. Raiders earned {fraction} the reward pool ({failed_reward:,} points) based on contribution.", "purple")
+        if active_event is not None and event is None:
+            damage_dealt = active_event.max_hp - active_event.current_hp
+            await services.raid_bosses.send_announcement(broadcaster_id, f"The encounter with {active_event.boss_name} has concluded after {active_event.stream_limit} streams. Raiders dealt {damage_dealt:,} damage and earned {failed_reward:,} points through raid rank.", "purple")
 
             if raids_enabled:
                 await services.raid_bosses.schedule_spawn(broadcaster_id, profile.raid_bosses, stream_id=stream_id)

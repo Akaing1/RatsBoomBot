@@ -140,7 +140,7 @@ RAID_BOSS_COMMANDS = CommandGroupDefinition(
         CommandDefinition("!raid loot", "Show rewards earned from your most recent completed raid.", feature=FeatureName.RAID_BOSSES),
         CommandDefinition("!raid leaderboard", "Show the current boss’s damage leaderboard.", feature=FeatureName.RAID_BOSSES),
         CommandDefinition("!raid spawn <tier> <type>", "Schedule a tutorial, mini, or main boss for testing or moderation.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES),
-        CommandDefinition("!raid end", "End the active encounter as a failed subjugation and distribute reduced rewards.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES)
+        CommandDefinition("!raid end", "Conclude the active encounter and distribute the points earned from damage.", "Broadcaster/mod", feature=FeatureName.RAID_BOSSES)
     )
 )
 

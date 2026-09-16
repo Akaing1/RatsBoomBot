@@ -748,7 +748,7 @@ async def test_dashboard_metrics_summarize_latest_encounter(tmp_path, monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_failed_subjugation_uses_half_or_quarter_reward_pool(tmp_path) -> None:
+async def test_concluded_encounter_pays_for_damage_with_raid_rank(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
@@ -766,10 +766,10 @@ async def test_failed_subjugation_uses_half_or_quarter_reward_pool(tmp_path) -> 
         await service.attack("channel-1", "stream-2", "user-2", "bob", half_config)
         half_pool = await service.resolve("channel-1", defeated=False)
 
-        assert quarter_pool == 250
-        assert half_pool == 500
-        assert await points.get_points("channel-1", "user-1") == 250
-        assert await points.get_points("channel-1", "user-2") == 500
+        assert quarter_pool == 150
+        assert half_pool == 1200
+        assert await points.get_points("channel-1", "user-1") == 150
+        assert await points.get_points("channel-1", "user-2") == 1200
 
 
 @pytest.mark.asyncio
@@ -1025,8 +1025,8 @@ async def test_boss_expires_after_configured_number_of_unique_streams(tmp_path) 
         assert second_stream.streams_used == 2
         assert first_reward == duplicate_reward == second_reward == 0
         assert expired_event is None
-        assert failed_reward == 250
-        assert await points.get_points("channel-1", "user-1") == 250
+        assert failed_reward == 150
+        assert await points.get_points("channel-1", "user-1") == 150
         assert await service.get_active_event("channel-1") is None
 
 
@@ -1075,7 +1075,7 @@ async def test_get_recent_events_uses_production_raid_schema(tmp_path) -> None:
             "boss_name": "Training Dummy",
             "boss_type": "melee",
             "boss_tier": "tutorial",
-            "status": "defeated",
+            "status": "cleared",
             "max_hp": 10000,
             "current_hp": 0,
             "reward_pool": 5000,

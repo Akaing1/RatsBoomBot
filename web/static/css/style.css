@@ -1274,6 +1274,8 @@ body.landing-page {
 .chatter-raid-result > span { padding: 4px 8px; border-radius: 999px; font-weight: 800; text-transform: uppercase; }
 .chatter-raid-result > span.defeated { background: rgba(34,197,94,.14); color: var(--success); }
 .chatter-raid-result > span.failed { background: rgba(239,68,68,.14); color: var(--danger); }
+.chatter-raid-result > span.cleared { background: rgba(34,197,94,.14); color: var(--success); }
+.chatter-raid-result > span.concluded { background: rgba(139,92,246,.14); color: var(--accent); }
 .chatter-raid-result em { color: var(--accent); font-size: 10px; font-style: normal; font-weight: 800; text-transform: uppercase; }
 
 @media (max-width: 760px) {

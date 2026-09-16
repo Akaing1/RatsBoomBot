@@ -11,6 +11,11 @@ from storage.transactions import immediate_transaction
 
 LOGGER = logging.getLogger("RatBoomBot")
 MINI_BOSS_HP_TIERS = (10000, 20000, 35000, 50000, 70000)
+HEALTH_CHECKPOINT_MESSAGES = {
+    25: "The raid has finally managed to leave a dent in {boss_name}! 75% HP remains.",
+    50: "{boss_name} is starting to falter! The raid has forced the boss down to 50% HP.",
+    75: "{boss_name} is on the ropes! Only 25% HP remains—finish the fight!"
+}
 
 BASIC_WEAPON_TYPES = {
     "basic_sword": "melee",
@@ -452,6 +457,9 @@ class RaidBossService:
         await self.bot.services.chat_identity.send_message(channel, message)
 
     async def send_announcement(self, broadcaster_id: str, message: str, color: str) -> None:
+        if self.bot is None:
+            return
+
         channel = self.bot.create_partialuser(str(broadcaster_id))
 
         try:
@@ -820,6 +828,7 @@ class RaidBossService:
                 """,
                 (damage, event.id)
             )
+            checkpoint = await self._record_health_checkpoints(connection, event, int(row["current_hp"])) if row is not None else None
 
             if row is not None and credited_damage > 0 and event.boss_tier in {"main", "mini"}:
                 if int(before["current_hp"]) == 1 and int(row["current_hp"]) == 0:
@@ -877,6 +886,9 @@ class RaidBossService:
         reward = 0
         drops: tuple[tuple[str, str], ...] = ()
 
+        if checkpoint is not None and current_hp > 0:
+            await self.send_announcement(broadcaster_id, HEALTH_CHECKPOINT_MESSAGES[checkpoint].format(boss_name=event.boss_name), "purple")
+
         if current_hp == 0:
             reward = await self.resolve(broadcaster_id, defeated=True, final_hitter_id=user_id, final_hitter_name=username)
 
@@ -886,6 +898,22 @@ class RaidBossService:
         LOGGER.info("[Raid Bosses] %s dealt %d damage to %s in broadcaster %s.", username, damage, event.boss_name, broadcaster_id)
         broken_weapon = weapon if weapon and not weapon_used else None
         return RaidAttackResult(damage, current_hp, event.boss_name, weapon_used, potion_used, current_hp == 0, reward, critical_hit=critical_hit, broken_weapon=broken_weapon, drops=drops, buff_used=buff_used, blessing_active=blessing_active, shattered_weapon=shattered_weapon, lucky_dice_used=lucky_dice_used, fools_card_points=fools_card_points, ancient_pact_active=ancient_pact_active, flag_bearer_bonus_damage=flag_bearer_bonus_damage, flag_bearer_username=str(flag_bearer["username"]) if flag_bearer_bonus_damage and flag_bearer is not None else None, overdrive_attempted=overdrive_attempted, overdrive_consumable=overdrive_consumable, weapon_passive=weapon_passive, weapon_passive_damage=weapon_passive_damage, weapon_passive_points=weapon_passive_points)
+
+    @staticmethod
+    async def _record_health_checkpoints(connection, event: RaidBossEvent, current_hp: int) -> int | None:
+        reached = []
+
+        for checkpoint in HEALTH_CHECKPOINT_MESSAGES:
+            if (event.max_hp - current_hp) * 100 < event.max_hp * checkpoint:
+                continue
+            row = await connection.fetchone(
+                "INSERT INTO raid_boss_health_checkpoints (event_id, checkpoint) VALUES (?, ?) ON CONFLICT(event_id, checkpoint) DO NOTHING RETURNING checkpoint",
+                (event.id, checkpoint)
+            )
+            if row is not None:
+                reached.append(int(row["checkpoint"]))
+
+        return max(reached, default=None)
 
     async def register_stream(self, broadcaster_id: str, stream_id: str) -> tuple[RaidBossEvent | None, int]:
         event = await self.get_active_event(broadcaster_id)
@@ -1351,7 +1379,7 @@ class RaidBossService:
                     "boss_name": str(row["boss_name"]),
                     "boss_type": str(row["boss_type"]),
                     "boss_tier": str(row["boss_tier"]),
-                    "status": str(row["status"]),
+                    "status": "cleared" if str(row["status"]) == "defeated" else "concluded",
                     "max_hp": int(row["max_hp"]),
                     "current_hp": int(row["current_hp"]),
                     "reward_pool": int(row["reward_pool"]),
@@ -1445,9 +1473,7 @@ class RaidBossService:
             return 0
 
         damage_dealt = event.max_hp - event.current_hp
-        remaining_ratio = event.current_hp / event.max_hp
-        multiplier = 1.0 if defeated else (0.5 if remaining_ratio <= 0.25 else 0.25)
-        payout_pool = event.max_hp if defeated else round(event.reward_pool * multiplier)
+        payout_pool = round(event.reward_pool * damage_dealt / event.max_hp)
         status = "defeated" if defeated else "failed"
 
         async with self.db.acquire() as connection:
@@ -1472,10 +1498,10 @@ class RaidBossService:
             total_contribution_rewards = 0
 
             if damage_dealt > 0:
-                base_reward = event.max_hp // len(contributions) if defeated and contributions else 0
+                base_reward = payout_pool // len(contributions) if contributions else 0
 
                 for rank, contribution in enumerate(contributions, start=1):
-                    reward = int(base_reward * self.contribution_reward_multiplier(rank, len(contributions))) if defeated else payout_pool * int(contribution["damage"]) // damage_dealt
+                    reward = int(base_reward * self.contribution_reward_multiplier(rank, len(contributions)))
                     total_contribution_rewards += reward
                     await self._add_points(connection, broadcaster_id, contribution["user_id"], contribution["username"], reward)
                     await connection.execute(
@@ -1509,7 +1535,7 @@ class RaidBossService:
                     (str(broadcaster_id),)
                 )
 
-        awarded_points = total_contribution_rewards if defeated else payout_pool
+        awarded_points = total_contribution_rewards
         LOGGER.info("[Raid Bosses] Resolved %s as %s with %d contribution points awarded.", event.boss_name, status, awarded_points)
         reminder_task = self.reminder_tasks.pop(str(broadcaster_id), None)
 

@@ -414,7 +414,7 @@ class ChatterStatsService:
             "channel": self._channel_metadata(str(row["broadcaster_id"])),
             "boss_name": str(row["boss_name"]),
             "boss_tier": str(row["boss_tier"]),
-            "status": str(row["status"]),
+            "status": "cleared" if str(row["status"]) == "defeated" else "concluded",
             "date": str(row["spawned_at"])[:10],
             "damage": int(row["damage"]),
             "reward_points": int(row["reward_points"]),

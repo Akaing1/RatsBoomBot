@@ -461,7 +461,7 @@ class RaidBossCommands(commands.Component):
         event, failed_reward = await self.bot.services.raid_bosses.register_stream(context[0], stream_id)
 
         if event is None:
-            await ctx.send(f"The simulated stream limit was reached. Raiders received a reduced {failed_reward:,}-point pool based on contribution.")
+            await ctx.send(f"The simulated stream limit was reached. Raiders earned {failed_reward:,} points for their damage through raid rank.")
             return
 
         await ctx.send(f"Offline raid testing advanced to simulated stream {event.streams_used}. Everyone can use !raid attack again.")
@@ -479,10 +479,9 @@ class RaidBossCommands(commands.Component):
             await ctx.reply("There is no active raid boss to end.")
             return
 
-        remaining_ratio = event.current_hp / event.max_hp
         reward = await self.bot.services.raid_bosses.resolve(context[0], defeated=False)
-        fraction = "half" if remaining_ratio <= 0.25 else "one quarter of"
-        await ctx.send(f"The subjugation of {event.boss_name} failed. Raiders earned {fraction} the reward pool ({reward:,} points) based on contribution.")
+        damage_dealt = event.max_hp - event.current_hp
+        await ctx.send(f"The encounter with {event.boss_name} has concluded. Raiders dealt {damage_dealt:,} damage and earned {reward:,} points through raid rank.")
 
     async def get_stream_id(self, broadcaster_id: str, config: RaidBossConfig) -> str | None:
         stream_id = await self.get_live_stream_id(broadcaster_id)
