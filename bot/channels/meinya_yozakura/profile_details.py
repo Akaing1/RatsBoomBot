@@ -41,6 +41,9 @@ MEINYA_RAID_BOSSES = RaidBossConfig(
         magic="Ahriman"
     ),
     weapon_names=RaidWeaponNames(
+        overclocked_bow="Failnaught",
+        overclocked_sword="Galatyn",
+        overclocked_tome="Organum",
         basic_sword="Weathered Shortsword",
         refined_sword="Lost Allagan Saber",
         masterwork_sword="Burtgang",
