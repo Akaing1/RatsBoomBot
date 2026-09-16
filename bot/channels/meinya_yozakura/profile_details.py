@@ -54,9 +54,6 @@ MEINYA_RAID_BOSSES = RaidBossConfig(
         archmage_grimoire="Ona Ramuhda",
         mythical_grimoire="Ultimate Grimoire of the Heavens"
     ),
-    mini_hp_min=20000,
-    mini_hp_max=50000,
-    mini_hp_step=15000,
     weapon_cost=5000,
     potion_cost=1500
 )

@@ -112,9 +112,6 @@ def test_default_damage_is_balanced_for_larger_chats() -> None:
 def test_default_mini_boss_balance_is_separate_from_main_bosses() -> None:
     config = RaidBossConfig()
 
-    assert config.mini_hp_min == 20000
-    assert config.mini_hp_max == 50000
-    assert config.mini_hp_step == 15000
     assert config.mini_duration_streams == 3
     assert config.mini_reward_pool == 25000
     assert config.mini_final_hit_reward == 1000
@@ -329,7 +326,7 @@ async def test_automatic_cycle_waits_for_tutorial_completion(tmp_path) -> None:
 ))
 async def test_automatic_cycle_uses_main_boss_pity_chances(tmp_path, monkeypatch, consecutive_minis, roll, expected_tier, next_count) -> None:
     monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: roll)
-    monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: "melee")
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.choice", lambda values: values[0])
 
     async with asqlite.create_pool(str(tmp_path / f"raid-{consecutive_minis}-{roll}.db")) as database:
         service = RaidBossService(bot=None, db=database)
@@ -386,7 +383,6 @@ async def test_critical_hit_adds_fifty_percent_damage(tmp_path, monkeypatch) -> 
 
 @pytest.mark.asyncio
 async def test_mini_boss_uses_tier_specific_name_balance_and_persisted_tier(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr("bot.services.engagement.raid_boss.random.randrange", lambda start, stop, step: 55000)
 
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         service = RaidBossService(bot=None, db=database)
@@ -394,8 +390,6 @@ async def test_mini_boss_uses_tier_specific_name_balance_and_persisted_tier(tmp_
         await service.setup()
         config = build_config(
             mini_names=RaidBossNames(melee="Behemoth", ranged="Magitek Gunship", magic="Ahriman"),
-            mini_hp_min=35000,
-            mini_hp_max=70000,
             mini_duration_streams=3,
             mini_reward_pool=25000,
             mini_final_hit_reward=1000
@@ -406,9 +400,9 @@ async def test_mini_boss_uses_tier_specific_name_balance_and_persisted_tier(tmp_
         assert event is not None
         assert event.boss_name == "Behemoth"
         assert event.boss_tier == "mini"
-        assert event.max_hp == 55000
+        assert event.max_hp == 10000
         assert event.stream_limit == 3
-        assert event.reward_pool == 55000
+        assert event.reward_pool == 10000
 
 
 @pytest.mark.asyncio
