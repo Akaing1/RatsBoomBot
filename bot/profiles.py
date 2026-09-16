@@ -440,9 +440,6 @@ class RaidBossConfig:
     duration_streams: int = 5
     reward_pool: int = 100000
     final_hit_reward: int = 2500
-    mini_hp_min: int = 20000
-    mini_hp_max: int = 50000
-    mini_hp_step: int = 15000
     mini_duration_streams: int = 3
     mini_reward_pool: int = 25000
     mini_final_hit_reward: int = 1000

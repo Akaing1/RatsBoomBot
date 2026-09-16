@@ -10,6 +10,7 @@ from bot.profiles import RaidBossConfig
 from storage.transactions import immediate_transaction
 
 LOGGER = logging.getLogger("RatBoomBot")
+MINI_BOSS_HP_TIERS = (10000, 20000, 35000, 50000, 70000)
 
 BASIC_WEAPON_TYPES = {
     "basic_sword": "melee",
@@ -533,6 +534,25 @@ class RaidBossService:
         LOGGER.info("[Raid Bosses] Automatic cycle selected a %s boss for broadcaster %s after %d consecutive mini bosses.", boss_tier, broadcaster_id, consecutive_minis)
         return event
 
+    @staticmethod
+    def mini_boss_hp_pool(contributors: int) -> tuple[int, ...]:
+        return MINI_BOSS_HP_TIERS[:min(len(MINI_BOSS_HP_TIERS), max(0, contributors) // 10 + 1)]
+
+    async def previous_raid_contributors(self, broadcaster_id: str) -> int:
+        query = """
+        SELECT COUNT(DISTINCT user_id) AS contributors
+        FROM raid_boss_contributions
+        WHERE damage > 0 AND event_id = (
+            SELECT id FROM raid_boss_events
+            WHERE broadcaster_id = ? AND boss_tier IN ('main', 'mini')
+              AND status IN ('defeated', 'failed')
+            ORDER BY id DESC LIMIT 1
+        )
+        """
+        async with self.db.acquire() as connection:
+            row = await connection.fetchone(query, (str(broadcaster_id),))
+        return int(row["contributors"])
+
     async def spawn(self, broadcaster_id: str, boss_type: str, config: RaidBossConfig, boss_tier: str = "main") -> RaidBossEvent | None:
         boss_type = boss_type.lower()
         boss_tier = boss_tier.lower()
@@ -551,7 +571,10 @@ class RaidBossService:
             stream_limit = config.tutorial_duration_streams
         elif boss_tier == "mini":
             boss_name = random.choice(config.mini_names.choices_for(boss_type))
-            max_hp = random.randrange(config.mini_hp_min, config.mini_hp_max + 1, config.mini_hp_step)
+            contributors = await self.previous_raid_contributors(broadcaster_id)
+            hp_pool = self.mini_boss_hp_pool(contributors)
+            max_hp = random.choice(hp_pool)
+            LOGGER.info("[Raid Bosses] Mini HP selection for broadcaster %s: previous contributors=%d, eligible HP=%s, selected HP=%d.", broadcaster_id, contributors, hp_pool, max_hp)
             final_hit_reward = config.mini_final_hit_reward
             stream_limit = config.mini_duration_streams
         else:
