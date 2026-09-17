@@ -65,13 +65,14 @@ async def test_stream_roll_is_limited_per_viewer_command_and_stream(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_measurement_command_is_unavailable_off_stream(tmp_path, monkeypatch):
+async def test_offline_measurement_responds_normally_without_achievement_tracking(tmp_path, monkeypatch):
     async with asqlite.create_pool(str(tmp_path / "offline-roll.db")) as db:
         await run_migrations(db)
         stream_logs = SimpleNamespace(get_active_session=lambda broadcaster_id: None)
         bot = SimpleNamespace(services=SimpleNamespace(achievements=AchievementService(db),stream_logs=stream_logs))
         commands = UtilityCommands(bot)
         monkeypatch.setattr(commands, "command_enabled", lambda ctx, name: True)
+        monkeypatch.setattr("bot.shared.commands.utility.random.randint", lambda low, high: 100)
         replies = []
 
         async def reply(message):
@@ -84,7 +85,7 @@ async def test_measurement_command_is_unavailable_off_stream(tmp_path, monkeypat
         )
         await commands.lucky.callback(commands,ctx)
 
-        assert replies == ["!lucky is only available while the stream is live."]
+        assert len(replies) == 1 and "100% lucky" in replies[0]
 
         async with db.acquire() as connection:
             assert not await connection.fetchone("SELECT 1 FROM command_stream_rolls")
@@ -174,14 +175,14 @@ async def test_measurement_command_awards_target_not_caller(tmp_path, monkeypatc
         await commands.height.callback(commands,ctx,target)
         ctx.payload.id = "second-height-message"
         await commands.height.callback(commands,ctx,target)
-        assert replies and "measured" in replies[0]
-        assert replies[1] == "measured already has a !height result for this stream."
+        assert len(replies) == 2 and all("measured" in message for message in replies)
         async with db.acquire() as connection:
             unlock = await connection.fetchone("SELECT user_id FROM achievement_unlocks WHERE broadcaster_id='channel' AND achievement_id='tiny'")
             paid = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id='channel' AND user_id='measured'")
             caller = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id='channel' AND user_id='caller'")
             rolls = await connection.fetchone("SELECT COUNT(*) AS total FROM command_stream_rolls WHERE user_id='measured' AND command='height'")
-        assert unlock['user_id']=='measured' and paid['points']==25000 and caller is None and rolls['total']==1
+            achievement_rolls = await connection.fetchone("SELECT COUNT(*) AS total FROM command_achievement_rolls WHERE user_id='measured' AND command='height'")
+        assert unlock['user_id']=='measured' and paid['points']==25000 and caller is None and rolls['total']==1 and achievement_rolls['total']==1
 
 
 @pytest.mark.asyncio
