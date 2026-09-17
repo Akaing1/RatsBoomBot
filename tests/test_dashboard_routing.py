@@ -18,6 +18,9 @@ def test_root_is_the_public_landing_page() -> None:
     assert '<details class="landing-feature-card">' in response.text
     assert "!register &lt;Riot ID&gt; [region]" in response.text
     assert "please contact the developer" in response.text.lower()
+    assert "Help keep RatsBoomBot growing." in response.text
+    assert 'href="https://ko-fi.com/ninjakaing"' in response.text
+    assert "Support never affects features, points, achievements, or raid odds." in response.text
     assert f'{settings.DASHBOARD_BASE_URL}/connect/twitch' in response.text
 
 
