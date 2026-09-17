@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import asqlite
 import pytest
+from twitchio.assets import Asset
 
 from bot.services.channels.chatter_stats import ChatterStatsService
 from bot.services.engagement.points import PointsService
@@ -173,7 +174,7 @@ async def test_global_profile_refreshes_and_caches_twitch_profile_image(tmp_path
 
         async def fetch_user(*, id):
             calls.append(id)
-            return SimpleNamespace(profile_image="https://example.com/alice.png")
+            return SimpleNamespace(profile_image=Asset("https://example.com/alice.png", http=None))
 
         bot = SimpleNamespace(bot_id="main-bot", fetch_user=fetch_user)
         service = ChatterStatsService(bot, database, FakeBroadcasters())
