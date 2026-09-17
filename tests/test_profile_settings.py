@@ -12,15 +12,15 @@ def reset_profiles():
     clear_profiles()
 
 
-def test_generic_profile_starts_with_safe_features() -> None:
+def test_generic_profile_starts_with_standard_commands() -> None:
     profile = create_generic_profile("new_streamer")
 
     assert profile.channel_name == "new_streamer"
     assert profile.features.channel is True
-    assert profile.features.points is False
+    assert profile.features.points is True
     assert profile.features.timers is False
     assert profile.globals.help is True
-    assert profile.globals.kamikaze is False
+    assert profile.globals.kamikaze is True
 
 
 @pytest.mark.asyncio

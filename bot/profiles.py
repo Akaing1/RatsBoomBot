@@ -582,32 +582,13 @@ def create_generic_profile(channel_name: str) -> ChannelProfile:
             channel=True,
             timers=False,
             ad_announcements=False,
-            points=False,
+            points=True,
             redeems=False,
             community_events=False,
             raid_responses=False,
             raid_bosses=False
         ),
-        globals=GlobalCommandDefaults(
-            enabled=True,
-            points=False,
-            viewer_queue=False,
-            shoutouts=False,
-            socials=False,
-            settings=False,
-            clips=False,
-            hi=False,
-            choice=False,
-            kaboom=False,
-            stinky=False,
-            lucky=False,
-            smart=False,
-            height=False,
-            pp=False,
-            lurk=False,
-            help=True,
-            kamikaze=False
-        )
+        globals=GlobalCommandDefaults()
     )
 
 
