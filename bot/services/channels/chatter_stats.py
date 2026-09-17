@@ -241,7 +241,8 @@ class ChatterStatsService:
             return result
 
         refreshed_at = datetime.now(UTC).isoformat()
-        profile_image_url = getattr(user, "profile_image", None)
+        profile_image = getattr(user, "profile_image", None)
+        profile_image_url = str(profile_image) if profile_image else None
 
         async with self.db.acquire() as connection:
             await connection.execute("UPDATE chatter_identities SET profile_image_url = ?, profile_image_updated_at = ? WHERE user_id = ?", (profile_image_url, refreshed_at, str(result["user_id"])))
