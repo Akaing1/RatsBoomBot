@@ -45,6 +45,52 @@ async def test_roll_credits_measured_user_once_and_no_backfill(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_stream_roll_is_limited_per_viewer_command_and_stream(tmp_path):
+    async with asqlite.create_pool(str(tmp_path / "stream-rolls.db")) as db:
+        await run_migrations(db)
+        service = AchievementService(db)
+
+        assert await service.record_stream_command_roll("channel", "stream-1", "message-1", "stinky", "viewer", 45) is True
+        assert await service.record_stream_command_roll("channel", "stream-1", "message-2", "stinky", "viewer", 100) is False
+        assert await service.record_stream_command_roll("channel", "stream-1", "message-3", "smart", "viewer", 50) is True
+        assert await service.record_stream_command_roll("channel", "stream-1", "message-4", "stinky", "other", 50) is True
+        assert await service.record_stream_command_roll("channel", "stream-2", "message-5", "stinky", "viewer", 100) is True
+
+        async with db.acquire() as connection:
+            rolls = await connection.fetchall("SELECT stream_id,command,user_id,value FROM command_stream_rolls ORDER BY message_id")
+            achievement_rolls = await connection.fetchall("SELECT message_id FROM command_achievement_rolls ORDER BY message_id")
+
+        assert len(rolls) == 4
+        assert [row["message_id"] for row in achievement_rolls] == ["message-3", "message-4", "message-5"]
+
+
+@pytest.mark.asyncio
+async def test_measurement_command_is_unavailable_off_stream(tmp_path, monkeypatch):
+    async with asqlite.create_pool(str(tmp_path / "offline-roll.db")) as db:
+        await run_migrations(db)
+        stream_logs = SimpleNamespace(get_active_session=lambda broadcaster_id: None)
+        bot = SimpleNamespace(services=SimpleNamespace(achievements=AchievementService(db),stream_logs=stream_logs))
+        commands = UtilityCommands(bot)
+        monkeypatch.setattr(commands, "command_enabled", lambda ctx, name: True)
+        replies = []
+
+        async def reply(message):
+            replies.append(message)
+
+        ctx = SimpleNamespace(
+            broadcaster=SimpleNamespace(id="channel"),
+            chatter=SimpleNamespace(id="viewer",name="viewer"),
+            payload=SimpleNamespace(id="offline-message"),reply=reply
+        )
+        await commands.lucky.callback(commands,ctx)
+
+        assert replies == ["!lucky is only available while the stream is live."]
+
+        async with db.acquire() as connection:
+            assert not await connection.fetchone("SELECT 1 FROM command_stream_rolls")
+
+
+@pytest.mark.asyncio
 async def test_failed_kamikaze_unlocks_global_and_channel_without_double_payment(tmp_path):
     async with asqlite.create_pool(str(tmp_path / "misses.db")) as db:
         await run_migrations(db)
@@ -109,7 +155,8 @@ async def test_win_streak_requires_ten_consecutive_wins(tmp_path):
 async def test_measurement_command_awards_target_not_caller(tmp_path, monkeypatch):
     async with asqlite.create_pool(str(tmp_path / "measured.db")) as db:
         await run_migrations(db)
-        bot = SimpleNamespace(services=SimpleNamespace(achievements=AchievementService(db)))
+        stream_logs = SimpleNamespace(get_active_session=lambda broadcaster_id: SimpleNamespace(stream_id="stream-1"))
+        bot = SimpleNamespace(services=SimpleNamespace(achievements=AchievementService(db),stream_logs=stream_logs))
         commands = UtilityCommands(bot)
         monkeypatch.setattr(commands, "command_enabled", lambda ctx, name: True)
         monkeypatch.setattr("bot.shared.commands.utility.random.randint", lambda low, high: 12)
@@ -125,12 +172,16 @@ async def test_measurement_command_awards_target_not_caller(tmp_path, monkeypatc
         )
         target = SimpleNamespace(id="measured",name="measured")
         await commands.height.callback(commands,ctx,target)
+        ctx.payload.id = "second-height-message"
+        await commands.height.callback(commands,ctx,target)
         assert replies and "measured" in replies[0]
+        assert replies[1] == "measured already has a !height result for this stream."
         async with db.acquire() as connection:
             unlock = await connection.fetchone("SELECT user_id FROM achievement_unlocks WHERE broadcaster_id='channel' AND achievement_id='tiny'")
             paid = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id='channel' AND user_id='measured'")
             caller = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id='channel' AND user_id='caller'")
-        assert unlock['user_id']=='measured' and paid['points']==25000 and caller is None
+            rolls = await connection.fetchone("SELECT COUNT(*) AS total FROM command_stream_rolls WHERE user_id='measured' AND command='height'")
+        assert unlock['user_id']=='measured' and paid['points']==25000 and caller is None and rolls['total']==1
 
 
 @pytest.mark.asyncio

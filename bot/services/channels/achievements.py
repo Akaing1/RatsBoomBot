@@ -86,6 +86,30 @@ class AchievementService:
                 (str(broadcaster_id),str(message_id),command,str(user_id),int(value))
             )
 
+    async def record_stream_command_roll(self, broadcaster_id: str, stream_id: str, message_id: str, command: str, user_id: str, value: int) -> bool:
+        endpoints = {"stinky": (0, 50, 100), "smart": (0, 50, 100), "lucky": (0, 50, 100), "height": (12, 96)}
+
+        if command not in endpoints:
+            raise ValueError("Unsupported achievement roll")
+
+        async with self.db.acquire() as connection:
+            await connection.execute(
+                "INSERT OR IGNORE INTO command_stream_rolls (broadcaster_id,stream_id,command,user_id,message_id,value) VALUES (?,?,?,?,?,?)",
+                (str(broadcaster_id),str(stream_id),command,str(user_id),str(message_id),int(value))
+            )
+            inserted = await connection.fetchone("SELECT changes() AS count")
+
+            if int(inserted["count"]) == 0:
+                return False
+
+            if int(value) in endpoints[command]:
+                await connection.execute(
+                    "INSERT OR IGNORE INTO command_achievement_rolls (broadcaster_id,message_id,command,user_id,value) VALUES (?,?,?,?,?)",
+                    (str(broadcaster_id),str(message_id),command,str(user_id),int(value))
+                )
+
+        return True
+
     async def get_collection(self, user_id: str, channel_metadata) -> dict:
         async with self.db.acquire() as connection:
             tiers = await connection.fetchall("SELECT * FROM achievement_tiers ORDER BY achievement_id, tier")

@@ -46,14 +46,30 @@ class UtilityCommands(commands.Component):
 
         return True
 
-    async def record_roll(self, ctx: commands.Context, command: str, target, result: int) -> None:
+    async def record_roll(self, ctx: commands.Context, command: str, target, result: int) -> bool:
         services = getattr(self.bot, "services", None)
         achievements = getattr(services, "achievements", None)
+        stream_logs = getattr(services, "stream_logs", None)
         broadcaster_id = get_context_broadcaster_id(ctx)
-        if achievements is None or broadcaster_id is None:
-            return
+
+        if achievements is None or stream_logs is None or broadcaster_id is None:
+            LOGGER.warning("[Commands] !%s could not resolve the achievement or stream service.", command)
+            return False
+
+        active_session = stream_logs.get_active_session(broadcaster_id)
+
+        if active_session is None:
+            await ctx.reply(f"!{command} is only available while the stream is live.")
+            return False
+
         user_id = str(target.id) if target is not None else str(ctx.chatter.id)
-        await achievements.record_command_roll(broadcaster_id, str(ctx.payload.id), command, user_id, result)
+        recorded = await achievements.record_stream_command_roll(broadcaster_id, active_session.stream_id, str(ctx.payload.id), command, user_id, result)
+
+        if not recorded:
+            target_name = getattr(target, "name", None) or ctx.chatter.name
+            await ctx.reply(f"{target_name} already has a !{command} result for this stream.")
+
+        return recorded
 
     @commands.command()
     async def hi(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
@@ -115,7 +131,8 @@ class UtilityCommands(commands.Component):
             return
 
         stinky_percentage = random.randint(0, 100)
-        await self.record_roll(ctx, "stinky", user, stinky_percentage)
+        if not await self.record_roll(ctx, "stinky", user, stinky_percentage):
+            return
         target_name = user or ctx.chatter.name
 
         LOGGER.debug(
@@ -167,7 +184,8 @@ class UtilityCommands(commands.Component):
             return
 
         lucky_percentage = random.randint(0, 100)
-        await self.record_roll(ctx, "lucky", user, lucky_percentage)
+        if not await self.record_roll(ctx, "lucky", user, lucky_percentage):
+            return
         target_name = user or ctx.chatter.name
 
         LOGGER.debug(
@@ -219,7 +237,8 @@ class UtilityCommands(commands.Component):
             return
 
         smart_percentage = random.randint(0, 100)
-        await self.record_roll(ctx, "smart", user, smart_percentage)
+        if not await self.record_roll(ctx, "smart", user, smart_percentage):
+            return
         target_name = user or ctx.chatter.name
 
         LOGGER.debug(
@@ -271,7 +290,8 @@ class UtilityCommands(commands.Component):
             return
 
         total_inches = random.randint(12, 96)
-        await self.record_roll(ctx, "height", user, total_inches)
+        if not await self.record_roll(ctx, "height", user, total_inches):
+            return
         feet, inches = divmod(total_inches, 12)
         height = f"{feet}' {inches}\""
 
