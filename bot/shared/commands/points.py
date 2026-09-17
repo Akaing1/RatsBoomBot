@@ -82,6 +82,8 @@ class PointsCommandHandler:
 
     @staticmethod
     async def send_message(ctx: commands.Context, template: str | None, **values) -> None:
+        profile = get_active_profile(get_context_broadcaster_id(ctx))
+        values["currency"] = (profile.points.display_name or profile.points.command_name) if profile else "points"
         message = render_profile_message(template, **values)
 
         if not message:
@@ -163,6 +165,7 @@ class PointsCommandHandler:
         for index, row in enumerate(rows):
             entry = render_profile_message(
                 config.messages.leaderboard_entry,
+                currency=config.display_name or config.command_name,
                 position=index + 1,
                 username=row["username"],
                 points=row["points"],
