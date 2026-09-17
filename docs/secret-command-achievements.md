@@ -1,5 +1,7 @@
 # Command-roll and gambling-streak achievements (v11.1.0)
 
+Migration 32 also defines **Rat Exterminator**, a hidden global Platinum badge for 100 confirmed successful `!kamikaze` hits across all channels. It remains hidden until earned and has no points payout.
+
 Migration 34 adds visible Nice Try achievements for confirmed missed `!kamikaze` attacks. Global misses add together across channels; channel misses are separate. Both use Bronze / Silver / Gold / Platinum at 1 / 10 / 50 / 100 misses. Global badges do not pay points; channel tiers use the normal 500 / 2,000 / 7,500 / 25,000 reward schedule.
 
 Eight secret channel Platinum badges unlock for exact outcomes: `!stinky` at 0% or 100%, `!smart` at 0% or 100%, `!height` at exactly 1'0" or 8'0", and `!lucky` at 0% or 100%. Commands continue working normally on and off stream, but only each measured viewer's first result per command during a live stream is eligible for achievements. The person measured earns the badge, whether they issued the command or were named as the target. Each achievement awards 25,000 channel loyalty points once.

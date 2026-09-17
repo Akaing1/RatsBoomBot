@@ -7,6 +7,7 @@ from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService,
 from bot.services.support import HelpService, ModerationService
 from config.settings import settings
 from bot.services.channels.achievements import AchievementService
+from bot.services.channels.command_slowmode import CommandSlowmodeService
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -24,6 +25,7 @@ class ServiceContainer:
         self.chat_identity = ChatIdentityService(bot, db)
         self.chatters = ChatterIdentityService(bot, db)
         self.achievements = AchievementService(db)
+        self.command_slowmode = CommandSlowmodeService(db)
         self.chatter_stats = ChatterStatsService(bot, db, self.broadcasters)
         self.profile_settings = ProfileSettingsService(db)
         self.features = FeatureToggleService(db, self.profile_settings)
@@ -50,6 +52,7 @@ class ServiceContainer:
         LOGGER.info("[Services] Beginning service setup.")
 
         services = (
+            ("CommandSlowmodeService", self.command_slowmode),
             ("BroadcasterService", self.broadcasters),
             ("BroadcasterSettingsService", self.broadcaster_settings),
             ("ChatIdentityService", self.chat_identity),
