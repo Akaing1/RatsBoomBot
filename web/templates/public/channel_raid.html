@@ -192,8 +192,9 @@
                 <div class="public-raid-section-content public-raid-copy">
                     <p>Defeating a boss starts with an equal base share of its full HP value for every contributor. The top 15% receive <strong>1.5×</strong>, the next 15% receive <strong>1.25×</strong>, the next 20% receive <strong>1.10×</strong>, and everyone else receives the base share.</p>
                     <p>The final hitter also receives a <strong>{{ "{:,}".format(config.final_hit_reward) }}-point</strong> bonus on main bosses or <strong>{{ "{:,}".format(config.mini_final_hit_reward) }} points</strong> on mini bosses.</p>
+                    <p>Every contributor to a defeated encounter earns chatter XP: <strong>25 XP</strong> for a tutorial, <strong>50 XP</strong> for a mini boss, and <strong>100 XP</strong> for a main boss.</p>
                     <p>Successful non-tutorial raids can drop mythical melee, ranged, or magic weapons. Tutorial participants receive a starter weapon they do not own, or {{ "{:,}".format(config.tutorial_complete_collection_points) }} points after completing the full starter collection.</p>
-                    <p>Failed encounters still distribute a reduced portion of their reward pool according to contribution.</p>
+                    <p>Encounters that end before the boss is defeated distribute a point pool based on the damage dealt, without raid-clear XP, finishing bonuses, or drops.</p>
                 </div>
             </details>
 

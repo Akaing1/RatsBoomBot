@@ -1235,6 +1235,13 @@ body.landing-page {
 .chatter-profile-hero h1 { margin: 0; font-size: 38px; }
 .chatter-profile-hero p:not(.eyebrow) { margin: 7px 0 0; color: var(--muted); }
 .chatter-profile-avatar, .channel-profile-hero > img { display: grid; width: 76px; height: 76px; place-items: center; border-radius: 20px; background: linear-gradient(135deg, var(--accent), #ec4899); color: #fff; font-size: 28px; font-weight: 800; object-fit: cover; }
+img.chatter-profile-avatar { display: block; }
+.chatter-level-summary { width: min(260px, 24vw); }
+.chatter-level-summary > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.chatter-level-summary > div:first-child span { color: var(--muted); font-size: 12px; }
+.chatter-level-summary > div:first-child strong { font-size: 20px; }
+.chatter-level-summary .chatter-level-progress { height: 9px; margin-top: 10px; }
+.chatter-level-summary small { display: block; margin-top: 8px; color: var(--muted); font-size: 11px; text-align: right; }
 .chatter-stat-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; margin-bottom: 30px; }
 .chatter-stat-grid article { padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
 .chatter-stat-grid span { display: block; margin-bottom: 10px; color: var(--muted); font-size: 12px; }
@@ -1283,7 +1290,7 @@ body.landing-page {
     .chatter-search { width: 100%; }
     .chatter-search input { width: 100%; }
     .chatter-profile-hero { grid-template-columns: auto minmax(0,1fr); padding: 21px; }
-    .chatter-profile-hero .button { grid-column: 1 / -1; }
+    .chatter-level-summary { grid-column: 1 / -1; width: 100%; }
     .chatter-profile-hero h1 { font-size: 29px; }
     .chatter-stat-grid, .chatter-channel-grid, .chatter-detail-grid { grid-template-columns: 1fr; }
     .chatter-section-heading { align-items: flex-start; flex-direction: column; }

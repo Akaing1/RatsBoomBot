@@ -72,6 +72,7 @@ async def test_channel_achievement_backfill_and_rewards_are_idempotent(tmp_path)
         assert cards["Breadwinner"]["tier"] == "Gold"
         assert cards["Sewer Socialite"]["tier"] == "Bronze"
         assert cards["Sewer Socialite"]["steps"][0]["reward"] == 500
+        assert cards["Sewer Socialite"]["steps"][0]["xp"] == 100
         assert collection["currency_name"] == "bread"
 
 
