@@ -55,9 +55,9 @@ def test_meinya_uses_final_fantasy_fourteen_raid_pilot() -> None:
     assert config.names.melee == "Dragon-king Thordan"
     assert config.names.ranged == "The Ultima Weapon"
     assert config.names.magic == "Bahamut Prime"
-    assert config.mini_names.melee == "Behemoth"
-    assert config.mini_names.ranged == "Magitek Gunship"
-    assert config.mini_names.magic == "Ahriman"
+    assert config.mini_names.melee == ("Behemoth", "Garula")
+    assert config.mini_names.ranged == ("Magitek Gunship", "Barreltender")
+    assert config.mini_names.magic == ("Ahriman", "Chieftain Moglin")
     assert config.weapon_names.basic_sword == "Weathered Shortsword"
     assert config.weapon_names.refined_sword == "Lost Allagan Saber"
     assert config.weapon_names.masterwork_sword == "Burtgang"

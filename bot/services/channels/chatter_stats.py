@@ -3,6 +3,7 @@ from typing import Any
 
 from bot.profiles import get_active_profile
 from bot.services.channels.achievements import AchievementService
+from bot.services.engagement.raid_boss import public_raid_status
 from config.settings import settings
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -414,7 +415,7 @@ class ChatterStatsService:
             "channel": self._channel_metadata(str(row["broadcaster_id"])),
             "boss_name": str(row["boss_name"]),
             "boss_tier": str(row["boss_tier"]),
-            "status": str(row["status"]),
+            "status": public_raid_status(str(row["boss_tier"]), str(row["status"])),
             "date": str(row["spawned_at"])[:10],
             "damage": int(row["damage"]),
             "reward_points": int(row["reward_points"]),
