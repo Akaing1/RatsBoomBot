@@ -64,6 +64,24 @@ async def test_large_attack_announces_highest_new_checkpoint_without_stacking_me
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("boss_tier", ("mini", "tutorial"))
+async def test_health_checkpoints_only_apply_to_main_bosses(tmp_path, monkeypatch, boss_tier):
+    monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: 1.0)
+    async with asqlite.create_pool(str(tmp_path / f"{boss_tier}.db")) as database:
+        await run_migrations(database)
+        service = RaidBossService(bot=None, db=database)
+        service.send_announcement = AsyncMock()
+        raid_config = config(base_damage_min=250, base_damage_max=250)
+        await service.spawn("channel", "melee", raid_config, boss_tier)
+        await service.attack("channel", "one", "user", "viewer", raid_config)
+
+        service.send_announcement.assert_not_awaited()
+        async with database.acquire() as connection:
+            rows = await connection.fetchall("SELECT checkpoint FROM raid_boss_health_checkpoints")
+        assert rows == []
+
+
+@pytest.mark.asyncio
 async def test_partial_damage_uses_same_ranked_distribution_as_a_clear(tmp_path, monkeypatch):
     monkeypatch.setattr("bot.services.engagement.raid_boss.random.random", lambda: 1.0)
     async with asqlite.create_pool(str(tmp_path / "payout.db")) as database:
