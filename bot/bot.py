@@ -8,6 +8,7 @@ from bot.component_loader import load_components
 from bot.context import ChannelContext
 from bot.profiles import CHANNEL_PROFILES, activate_profile, create_generic_profile, get_active_profile
 from bot.services.container import ServiceContainer
+from bot.services.channels.command_slowmode import SlowmodeBlocked
 from config.settings import settings
 from storage.database import create_broadcaster_subscriptions, delete_token, save_token
 
@@ -15,6 +16,11 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 
 class TwitchBot(commands.AutoBot):
+
+    async def global_guard(self, ctx) -> bool:
+        if self.services is not None and not self.services.command_slowmode.allow(ctx):
+            raise SlowmodeBlocked("Command slowmode cooldown is active.")
+        return True
 
     def get_context(self, payload, *, cls=None):
         return super().get_context(payload, cls=cls or ChannelContext)
@@ -310,6 +316,8 @@ class TwitchBot(commands.AutoBot):
 
     async def event_command_error(self, payload) -> None:
         exception = getattr(payload, "exception", None)
+        if isinstance(exception, SlowmodeBlocked):
+            return
         context = getattr(payload, "context", None)
         command = getattr(context, "command", None)
         author = getattr(context, "chatter", None) or getattr(context, "author", None)
