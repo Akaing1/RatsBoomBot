@@ -49,11 +49,20 @@ class UtilityCommands(commands.Component):
     async def record_roll(self, ctx: commands.Context, command: str, target, result: int) -> None:
         services = getattr(self.bot, "services", None)
         achievements = getattr(services, "achievements", None)
+        stream_logs = getattr(services, "stream_logs", None)
         broadcaster_id = get_context_broadcaster_id(ctx)
-        if achievements is None or broadcaster_id is None:
+
+        if achievements is None or stream_logs is None or broadcaster_id is None:
+            LOGGER.warning("[Commands] !%s could not resolve the achievement or stream service.", command)
             return
+
+        active_session = stream_logs.get_active_session(broadcaster_id)
+
+        if active_session is None:
+            return
+
         user_id = str(target.id) if target is not None else str(ctx.chatter.id)
-        await achievements.record_command_roll(broadcaster_id, str(ctx.payload.id), command, user_id, result)
+        await achievements.record_stream_command_roll(broadcaster_id, active_session.stream_id, str(ctx.payload.id), command, user_id, result)
 
     @commands.command()
     async def hi(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
