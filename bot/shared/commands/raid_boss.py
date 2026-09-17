@@ -5,6 +5,7 @@ from urllib.parse import quote
 from twitchio.ext import commands
 
 from bot.profiles import FeatureName, RaidBossConfig, get_active_profile
+from bot.services.engagement.raid_boss import raid_conclusion_message
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
 from config.settings import settings
 
@@ -53,8 +54,8 @@ class RaidBossCommands(commands.Component):
             return
 
         percent = event.current_hp / event.max_hp * 100
-        streams_remaining = event.stream_limit - event.streams_used + 1
-        await ctx.send(f"{event.boss_name} [{event.boss_tier.title()} Boss / {event.boss_type.title()}] — {event.current_hp:,}/{event.max_hp:,} HP ({percent:.1f}%). {streams_remaining} raid stream(s) remain. Use !raid attack once this stream!")
+        duration = "Remains active until defeated." if event.boss_tier == "tutorial" else f"{event.stream_limit - event.streams_used + 1} raid stream(s) remain."
+        await ctx.send(f"{event.boss_name} [{event.boss_tier.title()} Boss / {event.boss_type.title()}] — {event.current_hp:,}/{event.max_hp:,} HP ({percent:.1f}%). {duration} Use !raid attack once this stream!")
 
     @raid.command(name="loot")
     async def loot(self, ctx: commands.Context) -> None:
@@ -101,6 +102,12 @@ class RaidBossCommands(commands.Component):
 
         if stream_id is None:
             await ctx.reply("You can only attack while the stream is live.")
+            return
+
+        active_event = await self.bot.services.raid_bosses.get_active_event(broadcaster_id)
+
+        if active_event is None:
+            await ctx.reply("There is no active raid boss.")
             return
 
         event, failed_reward = await self.bot.services.raid_bosses.register_stream(broadcaster_id, stream_id)
@@ -180,7 +187,8 @@ class RaidBossCommands(commands.Component):
             remaining_drops = len(drop_summaries) - len(visible_drops)
             more_text = f", and {remaining_drops} more—use !raid loot" if remaining_drops else ""
             drop_text = f" Loot: {', '.join(visible_drops)}{more_text}!" if visible_drops else ""
-            message = f"@{chatter.name} dealt the final {result.damage:,} damage{bonus_text} and defeated {result.boss_name}! {result.reward:,} contribution points have been awarded by raid rank!{drop_text}"
+            outcome = "cleared the encounter with" if result.boss_tier == "main" else "defeated"
+            message = f"@{chatter.name} dealt the final {result.damage:,} damage{bonus_text} and {outcome} {result.boss_name}! {result.reward:,} contribution points have been awarded by raid rank!{drop_text}"
             await self.bot.services.raid_bosses.send_announcement(broadcaster_id, message, "green")
             return
 
@@ -458,10 +466,12 @@ class RaidBossCommands(commands.Component):
             return
 
         stream_id = self.get_offline_stream_id(event.id, event.streams_used + 1)
+        active_event = event
         event, failed_reward = await self.bot.services.raid_bosses.register_stream(context[0], stream_id)
 
         if event is None:
-            await ctx.send(f"The simulated stream limit was reached. Raiders received a reduced {failed_reward:,}-point pool based on contribution.")
+            damage_dealt = active_event.max_hp - active_event.current_hp
+            await ctx.send(raid_conclusion_message(active_event, damage_dealt, failed_reward, expired=True))
             return
 
         await ctx.send(f"Offline raid testing advanced to simulated stream {event.streams_used}. Everyone can use !raid attack again.")
@@ -479,10 +489,9 @@ class RaidBossCommands(commands.Component):
             await ctx.reply("There is no active raid boss to end.")
             return
 
-        remaining_ratio = event.current_hp / event.max_hp
         reward = await self.bot.services.raid_bosses.resolve(context[0], defeated=False)
-        fraction = "half" if remaining_ratio <= 0.25 else "one quarter of"
-        await ctx.send(f"The subjugation of {event.boss_name} failed. Raiders earned {fraction} the reward pool ({reward:,} points) based on contribution.")
+        damage_dealt = event.max_hp - event.current_hp
+        await ctx.send(raid_conclusion_message(event, damage_dealt, reward))
 
     async def get_stream_id(self, broadcaster_id: str, config: RaidBossConfig) -> str | None:
         stream_id = await self.get_live_stream_id(broadcaster_id)

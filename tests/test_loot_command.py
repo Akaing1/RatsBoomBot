@@ -88,6 +88,61 @@ async def test_defeated_raid_uses_green_announcement() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cleared_main_raid_uses_main_boss_wording() -> None:
+    event = RaidBossEvent(1, "Magitek Gunship", "ranged", "main", 150000, 100, 150000, "active", 3, 1)
+    announcements = []
+
+    class FakeCompletedRaidService:
+
+        async def get_active_event(self, broadcaster_id):
+            return event
+
+        async def register_stream(self, broadcaster_id, stream_id):
+            return event, 0
+
+        async def attack(self, *args):
+            return RaidAttackResult(100, 0, "Magitek Gunship", None, False, True, reward=150000, boss_tier="main")
+
+        async def send_announcement(self, broadcaster_id, message, color):
+            announcements.append((broadcaster_id, message, color))
+
+    features = SimpleNamespace(is_enabled=lambda broadcaster_id, feature: True)
+    stream_logs = SimpleNamespace(active_sessions={"channel-1": SimpleNamespace(stream_id="stream-1")})
+    bot = SimpleNamespace(services=SimpleNamespace(features=features, raid_bosses=FakeCompletedRaidService(), stream_logs=stream_logs))
+    profile = ChannelProfile(channel_name="channel", features=FeatureDefaults(points=True, raid_bosses=True), raid_bosses=RaidBossConfig(enabled=True))
+    activate_profile("channel-1", profile)
+    command = RaidBossCommands(bot)
+    context = FakeContext()
+
+    await command.attack.callback(command, context)
+
+    assert announcements == [("channel-1", "@alice dealt the final 100 damage and cleared the encounter with Magitek Gunship! 150,000 contribution points have been awarded by raid rank!", "green")]
+
+
+@pytest.mark.asyncio
+async def test_attack_after_completed_raid_reports_no_active_boss_without_zero_payout() -> None:
+    class FakeCompletedRaidService:
+
+        async def get_active_event(self, broadcaster_id):
+            return None
+
+        async def register_stream(self, broadcaster_id, stream_id):
+            raise AssertionError("A completed raid must not be registered again.")
+
+    features = SimpleNamespace(is_enabled=lambda broadcaster_id, feature: True)
+    stream_logs = SimpleNamespace(active_sessions={"channel-1": SimpleNamespace(stream_id="stream-1")})
+    bot = SimpleNamespace(services=SimpleNamespace(features=features, raid_bosses=FakeCompletedRaidService(), stream_logs=stream_logs))
+    profile = ChannelProfile(channel_name="channel", features=FeatureDefaults(points=True, raid_bosses=True), raid_bosses=RaidBossConfig(enabled=True))
+    activate_profile("channel-1", profile)
+    command = RaidBossCommands(bot)
+    context = FakeContext()
+
+    await command.attack.callback(command, context)
+
+    assert context.replies == ["There is no active raid boss."]
+
+
+@pytest.mark.asyncio
 async def test_sell_command_reports_item_value_and_new_balance() -> None:
     class FakeSellService:
 

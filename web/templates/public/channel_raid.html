@@ -48,7 +48,7 @@
                 </div>
 
                 <div class="raid-monitor-heading">
-                    <p id="public-raid-boss-details">{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; Stream {{ raid_metrics.streams_used }} of {{ raid_metrics.stream_limit }}</p>
+                    <p id="public-raid-boss-details">{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; {% if raid_metrics.boss_tier == 'tutorial' %}Active until defeated &middot; Stream {{ raid_metrics.streams_used }}{% else %}Stream {{ raid_metrics.streams_used }} of {{ raid_metrics.stream_limit }}{% endif %}</p>
                     <strong id="public-raid-hp-text">{{ "{:,}".format(raid_metrics.current_hp) }}/{{ "{:,}".format(raid_metrics.max_hp) }} HP</strong>
                 </div>
 
@@ -223,7 +223,7 @@
                                 <article>
                                     <div><span>{{ event.boss_tier | title }} {{ event.boss_type | title }} boss</span><h3>{{ event.boss_name }}</h3><p>{{ event.spawned_at[:10] }}</p></div>
                                     <div><strong>{{ "{:,}".format(event.total_damage) }} damage</strong><span>{{ event.unique_attackers }} attackers</span></div>
-                                    <b class="channel-state {% if event.status == 'defeated' %}live{% endif %}">{{ event.status | title }}</b>
+                                    <b class="channel-state {% if event.status in ('cleared', 'defeated') %}live{% endif %}">{{ event.status | title }}</b>
                                     {% if event.contributors %}
                                         <details class="public-raid-history-leaderboard">
                                             <summary>View leaderboard</summary>
