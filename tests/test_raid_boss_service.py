@@ -1524,6 +1524,44 @@ async def test_selling_ignores_durability_and_preserves_an_equipped_copy(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_selling_waits_for_an_existing_database_writer(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(weapon_cost=5000)
+        writer_ready = asyncio.Event()
+        release_writer = asyncio.Event()
+
+        async with database.acquire() as connection:
+            await connection.execute("INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES ('channel-1', 'user-1', 'basic_sword', 4, 15)")
+            await connection.execute("INSERT INTO viewers (broadcaster_id, user_id, username, points, messages) VALUES ('channel-1', 'writer', 'writer', 0, 0)")
+
+        async def hold_writer() -> None:
+            async with database.acquire() as connection:
+                await connection.execute("BEGIN IMMEDIATE")
+                await connection.execute("UPDATE viewers SET points = points + 1 WHERE broadcaster_id = 'channel-1' AND user_id = 'writer'")
+                writer_ready.set()
+                await release_writer.wait()
+                await connection.commit()
+
+        writer = asyncio.create_task(hold_writer())
+        await writer_ready.wait()
+        sale = asyncio.create_task(service.sell("channel-1", "user-1", "alice", "basic_sword", config))
+        await asyncio.sleep(0.05)
+
+        assert not sale.done()
+        release_writer.set()
+        await writer
+        assert await sale == "sold:basic_sword:2500:2500"
+
+        weapons, _, _, _ = await service.get_inventory("channel-1", "user-1")
+        assert weapons == [("basic_sword", 3)]
+        assert await points.get_points("channel-1", "user-1") == 2500
+
+
+@pytest.mark.asyncio
 async def test_mythical_and_blessed_unique_weapons_cannot_be_sold(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         service = RaidBossService(bot=None, db=database)
