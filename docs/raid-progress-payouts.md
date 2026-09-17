@@ -7,3 +7,5 @@ The released pool uses the existing ranked mini-boss distribution: divide it eve
 Full clears continue to award the configured finishing bonus and run weapon drop rolls. An encounter that reaches its stream limit or is ended manually pays its damage-earned pool without a finishing bonus or drops. Zero damage pays zero points. Internal `defeated` and `failed` database statuses remain for compatibility. Public history displays `Cleared` and `Concluded` for main bosses, while mini and tutorial encounters retain `Defeated` and `Failed`.
 
 Health progress announcements are persisted in `raid_boss_health_checkpoints` at 25%, 50%, and 75% damage. A restart cannot repeat a checkpoint. If one attack crosses several thresholds, all crossed thresholds are recorded and only the highest new checkpoint is announced, avoiding stacked Twitch announcements. A finishing attack does not add a checkpoint announcement beside the existing clear announcement.
+
+Tutorial encounters no longer expire after a configured number of streams. They remain active until viewers defeat them or a moderator ends them manually; mini and main bosses retain their configured stream limits.

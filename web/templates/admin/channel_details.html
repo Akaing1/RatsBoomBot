@@ -156,7 +156,7 @@
 
         <div id="raid-monitor-details" {% if not raid_metrics %}hidden{% endif %}>
             <div class="raid-monitor-heading">
-                <div><strong id="raid-boss-name">{% if raid_metrics %}{{ raid_metrics.boss_name }}{% endif %}</strong><p id="raid-boss-meta">{% if raid_metrics %}{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; {{ raid_metrics.streams_used }}/{{ raid_metrics.stream_limit }} streams{% endif %}</p></div>
+                <div><strong id="raid-boss-name">{% if raid_metrics %}{{ raid_metrics.boss_name }}{% endif %}</strong><p id="raid-boss-meta">{% if raid_metrics %}{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; {% if raid_metrics.boss_tier == 'tutorial' %}Active until defeated &middot; Stream {{ raid_metrics.streams_used }}{% else %}{{ raid_metrics.streams_used }}/{{ raid_metrics.stream_limit }} streams{% endif %}{% endif %}</p></div>
                 <strong id="raid-hp-label">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.current_hp) }}/{{ "{:,}".format(raid_metrics.max_hp) }} HP{% endif %}</strong>
             </div>
 
@@ -734,7 +734,8 @@
             if (!hasRaid) return;
 
             document.getElementById("raid-boss-name").textContent = raid.boss_name;
-            document.getElementById("raid-boss-meta").textContent = `${raid.boss_tier.charAt(0).toUpperCase() + raid.boss_tier.slice(1)} Boss · ${raid.boss_type.charAt(0).toUpperCase() + raid.boss_type.slice(1)} · ${raid.streams_used}/${raid.stream_limit} streams`;
+            const raidDuration = raid.boss_tier === "tutorial" ? `Active until defeated · Stream ${raid.streams_used}` : `${raid.streams_used}/${raid.stream_limit} streams`;
+            document.getElementById("raid-boss-meta").textContent = `${raid.boss_tier.charAt(0).toUpperCase() + raid.boss_tier.slice(1)} Boss · ${raid.boss_type.charAt(0).toUpperCase() + raid.boss_type.slice(1)} · ${raidDuration}`;
             document.getElementById("raid-hp-label").textContent = `${raid.current_hp.toLocaleString()}/${raid.max_hp.toLocaleString()} HP`;
             document.getElementById("raid-hp-progress").style.width = `${Math.max(0, Math.min(100, raid.hp_percent))}%`;
             document.getElementById("raid-unique-attackers").textContent = raid.unique_attackers.toLocaleString();
