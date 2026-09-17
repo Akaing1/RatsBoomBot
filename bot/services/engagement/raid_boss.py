@@ -855,7 +855,7 @@ class RaidBossService:
                 """,
                 (damage, event.id)
             )
-            checkpoint = await self._record_health_checkpoints(connection, event, int(row["current_hp"])) if row is not None else None
+            checkpoint = await self._record_health_checkpoints(connection, event, int(row["current_hp"])) if row is not None and event.boss_tier == "main" else None
 
             if row is not None and credited_damage > 0 and event.boss_tier in {"main", "mini"}:
                 if int(before["current_hp"]) == 1 and int(row["current_hp"]) == 0:
