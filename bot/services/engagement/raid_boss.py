@@ -1212,46 +1212,37 @@ class RaidBossService:
         if sale_value is None:
             return "unsellable"
 
-        async with self.db.acquire() as connection:
-            await connection.execute("BEGIN")
+        async with self.db.acquire() as connection, immediate_transaction(connection):
+            owned = await connection.fetchone(
+                """
+                SELECT inventory.quantity, players.equipped_weapon
+                FROM raid_boss_inventory AS inventory
+                LEFT JOIN raid_boss_players AS players
+                  ON players.broadcaster_id = inventory.broadcaster_id
+                 AND players.user_id = inventory.user_id
+                WHERE inventory.broadcaster_id = ?
+                  AND inventory.user_id = ?
+                  AND inventory.item_id = ?
+                  AND inventory.quantity > 0
+                """,
+                (str(broadcaster_id), str(user_id), weapon)
+            )
 
-            try:
-                owned = await connection.fetchone(
-                    """
-                    SELECT inventory.quantity, players.equipped_weapon
-                    FROM raid_boss_inventory AS inventory
-                    LEFT JOIN raid_boss_players AS players
-                      ON players.broadcaster_id = inventory.broadcaster_id
-                     AND players.user_id = inventory.user_id
-                    WHERE inventory.broadcaster_id = ?
-                      AND inventory.user_id = ?
-                      AND inventory.item_id = ?
-                      AND inventory.quantity > 0
-                    """,
-                    (str(broadcaster_id), str(user_id), weapon)
-                )
+            if owned is None:
+                return "not_owned"
 
-                if owned is None:
-                    await connection.rollback()
-                    return "not_owned"
+            if owned["equipped_weapon"] == weapon and int(owned["quantity"]) == 1:
+                return "equipped"
 
-                if owned["equipped_weapon"] == weapon and int(owned["quantity"]) == 1:
-                    await connection.rollback()
-                    return "equipped"
-
-                await connection.execute(
-                    "UPDATE raid_boss_inventory SET quantity = quantity - 1 WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?",
-                    (str(broadcaster_id), str(user_id), weapon)
-                )
-                await self._add_points(connection, broadcaster_id, user_id, username, sale_value)
-                balance = await connection.fetchone(
-                    "SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?",
-                    (str(broadcaster_id), str(user_id))
-                )
-                await connection.commit()
-            except Exception:
-                await connection.rollback()
-                raise
+            await connection.execute(
+                "UPDATE raid_boss_inventory SET quantity = quantity - 1 WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?",
+                (str(broadcaster_id), str(user_id), weapon)
+            )
+            await self._add_points(connection, broadcaster_id, user_id, username, sale_value)
+            balance = await connection.fetchone(
+                "SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?",
+                (str(broadcaster_id), str(user_id))
+            )
 
         return f"sold:{weapon}:{sale_value}:{int(balance['points'])}"
 
