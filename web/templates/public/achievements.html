@@ -31,7 +31,7 @@
             <details><summary>Tier milestones and unlocks</summary>
                 <ul class="achievement-tiers">
                 {% for step in card.steps %}
-                    <li><strong>{{ step.name }}</strong><span class="achievement-tier-requirement"><span>{{ "{:,}".format(step.threshold) }}</span>{% if step.reward %}<small>+{{ "{:,}".format(step.reward) }} {{ profile.achievements.currency_name }}</small>{% endif %}</span>
+                    <li><strong>{{ step.name }}</strong><span class="achievement-tier-requirement"><span>{{ "{:,}".format(step.threshold) }}</span><small>+{{ "{:,}".format(step.xp) }} XP{% if step.reward %} &middot; +{{ "{:,}".format(step.reward) }} {{ profile.achievements.currency_name }}{% endif %}</small></span>
                     {% if step.earned %}
                         <span class="achievement-tier-status">Unlocked{% if step.date %} · {{ step.date }} UTC{% else %} from historical totals · date unknown{% endif %}</span>
                     {% else %}<span class="achievement-tier-status">Locked</span>{% endif %}</li>

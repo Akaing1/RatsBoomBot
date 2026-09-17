@@ -15,7 +15,8 @@ class FakeChatterStats:
             return None
 
         return {
-            "identity": {"user_id": "user-1", "login": "alice", "display_name": "Alice"},
+            "identity": {"user_id": "user-1", "login": "alice", "display_name": "Alice", "profile_image_url": "https://example.com/alice.png"},
+            "level": {"level": 3, "total_xp": 2750, "achievement_xp": 2500, "raid_xp": 250, "current_xp": 750, "xp_required": 2500, "percent": 30},
             "messages_sent": 1200,
             "lifetime_points_earned": 4500,
             "channels_interacted": 1,
@@ -82,6 +83,10 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert 'data-chatter-tab="raids"' in response.text
     assert 'data-chatter-panel="raids" hidden' in response.text
     assert "/chatters/alice/channels/testchannel" in response.text
+    assert "Level 3" in response.text
+    assert "750 / 2,500 XP" in response.text
+    assert 'src="https://example.com/alice.png"' in response.text
+    assert "View on Twitch" not in response.text
 
 
 def test_public_channel_chatter_profile_renders(monkeypatch) -> None:

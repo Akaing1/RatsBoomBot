@@ -138,6 +138,8 @@ async def test_chatter_profiles_aggregate_global_and_channel_activity(tmp_path) 
         assert global_profile["daily_check_ins"] == 4
         assert global_profile["favorite_channel"]["display_name"] == "TestChannel"
         assert global_profile["raid_reward_points"] == 240
+        assert global_profile["level"]["total_xp"] == 200
+        assert global_profile["level"]["level"] == 1
         assert global_profile["top_contributor_finishes"] == 0
         assert global_profile["recent_raids"][0]["boss_name"] == "Test Boss"
         assert global_profile["recent_raids"][0]["placement"] == 2
@@ -160,6 +162,33 @@ async def test_chatter_profiles_aggregate_global_and_channel_activity(tmp_path) 
             {"item_id": "lucky_dice", "display_name": "Lucky Dice", "quantity": 3},
             {"item_id": "fools_card", "display_name": "The Fool's Card", "quantity": 1}
         ]
+
+
+@pytest.mark.asyncio
+async def test_global_profile_refreshes_and_caches_twitch_profile_image(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "profile-image.db")) as database:
+        await run_migrations(database)
+        await seed_identity(database)
+        calls = []
+
+        async def fetch_user(*, id):
+            calls.append(id)
+            return SimpleNamespace(profile_image="https://example.com/alice.png")
+
+        bot = SimpleNamespace(bot_id="main-bot", fetch_user=fetch_user)
+        service = ChatterStatsService(bot, database, FakeBroadcasters())
+        first = await service.get_global_profile("alice")
+        second = await service.get_global_profile("alice")
+
+        assert first["identity"]["profile_image_url"] == "https://example.com/alice.png"
+        assert second["identity"]["profile_image_url"] == "https://example.com/alice.png"
+        assert calls == ["user-1"]
+
+        async with database.acquire() as connection:
+            saved = await connection.fetchone("SELECT profile_image_url,profile_image_updated_at FROM chatter_identities WHERE user_id='user-1'")
+
+        assert saved["profile_image_url"] == "https://example.com/alice.png"
+        assert saved["profile_image_updated_at"] is not None
 
 
 @pytest.mark.asyncio

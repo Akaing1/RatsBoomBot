@@ -1,4 +1,5 @@
 TIER_NAMES = ("Bronze", "Silver", "Gold", "Platinum")
+ACHIEVEMENT_TIER_XP = {1: 100, 2: 250, 3: 500, 4: 1000}
 CHANNEL_TIER_REWARDS = {1: 500, 2: 2000, 3: 7500, 4: 25000}
 SECRET_CHANNEL_ACHIEVEMENTS = {
     "whisker": ("By a Whisker", "Finish a main or mini boss that has exactly 1 HP remaining.", "swords", "raids", "finishing blows"),
@@ -119,7 +120,7 @@ class AchievementService:
                     continue
                 tier = int(row["tier"])
                 unlock = earned.get((name, channel, tier))
-                steps.append({"name": TIER_NAMES[tier - 1], "threshold": int(row["threshold"]), "earned": unlock is not None, "date": unlock["unlocked_at"] if unlock else None, "reward": None})
+                steps.append({"name": TIER_NAMES[tier - 1], "threshold": int(row["threshold"]), "earned": unlock is not None, "date": unlock["unlocked_at"] if unlock else None, "reward": None, "xp": ACHIEVEMENT_TIER_XP[tier]})
             highest = next((step for step in reversed(steps) if step["earned"]), None)
             next_tier = next((step for step in steps if not step["earned"]), None)
             count = counts.get((name, channel), 0)
@@ -173,7 +174,7 @@ class AchievementService:
                 steps.append({
                     "name": TIER_NAMES[tier - 1], "threshold": int(row["threshold"]) // 60 if achievement_id == "watch_time" else int(row["threshold"]),
                     "earned": unlock is not None, "date": unlock["unlocked_at"] if unlock else None,
-                    "reward": CHANNEL_TIER_REWARDS[tier]
+                    "reward": CHANNEL_TIER_REWARDS[tier], "xp": ACHIEVEMENT_TIER_XP[tier]
                 })
             highest = next((step for step in reversed(steps) if step["earned"]), None)
             next_tier = next((step for step in steps if not step["earned"]), None)
