@@ -5,6 +5,7 @@
     </div>
 {% endif %}
 
+{% if show_social_links | default(true) %}
 <section class="panel toggle-management-panel profile-settings-panel">
     <div class="panel-header"><div><p class="eyebrow">Editable profile details</p><h3>Social links</h3></div></div>
     <div class="profile-settings-grid">
@@ -24,6 +25,8 @@
         {% endfor %}
     </div>
 </section>
+
+{% endif %}
 
 {% for group_name, settings in setting_groups.items() %}
     <section class="panel toggle-management-panel profile-settings-panel">

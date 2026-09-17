@@ -318,6 +318,7 @@ class PointsMessages:
 
 @dataclass(frozen=True)
 class PointsConfig:
+    display_name: str = ""
     command_name: str = "points"
     points_per_message: int = 25
     message_cooldown_seconds: int = 60
