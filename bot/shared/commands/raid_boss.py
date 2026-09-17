@@ -54,8 +54,8 @@ class RaidBossCommands(commands.Component):
             return
 
         percent = event.current_hp / event.max_hp * 100
-        streams_remaining = event.stream_limit - event.streams_used + 1
-        await ctx.send(f"{event.boss_name} [{event.boss_tier.title()} Boss / {event.boss_type.title()}] — {event.current_hp:,}/{event.max_hp:,} HP ({percent:.1f}%). {streams_remaining} raid stream(s) remain. Use !raid attack once this stream!")
+        duration = "Remains active until defeated." if event.boss_tier == "tutorial" else f"{event.stream_limit - event.streams_used + 1} raid stream(s) remain."
+        await ctx.send(f"{event.boss_name} [{event.boss_tier.title()} Boss / {event.boss_type.title()}] — {event.current_hp:,}/{event.max_hp:,} HP ({percent:.1f}%). {duration} Use !raid attack once this stream!")
 
     @raid.command(name="loot")
     async def loot(self, ctx: commands.Context) -> None:

@@ -6,7 +6,7 @@ import pytest
 
 from bot.profiles import RaidBossConfig, RaidBossNames
 from bot.services.engagement.points import PointsService
-from bot.services.engagement.raid_boss import RaidBossService
+from bot.services.engagement.raid_boss import RaidBossEvent, RaidBossService
 from storage.migration_runner import run_migrations
 
 
@@ -1028,6 +1028,31 @@ async def test_boss_expires_after_configured_number_of_unique_streams(tmp_path) 
         assert failed_reward == 150
         assert await points.get_points("channel-1", "user-1") == 150
         assert await service.get_active_event("channel-1") is None
+
+
+@pytest.mark.asyncio
+async def test_tutorial_remains_active_past_configured_stream_limit(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        service = RaidBossService(bot=None, db=database)
+        await run_migrations(database)
+        await service.setup()
+        config = build_config(tutorial_enabled=True, tutorial_duration_streams=1)
+        spawned = await service.spawn("channel-1", "melee", config, "tutorial")
+
+        results = [await service.register_stream("channel-1", f"stream-{number}") for number in range(1, 5)]
+        active = await service.get_active_event("channel-1")
+
+        assert spawned is not None
+        assert all(event is not None and reward == 0 for event, reward in results)
+        assert active is not None
+        assert active.boss_tier == "tutorial"
+        assert active.streams_used == 4
+
+
+def test_tutorial_spawn_message_explains_unlimited_duration() -> None:
+    event = RaidBossEvent(1, "Striking Dummy", "melee", "tutorial", 10000, 10000, 10000, "active", 1, 0)
+
+    assert RaidBossService._spawn_message(event) == "Striking Dummy [Tutorial Boss / Melee] has appeared with 10,000 HP and will remain until defeated! Everyone gets one !raid attack per stream."
 
 
 

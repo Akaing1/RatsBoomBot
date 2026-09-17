@@ -494,6 +494,9 @@ class RaidBossService:
 
     @staticmethod
     def _spawn_message(event: RaidBossEvent) -> str:
+        if event.boss_tier == "tutorial":
+            return f"{event.boss_name} [Tutorial Boss / {event.boss_type.title()}] has appeared with {event.max_hp:,} HP and will remain until defeated! Everyone gets one !raid attack per stream."
+
         return f"{event.boss_name} [{event.boss_tier.title()} Boss / {event.boss_type.title()}] has appeared with {event.max_hp:,} HP for {event.stream_limit} streams! Everyone gets one !raid attack per stream."
 
     @staticmethod
@@ -969,7 +972,7 @@ class RaidBossService:
 
         streams_used = int(row["streams_used"])
 
-        if streams_used > event.stream_limit:
+        if event.boss_tier != "tutorial" and streams_used > event.stream_limit:
             reward = await self.resolve(broadcaster_id, defeated=False)
             return None, reward
 
