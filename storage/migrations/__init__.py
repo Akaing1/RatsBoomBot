@@ -38,6 +38,8 @@ from storage.migrations.v033_channel_achievements import migrate as migrate_chan
 from storage.migrations.v034_secret_command_achievements import migrate as migrate_secret_command_achievements
 from storage.migrations.v035_community_achievements import migrate as migrate_community_achievements
 from storage.migrations.v036_raid_progress_checkpoints import migrate as migrate_raid_progress_checkpoints
+from storage.migrations.v037_chatter_profile_images import migrate as migrate_chatter_profile_images
+from storage.migrations.v038_live_command_roll_limits import migrate as migrate_live_command_roll_limits
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -86,4 +88,6 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=34, name="secret_command_achievements", run=migrate_secret_command_achievements)
     , Migration(version=35, name="community_achievements", run=migrate_community_achievements)
     , Migration(version=36, name="raid_progress_checkpoints", run=migrate_raid_progress_checkpoints)
+    , Migration(version=37, name="chatter_profile_images", run=migrate_chatter_profile_images)
+    , Migration(version=38, name="live_command_roll_limits", run=migrate_live_command_roll_limits)
 )

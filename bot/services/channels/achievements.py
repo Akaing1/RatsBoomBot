@@ -1,4 +1,5 @@
 TIER_NAMES = ("Bronze", "Silver", "Gold", "Platinum")
+ACHIEVEMENT_TIER_XP = {1: 100, 2: 250, 3: 500, 4: 1000}
 CHANNEL_TIER_REWARDS = {1: 500, 2: 2000, 3: 7500, 4: 25000}
 SECRET_CHANNEL_ACHIEVEMENTS = {
     "whisker": ("By a Whisker", "Finish a main or mini boss that has exactly 1 HP remaining.", "swords", "raids", "finishing blows"),
@@ -85,6 +86,30 @@ class AchievementService:
                 (str(broadcaster_id),str(message_id),command,str(user_id),int(value))
             )
 
+    async def record_stream_command_roll(self, broadcaster_id: str, stream_id: str, message_id: str, command: str, user_id: str, value: int) -> bool:
+        endpoints = {"stinky": (0, 50, 100), "smart": (0, 50, 100), "lucky": (0, 50, 100), "height": (12, 96)}
+
+        if command not in endpoints:
+            raise ValueError("Unsupported achievement roll")
+
+        async with self.db.acquire() as connection:
+            await connection.execute(
+                "INSERT OR IGNORE INTO command_stream_rolls (broadcaster_id,stream_id,command,user_id,message_id,value) VALUES (?,?,?,?,?,?)",
+                (str(broadcaster_id),str(stream_id),command,str(user_id),str(message_id),int(value))
+            )
+            inserted = await connection.fetchone("SELECT changes() AS count")
+
+            if int(inserted["count"]) == 0:
+                return False
+
+            if int(value) in endpoints[command]:
+                await connection.execute(
+                    "INSERT OR IGNORE INTO command_achievement_rolls (broadcaster_id,message_id,command,user_id,value) VALUES (?,?,?,?,?)",
+                    (str(broadcaster_id),str(message_id),command,str(user_id),int(value))
+                )
+
+        return True
+
     async def get_collection(self, user_id: str, channel_metadata) -> dict:
         async with self.db.acquire() as connection:
             tiers = await connection.fetchall("SELECT * FROM achievement_tiers ORDER BY achievement_id, tier")
@@ -119,7 +144,7 @@ class AchievementService:
                     continue
                 tier = int(row["tier"])
                 unlock = earned.get((name, channel, tier))
-                steps.append({"name": TIER_NAMES[tier - 1], "threshold": int(row["threshold"]), "earned": unlock is not None, "date": unlock["unlocked_at"] if unlock else None, "reward": None})
+                steps.append({"name": TIER_NAMES[tier - 1], "threshold": int(row["threshold"]), "earned": unlock is not None, "date": unlock["unlocked_at"] if unlock else None, "reward": None, "xp": ACHIEVEMENT_TIER_XP[tier]})
             highest = next((step for step in reversed(steps) if step["earned"]), None)
             next_tier = next((step for step in steps if not step["earned"]), None)
             count = counts.get((name, channel), 0)
@@ -173,7 +198,7 @@ class AchievementService:
                 steps.append({
                     "name": TIER_NAMES[tier - 1], "threshold": int(row["threshold"]) // 60 if achievement_id == "watch_time" else int(row["threshold"]),
                     "earned": unlock is not None, "date": unlock["unlocked_at"] if unlock else None,
-                    "reward": CHANNEL_TIER_REWARDS[tier]
+                    "reward": CHANNEL_TIER_REWARDS[tier], "xp": ACHIEVEMENT_TIER_XP[tier]
                 })
             highest = next((step for step in reversed(steps) if step["earned"]), None)
             next_tier = next((step for step in steps if not step["earned"]), None)

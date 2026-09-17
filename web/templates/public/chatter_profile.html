@@ -24,13 +24,17 @@
 
     <main class="chatter-profile-content">
         <header class="chatter-profile-hero">
-            <div class="chatter-profile-avatar">{{ profile.identity.display_name[0] | upper }}</div>
+            {% if profile.identity.profile_image_url %}<img class="chatter-profile-avatar" src="{{ profile.identity.profile_image_url }}" alt="{{ profile.identity.display_name }} Twitch profile picture">{% else %}<div class="chatter-profile-avatar">{{ profile.identity.display_name[0] | upper }}</div>{% endif %}
             <div>
                 <p class="eyebrow">Public chatter profile</p>
                 <h1>{{ profile.identity.display_name }}</h1>
                 <p>@{{ profile.identity.login }} &middot; Seen in {{ profile.channels_interacted }} RatsBoomBot {{ "channel" if profile.channels_interacted == 1 else "channels" }}</p>
             </div>
-            <a class="button primary" href="https://twitch.tv/{{ profile.identity.login }}">View on Twitch</a>
+            <div class="chatter-level-summary" title="{{ '{:,}'.format(profile.level.achievement_xp) }} XP from achievements and {{ '{:,}'.format(profile.level.raid_xp) }} XP from raid clears">
+                <div><span>Chatter level</span><strong>Level {{ profile.level.level }}</strong></div>
+                <div class="progress-track chatter-level-progress" role="progressbar" aria-label="Experience toward level {{ profile.level.level + 1 }}" aria-valuemin="0" aria-valuemax="{{ profile.level.xp_required }}" aria-valuenow="{{ profile.level.current_xp }}"><span style="width: {{ profile.level.percent }}%"></span></div>
+                <small>{{ "{:,}".format(profile.level.current_xp) }} / {{ "{:,}".format(profile.level.xp_required) }} XP &middot; {{ "{:,}".format(profile.level.total_xp) }} total</small>
+            </div>
         </header>
 
         <nav class="chatter-tabs" aria-label="Chatter profile sections">

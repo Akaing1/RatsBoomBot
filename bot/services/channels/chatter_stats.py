@@ -1,8 +1,10 @@
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from bot.profiles import get_active_profile
 from bot.services.channels.achievements import AchievementService
+from bot.services.channels.chatter_levels import ChatterLevelService
 from bot.services.engagement.raid_boss import public_raid_status
 from config.settings import settings
 
@@ -10,6 +12,8 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 
 class ChatterStatsService:
+
+    PROFILE_IMAGE_TTL = timedelta(days=1)
 
     def __init__(self, bot, db, broadcasters):
         self.bot = bot
@@ -81,7 +85,8 @@ class ChatterStatsService:
             return None
 
         query = """
-        SELECT user_id, login, display_name, first_seen_at, last_seen_at
+        SELECT user_id, login, display_name, first_seen_at, last_seen_at,
+               profile_image_url, profile_image_updated_at
         FROM chatter_identities
         WHERE user_id = ? OR login = ? COLLATE NOCASE OR display_name = ? COLLATE NOCASE
         LIMIT 1
@@ -97,6 +102,7 @@ class ChatterStatsService:
             return None
 
         user_id = str(identity["user_id"])
+        identity = await self._identity_with_profile_image(identity)
 
         async with self.db.acquire() as connection:
             totals = await connection.fetchone(
@@ -195,6 +201,7 @@ class ChatterStatsService:
 
         return {
             "identity": dict(identity),
+            "level": await ChatterLevelService(self.db).get_global_level(user_id),
             "achievements": await AchievementService(self.db).get_collection(user_id, self._channel_metadata),
             "messages_sent": int(totals["messages_sent"]),
             "lifetime_points_earned": int(totals["lifetime_points_earned"]),
@@ -211,6 +218,50 @@ class ChatterStatsService:
             "recent_raids": [self._raid_history(row) for row in recent_raids],
             "channels": channel_summaries
         }
+
+    async def _identity_with_profile_image(self, identity) -> dict[str, Any]:
+        result = dict(identity)
+        updated_at = self._parse_timestamp(result.get("profile_image_updated_at"))
+
+        if updated_at is not None and datetime.now(UTC) - updated_at < self.PROFILE_IMAGE_TTL:
+            return result
+
+        fetch_user = getattr(self.bot, "fetch_user", None)
+
+        if not callable(fetch_user):
+            return result
+
+        try:
+            user = await fetch_user(id=str(result["user_id"]))
+        except Exception:
+            LOGGER.warning("[Chatter Stats] Could not refresh the Twitch profile image for user %s.", result["user_id"], exc_info=True)
+            return result
+
+        if user is None:
+            return result
+
+        refreshed_at = datetime.now(UTC).isoformat()
+        profile_image = getattr(user, "profile_image", None)
+        profile_image_url = str(profile_image) if profile_image else None
+
+        async with self.db.acquire() as connection:
+            await connection.execute("UPDATE chatter_identities SET profile_image_url = ?, profile_image_updated_at = ? WHERE user_id = ?", (profile_image_url, refreshed_at, str(result["user_id"])))
+
+        result["profile_image_url"] = profile_image_url
+        result["profile_image_updated_at"] = refreshed_at
+        return result
+
+    @staticmethod
+    def _parse_timestamp(value) -> datetime | None:
+        if not value:
+            return None
+
+        try:
+            parsed = datetime.fromisoformat(str(value))
+        except ValueError:
+            return None
+
+        return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
     async def get_channel_profile(self, chatter_value: str, channel_value: str) -> dict[str, Any] | None:
         identity = await self.resolve_identity(chatter_value)
