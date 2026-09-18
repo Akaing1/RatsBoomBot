@@ -130,7 +130,7 @@ async def test_loyalty_customization_persists_and_preserves_income(tmp_path) -> 
         assert effective.points.points_per_message == base_profile.points.points_per_message
         assert effective.redeems == base_profile.redeems
         await service.clear_override("channel-1", "points.display_name", "test")
-        assert get_active_profile("channel-1").points.display_name == ""
+        assert get_active_profile("channel-1").points.display_name == "Points"
 
 
 def test_loyalty_only_allows_five_fields_and_defaults_follow_currency():
@@ -148,3 +148,36 @@ def test_loyalty_only_allows_five_fields_and_defaults_follow_currency():
     assert effective.points.messages.leaderboard_entry.format(position=1, username="rat", points=20, currency="Bread") == "1. rat: 20 Bread"
     with pytest.raises(ValueError):
         service.get_definition("points.messages.gamble_win")
+
+
+def test_all_channel_defaults_use_currency_and_follow_name_override():
+    from bot.channels import register_channel_profiles
+    from bot.profiles import CHANNEL_PROFILES
+    register_channel_profiles()
+    service = ProfileSettingsService(None)
+    for name, profile in CHANNEL_PROFILES.items():
+        assert profile.points.display_name
+        for field in ("balance_self", "balance_other", "add_success", "give_success"):
+            assert "{currency}" in getattr(profile.points.messages, field), (name, field)
+        service.overrides[name] = {"points.display_name": "Test Coins"}
+        effective = service.apply_overrides(name, profile)
+        assert "Test Coins" in effective.points.messages.balance_self.format(username="rat", points=10, currency=effective.points.display_name)
+    assert ProfileSettingsService.validate_value(service.get_definition("points.display_name"), "  ") == "Points"
+
+
+@pytest.mark.asyncio
+async def test_seeded_developer_currency_defaults_refresh_but_user_edits_remain(tmp_path):
+    async with asqlite.create_pool(str(tmp_path / "defaults.db")) as db:
+        service = ProfileSettingsService(db)
+        await service.setup()
+        async with db.acquire() as connection:
+            for field, value, author in [
+                ("balance_self", "Old ores response", "developer-profile-migration"),
+                ("balance_other", "My saved response", "streamer:123")
+            ]:
+                await connection.execute("INSERT INTO channel_profile_overrides (broadcaster_id, setting_name, setting_value, updated_by) VALUES (?, ?, ?, ?)", ("123", f"points.messages.{field}", service.serialize_value(value), author))
+        await service.load_overrides()
+        effective = service.apply_overrides("123", ChannelProfile(channel_name="test"))
+        assert effective.points.display_name == "Points"
+        assert effective.points.messages.balance_self == "{username}, you have {points} {currency}!"
+        assert effective.points.messages.balance_other == "My saved response"

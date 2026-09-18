@@ -108,6 +108,7 @@ TEMPLATE_REDEEMS = RedeemConfig(
 
 
 TEMPLATE_POINTS = PointsConfig(
+    display_name="Points",
     command_name="placeholder_points",
     points_per_message=25,
     message_cooldown_seconds=60,

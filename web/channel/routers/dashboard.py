@@ -292,6 +292,7 @@ async def channel_customization_page(request: Request):
             "active_page": "loyalty" if loyalty_page else "customization",
             "customization_action": "/channel/loyalty" if loyalty_page else "/channel/customization",
             "show_social_links": not loyalty_page,
+            "loyalty_alias": get_active_profile(broadcaster_id).points.command_alias,
             "broadcaster": broadcaster,
             "channel_settings": await services.broadcaster_settings.get_settings(broadcaster_id),
             "setting_groups": {name: entries for name, entries in groups.items() if (name == LOYALTY_GROUP) == loyalty_page},

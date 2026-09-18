@@ -100,6 +100,7 @@ BARBATOS2UPUSR3X_REDEEMS = RedeemConfig(
 
 
 BARBATOS2UPUSR3X_POINTS = PointsConfig(
+    display_name="Points",
     command_name="barbatos2upusr3x_placeholder_points",
     points_per_message=25,
     message_cooldown_seconds=60,

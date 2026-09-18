@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 from dataclasses import dataclass, fields, replace
 from string import Formatter
 
@@ -73,7 +72,7 @@ LOYALTY_PLACEHOLDERS = {
     for field in fields(PointsMessages)
 }
 PROFILE_SETTING_DEFINITIONS += (
-    ProfileSettingDefinition("points.display_name", LOYALTY_GROUP, "Loyalty Points Name", "Display name for your channel currency. Leave empty to use the existing name. Use {currency} in responses to insert this name.", maximum_length=60, rows=1),
+    ProfileSettingDefinition("points.display_name", LOYALTY_GROUP, "Loyalty Points Name", "Display name for your channel currency. Defaults to Points. Leave empty to use Points. Use {currency} in responses to insert this name. This name also becomes a chat command alias (for example, bombs gives !bombs).", maximum_length=60, rows=1),
 ) + tuple(
     ProfileSettingDefinition(f"points.messages.{field.name}", LOYALTY_GROUP, LOYALTY_RESPONSE_LABELS[field.name], "Available placeholders: " + ", ".join("{" + name + "}" for name in sorted(LOYALTY_PLACEHOLDERS[f"points.messages.{field.name}"])) + ". Leave empty to send nothing.")
     for field in fields(PointsMessages) if field.name in LOYALTY_RESPONSE_LABELS
@@ -118,7 +117,7 @@ class ProfileSettingsService:
 
     async def load_overrides(self) -> None:
         query = """
-        SELECT broadcaster_id, setting_name, setting_value
+        SELECT broadcaster_id, setting_name, setting_value, updated_by
         FROM channel_profile_overrides
         """
 
@@ -128,6 +127,9 @@ class ProfileSettingsService:
         loaded: dict[str, dict[str, str | int]] = {}
 
         for row in rows:
+            # Seeded developer defaults should follow the current code; preserve user edits.
+            if row["updated_by"] == "developer-profile-migration" and row["setting_name"] in {"points.display_name", *(f"points.messages.{name}" for name in LOYALTY_RESPONSE_LABELS)}:
+                continue
             definition = PROFILE_SETTINGS_BY_KEY.get(row["setting_name"])
 
             if definition is None:
@@ -217,16 +219,7 @@ class ProfileSettingsService:
         broadcaster_id = str(broadcaster_id)
         self.base_profiles[broadcaster_id] = profile
         default_messages = PointsMessages()
-        fixed_messages = {}
-        for field in fields(PointsMessages):
-            if field.name in LOYALTY_RESPONSE_LABELS:
-                continue
-            parts = []
-            for literal, name, _, _ in Formatter().parse(getattr(default_messages, field.name)):
-                parts.append(re.sub(r"\bpoints?\b", "{currency}", literal))
-                if name is not None:
-                    parts.append("{" + name + "}")
-            fixed_messages[field.name] = "".join(parts)
+        fixed_messages = {field.name: getattr(default_messages, field.name) for field in fields(PointsMessages) if field.name not in LOYALTY_RESPONSE_LABELS}
         messages = replace(profile.points.messages, **fixed_messages)
         effective_profile = replace(profile, points=replace(profile.points, messages=messages))
 
@@ -234,6 +227,8 @@ class ProfileSettingsService:
             if setting_name in PROFILE_SETTINGS_BY_KEY:
                 effective_profile = self.replace_profile_value(effective_profile, setting_name, value)
 
+        if not effective_profile.points.display_name.strip():
+            effective_profile = replace(effective_profile, points=replace(effective_profile.points, display_name="Points"))
         return effective_profile
 
     def get_setting_groups(self, broadcaster_id: str, available_integrations: set[str] | None = None) -> dict[str, list[ProfileSettingState]]:
@@ -343,6 +338,8 @@ class ProfileSettingsService:
             return value
 
         value = raw_value.strip()
+        if definition.key == "points.display_name" and not value:
+            value = "Points"
 
         if definition.value_type == "lines":
             messages = [line.strip() for line in value.splitlines() if line.strip()]
