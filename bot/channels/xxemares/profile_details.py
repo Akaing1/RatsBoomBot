@@ -89,6 +89,7 @@ XXEMARES_REDEEMS = RedeemConfig(
 
 
 XXEMARES_POINTS = PointsConfig(
+    display_name="Points",
     command_name="xxemares_placeholder_points",
     points_per_message=25,
     message_cooldown_seconds=60,

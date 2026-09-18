@@ -1,4 +1,5 @@
 import logging
+import re
 from dataclasses import dataclass
 from enum import Enum
 
@@ -270,55 +271,55 @@ class RedeemConfig:
 
 @dataclass(frozen=True)
 class PointsMessages:
-    balance_self: str = "{username}, you have {points} points!"
-    balance_other: str = "{username} has {points} points!"
-    leaderboard_empty: str = "No points have been collected yet."
-    leaderboard_entry: str = "{position}. {username}: {points} points"
-    leaderboard_title: str = "Top point holders: {leaderboard}"
-    reset_denied: str = "Only the broadcaster can reset the points."
-    reset_success: str = "This channel's points have been reset."
-    add_denied: str = "Only moderators can add points to viewers."
-    add_invalid: str = "The points amount must be greater than 0."
-    add_success: str = "Added {amount} points to {username}."
-    give_invalid: str = "You need to give at least 1 point."
-    give_self: str = "You cannot give points to yourself."
-    give_insufficient: str = "You only have {points} points."
-    give_success: str = "{sender} gave {amount} points to {username} and now has {points} points."
-    gamble_no_points: str = "You do not have any points to gamble."
+    balance_self: str = "{username}, you have {points} {currency}!"
+    balance_other: str = "{username} has {points} {currency}!"
+    leaderboard_empty: str = "No {currency} have been collected yet."
+    leaderboard_entry: str = "{position}. {username}: {points} {currency}"
+    leaderboard_title: str = "Top {currency} holders: {leaderboard}"
+    reset_denied: str = "Only the broadcaster can reset the {currency}."
+    reset_success: str = "This channel's {currency} have been reset."
+    add_denied: str = "Only moderators can add {currency} to viewers."
+    add_invalid: str = "The {currency} amount must be greater than 0."
+    add_success: str = "Added {amount} {currency} to {username}."
+    give_invalid: str = "You need to give at least 1 {currency}."
+    give_self: str = "You cannot give {currency} to yourself."
+    give_insufficient: str = "You only have {points} {currency}."
+    give_success: str = "{sender} gave {amount} {currency} to {username} and now has {points} {currency}."
+    gamble_no_points: str = "You do not have any {currency} to gamble."
     gamble_usage: str = "Use it like this: !{command} gamble 50 or !{command} gamble all"
-    gamble_invalid: str = "You need to gamble at least 1 point."
-    gamble_insufficient: str = "You only have {points} points."
-    gamble_win: str = "{username} won {amount} points and now has {new_balance} points!"
-    gamble_all_win: str = "{username} doubled their points and now has {new_balance} points!"
-    gamble_loss: str = "{username} lost {amount} points and now has {new_balance} points."
-    gamble_all_loss: str = "{username} lost all their points."
+    gamble_invalid: str = "You need to gamble at least 1 {currency}."
+    gamble_insufficient: str = "You only have {points} {currency}."
+    gamble_win: str = "{username} won {amount} {currency} and now has {new_balance} {currency}!"
+    gamble_all_win: str = "{username} doubled their {currency} and now has {new_balance} {currency}!"
+    gamble_loss: str = "{username} lost {amount} {currency} and now has {new_balance} {currency}."
+    gamble_all_loss: str = "{username} lost all their {currency}."
     roulette_usage: str = "Use it like this: !{command} roulette red 100"
     roulette_color_invalid: str = "Choose red, black, or green."
     roulette_bet_invalid: str = "Your roulette bet must be a positive whole number."
-    roulette_bet_maximum: str = "The maximum roulette bet is {maximum} points."
-    roulette_insufficient: str = "You only have {points} points."
-    roulette_win: str = "The wheel landed on {number} {result}! {username} won {profit} points and now has {new_balance}!"
-    roulette_loss: str = "The wheel landed on {number} {result}. {username} lost {bet} points and now has {new_balance}."
+    roulette_bet_maximum: str = "The maximum roulette bet is {maximum} {currency}."
+    roulette_insufficient: str = "You only have {points} {currency}."
+    roulette_win: str = "The wheel landed on {number} {result}! {username} won {profit} {currency} and now has {new_balance}!"
+    roulette_loss: str = "The wheel landed on {number} {result}. {username} lost {bet} {currency} and now has {new_balance}."
     duel_usage: str = "Use it like this: !{command} duel @user 100"
     duel_amount_invalid: str = "The duel amount must be a number or 'all'."
     duel_self: str = "You cannot duel yourself."
     duel_invalid: str = "The duel amount must be greater than 0."
-    duel_challenger_insufficient: str = "You only have {points} points."
-    duel_opponent_insufficient: str = "{username} only has {points} points."
+    duel_challenger_insufficient: str = "You only have {points} {currency}."
+    duel_opponent_insufficient: str = "{username} only has {points} {currency}."
     duel_challenge: str = (
-        "@{opponent}, @{challenger} challenged you for {amount} points! "
+        "@{opponent}, @{challenger} challenged you for {amount} {currency}! "
         "Type !{command} duel accept or !{command} duel decline. "
         "This duel expires in {expiration} seconds."
     )
     duel_missing: str = "You do not have a pending duel, or it expired."
-    duel_cancelled: str = "The duel was cancelled because someone no longer has enough points."
-    duel_result: str = "@{winner} beat @{loser} and won {amount} points."
+    duel_cancelled: str = "The duel was cancelled because someone no longer has enough {currency}."
+    duel_result: str = "@{winner} beat @{loser} and won {amount} {currency}."
     duel_declined: str = "{username} declined the duel."
 
 
 @dataclass(frozen=True)
 class PointsConfig:
-    display_name: str = ""
+    display_name: str = "Points"
     command_name: str = "points"
     points_per_message: int = 25
     message_cooldown_seconds: int = 60
@@ -329,6 +330,10 @@ class PointsConfig:
     cheer_minimum_bits: int = 100
     duel_expiration_seconds: int = 60
     messages: PointsMessages = PointsMessages()
+
+    @property
+    def command_alias(self) -> str:
+        return re.sub(r"[^\w]", "", self.display_name.casefold()) or "points"
 
 
 @dataclass(frozen=True)
