@@ -131,3 +131,20 @@ async def test_loyalty_customization_persists_and_preserves_income(tmp_path) -> 
         assert effective.redeems == base_profile.redeems
         await service.clear_override("channel-1", "points.display_name", "test")
         assert get_active_profile("channel-1").points.display_name == ""
+
+
+def test_loyalty_only_allows_five_fields_and_defaults_follow_currency():
+    from bot.profiles import PointsConfig, PointsMessages
+    from bot.services.channels.profile_settings import LOYALTY_GROUP
+
+    keys = {key for key, definition in PROFILE_SETTINGS_BY_KEY.items() if definition.group == LOYALTY_GROUP}
+    assert keys == {"points.display_name", "points.messages.balance_self", "points.messages.balance_other", "points.messages.add_success", "points.messages.give_success"}
+    profile = ChannelProfile(channel_name="example", points=PointsConfig(messages=PointsMessages(gamble_win="Old themed response")))
+    service = ProfileSettingsService(None)
+    service.overrides["channel"] = {"points.display_name": "Bread", "points.messages.gamble_win": "Old saved override", "points.messages.balance_self": "You have {points} {currency}"}
+    effective = service.apply_overrides("channel", profile)
+    assert effective.points.messages.gamble_win.format(username="rat", amount=10, new_balance=20, currency=effective.points.display_name) == "rat won 10 Bread and now has 20 Bread!"
+    assert effective.points.messages.balance_self == "You have {points} {currency}"
+    assert effective.points.messages.leaderboard_entry.format(position=1, username="rat", points=20, currency="Bread") == "1. rat: 20 Bread"
+    with pytest.raises(ValueError):
+        service.get_definition("points.messages.gamble_win")

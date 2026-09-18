@@ -88,7 +88,8 @@ def test_loyalty_template_only_shows_names_and_responses() -> None:
             deployment_stamp=lambda: "test"
         )
         assert 'name="setting_name" value="points.display_name"' in html
-        assert 'name="setting_name" value="points.messages.gamble_win"' in html
+        assert 'name="setting_name" value="points.messages.gamble_win"' not in html
+        assert html.index('href="/channel/loyalty"') < html.index('href="/channel/help"')
         assert 'action="/channel/loyalty"' in html
         assert "Income amounts are fixed" in html
         assert 'type="number"' not in html
