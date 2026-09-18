@@ -12,7 +12,10 @@ STEOHANYY_PROFILE = ChannelProfile(
         ad_announcements=False,
         points=True,
         redeems=False,
-        community_events=True,
+        follow_responses=True,
+        subscription_responses=True,
+        resubscription_responses=True,
+        gifted_subscription_responses=True,
         raid_responses=True
     ),
     globals=GlobalCommandDefaults(

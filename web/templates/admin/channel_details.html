@@ -368,8 +368,18 @@
                     {% set description = "Controls points earning, balances, custom points commands, gambling, and duels." %}
                 {% elif feature.value == "redeems" %}
                     {% set description = "Controls profile-configured Twitch channel point redeem handling." %}
-                {% elif feature.value == "community_events" %}
-                    {% set description = "Controls follow, subscription, and resubscription response messages." %}
+                {% elif feature.value == "follow_responses" %}
+                    {% set display_name = "Follow Responses" %}
+                    {% set description = "Controls the message sent when someone follows." %}
+                {% elif feature.value == "subscription_responses" %}
+                    {% set display_name = "Subscription Responses" %}
+                    {% set description = "Controls the message sent for a new subscription." %}
+                {% elif feature.value == "resubscription_responses" %}
+                    {% set display_name = "Resubscription Responses" %}
+                    {% set description = "Controls the message sent for a returning subscription." %}
+                {% elif feature.value == "gifted_subscription_responses" %}
+                    {% set display_name = "Gifted Subscription Responses" %}
+                    {% set description = "Controls the condensed message sent once per gifted-sub batch." %}
                 {% elif feature.value == "raid_responses" %}
                     {% set description = "Controls incoming raid responses, automatic raider shoutouts, and the broadcaster-only !startraid command." %}
                 {% elif feature.value == "raid_bosses" %}

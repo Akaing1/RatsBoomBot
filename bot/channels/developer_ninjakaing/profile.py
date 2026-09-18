@@ -26,7 +26,10 @@ DEVELOPER_NINJAKAING_PROFILE = ChannelProfile(
         ad_announcements=False,
         points=True,
         redeems=True,
-        community_events=True,
+        follow_responses=True,
+        subscription_responses=True,
+        resubscription_responses=True,
+        gifted_subscription_responses=True,
         raid_responses=True,
         raid_bosses=True
     ),

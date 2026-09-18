@@ -12,7 +12,10 @@ XXEMARES_PROFILE = ChannelProfile(
         ad_announcements=False,
         points=False,
         redeems=False,
-        community_events=False,
+        follow_responses=False,
+        subscription_responses=False,
+        resubscription_responses=False,
+        gifted_subscription_responses=False,
         raid_responses=False
     ),
     globals=GlobalCommandDefaults(

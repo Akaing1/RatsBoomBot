@@ -111,6 +111,10 @@ async def test_gift_batch_sends_one_condensed_response(monkeypatch) -> None:
         "GIFTED SUBS",
         "gifter gifted 5 subscriptions."
     )
+    bot.services.features.is_enabled.assert_called_once_with(
+        "channel-1",
+        community.FeatureName.GIFTED_SUBSCRIPTION_RESPONSES
+    )
 
 
 @pytest.mark.asyncio
@@ -133,6 +137,42 @@ async def test_anonymous_gift_batch_uses_anonymous_name(monkeypatch) -> None:
     bot.services.chat_identity.send_message.assert_awaited_once_with(
         broadcaster,
         "Thanks Anonymous for gifting 1 sub!"
+    )
+
+
+@pytest.mark.asyncio
+async def test_disabled_gift_responses_do_not_disable_regular_subscriptions(monkeypatch) -> None:
+    bot = create_bot()
+    broadcaster = SimpleNamespace(id="channel-1", name="channel")
+    bot.create_partialuser = MagicMock(return_value=broadcaster)
+    bot.services.chat_identity = SimpleNamespace(send_message=AsyncMock())
+    bot.services.features.is_enabled.side_effect = lambda broadcaster_id, feature: (
+        feature is not community.FeatureName.GIFTED_SUBSCRIPTION_RESPONSES
+    )
+    profile = SimpleNamespace(
+        points=SimpleNamespace(subscription_reward=500),
+        community_messages=SimpleNamespace(
+            subscription="Thanks for subscribing, {username}!",
+            gifted_subscription="Thanks {username} for gifting {count} {subscription_word}!"
+        )
+    )
+    monkeypatch.setattr(community, "get_active_profile", lambda broadcaster_id: profile)
+    component = community.CommunityEvents(bot)
+
+    await component.event_subscription_gift(SimpleNamespace(
+        broadcaster=broadcaster,
+        user=SimpleNamespace(name="gifter"),
+        total=5
+    ))
+    await component.event_subscription(SimpleNamespace(
+        broadcaster=broadcaster,
+        user=SimpleNamespace(id="viewer-1", name="viewer"),
+        gift=False
+    ))
+
+    bot.services.chat_identity.send_message.assert_awaited_once_with(
+        broadcaster,
+        "Thanks for subscribing, viewer!"
     )
 
 
