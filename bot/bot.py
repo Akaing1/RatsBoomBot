@@ -6,6 +6,7 @@ from twitchio.ext import commands
 
 from bot.component_loader import load_components
 from bot.context import ChannelContext
+from bot.command_timing import start_command_timing
 from bot.profiles import CHANNEL_PROFILES, activate_profile, create_generic_profile, get_active_profile
 from bot.services.container import ServiceContainer
 from bot.services.channels.command_slowmode import SlowmodeBlocked
@@ -23,7 +24,9 @@ class TwitchBot(commands.AutoBot):
         return True
 
     def get_context(self, payload, *, cls=None):
-        return super().get_context(payload, cls=cls or ChannelContext)
+        context = super().get_context(payload, cls=cls or ChannelContext)
+        start_command_timing(context, getattr(payload, "text", ""), settings.PREFIX)
+        return context
 
     def __init__(self, *, token_database, subs, broadcaster_ids, league_database=None):
         self.token_database = token_database
