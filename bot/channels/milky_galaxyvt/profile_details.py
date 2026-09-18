@@ -57,7 +57,8 @@ MILKY_GALAXYVT_SOCIAL_MESSAGES = SocialMessages(
 MILKY_GALAXYVT_COMMUNITY_MESSAGES = CommunityMessages(
     follow="Thanks for following, {username}!",
     subscription="Thanks for subscribing, {username}!",
-    resubscription="Thanks for subscribing for {months} months, {username}!"
+    resubscription="Thanks for subscribing for {months} months, {username}!",
+    gifted_subscription="{username} sent {count} gifted {subscription_word} across the galaxy! Thank you for the stellar support!"
 )
 
 

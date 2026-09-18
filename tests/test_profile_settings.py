@@ -93,6 +93,28 @@ def test_streamer_editable_settings_protect_points_and_custom_redeems() -> None:
     } <= PROFILE_SETTINGS_BY_KEY.keys()
 
 
+def test_community_messages_are_independently_editable() -> None:
+    assert {
+        "community_messages.follow",
+        "community_messages.subscription",
+        "community_messages.resubscription",
+        "community_messages.gifted_subscription"
+    } <= PROFILE_SETTINGS_BY_KEY.keys()
+
+
+def test_all_channel_profiles_have_a_gifted_subscription_message() -> None:
+    from bot.channels import register_channel_profiles
+    from bot.profiles import CHANNEL_PROFILES
+
+    register_channel_profiles()
+
+    for name, profile in CHANNEL_PROFILES.items():
+        message = profile.community_messages.gifted_subscription
+        assert message, name
+        assert "{username}" in message, name
+        assert "{count}" in message, name
+
+
 def test_timer_validation_normalizes_messages_and_enforces_twitch_limit() -> None:
     definition = ProfileSettingsService.get_definition("timer_messages")
 

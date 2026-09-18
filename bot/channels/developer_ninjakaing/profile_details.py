@@ -105,6 +105,9 @@ DEVELOPER_NINJAKAING_COMMUNITY_MESSAGES = CommunityMessages(
     ),
     resubscription=(
         "{username} has been here for {months} months!"
+    ),
+    gifted_subscription=(
+        "{username} deployed {count} gifted {subscription_word} to the developer cave!"
     )
 )
 

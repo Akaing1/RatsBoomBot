@@ -88,7 +88,8 @@ MEINYA_SOCIAL_MESSAGES = SocialMessages(
 MEINYA_COMMUNITY_MESSAGES = CommunityMessages(
     follow="A new wandering spirit has joined the Garden! 🌸 Thank you for the follow {username}, Nya! ✨~",
     subscription="🌸 A sacred bond has been forged! Thank you {username} for subscribing and supporting the Garden.~ You are now an elite guardian of the Blood Sakura Garden! Enjoy the perks and cute emotes :3. Mya~ ✨",
-    resubscription="🌸 Another month in the Sakura Garden! Thank you for staying by my side for {months} months {username}, mya~"
+    resubscription="🌸 Another month in the Sakura Garden! Thank you for staying by my side for {months} months {username}, mya~",
+    gifted_subscription="🌸 Thank you {username} for gifting {count} {subscription_word} to the Sakura Garden, mya~ ✨"
 )
 
 

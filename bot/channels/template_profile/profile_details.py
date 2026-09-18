@@ -70,7 +70,8 @@ TEMPLATE_TIMER_MESSAGES = (
 TEMPLATE_COMMUNITY_MESSAGES = CommunityMessages(
     follow="Thanks for following, {username}!",
     subscription="Thanks for subscribing, {username}!",
-    resubscription="Thanks for subscribing for {months} months, {username}!"
+    resubscription="Thanks for subscribing for {months} months, {username}!",
+    gifted_subscription="Thank you {username} for gifting {count} {subscription_word} to the community!"
 )
 
 
