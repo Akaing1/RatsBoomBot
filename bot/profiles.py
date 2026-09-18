@@ -18,7 +18,10 @@ class FeatureName(Enum):
     AD_ANNOUNCEMENTS = "ad_announcements"
     POINTS = "points"
     REDEEMS = "redeems"
-    COMMUNITY_EVENTS = "community_events"
+    FOLLOW_RESPONSES = "follow_responses"
+    SUBSCRIPTION_RESPONSES = "subscription_responses"
+    RESUBSCRIPTION_RESPONSES = "resubscription_responses"
+    GIFTED_SUBSCRIPTION_RESPONSES = "gifted_subscription_responses"
     RAID_RESPONSES = "raid_responses"
     RAID_BOSSES = "raid_bosses"
 
@@ -61,7 +64,10 @@ class FeatureDefaults:
     ad_announcements: bool = False
     points: bool = True
     redeems: bool = True
-    community_events: bool = True
+    follow_responses: bool = True
+    subscription_responses: bool = True
+    resubscription_responses: bool = True
+    gifted_subscription_responses: bool = True
     raid_responses: bool = True
     raid_bosses: bool = False
 
@@ -591,7 +597,10 @@ def create_generic_profile(channel_name: str) -> ChannelProfile:
             ad_announcements=False,
             points=True,
             redeems=False,
-            community_events=False,
+            follow_responses=False,
+            subscription_responses=False,
+            resubscription_responses=False,
+            gifted_subscription_responses=False,
             raid_responses=False,
             raid_bosses=False
         ),

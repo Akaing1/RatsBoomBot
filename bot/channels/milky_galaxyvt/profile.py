@@ -24,7 +24,10 @@ MILKY_GALAXYVT_PROFILE = ChannelProfile(
         ad_announcements=True,
         points=True,
         redeems=True,
-        community_events=False,
+        follow_responses=False,
+        subscription_responses=False,
+        resubscription_responses=False,
+        gifted_subscription_responses=False,
         raid_responses=True,
         raid_bosses=True
     ),
