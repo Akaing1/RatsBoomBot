@@ -118,6 +118,7 @@ class CommunityMessages:
     follow: str | None = None
     subscription: str | None = None
     resubscription: str | None = None
+    gifted_subscription: str | None = None
 
 
 @dataclass(frozen=True)

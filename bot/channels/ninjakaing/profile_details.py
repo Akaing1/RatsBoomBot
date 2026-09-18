@@ -81,6 +81,10 @@ NINJAKAING_COMMUNITY_MESSAGES = CommunityMessages(
     resubscription=(
         "{username} resubscribed for {months} months! "
         "Thank you for your continued support!"
+    ),
+    gifted_subscription=(
+        "{username} gifted {count} {subscription_word} to the basement! "
+        "Rats stronk together!"
     )
 )
 

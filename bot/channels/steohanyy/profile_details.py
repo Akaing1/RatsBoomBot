@@ -39,6 +39,9 @@ STEOHANYY_COMMUNITY_MESSAGES = CommunityMessages(
     resubscription=(
         "@{username} has kept their tab open for {months} months! "
         "Thanks for another round—cheers!"
+    ),
+    gifted_subscription=(
+        "{username} bought the bar {count} gifted {subscription_word}! Cheers!"
     )
 )
 

@@ -55,6 +55,7 @@ def create_broadcaster_subscriptions(broadcaster_user_id: str) -> list[Any]:
         eventsub.ChannelFollowSubscription(broadcaster_user_id=broadcaster_user_id, moderator_user_id=broadcaster_user_id),
         eventsub.ChannelSubscribeSubscription(broadcaster_user_id=broadcaster_user_id),
         eventsub.ChannelSubscribeMessageSubscription(broadcaster_user_id=broadcaster_user_id),
+        eventsub.ChannelSubscriptionGiftSubscription(broadcaster_user_id=broadcaster_user_id),
         eventsub.ChannelBanSubscription(broadcaster_user_id=broadcaster_user_id, moderator_user_id=broadcaster_user_id),
         eventsub.AdBreakBeginSubscription(broadcaster_user_id=broadcaster_user_id),
         eventsub.StreamOnlineSubscription(broadcaster_user_id=broadcaster_user_id),
