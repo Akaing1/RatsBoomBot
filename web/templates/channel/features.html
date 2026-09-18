@@ -259,17 +259,32 @@
 
         <div class="toggle-grid">
             {% for feature, state in channel_features.items() %}
+                {% set description = none %}
                 {% if feature.value == "channel" %}
                     {% set display_name = "Channel Profile" %}
+                {% elif feature.value == "follow_responses" %}
+                    {% set display_name = "Follow Responses" %}
+                    {% set description = "Controls the message sent when someone follows." %}
+                {% elif feature.value == "subscription_responses" %}
+                    {% set display_name = "Subscription Responses" %}
+                    {% set description = "Controls the message sent for a new subscription." %}
+                {% elif feature.value == "resubscription_responses" %}
+                    {% set display_name = "Resubscription Responses" %}
+                    {% set description = "Controls the message sent for a returning subscription." %}
+                {% elif feature.value == "gifted_subscription_responses" %}
+                    {% set display_name = "Gifted Subscription Responses" %}
+                    {% set description = "Controls the condensed message sent once per gifted-sub batch." %}
                 {% else %}
                     {% set display_name = feature.value | replace("_", " ") | title %}
+                    {% set description = none %}
                 {% endif %}
 
                 {{ toggle_card(
                     "feature",
                     feature.value,
                     display_name,
-                    state
+                    state,
+                    description
                 ) }}
             {% endfor %}
         </div>

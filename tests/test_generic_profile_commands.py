@@ -43,6 +43,10 @@ async def test_channel_without_code_profile_loads_and_runs_shared_commands(monke
     assert all(features.is_global_group_enabled("123", group) for group in GlobalCommandGroup)
     assert not features.is_enabled("123", FeatureName.RAID_BOSSES)
     assert not features.is_enabled("123", FeatureName.REDEEMS)
+    assert not features.is_enabled("123", FeatureName.FOLLOW_RESPONSES)
+    assert not features.is_enabled("123", FeatureName.SUBSCRIPTION_RESPONSES)
+    assert not features.is_enabled("123", FeatureName.RESUBSCRIPTION_RESPONSES)
+    assert not features.is_enabled("123", FeatureName.GIFTED_SUBSCRIPTION_RESPONSES)
     assert not features.is_profile_feature_enabled("123", ProfileFeatureName.LEAGUE)
     assert not features.is_profile_feature_enabled("123", ProfileFeatureName.OVERWATCH)
 
@@ -63,3 +67,23 @@ async def test_generic_profile_preserves_saved_opt_outs_after_reload(tmp_path):
         assert reloaded.is_global_command_enabled("123", GlobalCommandName.LURK)
         await reloaded.set_enabled("123", FeatureName.CHANNEL, False, "streamer:123")
         assert not reloaded.is_global_command_enabled("123", GlobalCommandName.LURK)
+
+
+@pytest.mark.asyncio
+async def test_community_event_override_splits_into_four_response_toggles(tmp_path):
+    activate_profile("123", create_generic_profile("new_streamer"))
+
+    async with asqlite.create_pool(str(tmp_path / "features.db")) as db:
+        features = FeatureToggleService(db)
+        await features.setup()
+        await features.set_override("123", "feature:community_events", True, "streamer:123")
+        await features.set_enabled("123", FeatureName.FOLLOW_RESPONSES, False, "streamer:123")
+
+        reloaded = FeatureToggleService(db)
+        await reloaded.setup()
+
+        assert not reloaded.is_enabled("123", FeatureName.FOLLOW_RESPONSES)
+        assert reloaded.is_enabled("123", FeatureName.SUBSCRIPTION_RESPONSES)
+        assert reloaded.is_enabled("123", FeatureName.RESUBSCRIPTION_RESPONSES)
+        assert reloaded.is_enabled("123", FeatureName.GIFTED_SUBSCRIPTION_RESPONSES)
+        assert "feature:community_events" not in reloaded.overrides["123"]
