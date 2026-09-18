@@ -51,7 +51,8 @@ ONEDAYBREAD_TIMER_MESSAGES = (
 ONEDAYBREAD_COMMUNITY_MESSAGES = CommunityMessages(
     follow="Welcome to our newest bunbun {username}!",
     subscription="Enjoy your wonderful sub, wonderful {username}!",
-    resubscription="Thankies for resub and hope both sides of your pillow stay cold user {username}!"
+    resubscription="Thankies for resub and hope both sides of your pillow stay cold user {username}!",
+    gifted_subscription="Thankies {username} for delivering {count} gifted {subscription_word} to the bunbuns!"
 )
 
 

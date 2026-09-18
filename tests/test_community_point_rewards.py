@@ -81,6 +81,62 @@ async def test_regular_subscription_keeps_chat_response(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_gift_batch_sends_one_condensed_response(monkeypatch) -> None:
+    bot = create_bot()
+    broadcaster = SimpleNamespace(id="channel-1", name="channel")
+    bot.create_partialuser = MagicMock(return_value=broadcaster)
+    bot.services.chat_identity = SimpleNamespace(send_message=AsyncMock())
+    profile = SimpleNamespace(
+        community_messages=SimpleNamespace(
+            gifted_subscription="Thanks {username} for gifting {count} {subscription_word}!"
+        )
+    )
+    payload = SimpleNamespace(
+        broadcaster=broadcaster,
+        user=SimpleNamespace(id="gifter-1", name="gifter"),
+        total=5
+    )
+    monkeypatch.setattr(community, "get_active_profile", lambda broadcaster_id: profile)
+
+    component = community.CommunityEvents(bot)
+    await component.event_subscription_gift(payload)
+
+    bot.services.chat_identity.send_message.assert_awaited_once_with(
+        broadcaster,
+        "Thanks gifter for gifting 5 subs!"
+    )
+    bot.services.points.add_points.assert_not_awaited()
+    bot.services.stream_logs.write.assert_called_once_with(
+        "channel-1",
+        "GIFTED SUBS",
+        "gifter gifted 5 subscriptions."
+    )
+
+
+@pytest.mark.asyncio
+async def test_anonymous_gift_batch_uses_anonymous_name(monkeypatch) -> None:
+    bot = create_bot()
+    broadcaster = SimpleNamespace(id="channel-1", name="channel")
+    bot.create_partialuser = MagicMock(return_value=broadcaster)
+    bot.services.chat_identity = SimpleNamespace(send_message=AsyncMock())
+    profile = SimpleNamespace(
+        community_messages=SimpleNamespace(
+            gifted_subscription="Thanks {username} for gifting {count} {subscription_word}!"
+        )
+    )
+    payload = SimpleNamespace(broadcaster=broadcaster, user=None, total=1)
+    monkeypatch.setattr(community, "get_active_profile", lambda broadcaster_id: profile)
+
+    component = community.CommunityEvents(bot)
+    await component.event_subscription_gift(payload)
+
+    bot.services.chat_identity.send_message.assert_awaited_once_with(
+        broadcaster,
+        "Thanks Anonymous for gifting 1 sub!"
+    )
+
+
+@pytest.mark.asyncio
 async def test_cheer_reward_requires_minimum_bits(monkeypatch) -> None:
     bot = create_bot()
     profile = SimpleNamespace(points=SimpleNamespace(cheer_reward=200, cheer_minimum_bits=100))

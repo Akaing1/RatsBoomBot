@@ -291,6 +291,54 @@ class CommunityEvents(commands.Component):
         await self.send_profile_message(broadcaster_id, profile.community_messages.subscription, username=username)
 
     @commands.Component.listener()
+    async def event_subscription_gift(self, payload) -> None:
+        broadcaster_id = str(payload.broadcaster.id)
+        broadcaster_name = payload.broadcaster.name
+        username = payload.user.name if payload.user is not None else "Anonymous"
+        count = int(payload.total)
+        services = self.bot.services
+
+        LOGGER.info(
+            "[Events] %s gifted %d subscriptions to %s (%s).",
+            username,
+            count,
+            broadcaster_name,
+            broadcaster_id
+        )
+
+        if services is None:
+            LOGGER.warning(
+                "[Events] Gifted subscription event received before services were initialized."
+            )
+        else:
+            services.stream_logs.write(
+                broadcaster_id,
+                "GIFTED SUBS",
+                f"{username} gifted {count} subscriptions."
+            )
+
+        if not self.community_events_enabled(broadcaster_id):
+            return
+
+        profile = get_active_profile(broadcaster_id)
+
+        if profile is None:
+            LOGGER.debug(
+                "[Events] No active profile found for gifted subscriptions in %s (%s).",
+                broadcaster_name,
+                broadcaster_id
+            )
+            return
+
+        await self.send_profile_message(
+            broadcaster_id,
+            profile.community_messages.gifted_subscription,
+            username=username,
+            count=count,
+            subscription_word="sub" if count == 1 else "subs"
+        )
+
+    @commands.Component.listener()
     async def event_subscription_message(self, payload) -> None:
         broadcaster_id = str(payload.broadcaster.id)
         broadcaster_name = payload.broadcaster.name
