@@ -182,7 +182,7 @@ class CommunityEvents(commands.Component):
             )
             raise
 
-    def community_events_enabled(self, broadcaster_id: str) -> bool:
+    def community_response_enabled(self, broadcaster_id: str, feature: FeatureName) -> bool:
         services = self.bot.services
 
         if services is None:
@@ -191,9 +191,10 @@ class CommunityEvents(commands.Component):
             )
             return False
 
-        if not services.features.is_enabled(broadcaster_id, FeatureName.COMMUNITY_EVENTS):
+        if not services.features.is_enabled(broadcaster_id, feature):
             LOGGER.debug(
-                "[Events] Community responses are disabled for broadcaster %s.",
+                "[Events] %s are disabled for broadcaster %s.",
+                feature.value,
                 broadcaster_id
             )
             return False
@@ -221,7 +222,7 @@ class CommunityEvents(commands.Component):
         else:
             services.stream_logs.write(broadcaster_id, "FOLLOW", f"{username} followed the channel.")
 
-        if not self.community_events_enabled(broadcaster_id):
+        if not self.community_response_enabled(broadcaster_id, FeatureName.FOLLOW_RESPONSES):
             return
 
         profile = get_active_profile(broadcaster_id)
@@ -275,7 +276,7 @@ class CommunityEvents(commands.Component):
             )
             return
 
-        if not self.community_events_enabled(broadcaster_id):
+        if not self.community_response_enabled(broadcaster_id, FeatureName.SUBSCRIPTION_RESPONSES):
             return
 
         profile = get_active_profile(broadcaster_id)
@@ -317,7 +318,7 @@ class CommunityEvents(commands.Component):
                 f"{username} gifted {count} subscriptions."
             )
 
-        if not self.community_events_enabled(broadcaster_id):
+        if not self.community_response_enabled(broadcaster_id, FeatureName.GIFTED_SUBSCRIPTION_RESPONSES):
             return
 
         profile = get_active_profile(broadcaster_id)
@@ -361,7 +362,7 @@ class CommunityEvents(commands.Component):
         else:
             services.stream_logs.write(broadcaster_id, "RESUB", f"{username} resubscribed for {months} months.")
 
-        if not self.community_events_enabled(broadcaster_id):
+        if not self.community_response_enabled(broadcaster_id, FeatureName.RESUBSCRIPTION_RESPONSES):
             return
 
         profile = get_active_profile(broadcaster_id)

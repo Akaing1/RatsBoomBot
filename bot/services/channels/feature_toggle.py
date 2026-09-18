@@ -101,6 +101,7 @@ class FeatureToggleService:
             raise
 
         await self.migrate_legacy_overrides()
+        await self.migrate_community_event_overrides()
         await self.load_overrides()
         await self.load_capability_overrides()
 
@@ -137,7 +138,10 @@ class FeatureToggleService:
             FeatureName.TIMERS.value,
             FeatureName.POINTS.value,
             FeatureName.REDEEMS.value,
-            FeatureName.COMMUNITY_EVENTS.value,
+            FeatureName.FOLLOW_RESPONSES.value,
+            FeatureName.SUBSCRIPTION_RESPONSES.value,
+            FeatureName.RESUBSCRIPTION_RESPONSES.value,
+            FeatureName.GIFTED_SUBSCRIPTION_RESPONSES.value,
             FeatureName.RAID_RESPONSES.value,
             FeatureName.RAID_BOSSES.value
         }
@@ -219,6 +223,56 @@ class FeatureToggleService:
                     )
         except Exception:
             LOGGER.exception("[Features] Failed to migrate legacy channel toggles.")
+            raise
+
+    async def migrate_community_event_overrides(self) -> None:
+        query = """
+        SELECT broadcaster_id, feature_name, enabled, updated_by
+        FROM channel_feature_overrides
+        WHERE feature_name IN ('community_events', 'feature:community_events')
+        """
+        features = (
+            FeatureName.FOLLOW_RESPONSES,
+            FeatureName.SUBSCRIPTION_RESPONSES,
+            FeatureName.RESUBSCRIPTION_RESPONSES,
+            FeatureName.GIFTED_SUBSCRIPTION_RESPONSES
+        )
+
+        try:
+            async with self.db.acquire() as connection:
+                rows = await connection.fetchall(query)
+
+                for row in rows:
+                    broadcaster_id = str(row["broadcaster_id"])
+                    updated_by = row["updated_by"] or "community-events-migration"
+
+                    for feature in features:
+                        await connection.execute(
+                            """
+                            INSERT INTO channel_feature_overrides (
+                                broadcaster_id,
+                                feature_name,
+                                enabled,
+                                updated_by,
+                                updated_at
+                            )
+                            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                            ON CONFLICT(broadcaster_id, feature_name) DO NOTHING
+                            """,
+                            (broadcaster_id, self.feature_key(feature), row["enabled"], updated_by)
+                        )
+
+                    await connection.execute(
+                        "DELETE FROM channel_feature_overrides WHERE broadcaster_id = ? AND feature_name = ?",
+                        (broadcaster_id, row["feature_name"])
+                    )
+
+                    LOGGER.info(
+                        "[Features] Split community event toggle into individual responses for broadcaster %s.",
+                        broadcaster_id
+                    )
+        except Exception:
+            LOGGER.exception("[Features] Failed to migrate community event toggles.")
             raise
 
     async def load_overrides(self) -> None:

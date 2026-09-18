@@ -12,7 +12,10 @@ ONEDAYBREAD_PROFILE = ChannelProfile(
         ad_announcements=False,
         points=True,
         redeems=True,
-        community_events=False,
+        follow_responses=False,
+        subscription_responses=False,
+        resubscription_responses=False,
+        gifted_subscription_responses=False,
         raid_responses=False
     ),
     globals=GlobalCommandDefaults(
