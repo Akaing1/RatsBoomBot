@@ -8,5 +8,6 @@
         <p class="page-description">Customize your loyalty point name and the four responses below. All other points responses use default wording with your loyalty point name. Income amounts are fixed. Saved changes apply immediately; Use Default restores your channel's original wording.</p>
     </div>
 </header>
+<p class="page-description">Currency command: <strong>!{{ loyalty_alias | default('points') }}</strong>. You can also use !points. Spaces and punctuation are removed from currency command names; existing commands keep their meaning.</p>
 {% include "shared/profile_inputs.html" %}
 {% endblock %}

@@ -72,7 +72,7 @@ LOYALTY_PLACEHOLDERS = {
     for field in fields(PointsMessages)
 }
 PROFILE_SETTING_DEFINITIONS += (
-    ProfileSettingDefinition("points.display_name", LOYALTY_GROUP, "Loyalty Points Name", "Display name for your channel currency. Defaults to Points. Leave empty to use Points. Use {currency} in responses to insert this name.", maximum_length=60, rows=1),
+    ProfileSettingDefinition("points.display_name", LOYALTY_GROUP, "Loyalty Points Name", "Display name for your channel currency. Defaults to Points. Leave empty to use Points. Use {currency} in responses to insert this name. This name also becomes a chat command alias (for example, bombs gives !bombs).", maximum_length=60, rows=1),
 ) + tuple(
     ProfileSettingDefinition(f"points.messages.{field.name}", LOYALTY_GROUP, LOYALTY_RESPONSE_LABELS[field.name], "Available placeholders: " + ", ".join("{" + name + "}" for name in sorted(LOYALTY_PLACEHOLDERS[f"points.messages.{field.name}"])) + ". Leave empty to send nothing.")
     for field in fields(PointsMessages) if field.name in LOYALTY_RESPONSE_LABELS

@@ -1,4 +1,5 @@
 import logging
+import re
 from dataclasses import dataclass
 from enum import Enum
 
@@ -329,6 +330,10 @@ class PointsConfig:
     cheer_minimum_bits: int = 100
     duel_expiration_seconds: int = 60
     messages: PointsMessages = PointsMessages()
+
+    @property
+    def command_alias(self) -> str:
+        return re.sub(r"[^\w]", "", self.display_name.casefold()) or "points"
 
 
 @dataclass(frozen=True)
