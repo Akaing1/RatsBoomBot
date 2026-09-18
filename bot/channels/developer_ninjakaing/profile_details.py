@@ -165,6 +165,7 @@ DEVELOPER_NINJAKAING_REDEEMS = RedeemConfig(
 
 
 DEVELOPER_NINJAKAING_POINTS = PointsConfig(
+    display_name="ores",
     command_name="ores",
     points_per_message=25,
     message_cooldown_seconds=10,
@@ -172,16 +173,16 @@ DEVELOPER_NINJAKAING_POINTS = PointsConfig(
     duel_expiration_seconds=30,
     messages=PointsMessages(
         balance_self=(
-            "{username}, you have mined {points} ores!"
+            "{username}, you have mined {points} {currency}!"
         ),
         balance_other=(
-            "{username} has mined {points} ores!"
+            "{username} has mined {points} {currency}!"
         ),
         leaderboard_empty=(
-            "No ores have been mined yet."
+            "No {currency} have been mined yet."
         ),
         leaderboard_entry=(
-            "{position}. {username}: {points} ores"
+            "{position}. {username}: {points} {currency}"
         ),
         leaderboard_title=(
             "Top miners: {leaderboard}"
@@ -191,44 +192,44 @@ DEVELOPER_NINJAKAING_POINTS = PointsConfig(
         ),
         reset_success=(
             "The mine has collapsed. "
-            "All ore balances have been reset."
+            "All {currency} balances have been reset."
         ),
         add_denied=(
-            "Only moderators can give ores to viewers."
+            "Only moderators can give {currency} to viewers."
         ),
         add_invalid=(
-            "The ore amount must be greater than 0."
+            "The {currency} amount must be greater than 0."
         ),
         add_success=(
-            "Added {amount} ores to {username}'s inventory."
+            "Added {amount} {currency} to {username}'s inventory."
         ),
         gamble_no_points=(
-            "You don't have any ores to gamble."
+            "You don't have any {currency} to gamble."
         ),
         gamble_usage=(
             "Use it like this: !{command} gamble 50 "
             "or !{command} gamble all"
         ),
         gamble_invalid=(
-            "You need to gamble at least 1 ore."
+            "You need to gamble at least 1 {currency}."
         ),
         gamble_insufficient=(
-            "You only have {points} ores."
+            "You only have {points} {currency}."
         ),
         gamble_win=(
-            "{username} struck a rich vein and found {amount} ores! "
-            "They now have {new_balance} ores."
+            "{username} struck a rich vein and found {amount} {currency}! "
+            "They now have {new_balance} {currency}."
         ),
         gamble_all_win=(
-            "{username} discovered a massive ore deposit and doubled "
-            "their inventory to {new_balance} ores!"
+            "{username} discovered a massive {currency} deposit and doubled "
+            "their inventory to {new_balance} {currency}!"
         ),
         gamble_loss=(
-            "{username}'s tunnel collapsed and they lost {amount} ores. "
-            "They now have {new_balance} ores."
+            "{username}'s tunnel collapsed and they lost {amount} {currency}. "
+            "They now have {new_balance} {currency}."
         ),
         gamble_all_loss=(
-            "{username} dropped their entire ore inventory "
+            "{username} dropped their entire {currency} inventory "
             "into a lava pit."
         ),
         duel_usage=(
@@ -244,14 +245,14 @@ DEVELOPER_NINJAKAING_POINTS = PointsConfig(
             "The mining duel amount must be greater than 0."
         ),
         duel_challenger_insufficient=(
-            "You only have {points} ores."
+            "You only have {points} {currency}."
         ),
         duel_opponent_insufficient=(
-            "{username} only has {points} ores."
+            "{username} only has {points} {currency}."
         ),
         duel_challenge=(
             "@{opponent}, @{challenger} challenged you to a mining "
-            "duel for {amount} ores! Type !{command} duel accept or "
+            "duel for {amount} {currency}! Type !{command} duel accept or "
             "!{command} duel decline. This challenge expires in "
             "{expiration} seconds."
         ),
@@ -261,10 +262,10 @@ DEVELOPER_NINJAKAING_POINTS = PointsConfig(
         ),
         duel_cancelled=(
             "The mining duel was cancelled because someone "
-            "no longer has enough ores."
+            "no longer has enough {currency}."
         ),
         duel_result=(
-            "@{winner} out-mined @{loser} and claimed {amount} ores."
+            "@{winner} out-mined @{loser} and claimed {amount} {currency}."
         ),
         duel_declined=(
             "{username} decided the mine was too dangerous "

@@ -97,44 +97,45 @@ ONEDAYBREAD_REDEEMS = RedeemConfig(
 
 
 ONEDAYBREAD_POINTS = PointsConfig(
+    display_name="mews",
     command_name="mews",
     points_per_message=25,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,
     duel_expiration_seconds=60,
     messages=PointsMessages(
-        balance_self="{username}, you have collected {points} mews!",
-        balance_other="{username} has collected {points} mews!",
-        leaderboard_empty="The cat choir is quiet—no mews have been collected yet.",
-        leaderboard_entry="{position}. {username}: {points} mews",
+        balance_self="{username}, you have collected {points} {currency}!",
+        balance_other="{username} has collected {points} {currency}!",
+        leaderboard_empty="The cat choir is quiet—no {currency} have been collected yet.",
+        leaderboard_entry="{position}. {username}: {points} {currency}",
         leaderboard_title="The loudest meowers: {leaderboard}",
-        reset_denied="Only the broadcaster can quiet all the mews.",
-        reset_success="The cat choir has gone silent. All mews have been reset.",
-        add_denied="Only moderators can give viewers more mews.",
-        add_invalid="The number of mews must be greater than 0.",
-        add_success="Gave {amount} mews to {username}.",
-        gamble_no_points="You do not have any mews to gamble.",
+        reset_denied="Only the broadcaster can quiet all the {currency}.",
+        reset_success="The cat choir has gone silent. All {currency} have been reset.",
+        add_denied="Only moderators can give viewers more {currency}.",
+        add_invalid="The number of {currency} must be greater than 0.",
+        add_success="Gave {amount} {currency} to {username}.",
+        gamble_no_points="You do not have any {currency} to gamble.",
         gamble_usage="Use it like this: !{command} gamble 50 or !{command} gamble all",
-        gamble_invalid="You need to gamble at least 1 mew.",
-        gamble_insufficient="You only have {points} mews.",
-        gamble_win="{username} let out {amount} triumphant mews and now has {new_balance}!",
-        gamble_all_win="{username}'s mews echoed back twice as loud! They now have {new_balance} mews!",
-        gamble_loss="{username} lost {amount} mews and now has {new_balance}.",
-        gamble_all_loss="{username} lost their voice and all of their mews.",
+        gamble_invalid="You need to gamble at least 1 {currency}.",
+        gamble_insufficient="You only have {points} {currency}.",
+        gamble_win="{username} let out {amount} triumphant {currency} and now has {new_balance}!",
+        gamble_all_win="{username}'s {currency} echoed back twice as loud! They now have {new_balance} {currency}!",
+        gamble_loss="{username} lost {amount} {currency} and now has {new_balance}.",
+        gamble_all_loss="{username} lost their voice and all of their {currency}.",
         duel_usage="Use it like this: !{command} duel @user 100",
-        duel_amount_invalid="The mew amount must be a number or 'all'.",
+        duel_amount_invalid="The {currency} amount must be a number or 'all'.",
         duel_self="You cannot challenge yourself to a meow-off.",
-        duel_invalid="The meow-off must be for at least 1 mew.",
-        duel_challenger_insufficient="You only have {points} mews.",
-        duel_opponent_insufficient="{username} only has {points} mews.",
+        duel_invalid="The meow-off must be for at least 1 {currency}.",
+        duel_challenger_insufficient="You only have {points} {currency}.",
+        duel_opponent_insufficient="{username} only has {points} {currency}.",
         duel_challenge=(
-            "@{opponent}, @{challenger} challenged you to a meow-off for {amount} mews! "
+            "@{opponent}, @{challenger} challenged you to a meow-off for {amount} {currency}! "
             "Type !{command} duel accept or !{command} duel decline. This challenge "
             "expires in {expiration} seconds."
         ),
         duel_missing="You do not have a pending meow-off, or it expired.",
-        duel_cancelled="The meow-off was cancelled because someone no longer has enough mews.",
-        duel_result="@{winner} out-meowed @{loser} and won {amount} mews!",
+        duel_cancelled="The meow-off was cancelled because someone no longer has enough {currency}.",
+        duel_result="@{winner} out-meowed @{loser} and won {amount} {currency}!",
         duel_declined="{username} declined the meow-off."
     )
 )

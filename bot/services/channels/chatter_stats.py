@@ -377,7 +377,7 @@ class ChatterStatsService:
 
         profile = get_active_profile(broadcaster_id)
         claim_counts = {str(row["redeem_type"]): int(row["claim_count"]) for row in claims}
-        currency_name = (profile.points.display_name or profile.points.command_name) if profile else "points"
+        currency_name = (profile.points.display_name or "Points") if profile else "Points"
         achievements = await AchievementService(self.db).get_channel_collection(
             user_id,
             broadcaster_id,

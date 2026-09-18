@@ -38,7 +38,7 @@ async def test_channel_without_code_profile_loads_and_runs_shared_commands(monke
     await utility.hi.callback(utility, ctx)
     ctx.reply.assert_awaited_with("Hallo viewer!")
     await PointsCommandHandler(bot).show_balance(ctx, None, "points")
-    ctx.reply.assert_awaited_with("viewer, you have 25 points!")
+    ctx.reply.assert_awaited_with("viewer, you have 25 Points!")
     assert all(features.is_global_command_enabled("123", command) for command in GlobalCommandName)
     assert all(features.is_global_group_enabled("123", group) for group in GlobalCommandGroup)
     assert not features.is_enabled("123", FeatureName.RAID_BOSSES)

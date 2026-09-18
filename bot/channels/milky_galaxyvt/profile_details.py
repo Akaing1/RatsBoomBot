@@ -140,44 +140,45 @@ MILKY_GALAXYVT_REDEEMS = RedeemConfig(
 
 
 MILKY_GALAXYVT_POINTS = PointsConfig(
+    display_name="star dust",
     command_name="dust",
     points_per_message=25,
     message_cooldown_seconds=60,
     gamble_win_chance=0.45,
     duel_expiration_seconds=60,
     messages=PointsMessages(
-        balance_self="{username}, you have {points} star dust!",
-        balance_other="{username} has {points} star dust!",
-        leaderboard_empty="No star dust have been collected yet.",
-        leaderboard_entry="{position}. {username}: {points} star dust",
+        balance_self="{username}, you have {points} {currency}!",
+        balance_other="{username} has {points} {currency}!",
+        leaderboard_empty="No {currency} have been collected yet.",
+        leaderboard_entry="{position}. {username}: {points} {currency}",
         leaderboard_title="Top star shard collectors: {leaderboard}",
-        reset_denied="Only the broadcaster can reset the star dust.",
-        reset_success="The galaxy's star dust have been reset.",
-        add_denied="Only moderators can give viewers star dust.",
+        reset_denied="Only the broadcaster can reset the {currency}.",
+        reset_success="The galaxy's {currency} have been reset.",
+        add_denied="Only moderators can give viewers {currency}.",
         add_invalid="The star shard amount must be greater than 0.",
-        add_success="Added {amount} star dust to {username}.",
-        gamble_no_points="You do not have any star dust to gamble.",
+        add_success="Added {amount} {currency} to {username}.",
+        gamble_no_points="You do not have any {currency} to gamble.",
         gamble_usage="Use it like this: !{command} gamble 50 or !{command} gamble all",
         gamble_invalid="You need to gamble at least 1 star shard.",
-        gamble_insufficient="You only have {points} star dust.",
-        gamble_win="{username} found {amount} star dust and now has {new_balance}!",
-        gamble_all_win="{username} doubled their star dust and now has {new_balance}!",
-        gamble_loss="{username} lost {amount} star dust and now has {new_balance}.",
-        gamble_all_loss="{username} lost all their star dust in the void.",
+        gamble_insufficient="You only have {points} {currency}.",
+        gamble_win="{username} found {amount} {currency} and now has {new_balance}!",
+        gamble_all_win="{username} doubled their {currency} and now has {new_balance}!",
+        gamble_loss="{username} lost {amount} {currency} and now has {new_balance}.",
+        gamble_all_loss="{username} lost all their {currency} in the void.",
         duel_usage="Use it like this: !{command} duel @user 100",
         duel_amount_invalid="The duel amount must be a number or 'all'.",
         duel_self="You cannot challenge yourself to a star shard duel.",
         duel_invalid="The duel amount must be greater than 0.",
-        duel_challenger_insufficient="You only have {points} star dust.",
-        duel_opponent_insufficient="{username} only has {points} star dust.",
+        duel_challenger_insufficient="You only have {points} {currency}.",
+        duel_opponent_insufficient="{username} only has {points} {currency}.",
         duel_challenge=(
             "@{opponent}, @{challenger} challenged you to a duel for {amount} "
-            "star dust! Type !{command} duel accept or !{command} duel decline. "
+            "{currency}! Type !{command} duel accept or !{command} duel decline. "
             "This duel expires in {expiration} seconds."
         ),
         duel_missing="You do not have a pending star shard duel, or it expired.",
-        duel_cancelled="The duel was cancelled because someone no longer has enough star dust.",
-        duel_result="@{winner} defeated @{loser} and won {amount} star dust.",
+        duel_cancelled="The duel was cancelled because someone no longer has enough {currency}.",
+        duel_result="@{winner} defeated @{loser} and won {amount} {currency}.",
         duel_declined="{username} declined the star shard duel."
     )
 )
