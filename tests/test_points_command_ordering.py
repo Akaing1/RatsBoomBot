@@ -20,8 +20,10 @@ async def test_balance_command_processes_message_reward_before_reading_balance(m
             return 25
 
     config = SimpleNamespace(
+        display_name="Stale Bread",
+        command_name="points",
         messages=SimpleNamespace(
-            balance_self="{username}, you have {points} points.",
+            balance_self="{username}, you have {points} {currency}.",
             balance_other="{username} has {points} points."
         )
     )
@@ -41,4 +43,4 @@ async def test_balance_command_processes_message_reward_before_reading_balance(m
     await PointsCommandHandler(bot).show_balance(ctx, None, "points")
 
     assert events == ["reward", "balance"]
-    ctx.reply.assert_awaited_once_with("viewer, you have 25 points.")
+    ctx.reply.assert_awaited_once_with("viewer, you have 25 Stale Bread.")

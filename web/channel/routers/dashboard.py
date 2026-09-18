@@ -3,6 +3,7 @@ from urllib.parse import quote_plus
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
+from bot.services.channels.profile_settings import LOYALTY_GROUP
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
@@ -261,6 +262,7 @@ async def channel_features_page(request: Request):
     )
 
 
+@router.get("/channel/loyalty", response_class=HTMLResponse)
 @router.get("/channel/customization", response_class=HTMLResponse)
 async def channel_customization_page(request: Request):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
@@ -280,14 +282,19 @@ async def channel_customization_page(request: Request):
         logout_channel_user(request)
         return RedirectResponse(url="/connect", status_code=303)
 
+    loyalty_page = request.url.path == "/channel/loyalty"
+    groups = services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)})
+
     return templates.TemplateResponse(
         request=request,
-        name="channel/customization.html",
+        name="channel/loyalty.html" if loyalty_page else "channel/customization.html",
         context={
-            "active_page": "customization",
+            "active_page": "loyalty" if loyalty_page else "customization",
+            "customization_action": "/channel/loyalty" if loyalty_page else "/channel/customization",
+            "show_social_links": not loyalty_page,
             "broadcaster": broadcaster,
             "channel_settings": await services.broadcaster_settings.get_settings(broadcaster_id),
-            "setting_groups": services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)}),
+            "setting_groups": {name: entries for name, entries in groups.items() if (name == LOYALTY_GROUP) == loyalty_page},
             "chat_identity": services.chat_identity.get_state(broadcaster_id),
             "setting_result": request.query_params.get("setting_result"),
             "setting_message": request.query_params.get("setting_message"),
@@ -298,8 +305,10 @@ async def channel_customization_page(request: Request):
     )
 
 
+@router.post("/channel/loyalty")
 @router.post("/channel/customization")
 async def update_channel_customization(request: Request, setting_name: str = Form(...), value: str = Form(""), action: str = Form(...), csrf_token: str = Form(...)):
+    destination = "/channel/loyalty" if request.url.path == "/channel/loyalty" else "/channel/customization"
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
 
     if not broadcaster_id:
@@ -309,11 +318,13 @@ async def update_channel_customization(request: Request, setting_name: str = For
     runtime_bot = get_bot()
 
     if runtime_bot is None or runtime_bot.services is None:
-        return RedirectResponse(url="/channel/customization?setting_result=error&setting_message=Runtime+unavailable.", status_code=303)
+        return RedirectResponse(url=f"{destination}?setting_result=error&setting_message=Runtime+unavailable.", status_code=303)
 
     services = runtime_bot.services
 
     try:
+        if destination == "/channel/loyalty" and services.profile_settings.get_definition(setting_name).group != LOYALTY_GROUP:
+            raise ValueError("Only loyalty point names and responses can be edited here.")
         if setting_name == "social.discord_url":
             await services.broadcaster_settings.set_discord_url(broadcaster_id, value.strip())
             message = "Discord URL was updated."
@@ -332,9 +343,9 @@ async def update_channel_customization(request: Request, setting_name: str = For
             else:
                 raise ValueError("Unknown customization action.")
     except (TypeError, ValueError) as error:
-        return RedirectResponse(url=f"/channel/customization?setting_result=error&setting_message={quote_plus(str(error))}", status_code=303)
+        return RedirectResponse(url=f"{destination}?setting_result=error&setting_message={quote_plus(str(error))}", status_code=303)
 
-    return RedirectResponse(url=f"/channel/customization?setting_result=success&setting_message={quote_plus(message)}", status_code=303)
+    return RedirectResponse(url=f"{destination}?setting_result=success&setting_message={quote_plus(message)}", status_code=303)
 
 
 @router.post("/channel/features/toggles")

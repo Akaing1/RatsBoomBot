@@ -109,6 +109,23 @@ class SettingsCommands(commands.Component):
 
         await ctx.reply("Use !set game <game name>, !set title <stream title>, !set discord <url>, or !set youtube <url>.")
 
+    @set_channel.command(name="slowmode")
+    async def set_slowmode(self, ctx: commands.Context, status: str | None = None) -> None:
+        broadcaster_id = self.get_context(ctx, "set slowmode")
+        if broadcaster_id is None or not self.has_permission(ctx, "set slowmode"):
+            return
+        service = self.bot.services.command_slowmode
+        if status is None:
+            state = "on" if broadcaster_id in service.enabled_channels else "off"
+            await ctx.reply(f"Command slowmode is {state}. Use !set slowmode on or off.")
+            return
+        status = status.casefold()
+        if status not in {"on", "off"}:
+            await ctx.reply("Use !set slowmode on or off.")
+            return
+        await service.set_enabled(broadcaster_id, status == "on")
+        await ctx.reply(f"Command slowmode is {status}. When enabled, viewers can use one command every two minutes; mods, the broadcaster, and !kamikaze are exempt.")
+
     @set_channel.command(name="game")
     async def set_game(self, ctx: commands.Context, *, game_name: str | None = None) -> None:
         broadcaster_id = self.get_context(ctx, "set game")

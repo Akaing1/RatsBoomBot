@@ -63,3 +63,37 @@ def test_channel_help_requires_channel_authentication() -> None:
 
     assert response.status_code == 303
     assert response.headers["location"] == "/connect"
+
+
+def test_loyalty_tab_requires_channel_authentication() -> None:
+    with TestClient(app) as client:
+        response = client.get("/channel/loyalty", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/connect"
+
+
+def test_loyalty_template_only_shows_names_and_responses() -> None:
+    from bot.profiles import ChannelProfile, activate_profile, clear_profiles
+    from bot.services.channels.profile_settings import LOYALTY_GROUP, ProfileSettingsService
+    from web.shared.common import templates
+
+    activate_profile("loyalty-test", ChannelProfile(channel_name="example"))
+    try:
+        service = ProfileSettingsService(None)
+        groups = service.get_setting_groups("loyalty-test")
+        html = templates.env.get_template("channel/loyalty.html").render(
+            active_page="loyalty", csrf_token="test", show_social_links=False,
+            setting_groups={LOYALTY_GROUP: groups[LOYALTY_GROUP]},
+            customization_action="/channel/loyalty", url_for=lambda *args, **kwargs: "/static",
+            deployment_stamp=lambda: "test"
+        )
+        assert 'name="setting_name" value="points.display_name"' in html
+        assert 'name="setting_name" value="points.messages.gamble_win"' not in html
+        assert html.index('href="/channel/loyalty"') < html.index('href="/channel/help"')
+        assert 'action="/channel/loyalty"' in html
+        assert "Income amounts are fixed" in html
+        assert 'type="number"' not in html
+        assert 'social.discord_url' not in html
+        assert 'redeems.daily_amount' not in html
+    finally:
+        clear_profiles()

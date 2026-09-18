@@ -1,8 +1,10 @@
 import json
 import logging
-from dataclasses import dataclass, replace
+import re
+from dataclasses import dataclass, fields, replace
+from string import Formatter
 
-from bot.profiles import ChannelProfile
+from bot.profiles import ChannelProfile, PointsMessages
 from bot.timer_messages import format_timers, parse_timers
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -47,8 +49,6 @@ PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("redeems.daily_title", "Redeems", "Daily redeem title", "Exact Twitch reward title used for the daily claim.", maximum_length=100, rows=1),
     ProfileSettingDefinition("redeems.first_title", "Redeems", "First redeem title", "Exact Twitch reward title used for first place.", maximum_length=100, rows=1),
     ProfileSettingDefinition("redeems.vip_title", "Redeems", "VIP redeem title", "Exact Twitch reward title that permanently grants VIP status.", maximum_length=100, rows=1),
-    ProfileSettingDefinition("redeems.daily_amount", "Redeems", "Daily point reward", "Points awarded for a daily claim.", value_type="integer", minimum=0, maximum=1000000, rows=1),
-    ProfileSettingDefinition("redeems.first_amount", "Redeems", "First point reward", "Points awarded for first place.", value_type="integer", minimum=0, maximum=1000000, rows=1),
     ProfileSettingDefinition("league.game_name", "League of Legends", "Riot game name", "The game-name portion of the broadcaster's Riot ID.", maximum_length=100, rows=1),
     ProfileSettingDefinition("league.tag_line", "League of Legends", "Riot tag line", "The tag-line portion of the broadcaster's Riot ID.", maximum_length=20, rows=1),
     ProfileSettingDefinition("league.region", "League of Legends", "Region", "The OP.GG region code, such as NA or EUW.", maximum_length=12, rows=1),
@@ -64,6 +64,19 @@ PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("raid_bosses.item_names.blessing", "Raid item names", "Blessing name", "Custom display and purchase name for Blessing of the Gods.", maximum_length=100, rows=1),
     ProfileSettingDefinition("raid_bosses.item_names.ancient_pact", "Raid item names", "Ancient Pact name", "Custom display and purchase name for Ancient Pact.", maximum_length=100, rows=1),
     ProfileSettingDefinition("raid_bosses.item_names.flag_bearer", "Raid item names", "Flag Bearer name", "Custom display and purchase name for Flag Bearer's Will.", maximum_length=100, rows=1)
+)
+
+LOYALTY_GROUP = "Loyalty points"
+LOYALTY_RESPONSE_LABELS = {"balance_self": "Points (user)", "balance_other": "Points (other)", "add_success": "Add Points", "give_success": "Give Points"}
+LOYALTY_PLACEHOLDERS = {
+    f"points.messages.{field.name}": {name for _, name, _, _ in Formatter().parse(field.default) if name is not None} | {"currency"}
+    for field in fields(PointsMessages)
+}
+PROFILE_SETTING_DEFINITIONS += (
+    ProfileSettingDefinition("points.display_name", LOYALTY_GROUP, "Loyalty Points Name", "Display name for your channel currency. Leave empty to use the existing name. Use {currency} in responses to insert this name.", maximum_length=60, rows=1),
+) + tuple(
+    ProfileSettingDefinition(f"points.messages.{field.name}", LOYALTY_GROUP, LOYALTY_RESPONSE_LABELS[field.name], "Available placeholders: " + ", ".join("{" + name + "}" for name in sorted(LOYALTY_PLACEHOLDERS[f"points.messages.{field.name}"])) + ". Leave empty to send nothing.")
+    for field in fields(PointsMessages) if field.name in LOYALTY_RESPONSE_LABELS
 )
 
 PROFILE_SETTINGS_BY_KEY = {definition.key: definition for definition in PROFILE_SETTING_DEFINITIONS}
@@ -203,10 +216,23 @@ class ProfileSettingsService:
     def apply_overrides(self, broadcaster_id: str, profile: ChannelProfile) -> ChannelProfile:
         broadcaster_id = str(broadcaster_id)
         self.base_profiles[broadcaster_id] = profile
-        effective_profile = profile
+        default_messages = PointsMessages()
+        fixed_messages = {}
+        for field in fields(PointsMessages):
+            if field.name in LOYALTY_RESPONSE_LABELS:
+                continue
+            parts = []
+            for literal, name, _, _ in Formatter().parse(getattr(default_messages, field.name)):
+                parts.append(re.sub(r"\bpoints?\b", "{currency}", literal))
+                if name is not None:
+                    parts.append("{" + name + "}")
+            fixed_messages[field.name] = "".join(parts)
+        messages = replace(profile.points.messages, **fixed_messages)
+        effective_profile = replace(profile, points=replace(profile.points, messages=messages))
 
         for setting_name, value in self.overrides.get(broadcaster_id, {}).items():
-            effective_profile = self.replace_profile_value(effective_profile, setting_name, value)
+            if setting_name in PROFILE_SETTINGS_BY_KEY:
+                effective_profile = self.replace_profile_value(effective_profile, setting_name, value)
 
         return effective_profile
 
@@ -328,6 +354,13 @@ class ProfileSettingsService:
 
         if len(value) > definition.maximum_length:
             raise ValueError(f"{definition.label} must be {definition.maximum_length} characters or fewer.")
+
+        if definition.key in LOYALTY_PLACEHOLDERS:
+            for _, name, spec, conversion in Formatter().parse(value):
+                if name is not None and (name not in LOYALTY_PLACEHOLDERS[definition.key] or spec or conversion):
+                    raise ValueError("Use only the listed placeholders without formatting modifiers.")
+        if definition.group == LOYALTY_GROUP and ("\n" in value or "\r" in value):
+            raise ValueError("Use a single line of text.")
 
         return value
 
