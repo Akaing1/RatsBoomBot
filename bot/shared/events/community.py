@@ -241,6 +241,7 @@ class CommunityEvents(commands.Component):
         broadcaster_id = str(payload.broadcaster.id)
         broadcaster_name = payload.broadcaster.name
         username = payload.user.name
+        is_gift = bool(getattr(payload, "gift", False))
         services = self.bot.services
 
         LOGGER.info(
@@ -265,6 +266,14 @@ class CommunityEvents(commands.Component):
                     username,
                     broadcaster_id
                 )
+
+        if is_gift:
+            LOGGER.debug(
+                "[Events] Suppressed gifted subscription response for %s in broadcaster %s.",
+                username,
+                broadcaster_id
+            )
+            return
 
         if not self.community_events_enabled(broadcaster_id):
             return
