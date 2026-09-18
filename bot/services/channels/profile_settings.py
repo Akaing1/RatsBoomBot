@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from dataclasses import dataclass, fields, replace
 from string import Formatter
 
@@ -66,15 +67,16 @@ PROFILE_SETTING_DEFINITIONS = (
 )
 
 LOYALTY_GROUP = "Loyalty points"
+LOYALTY_RESPONSE_LABELS = {"balance_self": "Points (user)", "balance_other": "Points (other)", "add_success": "Add Points", "give_success": "Give Points"}
 LOYALTY_PLACEHOLDERS = {
     f"points.messages.{field.name}": {name for _, name, _, _ in Formatter().parse(field.default) if name is not None} | {"currency"}
     for field in fields(PointsMessages)
 }
 PROFILE_SETTING_DEFINITIONS += (
-    ProfileSettingDefinition("points.display_name", LOYALTY_GROUP, "Loyalty point name", "Display name for your channel currency. Leave empty to use the existing name. Use {currency} in responses to insert this name.", maximum_length=60, rows=1),
+    ProfileSettingDefinition("points.display_name", LOYALTY_GROUP, "Loyalty Points Name", "Display name for your channel currency. Leave empty to use the existing name. Use {currency} in responses to insert this name.", maximum_length=60, rows=1),
 ) + tuple(
-    ProfileSettingDefinition(f"points.messages.{field.name}", LOYALTY_GROUP, field.name.replace("_", " ").capitalize(), "Available placeholders: " + ", ".join("{" + name + "}" for name in sorted(LOYALTY_PLACEHOLDERS[f"points.messages.{field.name}"])) + ". Leave empty to send nothing.")
-    for field in fields(PointsMessages)
+    ProfileSettingDefinition(f"points.messages.{field.name}", LOYALTY_GROUP, LOYALTY_RESPONSE_LABELS[field.name], "Available placeholders: " + ", ".join("{" + name + "}" for name in sorted(LOYALTY_PLACEHOLDERS[f"points.messages.{field.name}"])) + ". Leave empty to send nothing.")
+    for field in fields(PointsMessages) if field.name in LOYALTY_RESPONSE_LABELS
 )
 
 PROFILE_SETTINGS_BY_KEY = {definition.key: definition for definition in PROFILE_SETTING_DEFINITIONS}
@@ -214,10 +216,23 @@ class ProfileSettingsService:
     def apply_overrides(self, broadcaster_id: str, profile: ChannelProfile) -> ChannelProfile:
         broadcaster_id = str(broadcaster_id)
         self.base_profiles[broadcaster_id] = profile
-        effective_profile = profile
+        default_messages = PointsMessages()
+        fixed_messages = {}
+        for field in fields(PointsMessages):
+            if field.name in LOYALTY_RESPONSE_LABELS:
+                continue
+            parts = []
+            for literal, name, _, _ in Formatter().parse(getattr(default_messages, field.name)):
+                parts.append(re.sub(r"\bpoints?\b", "{currency}", literal))
+                if name is not None:
+                    parts.append("{" + name + "}")
+            fixed_messages[field.name] = "".join(parts)
+        messages = replace(profile.points.messages, **fixed_messages)
+        effective_profile = replace(profile, points=replace(profile.points, messages=messages))
 
         for setting_name, value in self.overrides.get(broadcaster_id, {}).items():
-            effective_profile = self.replace_profile_value(effective_profile, setting_name, value)
+            if setting_name in PROFILE_SETTINGS_BY_KEY:
+                effective_profile = self.replace_profile_value(effective_profile, setting_name, value)
 
         return effective_profile
 
