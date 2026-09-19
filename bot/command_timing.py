@@ -25,6 +25,6 @@ def log_command_timing(ctx, stage: str, *, send_ms: float | None = None, result=
         getattr(message, "id", "unknown"), ctx.command_timing_name,
         (perf_counter() - started) * 1000,
         f"{send_ms:.1f}" if send_ms is not None else "-",
-        getattr(result, "is_sent", "-"),
+        getattr(result, "sent", getattr(result, "is_sent", "-")),
         extra={"broadcaster_id": str(broadcaster.id), "markup": False}
     )

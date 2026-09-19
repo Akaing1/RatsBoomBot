@@ -181,6 +181,7 @@ button, input { font: inherit; }
 .activity-panel { min-width: 0; padding: 20px; }
 .activity-panel .panel-header { gap: 10px; }
 .activity-scroll { max-height: 430px; overflow-y: auto; scrollbar-gutter: stable; }
+#viewer-queue-content { max-height: 430px; overflow-y: auto; scrollbar-gutter: stable; }
 .activity-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .activity-list-item { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 13px 0; border-top: 1px solid var(--border); }
 .activity-list-item:first-child { border-top: 0; }
@@ -1082,32 +1083,44 @@ body.landing-page {
     }
 }
 
-.activity-scroll {
+.live-chat-feed,
+.activity-scroll,
+#viewer-queue-content {
     scrollbar-width: thin;
     scrollbar-color: var(--accent) transparent;
 }
 
-.activity-scroll::-webkit-scrollbar {
+.live-chat-feed::-webkit-scrollbar,
+.activity-scroll::-webkit-scrollbar,
+#viewer-queue-content::-webkit-scrollbar {
     width: 8px;
 }
 
-.activity-scroll::-webkit-scrollbar-track {
+.live-chat-feed::-webkit-scrollbar-track,
+.activity-scroll::-webkit-scrollbar-track,
+#viewer-queue-content::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.activity-scroll::-webkit-scrollbar-thumb {
+.live-chat-feed::-webkit-scrollbar-thumb,
+.activity-scroll::-webkit-scrollbar-thumb,
+#viewer-queue-content::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
     border-radius: 999px;
     background: rgba(139, 92, 246, .65);
     background-clip: padding-box;
 }
 
-.activity-scroll::-webkit-scrollbar-thumb:hover {
+.live-chat-feed::-webkit-scrollbar-thumb:hover,
+.activity-scroll::-webkit-scrollbar-thumb:hover,
+#viewer-queue-content::-webkit-scrollbar-thumb:hover {
     background: var(--accent);
     background-clip: padding-box;
 }
 
-.activity-scroll::-webkit-scrollbar-button {
+.live-chat-feed::-webkit-scrollbar-button,
+.activity-scroll::-webkit-scrollbar-button,
+#viewer-queue-content::-webkit-scrollbar-button {
     display: none;
 }
 

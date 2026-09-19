@@ -41,6 +41,19 @@ def test_twitch_messages_are_split_between_chat_and_commands():
     assert chat.badges == ("Mod", "Subscriber")
 
 
+def test_tagged_bot_response_is_kept_with_commands_without_classifying_all_bot_messages():
+    service = LiveChatService(None)
+    service.tag_command_response("channel-1", "command-response")
+
+    response = service.publish_twitch(twitch_payload("You have 500 points.", "command-response"))
+    unrelated = service.publish_twitch(twitch_payload("A raid boss is approaching!", "unrelated-bot-message"))
+
+    assert response.kind == "command"
+    assert unrelated.kind == "chat"
+    assert [item["message"] for item in service.history("channel-1", "commands")] == ["You have 500 points."]
+    assert [item["message"] for item in service.history("channel-1", "chat")] == ["A raid boss is approaching!"]
+
+
 def test_youtube_messages_are_normalized_and_deduplicated():
     service = LiveChatService(None)
     item = {
@@ -125,6 +138,9 @@ def test_youtube_authorization_uses_read_only_scope(monkeypatch):
 def test_dashboard_templates_keep_chat_read_only_and_raid_boss_below():
     dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
     customization = open("web/templates/shared/profile_inputs.html", encoding="utf-8").read()
+    dashboard_styles = open("web/static/css/style.css", encoding="utf-8").read()
+    widget_styles = open("web/static/css/chat-widget.css", encoding="utf-8").read()
+    chat_script = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
 
     assert 'data-stream-url="/channel/api/chat/stream?view=chat"' in dashboard
     assert 'data-stream-url="/channel/api/chat/stream?view=commands"' in dashboard
@@ -136,3 +152,12 @@ def test_dashboard_templates_keep_chat_read_only_and_raid_boss_below():
     assert "('chat', 'Chat'" in customization
     assert "('commands', 'Commands'" in customization
     assert "('both', 'Both'" in customization
+    assert ".live-chat-feed::-webkit-scrollbar" in dashboard_styles
+    assert "#viewer-queue-content::-webkit-scrollbar" in dashboard_styles
+    assert "#viewer-queue-content { max-height: 430px; overflow-y: auto;" in dashboard_styles
+    assert "background: #0f1115" in widget_styles
+    assert "background: transparent" not in widget_styles.split("body {", 1)[0]
+    assert ".widget-chat-feed::-webkit-scrollbar" in widget_styles
+    assert "overflow-y: auto" in widget_styles
+    assert "shouldFollowNewest" in chat_script
+    assert "if (shouldFollowNewest)" in chat_script
