@@ -16,16 +16,6 @@
         const row = makeElement("article", `live-chat-message platform-${message.platform} kind-${message.kind}`);
         row.dataset.messageId = message.id;
 
-        const avatar = makeElement("div", "live-chat-avatar");
-        if (message.avatar_url && String(message.avatar_url).startsWith("https://")) {
-            const image = document.createElement("img");
-            image.src = message.avatar_url;
-            image.alt = "";
-            avatar.appendChild(image);
-        } else {
-            avatar.textContent = String(message.display_name || message.username || "?").charAt(0).toUpperCase();
-        }
-
         const content = makeElement("div", "live-chat-message-content");
         const heading = makeElement("div", "live-chat-message-heading");
         const platform = makeElement("span", `live-chat-platform ${message.platform}`, message.platform === "youtube" ? "YT" : "TW");
@@ -43,7 +33,7 @@
         }
 
         content.append(heading, makeElement("p", "live-chat-text", message.message || ""));
-        row.append(avatar, content);
+        row.appendChild(content);
         feed.element.appendChild(row);
 
         while (feed.element.querySelectorAll(".live-chat-message").length > feed.maxMessages) {
