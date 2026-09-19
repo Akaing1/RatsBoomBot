@@ -62,6 +62,7 @@ def test_youtube_messages_are_normalized_and_deduplicated():
     assert messages[0]["platform"] == "youtube"
     assert messages[0]["kind"] == "command"
     assert messages[0]["badges"] == ["Mod", "Member"]
+    assert "avatar_url" not in messages[0]
 
 
 def test_chat_view_normalization_and_matching():
