@@ -67,6 +67,7 @@ class LiveChatService:
         self.db = db
         self.connections: dict[str, YouTubeConnection] = {}
         self.youtube_statuses: dict[str, tuple[str, str]] = {}
+        self.active_youtube_chat_ids: dict[str, str] = {}
         self.widget_tokens: dict[str, str] = {}
         self.token_broadcasters: dict[str, str] = {}
         self.messages: dict[str, deque[UnifiedChatMessage]] = defaultdict(lambda: deque(maxlen=250))
@@ -123,6 +124,7 @@ class LiveChatService:
             await asyncio.gather(*tasks, return_exceptions=True)
 
         self.tasks.clear()
+        self.active_youtube_chat_ids.clear()
 
         if self.client is not None:
             await self.client.aclose()
@@ -327,6 +329,7 @@ class LiveChatService:
 
         self.connections.pop(broadcaster_id, None)
         self.youtube_statuses.pop(broadcaster_id, None)
+        self.active_youtube_chat_ids.pop(broadcaster_id, None)
         LOGGER.info("[Live Chat] Disconnected YouTube from broadcaster %s.", broadcaster_id)
 
     def _start_watcher(self, broadcaster_id: str) -> None:
@@ -345,12 +348,17 @@ class LiveChatService:
                     live_chat_id = await self._find_active_live_chat(broadcaster_id)
 
                     if live_chat_id is None:
+                        self.active_youtube_chat_ids.pop(broadcaster_id, None)
                         self.youtube_statuses[broadcaster_id] = ("waiting", "Waiting for an active YouTube livestream.")
                         await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
                         continue
 
+                    self.active_youtube_chat_ids[broadcaster_id] = live_chat_id
                     self.youtube_statuses[broadcaster_id] = ("live", "Receiving YouTube live-chat messages.")
-                    await self._poll_live_chat(broadcaster_id, live_chat_id)
+                    try:
+                        await self._poll_live_chat(broadcaster_id, live_chat_id)
+                    finally:
+                        self.active_youtube_chat_ids.pop(broadcaster_id, None)
                 except asyncio.CancelledError:
                     raise
                 except Exception:
@@ -455,6 +463,48 @@ class LiveChatService:
                 f"{YOUTUBE_API_URL}{path}",
                 params=params,
                 headers={"Authorization": f"Bearer {connection.access_token}"}
+            )
+
+        response.raise_for_status()
+        return response.json()
+
+    async def send_youtube_message(self, broadcaster_id: str, message: str) -> dict:
+        broadcaster_id = str(broadcaster_id)
+        live_chat_id = self.active_youtube_chat_ids.get(broadcaster_id)
+
+        if broadcaster_id not in self.connections:
+            raise ValueError("Connect a YouTube channel before sending messages.")
+
+        if live_chat_id is None:
+            raise ValueError("No active YouTube live chat is available.")
+
+        if self.client is None:
+            raise RuntimeError("YouTube chat is not running.")
+
+        connection = await self._ensure_access_token(broadcaster_id)
+        request = {
+            "params": {"part": "snippet"},
+            "json": {
+                "snippet": {
+                    "liveChatId": live_chat_id,
+                    "type": "textMessageEvent",
+                    "textMessageDetails": {"messageText": message}
+                }
+            }
+        }
+        response = await self.client.post(
+            f"{YOUTUBE_API_URL}/liveChat/messages",
+            headers={"Authorization": f"Bearer {connection.access_token}"},
+            **request
+        )
+
+        if response.status_code == 401:
+            connection.expires_at = datetime.now(UTC).isoformat()
+            connection = await self._ensure_access_token(broadcaster_id)
+            response = await self.client.post(
+                f"{YOUTUBE_API_URL}/liveChat/messages",
+                headers={"Authorization": f"Bearer {connection.access_token}"},
+                **request
             )
 
         response.raise_for_status()
