@@ -53,7 +53,7 @@
                 <div class="toggle-card-heading">
                     <div>
                         <h4>YouTube live chat</h4>
-                        <p>Connect the YouTube channel that should appear beside Twitch chat. This integration is read-only.</p>
+                        <p>Connect the YouTube channel that should appear beside Twitch chat and send dashboard replies.</p>
                     </div>
                     <span class="toggle-status {% if youtube_chat.connected %}enabled{% endif %}">{% if youtube_chat.connected %}Connected{% elif youtube_chat.configured %}Not connected{% else %}Unavailable{% endif %}</span>
                 </div>
@@ -64,12 +64,15 @@
                         <div><span>YouTube channel ID</span><strong>{{ youtube_chat.channel_id }}</strong></div>
                         <div><span>Chat status</span><strong>{{ youtube_chat.detail }}</strong></div>
                     </div>
-                    <form method="post" action="/channel/youtube/disconnect" onsubmit="return confirm('Disconnect {{ youtube_chat.channel_title }} from combined chat?');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button class="button danger" type="submit">Disconnect YouTube</button>
-                    </form>
+                    <div class="toggle-actions">
+                        <a class="button secondary" href="/channel/youtube/connect">Reconnect YouTube</a>
+                        <form method="post" action="/channel/youtube/disconnect" onsubmit="return confirm('Disconnect {{ youtube_chat.channel_title }} from combined chat?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button class="button danger" type="submit">Disconnect YouTube</button>
+                        </form>
+                    </div>
                 {% elif youtube_chat.configured %}
-                    <p class="panel-description">Authorization grants read-only access so RatsBoomBot can discover your active livestream and display its chat.</p>
+                    <p class="panel-description">Authorization lets RatsBoomBot discover your active livestream, display its chat, and send messages you submit from the dashboard.</p>
                     <a class="button primary" href="/channel/youtube/connect">Connect YouTube Channel</a>
                 {% else %}
                     <p class="panel-description">YouTube integration has not been configured on this deployment yet.</p>
