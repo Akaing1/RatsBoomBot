@@ -9,6 +9,7 @@ VALID_ENVIRONMENTS = {"local", "uat", "production"}
 DEFAULT_BOT_SCOPES = "user:read:chat user:write:chat user:bot"
 DEFAULT_CHANNEL_SCOPES = (
     "channel:bot "
+    "user:write:chat "
     "moderator:manage:banned_users "
     "moderator:read:followers "
     "moderator:read:blocked_terms "
@@ -74,7 +75,7 @@ class Settings:
 
     BOT_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('BOT_SCOPES') or DEFAULT_BOT_SCOPES} moderator:manage:announcements moderator:read:chatters".split()))
 
-    CHANNEL_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('CHANNEL_SCOPES') or DEFAULT_CHANNEL_SCOPES} channel:manage:broadcast channel:manage:vips channel:manage:moderators".split()))
+    CHANNEL_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('CHANNEL_SCOPES') or DEFAULT_CHANNEL_SCOPES} user:write:chat channel:manage:broadcast channel:manage:vips channel:manage:moderators".split()))
 
     IGNORED_USERS = {
         user.strip().lower()

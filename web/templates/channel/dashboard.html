@@ -47,8 +47,9 @@
     {% endif %}
 </header>
 
+<div class="channel-dashboard-layout">
 <section class="status-grid channel-status-grid">
-    <article class="status-card">
+    <article class="status-card stream-status-card">
         <p class="card-label">Stream status</p>
 
         <div class="status-row">
@@ -56,27 +57,20 @@
             <strong>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
         </div>
 
-        <p class="card-detail">Current Twitch broadcast status.</p>
-    </article>
-
-    <article class="status-card">
-        <p class="card-label">Viewer queue</p>
-
-        <div class="status-row">
-            <span
-                id="queue-status-indicator"
-                class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"
-            ></span>
-            <strong id="queue-status-label">{% if queue_open %}Open{% else %}Closed{% endif %}</strong>
+        <div
+            class="ad-status-row state-{{ ad_status.state }}"
+            data-ad-status
+            data-state="{{ ad_status.state }}"
+            data-next-ad-at="{{ ad_status.next_ad_at or '' }}"
+            data-ends-at="{{ ad_status.ends_at or '' }}"
+        >
+            <span class="ad-status-label">Ads</span>
+            <strong data-ad-status-text>{{ ad_status.label }}</strong>
         </div>
-
-        <p id="queue-size-label" class="card-detail">
-            {{ queue_size }} viewer{% if queue_size != 1 %}s{% endif %} currently waiting.
-        </p>
+        <p class="card-detail">Live ad timing refreshes automatically.</p>
     </article>
 
-
-    <article class="status-card">
+    <article class="status-card gambling-status-card">
         <p class="card-label">Lost to RatsBoomBot</p>
 
         <div class="metric">{{ gambling_loss_total }}</div>
@@ -91,7 +85,7 @@
             <div>
                 <p class="eyebrow">Twitch + YouTube</p>
                 <h3>Chat</h3>
-                <p class="panel-description">Read-only chat messages. Commands appear in the Commands tab.</p>
+                <p class="panel-description">Combined chat messages. Commands appear in the Commands tab.</p>
             </div>
             <div class="chat-platform-states" aria-label="Connected chat platforms">
                 <span class="channel-state live">Twitch</span>
@@ -106,6 +100,21 @@
             data-max-messages="150"
             data-empty-title="Waiting for chat messages"
         ></div>
+
+        <form class="dashboard-chat-composer" data-chat-composer>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label class="sr-only" for="dashboard-chat-message">Send a chat message</label>
+            <textarea id="dashboard-chat-message" name="message" rows="2" maxlength="200" placeholder="Reply to chat…" required></textarea>
+            <div class="dashboard-chat-composer-actions">
+                <div class="chat-target-selector" role="group" aria-label="Send message to">
+                    <button class="chat-target active" type="button" data-chat-target="twitch" aria-pressed="true">Twitch</button>
+                    <button class="chat-target" type="button" data-chat-target="youtube" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>YouTube</button>
+                    <button class="chat-target" type="button" data-chat-target="both" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>Both</button>
+                </div>
+                <button class="button primary chat-send-button" type="submit">Send</button>
+            </div>
+            <p class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
+        </form>
     </section>
 
     <section class="panel activity-panel dashboard-activity-panel">
@@ -262,6 +271,7 @@
 
     </div>
 </div>
+</div>
 
 {% if raid_enabled %}
     {% include "channel/raid_summary.html" %}
@@ -288,9 +298,6 @@
     (() => {
         const endpoint = "/channel/api/viewer-queue";
         const csrfToken = {{ csrf_token | tojson }};
-        const statusIndicator = document.getElementById("queue-status-indicator");
-        const statusLabel = document.getElementById("queue-status-label");
-        const sizeLabel = document.getElementById("queue-size-label");
         const panelState = document.getElementById("queue-panel-state");
         const queueContent = document.getElementById("viewer-queue-content");
         let requestInProgress = false;
@@ -341,10 +348,6 @@
 
             lastQueueSignature = queueSignature;
 
-            statusIndicator.classList.toggle("online", isOpen);
-            statusIndicator.classList.toggle("offline", !isOpen);
-            statusLabel.textContent = isOpen ? "Open" : "Closed";
-            sizeLabel.textContent = `${size} viewer${size === 1 ? "" : "s"} currently waiting.`;
             panelState.classList.toggle("live", isOpen);
             panelState.textContent = isOpen ? "Open" : "Closed";
             queueContent.replaceChildren();
@@ -628,4 +631,6 @@
 
 {% block page_scripts %}
     <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-chat-send.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-ad-status.js') }}?v={{ deployment_stamp() }}" defer></script>
 {% endblock %}

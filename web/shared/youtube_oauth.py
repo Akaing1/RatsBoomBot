@@ -9,7 +9,7 @@ from config.settings import settings
 YOUTUBE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 YOUTUBE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3"
-YOUTUBE_READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
+YOUTUBE_CHAT_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
 
 
 @dataclass(frozen=True)
@@ -30,7 +30,7 @@ def build_youtube_oauth_url(state: str) -> str:
         "client_id": settings.YOUTUBE_CLIENT_ID,
         "redirect_uri": settings.YOUTUBE_REDIRECT_URI,
         "response_type": "code",
-        "scope": YOUTUBE_READONLY_SCOPE,
+        "scope": YOUTUBE_CHAT_SCOPE,
         "access_type": "offline",
         "include_granted_scopes": "true",
         "prompt": "consent",

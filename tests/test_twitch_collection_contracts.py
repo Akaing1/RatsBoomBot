@@ -63,4 +63,4 @@ def test_custom_channel_scopes_include_vip_permissions(monkeypatch):
 
     monkeypatch.setenv("CHANNEL_SCOPES", "channel:bot")
     settings = runpy.run_path("config/settings.py")["settings"]
-    assert {"channel:bot", "channel:manage:vips", "channel:manage:moderators"} <= set(settings.CHANNEL_SCOPES.split())
+    assert {"channel:bot", "user:write:chat", "channel:manage:vips", "channel:manage:moderators"} <= set(settings.CHANNEL_SCOPES.split())
