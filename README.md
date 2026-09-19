@@ -275,11 +275,20 @@ TRUST_PROXY_HEADERS=false
 BOT_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/bot
 CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/channel
 PUBLIC_CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel/connect
+
+YOUTUBE_CLIENT_ID=
+YOUTUBE_CLIENT_SECRET=
+YOUTUBE_REDIRECT_URI=http://127.0.0.1:4345/oauth/youtube/connect
+YOUTUBE_CHAT_DISCOVERY_SECONDS=30
 ```
 
 Keep `SESSION_SECRET` stable across deployments or existing browser sessions will become invalid. Administrator sessions default to eight hours; broadcaster sessions default to 30 days. In production, set `SESSION_COOKIE_DOMAIN=.ratsboombot.com` so an authenticated session is available to both the public site and dashboard subdomain.
 
 Register each callback exactly in the Twitch developer application. Changing scopes requires the affected account to reconnect.
+
+To enable combined Twitch and YouTube chat, enable the YouTube Data API v3 in a Google Cloud project and create an OAuth 2.0 Web application. Add `YOUTUBE_REDIRECT_URI` as an exact authorized redirect URI, then set its client ID and secret in `.env`. The integration requests only `youtube.readonly`, polls the connected channel's active livestream chat, and does not send messages or perform moderation. If the OAuth consent screen is still in Testing, add each broadcaster as a test user.
+
+Connected broadcasters receive three private OBS Browser Source URLs under **Customization → Socials → YouTube chat**: chat without commands, commands only, and both. Regenerating these URLs invalidates the previous set.
 
 ### 4. Run
 

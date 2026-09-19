@@ -6,8 +6,22 @@
 {% endif %}
 
 {% if show_social_links | default(true) %}
-<section class="panel toggle-management-panel profile-settings-panel">
-    <div class="panel-header"><div><p class="eyebrow">Editable profile details</p><h3>Social links</h3></div></div>
+<section id="youtube-integration" class="panel toggle-management-panel profile-settings-panel{% if youtube_chat is defined %} social-integrations-panel{% endif %}">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Editable profile details</p>
+            <h3>Socials</h3>
+        </div>
+    </div>
+
+    {% if youtube_chat is defined %}
+        <div class="dashboard-tabs social-integration-tabs" role="tablist" aria-label="Social settings">
+            <button class="dashboard-tab{% if social_tab != 'youtube' %} active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if social_tab != 'youtube' else 'false' }}" data-social-tab="links">Social links</button>
+            <button class="dashboard-tab{% if social_tab == 'youtube' %} active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if social_tab == 'youtube' else 'false' }}" data-social-tab="youtube">YouTube chat</button>
+        </div>
+    {% endif %}
+
+    <div{% if youtube_chat is defined %} data-social-panel="links"{% endif %}{% if youtube_chat is defined and social_tab == 'youtube' %} hidden{% endif %}>
     <div class="profile-settings-grid">
         {% for key, label, description, current_value in [
             ("social.discord_url", "Discord URL", "Used by the channel's Discord and social commands.", channel_settings.discord_url),
@@ -24,6 +38,73 @@
             </article>
         {% endfor %}
     </div>
+    </div>
+
+    {% if youtube_chat is defined %}
+        <div data-social-panel="youtube"{% if social_tab != 'youtube' %} hidden{% endif %}>
+            {% if youtube_message %}
+                <div class="toggle-feedback {% if youtube_result == 'success' %}success{% else %}error{% endif %}" role="status">
+                    <span class="toggle-feedback-icon">{% if youtube_result == "success" %}&#10003;{% else %}!{% endif %}</span>
+                    <span>{{ youtube_message }}</span>
+                </div>
+            {% endif %}
+
+            <article class="youtube-integration-card">
+                <div class="toggle-card-heading">
+                    <div>
+                        <h4>YouTube live chat</h4>
+                        <p>Connect the YouTube channel that should appear beside Twitch chat. This integration is read-only.</p>
+                    </div>
+                    <span class="toggle-status {% if youtube_chat.connected %}enabled{% endif %}">{% if youtube_chat.connected %}Connected{% elif youtube_chat.configured %}Not connected{% else %}Unavailable{% endif %}</span>
+                </div>
+
+                {% if youtube_chat.connected %}
+                    <div class="channel-user-details youtube-channel-details">
+                        <div><span>Connected channel</span><strong>{{ youtube_chat.channel_title }}</strong></div>
+                        <div><span>YouTube channel ID</span><strong>{{ youtube_chat.channel_id }}</strong></div>
+                        <div><span>Chat status</span><strong>{{ youtube_chat.detail }}</strong></div>
+                    </div>
+                    <form method="post" action="/channel/youtube/disconnect" onsubmit="return confirm('Disconnect {{ youtube_chat.channel_title }} from combined chat?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="button danger" type="submit">Disconnect YouTube</button>
+                    </form>
+                {% elif youtube_chat.configured %}
+                    <p class="panel-description">Authorization grants read-only access so RatsBoomBot can discover your active livestream and display its chat.</p>
+                    <a class="button primary" href="/channel/youtube/connect">Connect YouTube Channel</a>
+                {% else %}
+                    <p class="panel-description">YouTube integration has not been configured on this deployment yet.</p>
+                {% endif %}
+            </article>
+
+            <article class="youtube-integration-card widget-url-card">
+                <div class="toggle-card-heading">
+                    <div>
+                        <h4>OBS browser sources</h4>
+                        <p>Add any of these URLs to an OBS Browser Source. Treat them like private stream keys.</p>
+                    </div>
+                </div>
+
+                {% for key, label, description in [
+                    ('chat', 'Chat', 'Twitch and YouTube messages, excluding commands.'),
+                    ('commands', 'Commands', 'Command messages only.'),
+                    ('both', 'Both', 'All chat messages and commands.')
+                ] %}
+                    <label class="widget-url-field">
+                        <span><strong>{{ label }}</strong> &middot; {{ description }}</span>
+                        <div class="widget-url-controls">
+                            <input class="profile-setting-input" type="text" value="{{ widget_urls[key] }}" readonly data-widget-url="{{ key }}">
+                            <button class="button secondary" type="button" data-copy-widget-url="{{ key }}">Copy URL</button>
+                        </div>
+                    </label>
+                {% endfor %}
+
+                <form class="widget-regenerate-form" method="post" action="/channel/widgets/regenerate" onsubmit="return confirm('Generate new URLs? Existing OBS browser-source URLs will stop working.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="button danger" type="submit">Regenerate URLs</button>
+                </form>
+            </article>
+        </div>
+    {% endif %}
 </section>
 
 {% endif %}

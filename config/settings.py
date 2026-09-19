@@ -63,6 +63,14 @@ class Settings:
     BOT_REDIRECT_URI = os.getenv("BOT_REDIRECT_URI", f"{ADMIN_BASE_URL}/admin/oauth/bot")
     CHANNEL_REDIRECT_URI = os.getenv("CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/admin/oauth/channel")
     PUBLIC_CHANNEL_REDIRECT_URI = os.getenv("PUBLIC_CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/channel/connect")
+    YOUTUBE_CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID")
+    YOUTUBE_CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET")
+    YOUTUBE_REDIRECT_URI = os.getenv("YOUTUBE_REDIRECT_URI", f"{DASHBOARD_BASE_URL}/oauth/youtube/connect")
+    YOUTUBE_CHAT_DISCOVERY_SECONDS = max(15, int(os.getenv("YOUTUBE_CHAT_DISCOVERY_SECONDS", "30")))
+
+    @property
+    def YOUTUBE_CONFIGURED(self) -> bool:
+        return bool(self.YOUTUBE_CLIENT_ID and self.YOUTUBE_CLIENT_SECRET and self.YOUTUBE_REDIRECT_URI)
 
     BOT_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('BOT_SCOPES') or DEFAULT_BOT_SCOPES} moderator:manage:announcements moderator:read:chatters".split()))
 

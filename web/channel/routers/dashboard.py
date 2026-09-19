@@ -1,14 +1,16 @@
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from bot.services.channels.profile_settings import LOYALTY_GROUP
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
+from config.settings import settings
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.channel.command_help import build_command_help_groups
 from web.shared.common import templates
+from web.shared.live_chat import stream_chat_events
 from web.state import get_bot
 
 router = APIRouter()
@@ -125,6 +127,29 @@ async def channel_viewer_queue_state(request: Request):
     })
 
 
+@router.get("/channel/api/chat/stream")
+async def channel_chat_stream(request: Request, view: str = "both"):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+
+    if runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id)) is None:
+        logout_channel_user(request)
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    return StreamingResponse(
+        stream_chat_events(request, runtime_bot.services.live_chat, str(broadcaster_id), view),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
+
+
 @router.get("/channel", response_class=HTMLResponse)
 async def channel_dashboard(request: Request):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
@@ -179,6 +204,7 @@ async def channel_dashboard(request: Request):
             "gambling_loss_total": gambling_loss_total,
             "raid_enabled": raid_enabled,
             "raid_metrics": raid_metrics,
+            "youtube_chat": services.live_chat.get_youtube_state(broadcaster_id),
             "queue_result": request.query_params.get("queue_result"),
             "queue_message": request.query_params.get("queue_message"),
             "csrf_token": get_csrf_token(request)
@@ -284,6 +310,12 @@ async def channel_customization_page(request: Request):
 
     loyalty_page = request.url.path == "/channel/loyalty"
     groups = services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)})
+    widget_urls = {}
+
+    if not loyalty_page:
+        widget_token = await services.live_chat.get_or_create_widget_token(broadcaster_id)
+        widget_base_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/widgets/chat/{widget_token}"
+        widget_urls = {view: f"{widget_base_url}?view={view}" for view in ("chat", "commands", "both")}
 
     return templates.TemplateResponse(
         request=request,
@@ -297,10 +329,15 @@ async def channel_customization_page(request: Request):
             "channel_settings": await services.broadcaster_settings.get_settings(broadcaster_id),
             "setting_groups": {name: entries for name, entries in groups.items() if (name == LOYALTY_GROUP) == loyalty_page},
             "chat_identity": services.chat_identity.get_state(broadcaster_id),
+            "youtube_chat": services.live_chat.get_youtube_state(broadcaster_id),
+            "widget_urls": widget_urls,
             "setting_result": request.query_params.get("setting_result"),
             "setting_message": request.query_params.get("setting_message"),
             "identity_result": request.query_params.get("identity_result"),
             "identity_message": request.query_params.get("identity_message"),
+            "youtube_result": request.query_params.get("youtube_result"),
+            "youtube_message": request.query_params.get("youtube_message"),
+            "social_tab": request.query_params.get("social_tab", "links"),
             "csrf_token": get_csrf_token(request)
         }
     )

@@ -156,6 +156,15 @@ class ChatEvents(commands.Component):
 
             return
 
+        try:
+            services.live_chat.publish_twitch(payload)
+        except Exception:
+            LOGGER.exception(
+                "[Live Chat] Failed to publish Twitch message from %s in broadcaster %s.",
+                chatter_name,
+                broadcaster_id
+            )
+
         services.timers.track_message(payload)
         await services.raid_bosses.track_message(payload)
 
