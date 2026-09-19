@@ -202,16 +202,15 @@ async def test_ad_status_reports_running_and_offline_states():
 
 @pytest.mark.asyncio
 async def test_dashboard_can_send_to_twitch_and_youtube(monkeypatch):
-    broadcaster = SimpleNamespace(
-        id="channel-1",
-        send_message=AsyncMock(return_value=SimpleNamespace(sent=True))
-    )
+    broadcaster = SimpleNamespace(id="channel-1")
+    twitch_channel = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True)))
     live_chat = SimpleNamespace(send_youtube_message=AsyncMock(return_value={"id": "youtube-message"}))
     services = SimpleNamespace(
         broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
         live_chat=live_chat
     )
-    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    runtime_bot = SimpleNamespace(services=services, create_partialuser=lambda broadcaster_id: twitch_channel)
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
     request = Request({
         "type": "http", "method": "POST", "path": "/channel/api/chat/send", "headers": [],
         "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
@@ -223,8 +222,57 @@ async def test_dashboard_can_send_to_twitch_and_youtube(monkeypatch):
 
     assert response.status_code == 200
     assert payload["sent"] == ["twitch", "youtube"]
-    broadcaster.send_message.assert_awaited_once_with(sender="channel-1", message="Hello both chats")
+    twitch_channel.send_message.assert_awaited_once_with(sender="channel-1", message="Hello both chats")
     live_chat.send_youtube_message.assert_awaited_once_with("channel-1", "Hello both chats")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_both_target_uses_twitch_when_youtube_is_offline(monkeypatch):
+    broadcaster = SimpleNamespace(id="channel-1")
+    twitch_channel = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True)))
+    live_chat = SimpleNamespace(send_youtube_message=AsyncMock(side_effect=ValueError("No active YouTube live chat is available.")))
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
+        live_chat=live_chat
+    )
+    runtime_bot = SimpleNamespace(services=services, create_partialuser=lambda broadcaster_id: twitch_channel)
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/chat/send", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_send_chat_message(request, "Twitch fallback", "both", "csrf")
+    payload = json.loads(response.body)
+
+    assert response.status_code == 200
+    assert payload == {"sent": ["twitch"], "errors": {}}
+    twitch_channel.send_message.assert_awaited_once()
+    live_chat.send_youtube_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_dashboard_youtube_target_explains_when_youtube_is_offline(monkeypatch):
+    broadcaster = SimpleNamespace(id="channel-1")
+    live_chat = SimpleNamespace(send_youtube_message=AsyncMock(side_effect=ValueError("No active YouTube live chat is available.")))
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
+        live_chat=live_chat
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/chat/send", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_send_chat_message(request, "YouTube only", "youtube", "csrf")
+    payload = json.loads(response.body)
+
+    assert response.status_code == 400
+    assert payload["sent"] == []
+    assert payload["errors"]["youtube"].startswith("YouTube is offline.")
 
 
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
@@ -259,3 +307,4 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
     assert 'grid-template-areas: "stream gambling chat" "queue activity chat"' in dashboard_styles
+    assert "grid-template-rows: max-content minmax(540px,auto)" in dashboard_styles
