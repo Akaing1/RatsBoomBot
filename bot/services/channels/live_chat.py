@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 
+from bot.profiles import get_active_profile
 from config.settings import settings
 from web.shared.youtube_oauth import YOUTUBE_API_URL, YOUTUBE_TOKEN_URL, YouTubeChannel, YouTubeTokenResponse
 
@@ -63,8 +64,9 @@ def message_matches_view(message: UnifiedChatMessage, view: str) -> bool:
 
 class LiveChatService:
 
-    def __init__(self, db):
+    def __init__(self, db, *, bot=None):
         self.db = db
+        self.bot = bot
         self.connections: dict[str, YouTubeConnection] = {}
         self.youtube_statuses: dict[str, tuple[str, str]] = {}
         self.active_youtube_chat_ids: dict[str, str] = {}
@@ -153,7 +155,7 @@ class LiveChatService:
         message = UnifiedChatMessage(
             id=f"twitch:{message_id}",
             platform="twitch",
-            kind="command" if self._consume_command_response(broadcaster_id, message_id) else self._classify(message_text),
+            kind="command" if self._consume_command_response(broadcaster_id, message_id) else self._classify(broadcaster_id, message_text),
             username=username,
             display_name=display_name,
             message=message_text,
@@ -361,6 +363,28 @@ class LiveChatService:
                         self.active_youtube_chat_ids.pop(broadcaster_id, None)
                 except asyncio.CancelledError:
                     raise
+                except httpx.HTTPStatusError as error:
+                    if error.response.status_code != 403:
+                        raise
+
+                    reason, api_message = self._youtube_error_details(error.response)
+                    detail = {
+                        "liveStreamingNotEnabled": "YouTube live streaming is not enabled for the connected channel.",
+                        "insufficientLivePermissions": "Reconnect YouTube to grant live-stream access."
+                    }.get(reason, "YouTube live-chat discovery is unavailable; retrying automatically.")
+                    status = ("unavailable", detail)
+
+                    if self.youtube_statuses.get(broadcaster_id) != status:
+                        LOGGER.warning(
+                            "[Live Chat] YouTube discovery unavailable for broadcaster %s (%s): %s",
+                            broadcaster_id,
+                            reason or "forbidden",
+                            api_message or "The YouTube API returned HTTP 403."
+                        )
+
+                    self.active_youtube_chat_ids.pop(broadcaster_id, None)
+                    self.youtube_statuses[broadcaster_id] = status
+                    await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
                 except Exception:
                     self.youtube_statuses[broadcaster_id] = ("error", "YouTube chat is temporarily unavailable; retrying automatically.")
                     LOGGER.exception("[Live Chat] YouTube watcher failed for broadcaster %s.", broadcaster_id)
@@ -436,7 +460,7 @@ class LiveChatService:
             message = UnifiedChatMessage(
                 id=f"youtube:{item.get('id') or secrets.token_urlsafe(12)}",
                 platform="youtube",
-                kind=self._classify(message_text),
+                kind=self._classify(broadcaster_id, message_text),
                 username=username,
                 display_name=display_name,
                 message=message_text,
@@ -543,6 +567,36 @@ class LiveChatService:
         return connection
 
     @staticmethod
-    def _classify(message: str) -> str:
+    def _youtube_error_details(response: httpx.Response) -> tuple[str | None, str | None]:
+        try:
+            payload = response.json()
+            error = payload.get("error", {}) if isinstance(payload, dict) else {}
+        except (TypeError, ValueError):
+            return None, None
+
+        reasons = error.get("errors") or []
+        reason = reasons[0].get("reason") if reasons and isinstance(reasons[0], dict) else None
+        message = error.get("message")
+        return str(reason) if reason else None, str(message) if message else None
+
+    def _classify(self, broadcaster_id: str, message: str) -> str:
         prefix = settings.PREFIX or "!"
-        return "command" if message.lstrip().startswith(prefix) else "chat"
+        stripped = message.lstrip()
+
+        if not stripped.startswith(prefix):
+            return "chat"
+
+        invoked_with = stripped[len(prefix):].split(maxsplit=1)[0].casefold()
+
+        if not invoked_with:
+            return "chat"
+
+        if self.bot is not None and self.bot.get_command(invoked_with) is not None:
+            return "command"
+
+        profile = get_active_profile(str(broadcaster_id))
+
+        if profile is not None and invoked_with == profile.points.command_alias.casefold():
+            return "command"
+
+        return "chat"
