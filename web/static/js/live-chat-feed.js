@@ -8,6 +8,8 @@
 
     function renderMessage(feed, message) {
         if (!message || !message.id || feed.seen.has(message.id)) return;
+        const distanceFromBottom = feed.element.scrollHeight - feed.element.scrollTop - feed.element.clientHeight;
+        const shouldFollowNewest = distanceFromBottom <= 24;
         feed.seen.add(message.id);
 
         const empty = feed.element.querySelector("[data-live-chat-empty]");
@@ -43,7 +45,7 @@
             oldest.remove();
         }
 
-        feed.element.scrollTop = feed.element.scrollHeight;
+        if (shouldFollowNewest) feed.element.scrollTop = feed.element.scrollHeight;
     }
 
     document.querySelectorAll("[data-live-chat-feed]").forEach(element => {
