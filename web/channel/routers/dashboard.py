@@ -241,7 +241,8 @@ async def channel_send_chat_message(
 
     if target in {"twitch", "both"}:
         try:
-            result = await broadcaster.send_message(sender=str(broadcaster_id), message=message)
+            twitch_channel = runtime_bot.create_partialuser(str(broadcaster_id))
+            result = await twitch_channel.send_message(sender=str(broadcaster_id), message=message)
             if getattr(result, "sent", False):
                 sent.append("twitch")
             else:
@@ -255,10 +256,19 @@ async def channel_send_chat_message(
             await services.live_chat.send_youtube_message(str(broadcaster_id), message)
             sent.append("youtube")
         except ValueError as error:
-            errors["youtube"] = str(error)
+            youtube_error = str(error)
+
+            if target == "youtube" or not sent:
+                errors["youtube"] = (
+                    "YouTube is offline. Start a YouTube livestream with live chat enabled before sending a message."
+                    if "No active YouTube live chat" in youtube_error
+                    else youtube_error
+                )
         except Exception:
             LOGGER.exception("[Dashboard] Failed to send YouTube message for broadcaster %s.", broadcaster_id)
-            errors["youtube"] = "Reconnect YouTube to enable dashboard replies."
+
+            if target == "youtube" or not sent:
+                errors["youtube"] = "Reconnect YouTube to enable dashboard replies."
 
     if not sent:
         detail = " ".join(errors.values()) or "The message could not be sent."
