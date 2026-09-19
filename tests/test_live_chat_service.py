@@ -1,13 +1,21 @@
+import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from urllib.parse import parse_qs, urlparse
 
 import asqlite
+import httpx
 import pytest
+from starlette.requests import Request
 
+import web.channel.routers.dashboard as dashboard_router
 from bot.services.channels.live_chat import LiveChatService, UnifiedChatMessage, message_matches_view, normalize_chat_view
 from storage.migration_runner import run_migrations
-from web.shared.youtube_oauth import YOUTUBE_READONLY_SCOPE, YouTubeChannel, YouTubeTokenResponse, build_youtube_oauth_url
+from web.channel.routers.dashboard import get_ad_status
+from web.admin.auth import CSRF_SESSION_KEY
+from web.channel.auth import CHANNEL_USER_ID_KEY
+from web.shared.youtube_oauth import YOUTUBE_CHAT_SCOPE, YouTubeChannel, YouTubeTokenResponse, build_youtube_oauth_url
 
 
 def twitch_payload(text: str, message_id: str = "message-1"):
@@ -124,18 +132,102 @@ async def test_connections_and_widget_tokens_persist(tmp_path, monkeypatch):
         assert not restarted.get_youtube_state("channel-1").connected
 
 
-def test_youtube_authorization_uses_read_only_scope(monkeypatch):
+def test_youtube_authorization_uses_chat_write_scope(monkeypatch):
     monkeypatch.setattr("web.shared.youtube_oauth.settings.YOUTUBE_CLIENT_ID", "client-id")
     monkeypatch.setattr("web.shared.youtube_oauth.settings.YOUTUBE_REDIRECT_URI", "https://example.com/oauth/youtube/connect")
     query = parse_qs(urlparse(build_youtube_oauth_url("secure-state")).query)
 
-    assert query["scope"] == [YOUTUBE_READONLY_SCOPE]
+    assert query["scope"] == [YOUTUBE_CHAT_SCOPE]
     assert query["access_type"] == ["offline"]
     assert query["state"] == ["secure-state"]
-    assert "youtube.force-ssl" not in query["scope"][0]
+    assert query["scope"] == ["https://www.googleapis.com/auth/youtube.force-ssl"]
 
 
-def test_dashboard_templates_keep_chat_read_only_and_raid_boss_below():
+@pytest.mark.asyncio
+async def test_youtube_dashboard_message_uses_active_live_chat():
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"id": "sent-message"})
+
+    service = LiveChatService(None)
+    service.connections["channel-1"] = SimpleNamespace(
+        access_token="access",
+        expires_at=(datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    )
+    service.active_youtube_chat_ids["channel-1"] = "live-chat-1"
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        service.client = client
+        result = await service.send_youtube_message("channel-1", "Hello both chats")
+
+    assert result["id"] == "sent-message"
+    assert len(requests) == 1
+    assert requests[0].url.path.endswith("/liveChat/messages")
+    assert b'"liveChatId":"live-chat-1"' in requests[0].content
+    assert b'"messageText":"Hello both chats"' in requests[0].content
+
+
+@pytest.mark.asyncio
+async def test_youtube_dashboard_message_requires_active_chat():
+    service = LiveChatService(None)
+    service.connections["channel-1"] = SimpleNamespace()
+
+    with pytest.raises(ValueError, match="No active YouTube live chat"):
+        await service.send_youtube_message("channel-1", "Hello")
+
+
+@pytest.mark.asyncio
+async def test_ad_status_reports_running_and_offline_states():
+    now = datetime.now(UTC)
+    live = SimpleNamespace(
+        id="channel-1",
+        is_live=True,
+        fetch_ad_schedule=AsyncMock(return_value=SimpleNamespace(
+            last_ad_at=now - timedelta(seconds=10),
+            next_ad_at=now + timedelta(minutes=30),
+            duration=60
+        ))
+    )
+    offline = SimpleNamespace(id="channel-2", is_live=False)
+
+    running = await get_ad_status(live)
+    offline_status = await get_ad_status(offline)
+
+    assert running["state"] == "running"
+    assert running["ends_at"] is not None
+    assert offline_status["state"] == "offline"
+
+
+@pytest.mark.asyncio
+async def test_dashboard_can_send_to_twitch_and_youtube(monkeypatch):
+    broadcaster = SimpleNamespace(
+        id="channel-1",
+        send_message=AsyncMock(return_value=SimpleNamespace(sent=True))
+    )
+    live_chat = SimpleNamespace(send_youtube_message=AsyncMock(return_value={"id": "youtube-message"}))
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
+        live_chat=live_chat
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/chat/send", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_send_chat_message(request, "Hello both chats", "both", "csrf")
+    payload = json.loads(response.body)
+
+    assert response.status_code == 200
+    assert payload["sent"] == ["twitch", "youtube"]
+    broadcaster.send_message.assert_awaited_once_with(sender="channel-1", message="Hello both chats")
+    live_chat.send_youtube_message.assert_awaited_once_with("channel-1", "Hello both chats")
+
+
+def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
     customization = open("web/templates/shared/profile_inputs.html", encoding="utf-8").read()
     dashboard_styles = open("web/static/css/style.css", encoding="utf-8").read()
@@ -147,7 +239,12 @@ def test_dashboard_templates_keep_chat_read_only_and_raid_boss_below():
     assert 'data-activity-tab="redeems"' in dashboard
     assert 'data-activity-tab="checkins"' in dashboard
     assert dashboard.index("channel-live-layout") < dashboard.index('include "channel/raid_summary.html"')
-    assert "reply" not in dashboard.lower()
+    assert 'data-chat-composer' in dashboard
+    assert 'data-chat-target="twitch"' in dashboard
+    assert 'data-chat-target="youtube"' in dashboard
+    assert 'data-chat-target="both"' in dashboard
+    assert 'data-ad-status' in dashboard
+    assert dashboard.count("Viewer queue") == 1
     assert "Connect YouTube Channel" in customization
     assert "('chat', 'Chat'" in customization
     assert "('commands', 'Commands'" in customization
@@ -161,3 +258,4 @@ def test_dashboard_templates_keep_chat_read_only_and_raid_boss_below():
     assert "overflow-y: auto" in widget_styles
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
+    assert 'grid-template-areas: "stream gambling chat" "queue activity chat"' in dashboard_styles
