@@ -30,6 +30,11 @@ class ChannelContext(commands.Context):
         except Exception:
             log_command_timing(self, "send_failed", send_ms=(perf_counter() - started) * 1000)
             raise
+        if services is not None:
+            sent = getattr(result, "sent", getattr(result, "is_sent", False))
+            message_id = getattr(result, "id", None)
+            if sent and message_id:
+                services.live_chat.tag_command_response(str(self.broadcaster.id), str(message_id))
         log_command_timing(self, "send_complete", send_ms=(perf_counter() - started) * 1000, result=result)
         return result
 
