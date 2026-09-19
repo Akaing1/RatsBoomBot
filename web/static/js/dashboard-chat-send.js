@@ -23,7 +23,7 @@
     targets.forEach(button => button.addEventListener("click", () => selectTarget(button.dataset.chatTarget)));
 
     messageInput.addEventListener("keydown", event => {
-        if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
             event.preventDefault();
             form.requestSubmit();
         }

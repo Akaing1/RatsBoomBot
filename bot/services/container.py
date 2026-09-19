@@ -29,7 +29,7 @@ class ServiceContainer:
         self.chatter_stats = ChatterStatsService(bot, db, self.broadcasters)
         self.profile_settings = ProfileSettingsService(db)
         self.features = FeatureToggleService(db, self.profile_settings)
-        self.live_chat = LiveChatService(db)
+        self.live_chat = LiveChatService(db, bot=bot)
         self.stream_logs = StreamLogService(bot, self.broadcasters, settings.STREAM_LOGS_PATH)
         self.help = HelpService(bot)
         self.timers = TimerService(bot, self.broadcasters, self.broadcaster_settings)

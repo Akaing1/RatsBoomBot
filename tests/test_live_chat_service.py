@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -37,15 +38,18 @@ def twitch_payload(text: str, message_id: str = "message-1"):
 
 
 def test_twitch_messages_are_split_between_chat_and_commands():
-    service = LiveChatService(None)
+    bot = SimpleNamespace(get_command=lambda name: object() if name == "points" else None)
+    service = LiveChatService(None, bot=bot)
     chat = service.publish_twitch(twitch_payload("hello", "chat"))
     command = service.publish_twitch(twitch_payload("  !points", "command"))
+    unknown = service.publish_twitch(twitch_payload("!not-a-command", "unknown"))
 
     assert chat.kind == "chat"
     assert command.kind == "command"
-    assert [item["message"] for item in service.history("channel-1", "chat")] == ["hello"]
+    assert unknown.kind == "chat"
+    assert [item["message"] for item in service.history("channel-1", "chat")] == ["hello", "!not-a-command"]
     assert [item["message"] for item in service.history("channel-1", "commands")] == ["  !points"]
-    assert [item["message"] for item in service.history("channel-1", "both")] == ["hello", "  !points"]
+    assert [item["message"] for item in service.history("channel-1", "both")] == ["hello", "  !points", "!not-a-command"]
     assert chat.badges == ("Mod", "Subscriber")
 
 
@@ -63,7 +67,8 @@ def test_tagged_bot_response_is_kept_with_commands_without_classifying_all_bot_m
 
 
 def test_youtube_messages_are_normalized_and_deduplicated():
-    service = LiveChatService(None)
+    bot = SimpleNamespace(get_command=lambda name: object() if name == "raid" else None)
+    service = LiveChatService(None, bot=bot)
     item = {
         "id": "youtube-message",
         "snippet": {"displayMessage": "!raid", "hasDisplayContent": True, "publishedAt": "2026-09-19T12:00:00Z"},
@@ -84,6 +89,49 @@ def test_youtube_messages_are_normalized_and_deduplicated():
     assert messages[0]["kind"] == "command"
     assert messages[0]["badges"] == ["Mod", "Member"]
     assert "avatar_url" not in messages[0]
+
+
+def test_youtube_error_details_extracts_google_reason_and_message():
+    response = httpx.Response(403, json={
+        "error": {
+            "message": "The user is not enabled for live streaming.",
+            "errors": [{"reason": "liveStreamingNotEnabled"}]
+        }
+    })
+
+    assert LiveChatService._youtube_error_details(response) == (
+        "liveStreamingNotEnabled",
+        "The user is not enabled for live streaming."
+    )
+
+
+@pytest.mark.asyncio
+async def test_youtube_watcher_squelches_forbidden_discovery_traceback(monkeypatch):
+    request = httpx.Request("GET", "https://www.googleapis.com/youtube/v3/liveBroadcasts")
+    response = httpx.Response(403, request=request, json={
+        "error": {
+            "message": "The user is not enabled for live streaming.",
+            "errors": [{"reason": "liveStreamingNotEnabled"}]
+        }
+    })
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._find_active_live_chat = AsyncMock(side_effect=httpx.HTTPStatusError(
+        "Forbidden", request=request, response=response
+    ))
+    monkeypatch.setattr(
+        "bot.services.channels.live_chat.asyncio.sleep",
+        AsyncMock(side_effect=asyncio.CancelledError)
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube("channel-1")
+
+    assert service.youtube_statuses["channel-1"] == (
+        "unavailable",
+        "YouTube live streaming is not enabled for the connected channel."
+    )
 
 
 def test_chat_view_normalization_and_matching():
