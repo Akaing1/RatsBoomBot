@@ -155,12 +155,20 @@ button, input { font: inherit; }
 .channel-status-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .channel-detail-grid {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));align-items: start; gap: 24px; }
 .channel-dashboard-grid { display: grid; grid-template-columns: minmax(0,3fr) minmax(0,3fr) minmax(0,4fr); align-items: start; gap: 24px; }
-.channel-live-layout { display: grid; grid-template-columns: minmax(280px, 1.15fr) minmax(260px, .9fr) minmax(250px, .8fr); align-items: stretch; gap: 18px; margin-bottom: 24px; }
-.channel-live-layout > .panel, .channel-live-layout > .channel-dashboard-side > .panel { min-height: 540px; }
+.channel-dashboard-layout { display: grid; grid-template-columns: minmax(250px,.8fr) minmax(270px,.9fr) minmax(360px,1.25fr); grid-template-areas: "stream gambling chat" "queue activity chat"; align-items: stretch; gap: 18px; margin-bottom: 24px; }
+.channel-dashboard-layout > .channel-status-grid, .channel-dashboard-layout > .channel-live-layout { display: contents; }
+.stream-status-card { grid-area: stream; }
+.gambling-status-card { grid-area: gambling; }
+.live-chat-panel { grid-area: chat; }
+.dashboard-activity-panel { grid-area: activity; }
+.viewer-queue-column { grid-area: queue; }
+.channel-dashboard-layout .panel { margin-bottom: 0; }
+.dashboard-activity-panel, .viewer-queue-column > .panel { min-height: 540px; }
 .live-chat-panel, .dashboard-activity-panel, .viewer-queue-column > .panel { display: flex; min-width: 0; flex-direction: column; padding: 20px; }
 .chat-platform-states { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .live-chat-feed { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 8px; overflow-y: auto; scrollbar-gutter: stable; }
-.dashboard-chat-feed, .dashboard-command-feed { min-height: 390px; max-height: 455px; }
+.dashboard-chat-feed { min-height: 560px; }
+.dashboard-command-feed { min-height: 390px; max-height: 455px; }
 .live-chat-message { display: flex; align-items: flex-start; gap: 9px; padding: 10px; border-left: 3px solid #9147ff; border-radius: 9px; background: var(--surface-raised); }
 .live-chat-message.platform-youtube { border-left-color: #ff3b3b; }
 .live-chat-avatar { display: none; }
@@ -173,6 +181,26 @@ button, input { font: inherit; }
 .live-chat-text { margin: 4px 0 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.4; }
 .kind-command .live-chat-text { color: #d8bcff; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .live-chat-empty { display: grid; min-height: 170px; flex: 1; place-items: center; color: var(--muted); font-size: 12px; text-align: center; }
+.ad-status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 17px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12px; }
+.ad-status-label { color: var(--muted); font-weight: 700; }
+.ad-status-row strong { color: var(--text); text-align: right; }
+.ad-status-row.state-running strong { color: #f5c451; }
+.ad-status-row.state-scheduled strong { color: #c7b7ff; }
+.ad-status-row.state-unavailable strong { color: var(--danger); }
+.dashboard-chat-composer { display: flex; flex-direction: column; gap: 9px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.dashboard-chat-composer textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; outline: 0; resize: vertical; background: var(--background); color: var(--text); font: inherit; line-height: 1.4; }
+.dashboard-chat-composer textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,92,246,.14); }
+.dashboard-chat-composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.chat-target-selector { display: flex; gap: 5px; }
+.chat-target { min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.chat-target.active { border-color: rgba(139,92,246,.65); background: rgba(139,92,246,.16); color: #d8bcff; }
+.chat-target:disabled { cursor: not-allowed; opacity: .38; }
+.chat-send-button { min-height: 36px; }
+.chat-send-status { min-height: 16px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.chat-send-status.success { color: var(--success); }
+.chat-send-status.warning { color: #f5c451; }
+.chat-send-status.error { color: var(--danger); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; padding: 0; margin: -1px; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .activity-tabs { margin-bottom: 12px; }
 .activity-subheading { margin: 0; }
 .dashboard-command-feed { min-height: 350px; }
@@ -451,7 +479,9 @@ body.landing-page {
     .main-content { padding: 28px 20px; }
     .page-header { flex-direction: column; }
     .status-grid, .channel-summary, .channel-card-grid, .channel-status-grid, .channel-detail-grid, .channel-dashboard-grid, .channel-live-layout, .redemption-panel-grid, .performance-grid, .raid-metric-grid { grid-template-columns: 1fr; }
-    .channel-live-layout > .panel, .channel-live-layout > .channel-dashboard-side > .panel { min-height: 460px; }
+    .channel-dashboard-layout { grid-template-columns: 1fr; grid-template-areas: "stream" "gambling" "chat" "activity" "queue"; }
+    .dashboard-activity-panel, .viewer-queue-column > .panel { min-height: 460px; }
+    .dashboard-chat-feed { min-height: 460px; }
     .channel-heading { align-items: flex-start; }
     .social-link-row { align-items: flex-start; flex-direction: column; }
     .social-link-row p { white-space: normal; }
