@@ -627,5 +627,5 @@
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="/static/js/live-chat-feed.js" defer></script>
+    <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
 {% endblock %}
