@@ -26,6 +26,14 @@ https://uat.ratsboombot.com/oauth/channel/connect
 
 Use the application's client ID and secret only in `/opt/ratsboombot-uat/.env`. The bot account is `akaing1`; authorize only `developer_ninjakaing` as the broadcaster.
 
+For YouTube chat testing, enable the YouTube Data API v3 in a Google Cloud project and create an OAuth 2.0 Web application with this authorized redirect URI:
+
+```text
+https://uat.ratsboombot.com/oauth/youtube/connect
+```
+
+Set `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REDIRECT_URI` in the UAT `.env`. Add the UAT Google account as an OAuth consent-screen test user while the application remains in Testing.
+
 ## 2. Create the isolated Pi checkout
 
 ```bash

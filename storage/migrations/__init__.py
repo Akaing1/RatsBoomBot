@@ -41,6 +41,7 @@ from storage.migrations.v036_raid_progress_checkpoints import migrate as migrate
 from storage.migrations.v037_chatter_profile_images import migrate as migrate_chatter_profile_images
 from storage.migrations.v038_live_command_roll_limits import migrate as migrate_live_command_roll_limits
 from storage.migrations.v039_command_slowmode import migrate as migrate_command_slowmode
+from storage.migrations.v040_youtube_chat import migrate as migrate_youtube_chat
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -92,4 +93,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=37, name="chatter_profile_images", run=migrate_chatter_profile_images)
     , Migration(version=38, name="live_command_roll_limits", run=migrate_live_command_roll_limits)
     , Migration(version=39, name="command_slowmode", run=migrate_command_slowmode)
+    , Migration(version=40, name="youtube_chat", run=migrate_youtube_chat)
 )

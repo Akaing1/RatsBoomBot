@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>{{ (broadcaster.name if broadcaster else "Channel") }} {{ view | title }} Widget</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/chat-widget.css') }}?v={{ deployment_stamp() }}">
+</head>
+<body class="chat-widget-body">
+    <main
+        class="live-chat-feed widget-chat-feed"
+        data-live-chat-feed
+        data-stream-url="/widgets/chat/{{ token }}/events?view={{ view }}"
+        data-max-messages="60"
+        data-empty-title="Waiting for {{ view }}"
+    ></main>
+    <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
+</body>
+</html>

@@ -76,3 +76,8 @@
 
 {% include "shared/timer_editor.html" %}
 {% endblock %}
+
+{% block page_scripts %}
+    {{ super() }}
+    <script src="/static/js/social-integrations.js" defer></script>
+{% endblock %}
