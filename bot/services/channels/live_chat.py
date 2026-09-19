@@ -72,6 +72,8 @@ class LiveChatService:
         self.messages: dict[str, deque[UnifiedChatMessage]] = defaultdict(lambda: deque(maxlen=250))
         self.message_ids: dict[str, set[str]] = defaultdict(set)
         self.message_id_order: dict[str, deque[str]] = defaultdict(deque)
+        self.command_response_ids: dict[str, set[str]] = defaultdict(set)
+        self.command_response_id_order: dict[str, deque[str]] = defaultdict(deque)
         self.subscribers: dict[str, set[asyncio.Queue]] = defaultdict(set)
         self.tasks: dict[str, asyncio.Task] = {}
         self.client: httpx.AsyncClient | None = None
@@ -145,10 +147,11 @@ class LiveChatService:
 
         timestamp = getattr(payload, "timestamp", None)
         timestamp_value = timestamp.isoformat() if hasattr(timestamp, "isoformat") else datetime.now(UTC).isoformat()
+        message_id = str(getattr(payload, "id", None) or secrets.token_urlsafe(12))
         message = UnifiedChatMessage(
-            id=f"twitch:{getattr(payload, 'id', None) or secrets.token_urlsafe(12)}",
+            id=f"twitch:{message_id}",
             platform="twitch",
-            kind=self._classify(message_text),
+            kind="command" if self._consume_command_response(broadcaster_id, message_id) else self._classify(message_text),
             username=username,
             display_name=display_name,
             message=message_text,
@@ -158,6 +161,30 @@ class LiveChatService:
         )
         self.publish(broadcaster_id, message)
         return message
+
+    def tag_command_response(self, broadcaster_id: str, message_id: str) -> None:
+        broadcaster_id = str(broadcaster_id)
+        message_id = str(message_id)
+
+        if not message_id or message_id in self.command_response_ids[broadcaster_id]:
+            return
+
+        self.command_response_ids[broadcaster_id].add(message_id)
+        self.command_response_id_order[broadcaster_id].append(message_id)
+
+        while len(self.command_response_id_order[broadcaster_id]) > 1000:
+            expired_id = self.command_response_id_order[broadcaster_id].popleft()
+            self.command_response_ids[broadcaster_id].discard(expired_id)
+
+    def _consume_command_response(self, broadcaster_id: str, message_id: str) -> bool:
+        broadcaster_id = str(broadcaster_id)
+        message_id = str(message_id)
+
+        if message_id not in self.command_response_ids.get(broadcaster_id, set()):
+            return False
+
+        self.command_response_ids[broadcaster_id].discard(message_id)
+        return True
 
     def publish(self, broadcaster_id: str, message: UnifiedChatMessage) -> bool:
         broadcaster_id = str(broadcaster_id)
