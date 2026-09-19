@@ -222,7 +222,7 @@ async def test_dashboard_can_send_to_twitch_and_youtube(monkeypatch):
 
     assert response.status_code == 200
     assert payload["sent"] == ["twitch", "youtube"]
-    twitch_channel.send_message.assert_awaited_once_with(sender="channel-1", message="Hello both chats")
+    twitch_channel.send_message.assert_awaited_once_with(sender="channel-1", token_for="channel-1", message="Hello both chats")
     live_chat.send_youtube_message.assert_awaited_once_with("channel-1", "Hello both chats")
 
 
@@ -307,4 +307,17 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
     assert 'grid-template-areas: "stream gambling chat" "queue activity chat"' in dashboard_styles
-    assert "grid-template-rows: max-content minmax(540px,auto)" in dashboard_styles
+    assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("items, expected", [([], None), ([{"snippet": {"liveChatId": "chat-1"}}], "chat-1")])
+async def test_youtube_discovery_uses_only_one_filter(items, expected):
+    service = LiveChatService(None)
+    service._youtube_get = AsyncMock(return_value={"items": items})
+
+    assert await service._find_active_live_chat("channel-1") == expected
+    service._youtube_get.assert_awaited_once_with(
+        "channel-1", "/liveBroadcasts",
+        {"part": "id,snippet", "broadcastStatus": "active", "broadcastType": "all", "maxResults": 10}
+    )

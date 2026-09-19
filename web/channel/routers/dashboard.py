@@ -242,7 +242,9 @@ async def channel_send_chat_message(
     if target in {"twitch", "both"}:
         try:
             twitch_channel = runtime_bot.create_partialuser(str(broadcaster_id))
-            result = await twitch_channel.send_message(sender=str(broadcaster_id), message=message)
+            result = await twitch_channel.send_message(
+                sender=str(broadcaster_id), token_for=str(broadcaster_id), message=message
+            )
             if getattr(result, "sent", False):
                 sent.append("twitch")
             else:

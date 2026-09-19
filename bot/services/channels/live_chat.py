@@ -375,7 +375,7 @@ class LiveChatService:
         response = await self._youtube_get(
             broadcaster_id,
             "/liveBroadcasts",
-            {"part": "id,snippet", "broadcastStatus": "active", "broadcastType": "all", "mine": "true", "maxResults": 10}
+            {"part": "id,snippet", "broadcastStatus": "active", "broadcastType": "all", "maxResults": 10}
         )
 
         for item in response.get("items", []):

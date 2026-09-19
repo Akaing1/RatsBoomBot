@@ -155,7 +155,7 @@ button, input { font: inherit; }
 .channel-status-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .channel-detail-grid {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));align-items: start; gap: 24px; }
 .channel-dashboard-grid { display: grid; grid-template-columns: minmax(0,3fr) minmax(0,3fr) minmax(0,4fr); align-items: start; gap: 24px; }
-.channel-dashboard-layout { display: grid; grid-template-columns: minmax(250px,.8fr) minmax(270px,.9fr) minmax(360px,1.25fr); grid-template-rows: max-content minmax(540px,auto); grid-template-areas: "stream gambling chat" "queue activity chat"; align-items: stretch; gap: 18px; margin-bottom: 24px; }
+.channel-dashboard-layout { display: grid; grid-template-columns: minmax(250px,.8fr) minmax(270px,.9fr) minmax(360px,1.25fr); grid-template-rows: max-content minmax(540px,1fr); grid-template-areas: "stream gambling chat" "queue activity chat"; align-items: stretch; gap: 18px; margin-bottom: 24px; }
 .channel-dashboard-layout > .channel-status-grid, .channel-dashboard-layout > .channel-live-layout { display: contents; }
 .stream-status-card { grid-area: stream; }
 .gambling-status-card { grid-area: gambling; }
