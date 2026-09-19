@@ -23,7 +23,6 @@ class UnifiedChatMessage:
     display_name: str
     message: str
     timestamp: str
-    avatar_url: str | None = None
     color: str | None = None
     badges: tuple[str, ...] = ()
 
@@ -407,7 +406,6 @@ class LiveChatService:
                 display_name=display_name,
                 message=message_text,
                 timestamp=str(snippet.get("publishedAt") or datetime.now(UTC).isoformat()),
-                avatar_url=author.get("profileImageUrl"),
                 badges=tuple(badges)
             )
             self.publish(broadcaster_id, message)
