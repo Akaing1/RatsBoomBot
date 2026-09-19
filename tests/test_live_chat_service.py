@@ -140,6 +140,7 @@ def test_dashboard_templates_keep_chat_read_only_and_raid_boss_below():
     customization = open("web/templates/shared/profile_inputs.html", encoding="utf-8").read()
     dashboard_styles = open("web/static/css/style.css", encoding="utf-8").read()
     widget_styles = open("web/static/css/chat-widget.css", encoding="utf-8").read()
+    chat_script = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
 
     assert 'data-stream-url="/channel/api/chat/stream?view=chat"' in dashboard
     assert 'data-stream-url="/channel/api/chat/stream?view=commands"' in dashboard
@@ -156,3 +157,7 @@ def test_dashboard_templates_keep_chat_read_only_and_raid_boss_below():
     assert "#viewer-queue-content { max-height: 430px; overflow-y: auto;" in dashboard_styles
     assert "background: #0f1115" in widget_styles
     assert "background: transparent" not in widget_styles.split("body {", 1)[0]
+    assert ".widget-chat-feed::-webkit-scrollbar" in widget_styles
+    assert "overflow-y: auto" in widget_styles
+    assert "shouldFollowNewest" in chat_script
+    assert "if (shouldFollowNewest)" in chat_script
