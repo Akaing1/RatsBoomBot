@@ -206,6 +206,7 @@ button, input { font: inherit; }
 .dashboard-command-feed { min-height: 350px; }
 .redemption-panel-grid { display: contents; }
 .channel-dashboard-side { display: flex; min-width: 0; flex-direction: column; gap: 24px; }
+.viewer-queue-column > .panel { flex: 1; }
 .activity-panel { min-width: 0; padding: 20px; }
 .activity-panel .panel-header { gap: 10px; }
 .activity-scroll { max-height: 430px; overflow-y: auto; scrollbar-gutter: stable; }
