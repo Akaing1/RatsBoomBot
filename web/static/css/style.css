@@ -163,6 +163,7 @@ button, input { font: inherit; }
 .dashboard-chat-feed, .dashboard-command-feed { min-height: 390px; max-height: 455px; }
 .live-chat-message { display: flex; align-items: flex-start; gap: 9px; padding: 10px; border-left: 3px solid #9147ff; border-radius: 9px; background: var(--surface-raised); }
 .live-chat-message.platform-youtube { border-left-color: #ff3b3b; }
+.live-chat-avatar { display: none; }
 .live-chat-message-content { min-width: 0; flex: 1; }
 .live-chat-message-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 11px; }
 .live-chat-platform, .live-chat-badge { padding: 2px 5px; border-radius: 4px; background: #6034a5; color: #fff; font-size: 8px; font-weight: 900; letter-spacing: .04em; }
