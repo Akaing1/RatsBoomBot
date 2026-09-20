@@ -45,6 +45,7 @@ from storage.migrations.v040_youtube_chat import migrate as migrate_youtube_chat
 from storage.migrations.v041_viewer_queue_blacklist import migrate as migrate_viewer_queue_blacklist
 from storage.migrations.v042_viewer_queue_display_names import migrate as migrate_viewer_queue_display_names
 from storage.migrations.v043_pinned_chat_messages import migrate as migrate_pinned_chat_messages
+from storage.migrations.v044_channel_protected_users import migrate as migrate_channel_protected_users
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -100,4 +101,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=41, name="viewer_queue_blacklist", run=migrate_viewer_queue_blacklist)
     , Migration(version=42, name="viewer_queue_display_names", run=migrate_viewer_queue_display_names)
     , Migration(version=43, name="pinned_chat_messages", run=migrate_pinned_chat_messages)
+    , Migration(version=44, name="channel_protected_users", run=migrate_channel_protected_users)
 )
