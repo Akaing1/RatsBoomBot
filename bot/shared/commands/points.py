@@ -768,6 +768,10 @@ class PointsCommands(commands.Component):
     async def points_gamble(self, ctx: commands.Context, amount: str) -> None:
         await self.handler.gamble(ctx, amount, "points")
 
+    @points.command(name="roulette", aliases=("spin",))
+    async def points_roulette(self, ctx: commands.Context, color: str = None, amount: str = None) -> None:
+        await self.handler.roulette(ctx, color, amount, "points")
+
     @points.group(name="duel", invoke_fallback=True, case_insensitive=True)
     async def points_duel(self, ctx: commands.Context, opponent: LocalizedUser = None, amount: str = None) -> None:
         await self.handler.create_duel(ctx, opponent, amount, "points")

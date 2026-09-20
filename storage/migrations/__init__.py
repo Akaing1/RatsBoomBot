@@ -42,6 +42,9 @@ from storage.migrations.v037_chatter_profile_images import migrate as migrate_ch
 from storage.migrations.v038_live_command_roll_limits import migrate as migrate_live_command_roll_limits
 from storage.migrations.v039_command_slowmode import migrate as migrate_command_slowmode
 from storage.migrations.v040_youtube_chat import migrate as migrate_youtube_chat
+from storage.migrations.v041_viewer_queue_blacklist import migrate as migrate_viewer_queue_blacklist
+from storage.migrations.v042_viewer_queue_display_names import migrate as migrate_viewer_queue_display_names
+from storage.migrations.v043_pinned_chat_messages import migrate as migrate_pinned_chat_messages
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -94,4 +97,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=38, name="live_command_roll_limits", run=migrate_live_command_roll_limits)
     , Migration(version=39, name="command_slowmode", run=migrate_command_slowmode)
     , Migration(version=40, name="youtube_chat", run=migrate_youtube_chat)
+    , Migration(version=41, name="viewer_queue_blacklist", run=migrate_viewer_queue_blacklist)
+    , Migration(version=42, name="viewer_queue_display_names", run=migrate_viewer_queue_display_names)
+    , Migration(version=43, name="pinned_chat_messages", run=migrate_pinned_chat_messages)
 )

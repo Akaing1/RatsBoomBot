@@ -261,6 +261,12 @@ class TwitchBot(commands.AutoBot):
                 user_id
             )
 
+            live_chat = getattr(services, "live_chat", None)
+            if live_chat is not None:
+                live_chat.twitch_emote_cache.pop(user_id, None)
+                live_chat.twitch_badge_cache.pop(user_id, None)
+                live_chat._ensure_twitch_badge_loader(user_id)
+
             services.broadcasters.add_broadcaster(user_id)
 
             try:

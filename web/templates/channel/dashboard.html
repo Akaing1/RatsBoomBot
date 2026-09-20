@@ -5,77 +5,115 @@
 {% endblock %}
 
 {% block content %}
+<div class="channel-dashboard-layout">
 <header class="page-header">
-    <div class="channel-heading">
-        {% if broadcaster.profile_image_url %}
-            <img
-                class="channel-heading-image"
-                src="{{ broadcaster.profile_image_url }}"
-                alt="{{ broadcaster.name or broadcaster.id }}"
-            >
+    <div class="channel-heading dashboard-channel-heading">
+        <p class="eyebrow">Rat's Boom Bot</p>
+        {% if broadcaster.login %}
+        <a
+            class="dashboard-channel-identity"
+            href="https://twitch.tv/{{ broadcaster.login }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open {{ broadcaster.name or broadcaster.login }} on Twitch"
+        >
         {% else %}
-            <div class="channel-heading-placeholder">
-                {{ (broadcaster.name or broadcaster.id)[0] | upper }}
-            </div>
+        <div class="dashboard-channel-identity">
         {% endif %}
+            {% if broadcaster.profile_image_url %}
+                <img
+                    class="channel-heading-image"
+                    src="{{ broadcaster.profile_image_url }}"
+                    alt="{{ broadcaster.name or broadcaster.id }}"
+                >
+            {% else %}
+                <div class="channel-heading-placeholder">
+                    {{ (broadcaster.name or broadcaster.id)[0] | upper }}
+                </div>
+            {% endif %}
 
-        <div>
-            <p class="eyebrow">Rat's Boom Bot</p>
-            <h2>{{ broadcaster.name or "Unknown channel" }}</h2>
+            <div class="dashboard-channel-copy">
+                <h2>
+                    <span
+                        class="channel-heading-name"
+                        data-user-id="{{ broadcaster.id }}"
+                    >{{ broadcaster.name or "Unknown channel" }}</span>
+                </h2>
 
-            <p class="page-description">
                 {% if broadcaster.login %}
-                    @{{ broadcaster.login }} &middot;
+                    <p class="page-description">@{{ broadcaster.login }}</p>
                 {% endif %}
-
-                Twitch ID: {{ broadcaster.id }}
-            </p>
-        </div>
+            </div>
+        {% if broadcaster.login %}</a>{% else %}</div>{% endif %}
     </div>
 
-    {% if broadcaster.login %}
-        <div class="header-actions">
-            <a
-                class="button primary"
-                href="https://twitch.tv/{{ broadcaster.login }}"
-                target="_blank"
-                rel="noopener noreferrer"
+    <div class="dashboard-header-side">
+        <div
+            class="dashboard-header-stats"
+            data-dashboard-header-stats
+            data-channel-id="{{ broadcaster.id }}"
+            data-refresh-url="/channel/api/dashboard-stats"
+            aria-label="Channel statistics; activate a statistic to show or hide its number"
+        >
+            <div
+                class="dashboard-header-stat dashboard-stream-stat {% if broadcaster.is_live %}state-live{% else %}state-offline{% endif %}"
+                data-stream-status
+                data-started-at="{{ broadcaster.stream_started_at.isoformat() if broadcaster.stream_started_at else '' }}"
             >
-                Open Twitch
-            </a>
+                <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
+                <span>Stream</span>
+                <strong data-stream-status-text>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
+            </div>
+            {% for stat in dashboard_header_stats | default([]) %}
+                {% if stat.key == "points_lost" %}
+                    <div
+                        class="dashboard-header-stat dashboard-ad-stat state-{{ ad_status.state }}"
+                        data-ad-status
+                        data-state="{{ ad_status.state }}"
+                        data-next-ad-at="{{ ad_status.next_ad_at or '' }}"
+                        data-ends-at="{{ ad_status.ends_at or '' }}"
+                    >
+                        <span>Ads</span>
+                        <strong data-ad-status-text>{{ ad_status.label }}</strong>
+                    </div>
+                    <span class="dashboard-header-stat-break" aria-hidden="true"></span>
+                {% endif %}
+                <button
+                    class="dashboard-header-stat"
+                    type="button"
+                    data-dashboard-stat="{{ stat.key }}"
+                    aria-pressed="false"
+                    title="Hide {{ stat.label }} count"
+                >
+                    <span>{{ stat.label }}</span>
+                    <strong data-dashboard-stat-value>{{ stat.display_value }}</strong>
+                </button>
+            {% endfor %}
         </div>
-    {% endif %}
+    </div>
 </header>
 
-<div class="channel-dashboard-layout">
 <section class="status-grid channel-status-grid">
-    <article class="status-card stream-status-card">
-        <p class="card-label">Stream status</p>
-
-        <div class="status-row">
-            <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
-            <strong>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
+    <article
+        class="status-card twitch-channel-card"
+        data-channel-metadata
+        data-update-url="/channel/api/channel-metadata"
+        data-games-url="/channel/api/games"
+        data-csrf-token="{{ csrf_token }}"
+    >
+        <div class="panel-header twitch-channel-header">
+            <h3>Twitch stream</h3>
         </div>
-
-        <div
-            class="ad-status-row state-{{ ad_status.state }}"
-            data-ad-status
-            data-state="{{ ad_status.state }}"
-            data-next-ad-at="{{ ad_status.next_ad_at or '' }}"
-            data-ends-at="{{ ad_status.ends_at or '' }}"
-        >
-            <span class="ad-status-label">Ads</span>
-            <strong data-ad-status-text>{{ ad_status.label }}</strong>
+        <div class="twitch-channel-field">
+            <span>Title</span>
+            <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" data-channel-field="title">{{ twitch_channel_metadata.title }}</strong>
         </div>
-        <p class="card-detail">Live ad timing refreshes automatically.</p>
-    </article>
-
-    <article class="status-card gambling-status-card">
-        <p class="card-label">Lost to RatsBoomBot</p>
-
-        <div class="metric">{{ gambling_loss_total }}</div>
-
-        <p class="card-detail">Points lost to gambling in this channel.</p>
+        <div class="twitch-channel-field twitch-game-field">
+            <span>Category</span>
+            <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" data-channel-field="game">{{ twitch_channel_metadata.game }}</strong>
+            <div class="twitch-game-suggestions" data-game-suggestions role="listbox" hidden></div>
+        </div>
+        <p class="channel-metadata-status" data-channel-metadata-status aria-live="polite">Click the title or game to edit.</p>
     </article>
 </section>
 
@@ -83,9 +121,7 @@
     <section class="panel live-chat-panel">
         <div class="panel-header">
             <div>
-                <p class="eyebrow">Twitch + YouTube</p>
-                <h3>Chat</h3>
-                <p class="panel-description">Combined chat messages. Commands appear in the Commands tab.</p>
+                <h3>Combined Chat</h3>
             </div>
             <div class="chat-platform-states" aria-label="Connected chat platforms">
                 <span class="channel-state live">Twitch</span>
@@ -94,17 +130,50 @@
         </div>
 
         <div
-            class="live-chat-feed dashboard-chat-feed"
-            data-live-chat-feed
-            data-stream-url="/channel/api/chat/stream?view=chat"
+                class="live-chat-feed dashboard-chat-feed"
+                data-live-chat-feed
+                data-stream-url="/channel/api/chat/stream?view=both"
+                data-moderation-url="/channel/api/chat/moderate"
+            data-pinned-url="/channel/api/chat/pinned"
+            data-csrf-token="{{ csrf_token }}"
+            data-connection-status-target="#chat-send-status"
             data-max-messages="150"
-            data-empty-title="Waiting for chat messages"
         ></div>
 
-        <form class="dashboard-chat-composer" data-chat-composer>
+        <form class="dashboard-chat-composer" data-chat-composer data-channel-id="{{ broadcaster.id }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="reply_parent_message_id" value="" data-reply-message-id>
+            <div class="chat-reply-context" data-reply-context hidden>
+                <div>
+                    <strong data-reply-name></strong>
+                    <span data-reply-preview></span>
+                </div>
+                <button type="button" data-reply-cancel aria-label="Cancel reply" title="Cancel reply">×</button>
+            </div>
             <label class="sr-only" for="dashboard-chat-message">Send a chat message</label>
-            <textarea id="dashboard-chat-message" name="message" rows="2" maxlength="200" placeholder="Reply to chat…" required></textarea>
+            <div class="chat-message-entry">
+                <textarea id="dashboard-chat-message" name="message" rows="2" maxlength="200" placeholder="Send a message to chat... (supports autocomplete)" required autocomplete="off"></textarea>
+                <button class="chat-emote-toggle" type="button" data-emote-toggle aria-expanded="false" aria-label="Open emote picker" title="Emotes">
+                    <span aria-hidden="true">☺</span>
+                </button>
+                <p id="chat-send-status" class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
+                <div class="chat-emote-suggestions" data-emote-suggestions role="listbox" hidden></div>
+                <div class="chat-emote-picker" data-emote-picker hidden>
+                    <div class="chat-emote-picker-header">
+                        <label class="sr-only" for="dashboard-emote-search">Search emotes</label>
+                        <input id="dashboard-emote-search" type="search" placeholder="Search emotes…" data-emote-search autocomplete="off">
+                        <span data-emote-count></span>
+                    </div>
+                    <div class="chat-emote-picker-body">
+                        <div class="chat-emote-grid" data-emote-grid></div>
+                        <div class="chat-emote-rail" data-emote-group role="group" aria-label="Filter emotes by section; select again to show all">
+                            <div class="chat-emote-channel-list" data-emote-channels></div>
+                            <button type="button" class="chat-emote-section-button chat-emote-seventv" data-emote-seventv aria-pressed="false">7TV</button>
+                        </div>
+                    </div>
+                    <p class="chat-emote-picker-note" data-emote-note></p>
+                </div>
+            </div>
             <div class="dashboard-chat-composer-actions">
                 <div class="chat-target-selector" role="group" aria-label="Send message to">
                     <button class="chat-target active" type="button" data-chat-target="twitch" aria-pressed="true">Twitch</button>
@@ -113,26 +182,25 @@
                 </div>
                 <button class="button primary chat-send-button" type="submit">Send</button>
             </div>
-            <p class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
         </form>
     </section>
 
     <section class="panel activity-panel dashboard-activity-panel">
         <div class="panel-header">
             <div>
-                <p class="eyebrow">Stream activity</p>
                 <h3>Activity</h3>
             </div>
-
-            <span class="channel-state activity-stream-label">
-                {% if not redemption_activity.stream_id %}Waiting{% elif redemption_activity.using_previous_stream %}Previous{% else %}Current{% endif %}
-            </span>
         </div>
 
         <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Activity feed">
             <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-activity-tab="redeems">Redeems</button>
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="checkins">Check-ins</button>
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="commands">Commands</button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="mod-actions">Mod actions</button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="automod">AutoMod</button>
+            {% if raid_enabled %}
+                <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="raid">Raid</button>
+            {% endif %}
         </div>
 
         <div data-activity-panel="redeems">
@@ -143,7 +211,7 @@
                             <li class="activity-list-item redemption-activity-item">
                                 <div class="activity-main">
                                     <strong>{{ redemption.reward_title }}</strong>
-                                    <span>@{{ redemption.username }} &middot; {{ redemption.redeemed_at }}</span>
+                                    <span>{{ redemption.user_label }} &middot; {{ redemption.redeemed_at }}</span>
 
                                     {% if redemption.user_input %}
                                         <p>{{ redemption.user_input }}</p>
@@ -171,7 +239,7 @@
                         {% for checkin in redemption_activity.checkins %}
                             <li class="activity-list-item">
                                 <div class="activity-main">
-                                    <strong>@{{ checkin.username }}</strong>
+                                    <strong>{{ checkin.user_label }}</strong>
                                     <span>{{ checkin.redeemed_at }}</span>
                                 </div>
 
@@ -190,29 +258,62 @@
             </div>
         </div>
 
-        <div data-activity-panel="commands" hidden>
+        <div id="dashboard-commands" data-activity-panel="commands" hidden>
             <div
                 class="live-chat-feed dashboard-command-feed"
                 data-live-chat-feed
                 data-stream-url="/channel/api/chat/stream?view=commands"
+                data-activity-notify="commands"
                 data-max-messages="100"
-                data-empty-title="Waiting for commands"
             ></div>
         </div>
+
+        <div data-activity-panel="mod-actions" hidden>
+            <div id="mod-action-activity-content" class="activity-scroll">
+                <div class="compact-empty-state"><h4>No moderation actions yet</h4><p>Moderator actions will appear here.</p></div>
+            </div>
+        </div>
+
+        <div data-activity-panel="automod" hidden>
+            <div id="automod-activity-content" class="activity-scroll">
+                <div class="compact-empty-state"><h4>AutoMod queue is clear</h4><p>Held messages will appear here for review.</p></div>
+            </div>
+        </div>
+
+        {% if raid_enabled %}
+            <div class="dashboard-raid-tab" data-activity-panel="raid" hidden>
+                {% include "channel/raid_summary.html" %}
+            </div>
+        {% endif %}
     </section>
 
     <div class="channel-dashboard-side viewer-queue-column">
-        <section class="panel">
-            <div class="panel-header">
-                <div>
-                    <p class="eyebrow">Viewer games</p>
+        <section
+            class="panel"
+            data-viewer-queue-panel
+            data-state-url="/channel/api/viewer-queue"
+            data-action-url="/channel/api/viewer-queue/action"
+            data-csrf-token="{{ csrf_token }}"
+        >
+            <div class="panel-header queue-panel-header">
+                <div class="queue-heading-row">
                     <h3>Viewer queue</h3>
+                    <small data-queue-count>{{ queue_size }} queued</small>
                 </div>
 
-                <span id="queue-panel-state" class="channel-state {% if queue_open %}live{% endif %}">
-                    {% if queue_open %}Open{% else %}Closed{% endif %}
-                </span>
+                <button id="queue-panel-state" class="queue-state-toggle {% if queue_open %}live{% endif %}" type="button" data-queue-toggle data-open="{{ 'true' if queue_open else 'false' }}">
+                    <span class="queue-state-current">{% if queue_open %}Open{% else %}Closed{% endif %}</span>
+                    <span class="queue-state-alternate">{% if queue_open %}Close{% else %}Open{% endif %}</span>
+                </button>
             </div>
+
+            <div class="queue-toolbar" aria-label="Viewer queue actions">
+                <button type="button" data-queue-action="next4">Next 4</button>
+                <button type="button" data-queue-action="next5">Next 5</button>
+                <button type="button" data-queue-action="clear" class="danger">Clear queue</button>
+                <a href="/channel/viewer-queue/blacklist">Blacklist</a>
+            </div>
+            <p class="queue-action-status" data-queue-action-status role="status" aria-live="polite"></p>
 
             {% if queue_message %}
                 <div
@@ -227,17 +328,17 @@
             {% endif %}
 
             <div id="viewer-queue-content">
-                {% if queue_users %}
+                {% if queue_members %}
                     <ul class="queue-list">
-                    {% for username in queue_users %}
+                    {% for member in queue_members %}
                         <li class="queue-list-item">
                             <span class="queue-position">{{ loop.index }}</span>
-                            <strong class="queue-username">@{{ username }}</strong>
+                            <strong class="queue-username">{{ member.label }}</strong>
 
                             <form
                                 method="post"
                                 action="/channel/viewer-queue/remove"
-                                onsubmit="return confirm('Remove @{{ username }} from the viewer queue?');"
+                                onsubmit="return confirm('Remove {{ member.username }} from the viewer queue?');"
                             >
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <input type="hidden" name="position" value="{{ loop.index }}">
@@ -245,8 +346,8 @@
                                 <button
                                     class="queue-remove-button"
                                     type="submit"
-                                    aria-label="Remove @{{ username }} from the queue"
-                                    title="Remove @{{ username }}"
+                                    aria-label="Remove {{ member.username }} from the queue"
+                                    title="Remove {{ member.username }}"
                                 >
                                     &times;
                                 </button>
@@ -273,29 +374,36 @@
 </div>
 </div>
 
-{% if raid_enabled %}
-    {% include "channel/raid_summary.html" %}
-{% endif %}
-
 <script>
     (() => {
         const tabs = Array.from(document.querySelectorAll("[data-activity-tab]"));
         const panels = Array.from(document.querySelectorAll("[data-activity-panel]"));
 
-        tabs.forEach(tab => {
-            tab.addEventListener("click", () => {
-                const selected = tab.dataset.activityTab;
-                tabs.forEach(candidate => {
-                    const active = candidate.dataset.activityTab === selected;
-                    candidate.classList.toggle("active", active);
-                    candidate.setAttribute("aria-selected", String(active));
-                });
-                panels.forEach(panel => { panel.hidden = panel.dataset.activityPanel !== selected; });
+        function selectActivity(selected) {
+            tabs.forEach(candidate => {
+                const active = candidate.dataset.activityTab === selected;
+                candidate.classList.toggle("active", active);
+                if (active) candidate.classList.remove("has-unseen");
+                candidate.setAttribute("aria-selected", String(active));
             });
+            panels.forEach(panel => { panel.hidden = panel.dataset.activityPanel !== selected; });
+        }
+
+        function markActivityUnread(activity) {
+            const tab = tabs.find(candidate => candidate.dataset.activityTab === activity);
+            if (tab && !tab.classList.contains("active")) tab.classList.add("has-unseen");
+        }
+
+        tabs.forEach(tab => {
+            tab.addEventListener("click", () => selectActivity(tab.dataset.activityTab));
+        });
+        document.addEventListener("dashboard-activity-unread", event => {
+            markActivityUnread(event.detail?.activity);
         });
     })();
 
     (() => {
+        if (document.querySelector("[data-viewer-queue-panel]")) return;
         const endpoint = "/channel/api/viewer-queue";
         const csrfToken = {{ csrf_token | tojson }};
         const panelState = document.getElementById("queue-panel-state");
@@ -308,7 +416,7 @@
             form.method = "post";
             form.action = "/channel/viewer-queue/remove";
             form.addEventListener("submit", event => {
-                if (!window.confirm(`Remove @${username} from the viewer queue?`)) {
+                if (!window.confirm(`Remove ${username} from the viewer queue?`)) {
                     event.preventDefault();
                 }
             });
@@ -328,8 +436,8 @@
             const button = document.createElement("button");
             button.className = "queue-remove-button";
             button.type = "submit";
-            button.setAttribute("aria-label", `Remove @${username} from the queue`);
-            button.title = `Remove @${username}`;
+            button.setAttribute("aria-label", `Remove ${username} from the queue`);
+            button.title = `Remove ${username}`;
             button.textContent = "×";
             form.appendChild(button);
 
@@ -389,7 +497,7 @@
 
                 const usernameLabel = document.createElement("strong");
                 usernameLabel.className = "queue-username";
-                usernameLabel.textContent = `@${username}`;
+                usernameLabel.textContent = username;
                 item.appendChild(usernameLabel);
                 item.appendChild(buildRemoveForm(username, position));
                 list.appendChild(item);
@@ -440,9 +548,16 @@
         const endpoint = "/channel/api/redemptions";
         const checkinContent = document.getElementById("checkin-activity-content");
         const redemptionContent = document.getElementById("redemption-activity-content");
-        const streamLabels = document.querySelectorAll(".activity-stream-label");
+        const modActionContent = document.getElementById("mod-action-activity-content");
+        const automodContent = document.getElementById("automod-activity-content");
+        const automodActionUrl = "/channel/api/automod/action";
+        const csrfToken = {{ csrf_token | tojson }};
         let requestInProgress = false;
         let lastActivitySignature = null;
+        let lastRedemptionSignature = null;
+        let lastCheckinSignature = null;
+        let lastModActionSignature = null;
+        let lastAutomodSignature = null;
 
         function formatActivityTime(value) {
             if (!value) {
@@ -499,7 +614,7 @@
                 main.className = "activity-main";
 
                 const username = document.createElement("strong");
-                username.textContent = `@${checkin.username}`;
+                username.textContent = checkin.user_label || checkin.username;
                 main.appendChild(username);
 
                 const time = document.createElement("span");
@@ -545,7 +660,7 @@
 
                 const metadata = document.createElement("span");
                 const time = formatActivityTime(redemption.redeemed_at);
-                metadata.textContent = `@${redemption.username}${time ? ` · ${time}` : ""}`;
+                metadata.textContent = `${redemption.user_label || redemption.username}${time ? ` · ${time}` : ""}`;
                 main.appendChild(metadata);
 
                 if (redemption.user_input) {
@@ -561,32 +676,143 @@
             redemptionContent.appendChild(list);
         }
 
+        function renderModActions(actions) {
+            modActionContent.replaceChildren();
+            if (!actions.length) {
+                renderEmptyState(modActionContent, "No moderation actions yet", "Moderator actions will appear here.");
+                return;
+            }
+            const list = document.createElement("ul");
+            list.className = "activity-list";
+            actions.forEach(action => {
+                const item = document.createElement("li");
+                item.className = "activity-list-item";
+                const main = document.createElement("div");
+                main.className = "activity-main";
+                const heading = document.createElement("strong");
+                heading.textContent = `${action.action}${action.target ? ` · ${action.target}` : ""}`;
+                const detail = document.createElement("span");
+                detail.textContent = `Performed by ${action.moderator}${action.timestamp ? ` · ${formatActivityTime(action.timestamp)}` : ""}`;
+                main.appendChild(heading);
+
+                const addDetail = (label, value) => {
+                    if (value === null || value === undefined || value === "") return;
+                    const line = document.createElement("p");
+                    line.textContent = `${label}: ${value}`;
+                    main.appendChild(line);
+                };
+                addDetail("Reason", action.reason);
+                addDetail("Timeout ends", action.expires_at ? formatActivityTime(action.expires_at) : "");
+                addDetail("Deleted message", action.message ? `“${action.message}”` : "");
+                addDetail("Moderator note", action.note);
+                addDetail("Followers-only requirement", action.follow_duration !== null && action.follow_duration !== undefined ? `${action.follow_duration} minute${action.follow_duration === 1 ? "" : "s"}` : "");
+                addDetail("Slow-mode delay", action.wait_time !== null && action.wait_time !== undefined ? `${action.wait_time} second${action.wait_time === 1 ? "" : "s"}` : "");
+                addDetail("Raid viewers", action.viewer_count);
+                addDetail("Terms", Array.isArray(action.terms) && action.terms.length ? `${action.term_list || "list"}: ${action.terms.join(", ")}${action.from_automod ? " · From AutoMod" : ""}` : "");
+                addDetail("Chat rules", Array.isArray(action.chat_rules) ? action.chat_rules.join(", ") : "");
+                addDetail("Source channel", action.source_channel);
+                main.appendChild(detail);
+                item.appendChild(main);
+                list.appendChild(item);
+            });
+            modActionContent.appendChild(list);
+        }
+
+        async function reviewAutomod(messageId, action) {
+            const data = new FormData();
+            data.set("csrf_token", csrfToken);
+            data.set("message_id", messageId);
+            data.set("action", action);
+            const response = await fetch(automodActionUrl, {method: "POST", body: data});
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.detail || "The AutoMod message could not be updated.");
+            document.querySelector(`[data-automod-message="${CSS.escape(messageId)}"]`)?.remove();
+        }
+
+        function renderAutomod(messages) {
+            automodContent.replaceChildren();
+            if (!messages.length) {
+                renderEmptyState(automodContent, "AutoMod queue is clear", "Held messages will appear here for review.");
+                return;
+            }
+            const list = document.createElement("ul");
+            list.className = "activity-list automod-list";
+            messages.forEach(message => {
+                const item = document.createElement("li");
+                item.className = "activity-list-item automod-item";
+                item.dataset.automodMessage = message.id;
+                const main = document.createElement("div");
+                main.className = "activity-main";
+                const user = document.createElement("strong");
+                user.textContent = message.display_name !== message.username
+                    ? `${message.display_name} (${message.username})`
+                    : message.username;
+                const text = document.createElement("p");
+                text.textContent = message.message;
+                const reason = document.createElement("span");
+                reason.textContent = `${message.reason}${message.level ? ` · Level ${message.level}` : ""}`;
+                main.append(user, text, reason);
+                const actions = document.createElement("div");
+                actions.className = "automod-actions";
+                [["approve", "Allow"], ["deny", "Deny"]].forEach(([action, label]) => {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = `button ${action === "deny" ? "danger" : "secondary"}`;
+                    button.textContent = label;
+                    button.addEventListener("click", async () => {
+                        button.disabled = true;
+                        try { await reviewAutomod(message.id, action); }
+                        catch (error) { window.alert(error.message); button.disabled = false; }
+                    });
+                    actions.appendChild(button);
+                });
+                item.append(main, actions);
+                list.appendChild(item);
+            });
+            automodContent.appendChild(list);
+        }
+
         function renderActivity(data) {
             const checkins = Array.isArray(data.checkins) ? data.checkins : [];
             const redemptions = Array.isArray(data.redemptions) ? data.redemptions : [];
+            const modActions = Array.isArray(data.mod_actions) ? data.mod_actions : [];
+            const automod = Array.isArray(data.automod) ? data.automod : [];
+            const redemptionSignature = JSON.stringify(redemptions);
+            const checkinSignature = JSON.stringify(checkins);
+            const modActionSignature = JSON.stringify(modActions);
+            const automodSignature = JSON.stringify(automod);
             const signature = JSON.stringify([
-                data.stream_id,
-                Boolean(data.using_previous_stream),
                 checkins,
-                redemptions
+                redemptions,
+                modActions,
+                automod
             ]);
 
             if (signature === lastActivitySignature) {
                 return;
             }
 
+            if (lastRedemptionSignature !== null && redemptionSignature !== lastRedemptionSignature) {
+                document.dispatchEvent(new CustomEvent("dashboard-activity-unread", {detail: {activity: "redeems"}}));
+            }
+            if (lastCheckinSignature !== null && checkinSignature !== lastCheckinSignature) {
+                document.dispatchEvent(new CustomEvent("dashboard-activity-unread", {detail: {activity: "checkins"}}));
+            }
+            if (lastModActionSignature !== null && modActionSignature !== lastModActionSignature) {
+                document.dispatchEvent(new CustomEvent("dashboard-activity-unread", {detail: {activity: "mod-actions"}}));
+            }
+            if (lastAutomodSignature !== null && automodSignature !== lastAutomodSignature) {
+                document.dispatchEvent(new CustomEvent("dashboard-activity-unread", {detail: {activity: "automod"}}));
+            }
+            lastRedemptionSignature = redemptionSignature;
+            lastCheckinSignature = checkinSignature;
+            lastModActionSignature = modActionSignature;
+            lastAutomodSignature = automodSignature;
             lastActivitySignature = signature;
-            const streamLabel = !data.stream_id
-                ? "Waiting"
-                : data.using_previous_stream ? "Previous" : "Current";
-
-            streamLabels.forEach(label => {
-                label.textContent = streamLabel;
-                label.classList.toggle("live", Boolean(data.stream_id) && !data.using_previous_stream);
-            });
-
             renderCheckins(checkins);
             renderRedemptions(redemptions);
+            renderModActions(modActions);
+            renderAutomod(automod);
         }
 
         async function refreshActivity() {
@@ -630,6 +856,9 @@
 {% endblock %}
 
 {% block page_scripts %}
+    <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-channel-metadata.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-viewer-queue.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-chat-send.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-ad-status.js') }}?v={{ deployment_stamp() }}" defer></script>

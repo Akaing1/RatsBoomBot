@@ -21,6 +21,11 @@ def get_chatter_name(ctx: commands.Context) -> str:
     return chatter.name
 
 
+def get_chatter_display_name(ctx: commands.Context) -> str:
+    chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
+    return str(getattr(chatter, "display_name", None) or get_chatter_name(ctx))
+
+
 def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
     chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
     broadcaster_id = get_context_broadcaster_id(ctx)
@@ -166,7 +171,11 @@ class ViewerQueueCommands(commands.Component):
             return
 
         broadcaster_id, services = context
-        _, message = await services.viewer_queue.join(broadcaster_id, get_chatter_name(ctx))
+        _, message = await services.viewer_queue.join(
+            broadcaster_id,
+            get_chatter_name(ctx),
+            get_chatter_display_name(ctx)
+        )
 
         await ctx.send(message)
 
@@ -194,7 +203,7 @@ class ViewerQueueCommands(commands.Component):
             return
 
         broadcaster_id, services = context
-        queue = services.viewer_queue.list_queue(broadcaster_id)
+        queue = [member["label"] for member in services.viewer_queue.list_queue_members(broadcaster_id)]
 
         if not queue:
             await ctx.send("The viewer queue is currently empty.")

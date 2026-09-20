@@ -61,6 +61,9 @@ def create_broadcaster_subscriptions(broadcaster_user_id: str) -> list[Any]:
         eventsub.StreamOnlineSubscription(broadcaster_user_id=broadcaster_user_id),
         eventsub.StreamOfflineSubscription(broadcaster_user_id=broadcaster_user_id),
         eventsub.ChannelModerateV2Subscription(broadcaster_user_id=broadcaster_user_id, moderator_user_id=broadcaster_user_id),
+        eventsub.AutomodMessageHoldV2Subscription(broadcaster_user_id=broadcaster_user_id, moderator_user_id=broadcaster_user_id),
+        eventsub.AutomodMessageUpdateV2Subscription(broadcaster_user_id=broadcaster_user_id, moderator_user_id=broadcaster_user_id),
+        eventsub.ChatMessageDeleteSubscription(broadcaster_user_id=broadcaster_user_id, user_id=settings.BOT_ID),
         eventsub.ShoutoutCreateSubscription(broadcaster_user_id=broadcaster_user_id, moderator_user_id=broadcaster_user_id)
     ]
 

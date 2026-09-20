@@ -26,6 +26,10 @@ class ModerationEvents(commands.Component):
         moderator = getattr(payload, "moderator", None)
         ban = getattr(payload, "ban", None)
 
+        live_chat = getattr(services, "live_chat", None)
+        if live_chat is not None:
+            live_chat.record_mod_action(payload)
+
         if action != "ban" or moderator is None or ban is None:
             return
 
@@ -107,3 +111,23 @@ class ModerationEvents(commands.Component):
                 f"Reason: {reason or 'No reason supplied'}"
             )
         )
+
+    @commands.Component.listener()
+    async def event_automod_message_hold(self, payload) -> None:
+        services = self.bot.services
+        if services is not None and getattr(services, "live_chat", None) is not None:
+            services.live_chat.hold_automod_message(payload)
+
+    @commands.Component.listener()
+    async def event_automod_message_update(self, payload) -> None:
+        services = self.bot.services
+        if services is not None and getattr(services, "live_chat", None) is not None:
+            services.live_chat.resolve_automod_message(str(payload.broadcaster.id), str(payload.message_id))
+
+    @commands.Component.listener()
+    async def event_message_delete(self, payload) -> None:
+        services = self.bot.services
+        if services is None or getattr(services, "live_chat", None) is None:
+            return
+        message_id = f"twitch:{payload.message_id}"
+        await services.live_chat.remove_message(str(payload.broadcaster.id), message_id)

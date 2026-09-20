@@ -126,7 +126,7 @@ async def test_queue_state_and_order_survive_service_restart(tmp_path) -> None:
         service = ViewerQueueService(bot=None, db=database)
         await service.setup()
         await service.open_queue("channel-1")
-        await service.join("channel-1", "alice")
+        await service.join("channel-1", "alice", "AliceTheRat")
         await service.join("channel-1", "bob")
         await service.join("channel-1", "carol")
         await service.requeue("channel-1", 3, 1)
@@ -136,6 +136,67 @@ async def test_queue_state_and_order_survive_service_restart(tmp_path) -> None:
 
         assert restarted_service.is_queue_open("channel-1") is True
         assert restarted_service.list_queue("channel-1") == ["carol", "alice", "bob"]
+        assert restarted_service.list_queue_members("channel-1")[1] == {
+            "username": "alice", "display_name": "AliceTheRat", "label": "AliceTheRat (alice)"
+        }
+
+
+@pytest.mark.asyncio
+async def test_queue_hides_display_name_when_it_only_differs_by_case(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "queue.db")) as database:
+        await run_migrations(database)
+        service = ViewerQueueService(bot=None, db=database)
+        await service.setup()
+        await service.open_queue("channel-1")
+
+        await service.join("channel-1", "caseuser", "CaseUser")
+
+        assert service.list_queue_members("channel-1") == [{
+            "username": "caseuser", "display_name": "CaseUser", "label": "caseuser"
+        }]
+
+
+@pytest.mark.asyncio
+async def test_blacklist_blocks_joins_and_survives_service_restart(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "queue.db")) as database:
+        await run_migrations(database)
+        service = ViewerQueueService(bot=None, db=database)
+        await service.setup()
+        await service.open_queue("channel-1")
+
+        added, message = await service.add_to_blacklist("channel-1", "BadUser")
+        joined, join_message = await service.join("channel-1", "baduser")
+
+        assert added is True
+        assert "added" in message
+        assert joined is False
+        assert "not allowed" in join_message
+
+        restarted_service = ViewerQueueService(bot=None, db=database)
+        await restarted_service.setup()
+
+        assert restarted_service.list_blacklist("channel-1") == ["baduser"]
+        removed, _ = await restarted_service.remove_from_blacklist("channel-1", "BADUSER")
+        joined, _ = await restarted_service.join("channel-1", "baduser")
+
+        assert removed is True
+        assert joined is True
+
+
+@pytest.mark.asyncio
+async def test_blacklisting_a_queued_viewer_removes_them(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "queue.db")) as database:
+        await run_migrations(database)
+        service = ViewerQueueService(bot=None, db=database)
+        await service.setup()
+        await service.open_queue("channel-1")
+        await service.join("channel-1", "alice")
+        await service.join("channel-1", "bob")
+
+        added, _ = await service.add_to_blacklist("channel-1", "Alice")
+
+        assert added is True
+        assert service.list_queue("channel-1") == ["bob"]
 
 
 def test_queue_messages_include_every_viewer() -> None:

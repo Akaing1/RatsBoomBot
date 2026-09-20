@@ -1,9 +1,21 @@
 import pytest
 from twitchio.ext import commands
 
+from bot.channels import register_channel_profiles
+from bot.command_registry import (
+    CommandAvailability,
+    CommandDefinition,
+    CommandPermission,
+    CommandSlowmode,
+    CommandVisibility,
+    SHARED_COMMAND_DEFINITIONS,
+    get_registered_definitions,
+    validate_command_definitions,
+)
 from bot.component_loader import GLOBAL_COMPONENTS
-from bot.profiles import ChannelProfile, FeatureDefaults, FeatureName, GlobalCommandDefaults, LeagueConfig, OverwatchConfig, PointsConfig, ProfileFeatureName, RaidBossConfig, activate_profile, clear_profiles
+from bot.profiles import CHANNEL_PROFILES, ChannelProfile, FeatureDefaults, FeatureName, GlobalCommandDefaults, LeagueConfig, OverwatchConfig, PointsConfig, ProfileFeatureName, RaidBossConfig, activate_profile, clear_profiles
 from bot.services.channels.feature_toggle import FeatureToggleService
+from bot.shared.commands.points import PointsCommands
 from web.channel.command_help import build_command_help_groups, build_enabled_command_help_groups
 
 
@@ -40,7 +52,8 @@ def test_command_help_uses_profile_currency_and_effective_toggle_states() -> Non
     assert get_command(utility, "!stats [username]").enabled is True
     assert get_command(points, "!shards [username]").enabled is True
     assert get_command(points, "!shards give <username> <amount>").enabled is True
-    assert len(points.commands) == 9
+    assert get_command(points, "!shards roulette <red|black|green> <amount>").enabled is True
+    assert len(points.commands) == 10
 
 
 @pytest.mark.parametrize(("channel_name", "expected_group"), [("MeinyaYozakura", "Channel-specific")])
@@ -157,11 +170,7 @@ def test_enabled_command_help_omits_disabled_commands_and_empty_groups() -> None
 
 
 def test_command_help_catalog_covers_every_shared_top_level_command() -> None:
-    broadcaster_id = "channel-1"
-    profile = ChannelProfile(channel_name="channel")
-    activate_profile(broadcaster_id, profile)
-    groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
-    catalog_names = {command.syntax.removeprefix("!").split()[0] for group in groups for command in group.commands}
+    registry_names = {definition.name for definition in SHARED_COMMAND_DEFINITIONS}
     shared_command_names = {
         command.name
         for component in GLOBAL_COMPONENTS
@@ -169,9 +178,68 @@ def test_command_help_catalog_covers_every_shared_top_level_command() -> None:
         if isinstance(command, commands.Command) and command.parent is None
     }
 
-    profile_specific_commands = {
-        "points", "champs", "register", "unregister", "rank", "ladder",
-        "explode", "reklop", "randy", "bark", "car",
-        "raid", "loot", "ow", "owrank", "owrecord", "owreset"
-    }
-    assert shared_command_names - profile_specific_commands <= catalog_names
+    assert registry_names == shared_command_names
+
+
+def test_command_registry_aliases_match_twitchio_decorators() -> None:
+    registry_aliases = {}
+
+    for definition in SHARED_COMMAND_DEFINITIONS:
+        if definition.is_root_command:
+            registry_aliases.setdefault(definition.name, set()).update(definition.aliases)
+
+    for component in GLOBAL_COMPONENTS:
+        for command in component.__dict__.values():
+            if not isinstance(command, commands.Command) or command.parent is not None:
+                continue
+
+            assert set(command.aliases) == registry_aliases.get(command.name, set())
+
+
+def test_command_registry_covers_every_profile_top_level_command() -> None:
+    register_channel_profiles()
+
+    for profile in CHANNEL_PROFILES.values():
+        registry_names = {definition.name for definition in get_registered_definitions(profile)}
+        component_command_names = {
+            command.name
+            for component in profile.components
+            for command in component.__dict__.values()
+            if isinstance(command, commands.Command) and command.parent is None
+        }
+
+        assert component_command_names <= registry_names, profile.channel_name
+
+
+def test_roulette_and_spin_are_registered_for_global_and_profile_points() -> None:
+    global_points = PointsCommands.__dict__["points"]
+    assert {"roulette", "spin"} <= set(global_points.commands)
+
+    register_channel_profiles()
+
+    for profile in CHANNEL_PROFILES.values():
+        matching_groups = [
+            command
+            for component in profile.components
+            for command in component.__dict__.values()
+            if isinstance(command, commands.Group) and command.name == profile.points.command_name
+        ]
+
+        assert len(matching_groups) == 1, profile.channel_name
+        assert {"roulette", "spin"} <= set(matching_groups[0].commands), profile.channel_name
+
+
+def test_command_registry_records_operational_policies() -> None:
+    definitions = {definition.syntax: definition for definition in SHARED_COMMAND_DEFINITIONS}
+
+    assert definitions["!clip"].availability is CommandAvailability.LIVE_ONLY
+    assert definitions["!startraid <channel>"].permission is CommandPermission.BROADCASTER
+    assert definitions["!kamikaze <username>"].slowmode is CommandSlowmode.EXEMPT
+    assert definitions["!explode"].visibility is CommandVisibility.HIDDEN
+
+
+def test_command_registry_rejects_duplicate_syntax() -> None:
+    duplicate = CommandDefinition("!duplicate", "Duplicate test command.")
+
+    with pytest.raises(ValueError, match="Duplicate command syntax"):
+        validate_command_definitions((duplicate, duplicate))

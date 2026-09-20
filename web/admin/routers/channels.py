@@ -110,21 +110,7 @@ def redirect_to_channel(broadcaster_id: str, **query_values) -> RedirectResponse
 
 
 async def get_redemption_dashboard_data(services, broadcaster_id: str) -> dict[str, object]:
-    active_session = services.stream_logs.get_active_session(broadcaster_id)
-    stream_id = active_session.stream_id if active_session is not None else None
-    using_previous_stream = False
-
-    if stream_id is None:
-        stream_id = await services.redeems.get_latest_stream_id(broadcaster_id)
-        using_previous_stream = stream_id is not None
-
-    activity = await services.redeems.get_dashboard_activity(
-        broadcaster_id=broadcaster_id,
-        stream_id=stream_id
-    )
-    activity["using_previous_stream"] = using_previous_stream
-
-    return activity
+    return await services.redeems.get_dashboard_activity(broadcaster_id=broadcaster_id)
 
 
 @router.get("", response_class=HTMLResponse)

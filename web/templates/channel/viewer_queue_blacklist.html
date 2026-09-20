@@ -1,0 +1,48 @@
+{% extends "channel/layout.html" %}
+
+{% block title %}Viewer Queue Blacklist | RatsBoomBot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Viewer queue</p>
+        <h2>Blacklist</h2>
+        <p class="page-description">Prevent specific Twitch users from joining this channel's viewer queue.</p>
+    </div>
+    <a class="button secondary" href="/channel">Back to dashboard</a>
+</header>
+
+{% if blacklist_message %}
+    <div class="toggle-feedback {{ blacklist_result }}" role="status">{{ blacklist_message }}</div>
+{% endif %}
+
+<section class="panel queue-blacklist-panel">
+    <form class="queue-blacklist-add" method="post" action="/channel/viewer-queue/blacklist">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="add">
+        <label for="queue-blacklist-username">Twitch username</label>
+        <div>
+            <input id="queue-blacklist-username" name="username" required maxlength="50" placeholder="username" autocomplete="off">
+            <button class="button primary" type="submit">Add to blacklist</button>
+        </div>
+    </form>
+
+    {% if blacklist %}
+        <ul class="queue-blacklist-list">
+            {% for member in blacklist %}
+                <li>
+                    <strong>{{ member.label }}</strong>
+                    <form method="post" action="/channel/viewer-queue/blacklist">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="action" value="remove">
+                        <input type="hidden" name="username" value="{{ member.username }}">
+                        <button class="button danger" type="submit">Remove</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="compact-empty-state"><h4>No blacklisted players</h4><p>Anyone can join while the queue is open.</p></div>
+    {% endif %}
+</section>
+{% endblock %}

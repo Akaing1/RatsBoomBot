@@ -69,7 +69,7 @@
         {% for contributor in raid_contributor_data.contributors %}
             <li class="raid-contributor-row">
                 <span class="raid-contributor-rank">#{{ contributor.rank }}</span>
-                <strong class="raid-contributor-name">{{ contributor.username }}</strong>
+                <strong class="raid-contributor-name">{{ contributor.user_label }}</strong>
                 <span class="raid-contributor-damage">{{ "{:,}".format(contributor.damage) }} damage</span>
             </li>
         {% endfor %}
@@ -165,7 +165,7 @@
 
             const name = document.createElement("strong");
             name.className = "raid-contributor-name";
-            name.textContent = contributor.username;
+            name.textContent = contributor.user_label || contributor.username;
 
             const damage = document.createElement("span");
             damage.className = "raid-contributor-damage";

@@ -20,9 +20,19 @@
     >
 </head>
 
-<body>
-    <div class="app-shell">
-        <aside class="sidebar">
+<body class="channel-page channel-page-{{ active_page }}">
+    <div class="app-shell" data-channel-shell>
+        <aside class="sidebar" data-channel-sidebar>
+            <button
+                class="sidebar-toggle"
+                type="button"
+                data-sidebar-toggle
+                aria-expanded="true"
+                aria-label="Collapse navigation"
+                title="Collapse navigation"
+            >
+                <span aria-hidden="true">‹</span>
+            </button>
             <div class="brand">
                 <img
                     class="brand-mark"
@@ -30,7 +40,7 @@
                     alt="RatsBoomBot icon"
                 >
 
-                <div>
+                <div class="brand-copy">
                     <h1>RatsBoomBot</h1>
                     <p>Streamer Control</p>
                 </div>
@@ -41,30 +51,37 @@
                     class="nav-link {% if active_page == 'overview' %}active{% endif %}"
                     href="/channel"
                 >
-                    Overview
+                    <span class="nav-link-icon" aria-hidden="true">⌂</span>
+                    <span class="nav-link-label">Overview</span>
                 </a>
 
                 <a
                     class="nav-link {% if active_page == 'features' %}active{% endif %}"
                     href="/channel/features"
                 >
-                    Features
+                    <span class="nav-link-icon" aria-hidden="true">✦</span>
+                    <span class="nav-link-label">Features</span>
                 </a>
 
                 <a
                     class="nav-link {% if active_page == 'customization' %}active{% endif %}"
                     href="/channel/customization"
                 >
-                    Customization
+                    <span class="nav-link-icon" aria-hidden="true">⚙</span>
+                    <span class="nav-link-label">Customization</span>
                 </a>
 
-                <a class="nav-link {% if active_page == 'loyalty' %}active{% endif %}" href="/channel/loyalty">Loyalty Points</a>
+                <a class="nav-link {% if active_page == 'loyalty' %}active{% endif %}" href="/channel/loyalty">
+                    <span class="nav-link-icon" aria-hidden="true">★</span>
+                    <span class="nav-link-label">Loyalty Points</span>
+                </a>
 
                 <a
                     class="nav-link {% if active_page == 'help' %}active{% endif %}"
                     href="/channel/help"
                 >
-                    Help
+                    <span class="nav-link-icon" aria-hidden="true">?</span>
+                    <span class="nav-link-label">Help</span>
                 </a>
             </nav>
 
@@ -72,7 +89,8 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
                 <button class="button secondary" type="submit">
-                    Sign Out
+                    <span class="nav-link-icon" aria-hidden="true">↪</span>
+                    <span class="sidebar-button-label">Sign Out</span>
                 </button>
             </form>
         </aside>
@@ -81,6 +99,7 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+    <script src="{{ url_for('static', path='/js/channel-sidebar.js') }}?v={{ deployment_stamp() }}" defer></script>
     {% block page_scripts %}{% endblock %}
 </body>
 </html>
