@@ -1,17 +1,24 @@
+import logging
+from datetime import UTC, datetime, timedelta
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from bot.services.channels.profile_settings import LOYALTY_GROUP
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
+from config.settings import settings
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.channel.command_help import build_command_help_groups
 from web.shared.common import templates
+from web.shared.live_chat import stream_chat_events
 from web.state import get_bot
 
 router = APIRouter()
+LOGGER = logging.getLogger("RatBoomBot")
+CHAT_SEND_TARGETS = {"twitch", "youtube", "both"}
+CHAT_MESSAGE_MAX_LENGTH = 200
 
 
 async def get_redemption_dashboard_data(services, broadcaster_id: str) -> dict[str, object]:
@@ -50,6 +57,29 @@ async def get_raid_contributor_data(services, broadcaster_id: str) -> dict[str, 
             for rank, (username, damage) in enumerate(contributors, start=1)
         ]
     }
+
+
+async def get_ad_status(broadcaster) -> dict[str, object]:
+    if not broadcaster.is_live:
+        return {"state": "offline", "label": "Stream offline", "next_ad_at": None, "ends_at": None}
+
+    try:
+        schedule = await broadcaster.fetch_ad_schedule()
+    except Exception:
+        LOGGER.exception("[Dashboard] Failed to fetch ad schedule for broadcaster %s.", broadcaster.id)
+        return {"state": "unavailable", "label": "Ad schedule unavailable", "next_ad_at": None, "ends_at": None}
+
+    now = datetime.now(UTC)
+    last_ad_at = schedule.last_ad_at
+    ends_at = last_ad_at + timedelta(seconds=schedule.duration) if last_ad_at is not None else None
+
+    if ends_at is not None and last_ad_at <= now < ends_at:
+        return {"state": "running", "label": "Ad running", "next_ad_at": None, "ends_at": ends_at.isoformat()}
+
+    if schedule.next_ad_at is not None:
+        return {"state": "scheduled", "label": "Next ad", "next_ad_at": schedule.next_ad_at.isoformat(), "ends_at": None}
+
+    return {"state": "none", "label": "No ad scheduled", "next_ad_at": None, "ends_at": None}
 
 
 @router.get("/channel/api/raid-contributors", response_class=JSONResponse)
@@ -125,6 +155,131 @@ async def channel_viewer_queue_state(request: Request):
     })
 
 
+@router.get("/channel/api/chat/stream")
+async def channel_chat_stream(request: Request, view: str = "both"):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+
+    if runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id)) is None:
+        logout_channel_user(request)
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    return StreamingResponse(
+        stream_chat_events(request, runtime_bot.services.live_chat, str(broadcaster_id), view),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
+
+
+@router.get("/channel/api/ad-status", response_class=JSONResponse)
+async def channel_ad_status(request: Request):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+
+    broadcaster = runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+
+    if broadcaster is None:
+        logout_channel_user(request)
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    return JSONResponse(await get_ad_status(broadcaster))
+
+
+@router.post("/channel/api/chat/send", response_class=JSONResponse)
+async def channel_send_chat_message(
+    request: Request,
+    message: str = Form(...),
+    target: str = Form(...),
+    csrf_token: str = Form(...)
+):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+
+    validate_csrf_token(request, csrf_token)
+    message = message.strip()
+    target = target.strip().lower()
+
+    if not message:
+        return JSONResponse({"detail": "Enter a message to send."}, status_code=400)
+
+    if len(message) > CHAT_MESSAGE_MAX_LENGTH:
+        return JSONResponse({"detail": f"Messages are limited to {CHAT_MESSAGE_MAX_LENGTH} characters."}, status_code=400)
+
+    if target not in CHAT_SEND_TARGETS:
+        return JSONResponse({"detail": "Choose Twitch, YouTube, or Both."}, status_code=400)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+
+    services = runtime_bot.services
+    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+
+    if broadcaster is None:
+        logout_channel_user(request)
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    sent = []
+    errors = {}
+
+    if target in {"twitch", "both"}:
+        try:
+            twitch_channel = runtime_bot.create_partialuser(str(broadcaster_id))
+            result = await twitch_channel.send_message(
+                sender=str(broadcaster_id), token_for=str(broadcaster_id), message=message
+            )
+            if getattr(result, "sent", False):
+                sent.append("twitch")
+            else:
+                errors["twitch"] = getattr(result, "dropped_message", None) or "Twitch did not send the message."
+        except Exception:
+            LOGGER.exception("[Dashboard] Failed to send Twitch message for broadcaster %s.", broadcaster_id)
+            errors["twitch"] = "Reconnect Twitch to enable dashboard replies."
+
+    if target in {"youtube", "both"}:
+        try:
+            await services.live_chat.send_youtube_message(str(broadcaster_id), message)
+            sent.append("youtube")
+        except ValueError as error:
+            youtube_error = str(error)
+
+            if target == "youtube" or not sent:
+                errors["youtube"] = (
+                    "YouTube is offline. Start a YouTube livestream with live chat enabled before sending a message."
+                    if "No active YouTube live chat" in youtube_error
+                    else youtube_error
+                )
+        except Exception:
+            LOGGER.exception("[Dashboard] Failed to send YouTube message for broadcaster %s.", broadcaster_id)
+
+            if target == "youtube" or not sent:
+                errors["youtube"] = "Reconnect YouTube to enable dashboard replies."
+
+    if not sent:
+        detail = " ".join(errors.values()) or "The message could not be sent."
+        return JSONResponse({"detail": detail, "sent": sent, "errors": errors}, status_code=400)
+
+    status_code = 207 if errors else 200
+    return JSONResponse({"sent": sent, "errors": errors}, status_code=status_code)
+
+
 @router.get("/channel", response_class=HTMLResponse)
 async def channel_dashboard(request: Request):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
@@ -163,6 +318,7 @@ async def channel_dashboard(request: Request):
     gambling_loss_total = await services.points.get_gambling_loss_total(broadcaster_id)
     raid_enabled = services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
     raid_metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_enabled else None
+    ad_status = await get_ad_status(broadcaster)
 
     return templates.TemplateResponse(
         request=request,
@@ -179,6 +335,8 @@ async def channel_dashboard(request: Request):
             "gambling_loss_total": gambling_loss_total,
             "raid_enabled": raid_enabled,
             "raid_metrics": raid_metrics,
+            "youtube_chat": services.live_chat.get_youtube_state(broadcaster_id),
+            "ad_status": ad_status,
             "queue_result": request.query_params.get("queue_result"),
             "queue_message": request.query_params.get("queue_message"),
             "csrf_token": get_csrf_token(request)
@@ -284,6 +442,12 @@ async def channel_customization_page(request: Request):
 
     loyalty_page = request.url.path == "/channel/loyalty"
     groups = services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)})
+    widget_urls = {}
+
+    if not loyalty_page:
+        widget_token = await services.live_chat.get_or_create_widget_token(broadcaster_id)
+        widget_base_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/widgets/chat/{widget_token}"
+        widget_urls = {view: f"{widget_base_url}?view={view}" for view in ("chat", "commands", "both")}
 
     return templates.TemplateResponse(
         request=request,
@@ -297,10 +461,15 @@ async def channel_customization_page(request: Request):
             "channel_settings": await services.broadcaster_settings.get_settings(broadcaster_id),
             "setting_groups": {name: entries for name, entries in groups.items() if (name == LOYALTY_GROUP) == loyalty_page},
             "chat_identity": services.chat_identity.get_state(broadcaster_id),
+            "youtube_chat": services.live_chat.get_youtube_state(broadcaster_id),
+            "widget_urls": widget_urls,
             "setting_result": request.query_params.get("setting_result"),
             "setting_message": request.query_params.get("setting_message"),
             "identity_result": request.query_params.get("identity_result"),
             "identity_message": request.query_params.get("identity_message"),
+            "youtube_result": request.query_params.get("youtube_result"),
+            "youtube_message": request.query_params.get("youtube_message"),
+            "social_tab": request.query_params.get("social_tab", "links"),
             "csrf_token": get_csrf_token(request)
         }
     )

@@ -47,8 +47,9 @@
     {% endif %}
 </header>
 
+<div class="channel-dashboard-layout">
 <section class="status-grid channel-status-grid">
-    <article class="status-card">
+    <article class="status-card stream-status-card">
         <p class="card-label">Stream status</p>
 
         <div class="status-row">
@@ -56,27 +57,20 @@
             <strong>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
         </div>
 
-        <p class="card-detail">Current Twitch broadcast status.</p>
-    </article>
-
-    <article class="status-card">
-        <p class="card-label">Viewer queue</p>
-
-        <div class="status-row">
-            <span
-                id="queue-status-indicator"
-                class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"
-            ></span>
-            <strong id="queue-status-label">{% if queue_open %}Open{% else %}Closed{% endif %}</strong>
+        <div
+            class="ad-status-row state-{{ ad_status.state }}"
+            data-ad-status
+            data-state="{{ ad_status.state }}"
+            data-next-ad-at="{{ ad_status.next_ad_at or '' }}"
+            data-ends-at="{{ ad_status.ends_at or '' }}"
+        >
+            <span class="ad-status-label">Ads</span>
+            <strong data-ad-status-text>{{ ad_status.label }}</strong>
         </div>
-
-        <p id="queue-size-label" class="card-detail">
-            {{ queue_size }} viewer{% if queue_size != 1 %}s{% endif %} currently waiting.
-        </p>
+        <p class="card-detail">Live ad timing refreshes automatically.</p>
     </article>
 
-
-    <article class="status-card">
+    <article class="status-card gambling-status-card">
         <p class="card-label">Lost to RatsBoomBot</p>
 
         <div class="metric">{{ gambling_loss_total }}</div>
@@ -85,57 +79,63 @@
     </article>
 </section>
 
-<div class="channel-dashboard-grid">
-    <div class="redemption-panel-grid">
-        <section class="panel activity-panel">
-            <div class="panel-header">
-                <div>
-                    <p class="eyebrow">Stream activity</p>
-                    <h3>Check-ins</h3>
+<div class="channel-live-layout">
+    <section class="panel live-chat-panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Twitch + YouTube</p>
+                <h3>Chat</h3>
+                <p class="panel-description">Combined chat messages. Commands appear in the Commands tab.</p>
+            </div>
+            <div class="chat-platform-states" aria-label="Connected chat platforms">
+                <span class="channel-state live">Twitch</span>
+                <span class="channel-state {% if youtube_chat.connected %}live{% endif %}">YouTube{% if not youtube_chat.connected %} off{% endif %}</span>
+            </div>
+        </div>
+
+        <div
+            class="live-chat-feed dashboard-chat-feed"
+            data-live-chat-feed
+            data-stream-url="/channel/api/chat/stream?view=chat"
+            data-max-messages="150"
+            data-empty-title="Waiting for chat messages"
+        ></div>
+
+        <form class="dashboard-chat-composer" data-chat-composer>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label class="sr-only" for="dashboard-chat-message">Send a chat message</label>
+            <textarea id="dashboard-chat-message" name="message" rows="2" maxlength="200" placeholder="Reply to chat…" required></textarea>
+            <div class="dashboard-chat-composer-actions">
+                <div class="chat-target-selector" role="group" aria-label="Send message to">
+                    <button class="chat-target active" type="button" data-chat-target="twitch" aria-pressed="true">Twitch</button>
+                    <button class="chat-target" type="button" data-chat-target="youtube" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>YouTube</button>
+                    <button class="chat-target" type="button" data-chat-target="both" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>Both</button>
                 </div>
+                <button class="button primary chat-send-button" type="submit">Send</button>
+            </div>
+            <p class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
+        </form>
+    </section>
 
-                <span class="channel-state activity-stream-label">
-                    {% if not redemption_activity.stream_id %}Waiting{% elif redemption_activity.using_previous_stream %}Previous{% else %}Current{% endif %}
-                </span>
+    <section class="panel activity-panel dashboard-activity-panel">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Stream activity</p>
+                <h3>Activity</h3>
             </div>
 
-            <div id="checkin-activity-content" class="activity-scroll">
-                {% if redemption_activity.checkins %}
-                    <ul class="activity-list">
-                        {% for checkin in redemption_activity.checkins %}
-                            <li class="activity-list-item">
-                                <div class="activity-main">
-                                    <strong>@{{ checkin.username }}</strong>
-                                    <span>{{ checkin.redeemed_at }}</span>
-                                </div>
+            <span class="channel-state activity-stream-label">
+                {% if not redemption_activity.stream_id %}Waiting{% elif redemption_activity.using_previous_stream %}Previous{% else %}Current{% endif %}
+            </span>
+        </div>
 
-                                <span class="activity-badge {% if checkin.type in ('first', 'second') %}{{ checkin.type }}{% endif %}">
-                                    {% if checkin.type == "first" %}FIRST{% elif checkin.type == "second" %}SECOND{% else %}Check-in{% endif %}
-                                </span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <div class="compact-empty-state">
-                        <h4>No check-ins yet</h4>
-                        <p>Daily, FIRST, and SECOND claims will appear here.</p>
-                    </div>
-                {% endif %}
-            </div>
-        </section>
+        <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Activity feed">
+            <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-activity-tab="redeems">Redeems</button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="checkins">Check-ins</button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="commands">Commands</button>
+        </div>
 
-        <section class="panel activity-panel">
-            <div class="panel-header">
-                <div>
-                    <p class="eyebrow">Stream activity</p>
-                    <h3>Redeems</h3>
-                </div>
-
-                <span class="channel-state activity-stream-label">
-                    {% if not redemption_activity.stream_id %}Waiting{% elif redemption_activity.using_previous_stream %}Previous{% else %}Current{% endif %}
-                </span>
-            </div>
-
+        <div data-activity-panel="redeems">
             <div id="redemption-activity-content" class="activity-scroll">
                 {% if redemption_activity.redemptions %}
                     <ul class="activity-list">
@@ -159,10 +159,49 @@
                     </div>
                 {% endif %}
             </div>
-        </section>
-    </div>
+        </div>
 
-    <div class="channel-dashboard-side">
+        <div data-activity-panel="checkins" hidden>
+            <div class="panel-header">
+                <h4 class="activity-subheading">Check-ins</h4>
+            </div>
+            <div id="checkin-activity-content" class="activity-scroll">
+                {% if redemption_activity.checkins %}
+                    <ul class="activity-list">
+                        {% for checkin in redemption_activity.checkins %}
+                            <li class="activity-list-item">
+                                <div class="activity-main">
+                                    <strong>@{{ checkin.username }}</strong>
+                                    <span>{{ checkin.redeemed_at }}</span>
+                                </div>
+
+                                <span class="activity-badge {% if checkin.type in ('first', 'second') %}{{ checkin.type }}{% endif %}">
+                                    {% if checkin.type == "first" %}FIRST{% elif checkin.type == "second" %}SECOND{% else %}Check-in{% endif %}
+                                </span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="compact-empty-state">
+                        <h4>No check-ins yet</h4>
+                        <p>Daily, FIRST, and SECOND claims will appear here.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div data-activity-panel="commands" hidden>
+            <div
+                class="live-chat-feed dashboard-command-feed"
+                data-live-chat-feed
+                data-stream-url="/channel/api/chat/stream?view=commands"
+                data-max-messages="100"
+                data-empty-title="Waiting for commands"
+            ></div>
+        </div>
+    </section>
+
+    <div class="channel-dashboard-side viewer-queue-column">
         <section class="panel">
             <div class="panel-header">
                 <div>
@@ -232,6 +271,7 @@
 
     </div>
 </div>
+</div>
 
 {% if raid_enabled %}
     {% include "channel/raid_summary.html" %}
@@ -239,11 +279,25 @@
 
 <script>
     (() => {
+        const tabs = Array.from(document.querySelectorAll("[data-activity-tab]"));
+        const panels = Array.from(document.querySelectorAll("[data-activity-panel]"));
+
+        tabs.forEach(tab => {
+            tab.addEventListener("click", () => {
+                const selected = tab.dataset.activityTab;
+                tabs.forEach(candidate => {
+                    const active = candidate.dataset.activityTab === selected;
+                    candidate.classList.toggle("active", active);
+                    candidate.setAttribute("aria-selected", String(active));
+                });
+                panels.forEach(panel => { panel.hidden = panel.dataset.activityPanel !== selected; });
+            });
+        });
+    })();
+
+    (() => {
         const endpoint = "/channel/api/viewer-queue";
         const csrfToken = {{ csrf_token | tojson }};
-        const statusIndicator = document.getElementById("queue-status-indicator");
-        const statusLabel = document.getElementById("queue-status-label");
-        const sizeLabel = document.getElementById("queue-size-label");
         const panelState = document.getElementById("queue-panel-state");
         const queueContent = document.getElementById("viewer-queue-content");
         let requestInProgress = false;
@@ -294,10 +348,6 @@
 
             lastQueueSignature = queueSignature;
 
-            statusIndicator.classList.toggle("online", isOpen);
-            statusIndicator.classList.toggle("offline", !isOpen);
-            statusLabel.textContent = isOpen ? "Open" : "Closed";
-            sizeLabel.textContent = `${size} viewer${size === 1 ? "" : "s"} currently waiting.`;
             panelState.classList.toggle("live", isOpen);
             panelState.textContent = isOpen ? "Open" : "Closed";
             queueContent.replaceChildren();
@@ -577,4 +627,10 @@
         });
     })();
 </script>
+{% endblock %}
+
+{% block page_scripts %}
+    <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-chat-send.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-ad-status.js') }}?v={{ deployment_stamp() }}" defer></script>
 {% endblock %}

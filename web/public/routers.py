@@ -1,17 +1,62 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from bot.profiles import FeatureName, get_active_profile
+from bot.services.channels.live_chat import normalize_chat_view
 from config.settings import settings
+from storage.patch_notes_repository import get_note, list_notes
 from web.channel.auth import CHANNEL_USER_ID_KEY
 from web.channel.command_help import build_enabled_command_help_groups
 from web.shared.common import templates
+from web.shared.live_chat import stream_chat_events
 from web.shared.markdown import render_markdown
-from web.state import get_bot
-from web.state import get_db
-from storage.patch_notes_repository import list_notes, get_note
+from web.state import get_bot, get_db
 
 router = APIRouter()
+
+
+@router.get("/widgets/chat/{token}", response_class=HTMLResponse)
+async def chat_widget(request: Request, token: str, view: str = "both"):
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return HTMLResponse("Widget unavailable", status_code=503)
+
+    broadcaster_id = runtime_bot.services.live_chat.resolve_widget_token(token)
+
+    if broadcaster_id is None:
+        return HTMLResponse("Widget not found", status_code=404)
+
+    broadcaster = runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+    return templates.TemplateResponse(
+        request=request,
+        name="public/chat_widget.html",
+        context={
+            "token": token,
+            "view": normalize_chat_view(view),
+            "broadcaster": broadcaster
+        },
+        headers={"Cache-Control": "no-store"}
+    )
+
+
+@router.get("/widgets/chat/{token}/events")
+async def chat_widget_events(request: Request, token: str, view: str = "both"):
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Widget unavailable."}, status_code=503)
+
+    broadcaster_id = runtime_bot.services.live_chat.resolve_widget_token(token)
+
+    if broadcaster_id is None:
+        return JSONResponse({"detail": "Widget not found."}, status_code=404)
+
+    return StreamingResponse(
+        stream_chat_events(request, runtime_bot.services.live_chat, broadcaster_id, view),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Access-Control-Allow-Origin": "*"}
+    )
 
 
 # Keep this intentionally curated. Homepage highlights change for minor and major
