@@ -3,6 +3,7 @@ import logging
 import math
 import random
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -77,7 +78,8 @@ SELLABLE_WEAPON_TYPES = STANDARD_WEAPON_TYPES | OVERCLOCKED_WEAPON_TYPES
 WEAPON_TYPES = SELLABLE_WEAPON_TYPES | UNIQUE_WEAPON_TYPES | BLESSED_UNIQUE_WEAPON_TYPES
 BOSS_TYPES = frozenset({"melee", "ranged", "magic"})
 ALL_WEAPON_TYPE = "all"
-ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "lucky": "lucky_dice", "dice": "lucky_dice", "fool": "fools_card", "fool_card": "fools_card", "the_fools_card": "fools_card", "ancient": "ancient_pact", "pact": "ancient_pact", "flag": "flag_bearer", "flag_bearer": "flag_bearer", "flag_bearers_will": "flag_bearer", "blessing_of_the_gods": "blessing", "heaven": "heavens_judgement", "heavens_judgement": "heavens_judgement", "heaven's_judgement": "heavens_judgement", "fools_dagger": "fools_dagger", "the_fool's_dagger": "fools_dagger", "brutalizer": "obsidian_brutalizer", "faithless": "forgotten_daggers", "forgotten_daggers_of_the_faithless": "forgotten_daggers", "yggdrasil": "branch_of_yggdrasil", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
+ITEM_ALIASES = {"sword": "basic_sword", "bow": "basic_bow", "tome": "apprentice_tome", "spellbook": "apprentice_tome", "refined_tome": "enchanted_tome", "refined_spellbook": "enchanted_tome", "masterwork_tome": "archmage_grimoire", "masterwork_spellbook": "archmage_grimoire", "power": "potion", "power_potion": "potion", "secondwind": "second_wind", "lucky": "lucky_dice", "dice": "lucky_dice", "fool": "fools_card", "fool_card": "fools_card", "the_fools_card": "fools_card", "ancient": "ancient_pact", "pact": "ancient_pact", "flag": "flag_bearer", "flag_bearer": "flag_bearer", "flag_bearers_will": "flag_bearer", "blessing_of_the_gods": "blessing", "heaven": "heavens_judgement", "heavens_judgement": "heavens_judgement", "heaven's_judgement": "heavens_judgement", "fools_dagger": "fools_dagger", "the_fool's_dagger": "fools_dagger", "brutalizer": "obsidian_brutalizer", "faithless": "forgotten_daggers", "forgotten_daggers_of_the_faithless": "forgotten_daggers", "yggdrasil": "branch_of_yggdrasil", "archmage's_grimoire": "archmage_grimoire", "archmage’s_grimoire": "archmage_grimoire"}
+ITEM_IGNORABLE_PATTERN = re.compile(r"[\u200B-\u200D\u2060\uFE00-\uFE0F\uFEFF\U000E0100-\U000E01EF]")
 BUFF_ITEMS = frozenset({"potion", "second_wind", "berserk", "lucky_dice", "fools_card", "blessing", "ancient_pact", "flag_bearer"})
 CRAFTING_RECIPES = {
     "refined_sword": "basic_sword", "refined_bow": "basic_bow", "enchanted_tome": "apprentice_tome",
@@ -1101,12 +1103,20 @@ class RaidBossService:
         return "purchased"
 
     async def craft(self, broadcaster_id: str, user_id: str, username: str, item_id: str, config: RaidBossConfig) -> str:
-        requested_item = "_".join(item_id.lower().strip().split())
+        raw_item_id = item_id
+        requested_item = self.normalize_item_key(item_id)
         family = CRAFTING_FAMILIES.get(requested_item)
         item_id = self.normalize_item(item_id, config) if family is None else ""
         ingredient = CRAFTING_RECIPES.get(item_id)
 
         if family is None and ingredient is None:
+            LOGGER.warning(
+                "[Raid Bosses] Rejected crafting item %r (normalized=%r) for user %s in broadcaster %s.",
+                raw_item_id,
+                requested_item,
+                user_id,
+                broadcaster_id
+            )
             return "invalid"
 
         async with self.db.acquire() as connection, immediate_transaction(connection):
@@ -1153,8 +1163,14 @@ class RaidBossService:
         )
 
     @staticmethod
-    def normalize_item(item_id: str, config: RaidBossConfig | None = None) -> str:
-        normalized = re.sub(r"[^a-z0-9]+", "_", item_id.casefold().replace("’", "'")).strip("_")
+    def normalize_item_key(item_id: str) -> str:
+        normalized = unicodedata.normalize("NFKC", str(item_id)).casefold()
+        normalized = ITEM_IGNORABLE_PATTERN.sub("", normalized)
+        return re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
+
+    @classmethod
+    def normalize_item(cls, item_id: str, config: RaidBossConfig | None = None) -> str:
+        normalized = cls.normalize_item_key(item_id)
         canonical = ITEM_ALIASES.get(normalized, normalized)
 
         if canonical in WEAPON_TYPES or canonical in BUFF_ITEMS:
@@ -1163,7 +1179,7 @@ class RaidBossService:
         if config is not None:
             for candidate in (*WEAPON_TYPES, *BUFF_ITEMS):
                 names = config.weapon_names if candidate in WEAPON_TYPES else config.item_names
-                configured = re.sub(r"[^a-z0-9]+", "_", names.display(candidate).casefold().replace("’", "'")).strip("_")
+                configured = cls.normalize_item_key(names.display(candidate))
                 if normalized == configured:
                     return candidate
 

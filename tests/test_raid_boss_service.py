@@ -558,6 +558,31 @@ async def test_family_crafting_prefers_highest_available_tier_and_is_case_insens
 
 
 @pytest.mark.asyncio
+async def test_tome_crafting_ignores_invisible_unicode_and_refined_alias_equips_result(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(refined_crafting_cost=500)
+        await points.add_points("channel-1", "user-1", "alice", 5000)
+
+        async with database.acquire() as connection:
+            await connection.execute(
+                "INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES (?, ?, ?, 4, ?)",
+                ("channel-1", "user-1", "apprentice_tome", config.weapon_durability)
+            )
+
+        assert await service.craft("channel-1", "user-1", "alice", "tome\u200b", config) == "crafted:enchanted_tome"
+        assert await service.craft("channel-1", "user-1", "alice", "tome\ufe0f", config) == "crafted:enchanted_tome"
+        assert await service.equip("channel-1", "user-1", "alice", "refined tome") is True
+
+        weapons, equipped, _, _ = await service.get_inventory("channel-1", "user-1")
+        assert weapons == [("enchanted_tome", 2)]
+        assert equipped == "enchanted_tome"
+
+
+@pytest.mark.asyncio
 async def test_full_archmage_name_remains_a_crafting_alias(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)
