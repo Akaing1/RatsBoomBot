@@ -144,6 +144,36 @@ class ChatterIdentityService:
 
         return None
 
+    def format_name(self, broadcaster_id: str | None, username: str) -> str:
+        """Return a cached Twitch display name while preserving the account login."""
+        login = str(username).strip().removeprefix("@").strip()
+        user_id = self._resolve_alias(broadcaster_id, login)
+        identity = self._identities.get(user_id) if user_id is not None else None
+
+        if identity is None or not identity.display_name or identity.display_name == login:
+            return login
+
+        return f"{identity.display_name} ({login})"
+
+    def list_channel_identities(self, broadcaster_id: str) -> list[dict[str, str]]:
+        """Return known chatters for a channel, using Twitch logins as insertable usernames."""
+        broadcaster_id = str(broadcaster_id)
+        identities = (
+            identity
+            for user_id, identity in self._identities.items()
+            if broadcaster_id in self._user_channels.get(user_id, set())
+        )
+        return [
+            {
+                "username": identity.login,
+                "display_name": identity.display_name or identity.login
+            }
+            for identity in sorted(
+                identities,
+                key=lambda item: (item.login.casefold(), item.login)
+            )
+        ]
+
     async def _persist(self, broadcaster_id: str, identity: ChatterIdentity, observed_at: datetime) -> None:
         observed_at_value = observed_at.isoformat()
 

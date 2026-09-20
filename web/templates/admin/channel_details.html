@@ -180,10 +180,8 @@
     <div class="redemption-panel-grid">
         <section class="panel activity-panel">
             <div class="panel-header">
-                <div><p class="eyebrow">Stream activity</p><h3>Check-ins</h3></div>
-                <span class="channel-state activity-stream-label">
-                    {% if not redemption_activity.stream_id %}Waiting{% elif redemption_activity.using_previous_stream %}Previous{% else %}Current{% endif %}
-                </span>
+                <div><p class="eyebrow">Account activity</p><h3>Check-ins</h3></div>
+                <span class="channel-state">Account</span>
             </div>
 
             <div id="checkin-activity-content" class="activity-scroll">
@@ -204,10 +202,8 @@
 
         <section class="panel activity-panel">
             <div class="panel-header">
-                <div><p class="eyebrow">Stream activity</p><h3>Redeems</h3></div>
-                <span class="channel-state activity-stream-label">
-                    {% if not redemption_activity.stream_id %}Waiting{% elif redemption_activity.using_previous_stream %}Previous{% else %}Current{% endif %}
-                </span>
+                <div><p class="eyebrow">Account activity</p><h3>Redeems</h3></div>
+                <span class="channel-state">Account</span>
             </div>
 
             <div id="redemption-activity-content" class="activity-scroll">
@@ -590,7 +586,6 @@
         const queueContent = document.getElementById("viewer-queue-content");
         const checkinContent = document.getElementById("checkin-activity-content");
         const redemptionContent = document.getElementById("redemption-activity-content");
-        const streamLabels = document.querySelectorAll(".activity-stream-label");
         const raidStatus = document.getElementById("raid-monitor-status");
         const raidEmpty = document.getElementById("raid-monitor-empty");
         const raidDetails = document.getElementById("raid-monitor-details");
@@ -767,13 +762,6 @@
             renderCheckins(Array.isArray(redemptions.checkins) ? redemptions.checkins : []);
             renderRedemptions(Array.isArray(redemptions.redemptions) ? redemptions.redemptions : []);
             renderRaid(data.raid || null);
-            const streamLabel = !redemptions.stream_id
-                ? "Waiting"
-                : redemptions.using_previous_stream ? "Previous" : "Current";
-            streamLabels.forEach(label => {
-                label.textContent = streamLabel;
-                label.classList.toggle("live", Boolean(redemptions.stream_id) && !redemptions.using_previous_stream);
-            });
         }
 
         async function refresh() {

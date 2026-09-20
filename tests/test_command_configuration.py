@@ -19,6 +19,10 @@ def test_bot_commands_are_case_insensitive() -> None:
 
 def test_bot_authorization_includes_announcement_scope() -> None:
     assert "moderator:manage:announcements" in settings.BOT_SCOPES.split()
+    assert "moderator:manage:automod" in settings.CHANNEL_SCOPES.split()
+    assert "moderator:manage:chat_messages" in settings.CHANNEL_SCOPES.split()
+    assert "moderator:manage:chat_settings" in settings.CHANNEL_SCOPES.split()
+    assert "moderator:manage:warnings" in settings.CHANNEL_SCOPES.split()
 
 
 def test_blank_bot_scope_configuration_uses_chat_defaults() -> None:

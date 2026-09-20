@@ -56,13 +56,28 @@ async def test_dashboard_activity_separates_checkins_and_other_redeems(tmp_path,
             user_input="Outer Wilds",
             stream_id="stream-1"
         )
-
-        activity = await service.get_dashboard_activity(
+        await service.record_activity(
+            redemption_id="offline-1",
             broadcaster_id="channel-1",
-            stream_id="stream-1"
+            user_id="user-3",
+            username="carol",
+            reward_title="Hydrate",
+            user_input=None,
+            stream_id=None
+        )
+        await service.record_activity(
+            redemption_id="other-channel-1",
+            broadcaster_id="channel-2",
+            user_id="user-4",
+            username="dave",
+            reward_title="Other channel reward",
+            user_input=None,
+            stream_id=None
         )
 
-    assert activity["stream_id"] == "stream-1"
+        activity = await service.get_dashboard_activity(broadcaster_id="channel-1")
+
+    assert activity["stream_id"] is None
     assert activity["checkins"] == [
         {
             "username": "alice",
@@ -72,11 +87,18 @@ async def test_dashboard_activity_separates_checkins_and_other_redeems(tmp_path,
     ]
     assert activity["redemptions"] == [
         {
+            "id": "offline-1",
+            "username": "carol",
+            "reward_title": "Hydrate",
+            "user_input": None,
+            "redeemed_at": activity["redemptions"][0]["redeemed_at"]
+        },
+        {
             "id": "other-1",
             "username": "bob",
             "reward_title": "Choose a Game",
             "user_input": "Outer Wilds",
-            "redeemed_at": activity["redemptions"][0]["redeemed_at"]
+            "redeemed_at": activity["redemptions"][1]["redeemed_at"]
         }
     ]
 

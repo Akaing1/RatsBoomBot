@@ -230,21 +230,16 @@ class RedeemService:
 
         return str(row["stream_id"]) if row else None
 
-    async def get_dashboard_activity(self, *, broadcaster_id: str, stream_id: str | None,
+    async def get_dashboard_activity(self, *, broadcaster_id: str, stream_id: str | None = None,
                                      limit: int = 100) -> dict[str, object]:
-        if stream_id is None:
-            return {"stream_id": None, "checkins": [], "redemptions": []}
-
         broadcaster_id = str(broadcaster_id)
-        stream_id = str(stream_id)
         safe_limit = max(1, min(int(limit), 200))
 
         claims_query = """
         SELECT username, redeem_type, created_at
         FROM redeem_claims
         WHERE broadcaster_id = ?
-          AND stream_id = ?
-        ORDER BY created_at ASC, id ASC
+        ORDER BY created_at DESC, id DESC
         LIMIT ?
         """
 
@@ -252,7 +247,6 @@ class RedeemService:
         SELECT redemption_id, username, reward_title, user_input, redeemed_at
         FROM redemption_events
         WHERE broadcaster_id = ?
-          AND stream_id = ?
         ORDER BY redeemed_at DESC
         LIMIT ?
         """
@@ -261,17 +255,16 @@ class RedeemService:
             async with self.db.acquire() as connection:
                 claim_rows = await connection.fetchall(
                     claims_query,
-                    (broadcaster_id, stream_id, safe_limit)
+                    (broadcaster_id, safe_limit)
                 )
                 redemption_rows = await connection.fetchall(
                     redemptions_query,
-                    (broadcaster_id, stream_id, safe_limit)
+                    (broadcaster_id, safe_limit)
                 )
         except Exception:
             LOGGER.exception(
-                "[Redeems] Failed to load dashboard activity for broadcaster %s stream %s.",
-                broadcaster_id,
-                stream_id
+                "[Redeems] Failed to load dashboard activity for broadcaster %s.",
+                broadcaster_id
             )
             raise
 
@@ -307,7 +300,7 @@ class RedeemService:
         ]
 
         return {
-            "stream_id": stream_id,
+            "stream_id": None,
             "checkins": checkins,
             "redemptions": redemptions
         }

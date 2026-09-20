@@ -108,3 +108,5 @@ class StreamEvents(commands.Component):
         await services.raid_bosses.cancel_announcements(broadcaster_id)
         await services.passive_points.stop_for_stream(broadcaster_id)
         await services.stream_logs.end_session(broadcaster_id)
+        if getattr(services, "live_chat", None) is not None:
+            await services.live_chat.clear_pinned_message(broadcaster_id)

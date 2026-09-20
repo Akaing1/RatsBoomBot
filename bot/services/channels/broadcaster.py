@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -11,6 +12,8 @@ class Broadcaster:
     display_name: str | None = None
     profile_image_url: str | None = None
     is_live: bool = False
+    viewer_count: int = 0
+    stream_started_at: datetime | None = None
 
     @property
     def name(self) -> str | None:
@@ -197,9 +200,13 @@ class BroadcasterService:
                     extra={"broadcaster_id": broadcaster_id}
                 )
                 broadcaster.is_live = False
+                broadcaster.viewer_count = 0
+                broadcaster.stream_started_at = None
                 continue
 
             broadcaster.is_live = stream is not None
+            broadcaster.viewer_count = int(getattr(stream, "viewer_count", 0) or 0) if stream is not None else 0
+            broadcaster.stream_started_at = getattr(stream, "started_at", None) if stream is not None else None
 
             if broadcaster.is_live:
                 live_count += 1

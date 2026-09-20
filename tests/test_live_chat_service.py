@@ -2,7 +2,7 @@ import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlparse
 
 import asqlite
@@ -11,7 +11,7 @@ import pytest
 from starlette.requests import Request
 
 import web.channel.routers.dashboard as dashboard_router
-from bot.services.channels.live_chat import LiveChatService, UnifiedChatMessage, message_matches_view, normalize_chat_view
+from bot.services.channels.live_chat import ChatBadge, ChatSegment, LiveChatService, UnifiedChatMessage, message_matches_view, normalize_chat_view
 from storage.migration_runner import run_migrations
 from web.channel.routers.dashboard import get_ad_status
 from web.admin.auth import CSRF_SESSION_KEY
@@ -50,7 +50,394 @@ def test_twitch_messages_are_split_between_chat_and_commands():
     assert [item["message"] for item in service.history("channel-1", "chat")] == ["hello", "!not-a-command"]
     assert [item["message"] for item in service.history("channel-1", "commands")] == ["  !points"]
     assert [item["message"] for item in service.history("channel-1", "both")] == ["hello", "  !points", "!not-a-command"]
-    assert chat.badges == ("Mod", "Subscriber")
+    assert chat.badges == (
+        ChatBadge("moderator", "Mod"),
+        ChatBadge("subscriber", "Subscriber")
+    )
+    assert chat.accent == "moderator"
+
+
+def test_twitch_first_time_and_role_accents_follow_display_priority():
+    service = LiveChatService(None)
+    first_time = twitch_payload("Hello!", "first-time")
+    first_time.type = "user_intro"
+    broadcaster = twitch_payload("hello", "broadcaster")
+    broadcaster.chatter.is_broadcaster = True
+    broadcaster.badges = [SimpleNamespace(set_id="staff", id="1", info="")]
+    staff = twitch_payload("hello", "staff")
+    staff.badges = [SimpleNamespace(set_id="staff", id="1", info="")]
+    vip = twitch_payload("hello", "vip")
+    vip.chatter.is_moderator = False
+    vip.chatter.is_vip = True
+    artist = twitch_payload("hello", "artist")
+    artist.chatter.is_moderator = False
+    artist.badges = [SimpleNamespace(set_id="artist-badge", id="1", info="")]
+    subscriber = twitch_payload("hello", "subscriber")
+    subscriber.chatter.is_moderator = False
+
+    assert service.publish_twitch(first_time).accent == "first-time"
+    assert service.publish_twitch(broadcaster).accent == "broadcaster"
+    assert service.publish_twitch(staff).accent == "staff"
+    assert service.publish_twitch(vip).accent == "vip"
+    assert service.publish_twitch(artist).accent == "artist"
+    assert service.publish_twitch(subscriber).accent == "subscriber"
+
+
+def test_twitch_eventsub_badges_use_cached_official_artwork():
+    service = LiveChatService(None)
+    badge = ChatBadge(
+        "moderator",
+        "Moderator",
+        "https://static-cdn.jtvnw.net/badges/v1/mod/1",
+        "https://static-cdn.jtvnw.net/badges/v1/mod/2",
+        "https://static-cdn.jtvnw.net/badges/v1/mod/4"
+    )
+    service.twitch_badge_cache["channel-1"] = (0.0, {("moderator", "1"): badge})
+    payload = twitch_payload("hello", "badged")
+    payload.badges = [SimpleNamespace(set_id="moderator", id="1", info="")]
+
+    message = service.publish_twitch(payload)
+
+    assert message.badges == (badge,)
+    assert message.as_dict()["badges"][0]["url_4x"].endswith("/4")
+
+
+def test_twitch_message_fragments_preserve_native_emotes():
+    service = LiveChatService(None)
+    payload = twitch_payload("Hello Kappa!", "native-emote")
+    payload.fragments = [
+        SimpleNamespace(type="text", text="Hello ", emote=None),
+        SimpleNamespace(type="emote", text="Kappa", emote=SimpleNamespace(id="25", format=["static"])),
+        SimpleNamespace(type="text", text="!", emote=None)
+    ]
+
+    message = service.publish_twitch(payload)
+    serialized = message.as_dict()["segments"]
+
+    assert serialized == [
+        {"type": "text", "text": "Hello ", "url": None, "provider": None},
+        {
+            "type": "emote",
+            "text": "Kappa",
+            "url": "https://static-cdn.jtvnw.net/emoticons/v2/25/static/dark/2.0",
+            "provider": "twitch"
+        },
+        {"type": "text", "text": "!", "url": None, "provider": None}
+    ]
+
+
+def test_twitch_message_prefers_animated_native_emotes_when_available():
+    service = LiveChatService(None)
+    payload = twitch_payload("Party", "animated-emote")
+    payload.fragments = [
+        SimpleNamespace(type="emote", text="Party", emote=SimpleNamespace(id="emote-id", format=["static", "animated"]))
+    ]
+
+    message = service.publish_twitch(payload)
+
+    assert message.segments[0].url == "https://static-cdn.jtvnw.net/emoticons/v2/emote-id/animated/dark/2.0"
+
+
+def test_7tv_emotes_are_applied_only_to_plain_text_fragments():
+    service = LiveChatService(None)
+    service.seventv_global_emotes = {
+        "GlobalRat": ChatSegment("emote", "GlobalRat", "https://cdn.7tv.app/emote/global/2x.webp", "7tv")
+    }
+    service.seventv_channel_emotes["channel-1"] = {
+        "ChannelRat": ChatSegment("emote", "ChannelRat", "https://cdn.7tv.app/emote/channel/2x.webp", "7tv")
+    }
+    payload = twitch_payload("GlobalRat ChannelRat", "7tv-emotes")
+
+    message = service.publish_twitch(payload)
+
+    assert [(segment.type, segment.text, segment.provider) for segment in message.segments] == [
+        ("emote", "GlobalRat", "7tv"),
+        ("text", " ", None),
+        ("emote", "ChannelRat", "7tv")
+    ]
+
+
+def test_parse_7tv_emotes_builds_allowlisted_cdn_urls():
+    emotes = LiveChatService._parse_seventv_emotes({
+        "emotes": [
+            {"name": "RatJam", "data": {"id": "01ABC123"}},
+            {"name": "Unsafe", "data": {"id": "../not-safe"}},
+            {"name": "", "data": {"id": "missing-name"}}
+        ]
+    })
+
+    assert emotes == {
+        "RatJam": ChatSegment("emote", "RatJam", "https://cdn.7tv.app/emote/01ABC123/2x.webp", "7tv")
+    }
+
+
+def test_parse_twitch_emotes_prefers_animated_cdn_assets():
+    emotes = LiveChatService._parse_twitch_emotes({
+        "data": [{"id": "emote/id", "name": "RatDance", "format": ["static", "animated"]}]
+    }, "available")
+
+    assert emotes == [{
+        "id": "emote/id",
+        "name": "RatDance",
+        "url": "https://static-cdn.jtvnw.net/emoticons/v2/emote%2Fid/animated/dark/2.0",
+        "provider": "twitch",
+        "scope": "available",
+        "owner_id": ""
+    }]
+
+
+@pytest.mark.asyncio
+async def test_fetch_twitch_user_emotes_paginates_without_unsupported_page_size():
+    service = LiveChatService(None)
+    service._fetch_twitch_emote_page = AsyncMock(side_effect=[
+        {
+            "data": [{"id": "1", "name": "FirstChannel", "owner_id": "101", "format": ["static"]}],
+            "pagination": {"cursor": "next-page"}
+        },
+        {
+            "data": [{"id": "2", "name": "SecondChannel", "owner_id": "202", "format": ["static"]}],
+            "pagination": {}
+        },
+        {
+            "data": [
+                {"id": "101", "display_name": "Channel One", "profile_image_url": "https://example.com/one.png"},
+                {"id": "202", "display_name": "Channel Two", "profile_image_url": "https://example.com/two.png"}
+            ]
+        }
+    ])
+
+    emotes = await service._fetch_twitch_user_emotes("channel-1", "secret")
+
+    first_params = service._fetch_twitch_emote_page.await_args_list[0].args[2]
+    second_params = service._fetch_twitch_emote_page.await_args_list[1].args[2]
+    assert first_params == {"user_id": "channel-1", "broadcaster_id": "channel-1"}
+    assert "first" not in first_params
+    assert second_params == {"user_id": "channel-1", "broadcaster_id": "channel-1", "after": "next-page"}
+    assert [(item["group"], item["group_key"]) for item in emotes] == [
+        ("Channel One", "twitch:101"),
+        ("Channel Two", "twitch:202")
+    ]
+
+
+def test_twitch_messages_tagging_the_broadcaster_are_highlighted():
+    service = LiveChatService(None)
+    payload = twitch_payload("Hey @Channel!", "mention")
+    payload.fragments = [
+        SimpleNamespace(type="text", text="Hey ", mention=None, emote=None),
+        SimpleNamespace(type="mention", text="@Channel", mention=SimpleNamespace(id="channel-1"), emote=None),
+        SimpleNamespace(type="text", text="!", mention=None, emote=None)
+    ]
+
+    message = service.publish_twitch(payload)
+
+    assert message.mentioned is True
+    assert message.as_dict()["mentioned"] is True
+
+
+def test_configured_chat_bot_messages_are_marked_for_quieter_display():
+    chat_identity = SimpleNamespace(is_custom_bot=lambda user_id: user_id == "custom-bot")
+    bot = SimpleNamespace(bot_id="rats-bot", services=SimpleNamespace(chat_identity=chat_identity))
+    service = LiveChatService(None, bot=bot)
+    rats_payload = twitch_payload("RatsBoomBot response", "rats-bot-message")
+    rats_payload.chatter.id = "rats-bot"
+    custom_payload = twitch_payload("Custom bot response", "custom-bot-message")
+    custom_payload.chatter.id = "custom-bot"
+
+    assert service.publish_twitch(rats_payload).is_bot is True
+    assert service.publish_twitch(custom_payload).is_bot is True
+
+
+def test_any_chatter_with_twitch_chat_bot_badge_is_marked_for_quieter_display():
+    service = LiveChatService(None)
+    payload = twitch_payload("Third-party bot response", "badged-bot-message")
+    payload.chatter.id = "unconfigured-third-party-bot"
+    payload.badges = [SimpleNamespace(set_id="bot", id="1", info="")]
+
+    message = service.publish_twitch(payload)
+
+    assert message.is_bot is True
+    assert message.badges[0].title == "Chat Bot"
+
+
+@pytest.mark.asyncio
+async def test_twitch_owner_lookup_isolates_invalid_ids_without_losing_valid_channels():
+    service = LiveChatService(None)
+
+    async def fetch_page(_, path, params):
+        assert path == "/users"
+        owner_ids = params["id"]
+
+        if "999" in owner_ids:
+            request = httpx.Request("GET", "https://api.twitch.tv/helix/users")
+            response = httpx.Response(400, request=request)
+            raise httpx.HTTPStatusError("bad owner", request=request, response=response)
+
+        return {"data": [
+            {"id": owner_id, "display_name": f"Channel {owner_id}", "profile_image_url": f"https://example.com/{owner_id}.png"}
+            for owner_id in owner_ids
+        ]}
+
+    service._fetch_twitch_emote_page = AsyncMock(side_effect=fetch_page)
+
+    names = await service._fetch_twitch_owner_names("secret", {"101", "202", "999", "not-a-user"})
+
+    assert names == {"101": "Channel 101", "202": "Channel 202"}
+    assert service.twitch_emote_owner_images == {
+        "101": "https://example.com/101.png",
+        "202": "https://example.com/202.png"
+    }
+
+
+@pytest.mark.asyncio
+async def test_emote_catalog_combines_twitch_and_live_7tv_caches():
+    service = LiveChatService(None, bot=SimpleNamespace(tokens={"channel-1": {"token": "secret"}}))
+    service.client = SimpleNamespace()
+    service._fetch_twitch_user_emotes = AsyncMock(return_value=[{
+        "name": "TwitchRat", "url": "https://static-cdn.jtvnw.net/emoticons/v2/1/static/dark/2.0",
+        "provider": "twitch", "scope": "available"
+    }])
+    service.seventv_global_emotes["GlobalRat"] = ChatSegment(
+        "emote", "GlobalRat", "https://cdn.7tv.app/emote/global/2x.webp", "7tv"
+    )
+    service.seventv_channel_emotes["channel-1"] = {
+        "ChannelRat": ChatSegment("emote", "ChannelRat", "https://cdn.7tv.app/emote/channel/2x.webp", "7tv")
+    }
+
+    catalog = await service.get_emote_catalog("channel-1")
+
+    assert catalog["complete_twitch_catalog"] is True
+    assert catalog["twitch_reconnect_required"] is False
+    assert [item["name"] for item in catalog["emotes"]] == ["TwitchRat", "ChannelRat", "GlobalRat"]
+    assert {item["group"] for item in catalog["emotes"] if item["provider"] == "7tv"} == {"7TV"}
+
+
+@pytest.mark.asyncio
+async def test_emote_catalog_preserves_names_that_only_differ_by_case():
+    service = LiveChatService(None, bot=SimpleNamespace(tokens={"channel-1": {"token": "secret"}}))
+    service.client = SimpleNamespace()
+    service._fetch_twitch_user_emotes = AsyncMock(return_value=[
+        {
+            "id": "1", "name": "RatJam", "url": "https://static-cdn.jtvnw.net/emoticons/v2/1/static/dark/2.0",
+            "provider": "twitch", "scope": "available", "group": "Channel A", "group_key": "twitch:a"
+        },
+        {
+            "id": "2", "name": "ratjam", "url": "https://static-cdn.jtvnw.net/emoticons/v2/2/static/dark/2.0",
+            "provider": "twitch", "scope": "available", "group": "Channel B", "group_key": "twitch:b"
+        }
+    ])
+
+    catalog = await service.get_emote_catalog("channel-1")
+
+    assert [item["name"] for item in catalog["emotes"]] == ["RatJam", "ratjam"]
+
+
+@pytest.mark.asyncio
+async def test_emote_catalog_falls_back_when_user_emote_scope_is_missing():
+    service = LiveChatService(None, bot=SimpleNamespace(tokens={"channel-1": {"token": "secret"}}))
+    service.client = SimpleNamespace()
+    response = httpx.Response(401, request=httpx.Request("GET", "https://api.twitch.tv/helix/chat/emotes/user"))
+    service._fetch_twitch_user_emotes = AsyncMock(side_effect=httpx.HTTPStatusError("missing scope", request=response.request, response=response))
+    fallback = [{
+        "name": "Kappa", "url": "https://static-cdn.jtvnw.net/emoticons/v2/25/static/dark/2.0",
+        "provider": "twitch", "scope": "global"
+    }]
+    service._fetch_basic_twitch_emotes = AsyncMock(return_value=fallback)
+
+    catalog = await service.get_emote_catalog("channel-1")
+
+    assert catalog["emotes"] == fallback
+    assert catalog["complete_twitch_catalog"] is False
+    assert catalog["twitch_reconnect_required"] is True
+
+
+@pytest.mark.asyncio
+async def test_refresh_7tv_channel_replaces_cache_and_tracks_set_id():
+    response = SimpleNamespace(
+        status_code=200,
+        raise_for_status=lambda: None,
+        json=lambda: {
+            "emote_set": {
+                "id": "set-1",
+                "emotes": [{"name": "FreshRat", "data": {"id": "01FRESH"}}]
+            }
+        }
+    )
+    service = LiveChatService(None)
+    service.client = SimpleNamespace(get=AsyncMock(return_value=response))
+
+    set_id = await service._refresh_seventv_channel("channel-1")
+
+    assert set_id == "set-1"
+    assert service.seventv_set_ids["channel-1"] == "set-1"
+    assert service.seventv_channel_emotes["channel-1"]["FreshRat"].url == "https://cdn.7tv.app/emote/01FRESH/2x.webp"
+
+
+@pytest.mark.asyncio
+async def test_refresh_7tv_set_uses_direct_set_endpoint_for_live_updates():
+    response = SimpleNamespace(
+        raise_for_status=lambda: None,
+        json=lambda: {"emotes": [{"name": "AddedLive", "data": {"id": "01LIVE"}}]}
+    )
+    service = LiveChatService(None)
+    service.client = SimpleNamespace(get=AsyncMock(return_value=response))
+
+    await service._refresh_seventv_set("channel-1", "set-1")
+
+    service.client.get.assert_awaited_once_with("https://7tv.io/v3/emote-sets/set-1")
+    assert service.seventv_channel_emotes["channel-1"]["AddedLive"].url == "https://cdn.7tv.app/emote/01LIVE/2x.webp"
+
+
+@pytest.mark.asyncio
+async def test_7tv_dispatch_refreshes_the_active_set_without_restarting():
+    class EventStream:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_):
+            return None
+
+        def raise_for_status(self):
+            return None
+
+        async def aiter_lines(self):
+            for line in ("event: dispatch", 'data: {"type":"emote_set.update"}', ""):
+                yield line
+
+    service = LiveChatService(None)
+    service.started = True
+    service.client = SimpleNamespace(stream=lambda *args, **kwargs: EventStream())
+    service._refresh_seventv_set = AsyncMock()
+
+    await service._stream_seventv_updates("channel-1", "set-1")
+
+    service._refresh_seventv_set.assert_awaited_once_with("channel-1", "set-1")
+
+
+@pytest.mark.asyncio
+async def test_7tv_watcher_refreshes_channel_while_event_stream_is_quiet(monkeypatch):
+    stream_cancelled = asyncio.Event()
+
+    async def quiet_stream(*_):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stream_cancelled.set()
+
+    service = LiveChatService(None)
+    service.started = True
+    service._stream_seventv_updates = quiet_stream
+
+    async def refresh_channel(_):
+        service.started = False
+        return "set-1"
+
+    service._refresh_seventv_channel = AsyncMock(side_effect=refresh_channel)
+    monkeypatch.setattr("bot.services.channels.live_chat.SEVENTV_REFRESH_SECONDS", 0.01)
+
+    await service._watch_seventv_set("channel-1", "set-1")
+
+    service._refresh_seventv_channel.assert_awaited_once_with("channel-1")
+    assert stream_cancelled.is_set()
 
 
 def test_tagged_bot_response_is_kept_with_commands_without_classifying_all_bot_messages():
@@ -64,6 +451,22 @@ def test_tagged_bot_response_is_kept_with_commands_without_classifying_all_bot_m
     assert unrelated.kind == "chat"
     assert [item["message"] for item in service.history("channel-1", "commands")] == ["You have 500 points."]
     assert [item["message"] for item in service.history("channel-1", "chat")] == ["A raid boss is approaching!"]
+
+
+@pytest.mark.asyncio
+async def test_deleted_chat_messages_remain_in_history_as_deleted_updates():
+    service = LiveChatService(None)
+    message = service.publish_twitch(twitch_payload("This will be deleted", "deleted-message"))
+    subscriber = service.subscribe("channel-1")
+
+    await service.remove_message("channel-1", message.id)
+
+    history = service.history("channel-1")
+    update = subscriber.get_nowait()
+    assert history[0]["message"] == "This will be deleted"
+    assert history[0]["deleted"] is True
+    assert update.id == message.id
+    assert update.deleted is True
 
 
 def test_youtube_messages_are_normalized_and_deduplicated():
@@ -275,6 +678,161 @@ async def test_dashboard_can_send_to_twitch_and_youtube(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_dashboard_can_reply_to_a_twitch_message(monkeypatch):
+    broadcaster = SimpleNamespace(id="channel-1")
+    twitch_channel = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True)))
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
+        live_chat=SimpleNamespace()
+    )
+    runtime_bot = SimpleNamespace(services=services, create_partialuser=lambda broadcaster_id: twitch_channel)
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/chat/send", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_send_chat_message(
+        request, "This is a reply", "twitch", "csrf", "twitch:parent-message"
+    )
+
+    assert response.status_code == 200
+    twitch_channel.send_message.assert_awaited_once_with(
+        sender="channel-1",
+        token_for="channel-1",
+        message="This is a reply",
+        reply_to_message_id="parent-message"
+    )
+
+
+@pytest.mark.asyncio
+async def test_dashboard_viewer_queue_actions_send_their_chat_response(monkeypatch):
+    queue = SimpleNamespace(
+        requeue=AsyncMock(return_value=(True, "Moved alice to position 1.")),
+        size=lambda _: 2,
+        list_queue=lambda _: ["alice", "bob"],
+        list_queue_members=lambda _: [
+            {"username": "alice", "display_name": "Alice", "label": "alice"},
+            {"username": "bob", "display_name": "Bob", "label": "bob"}
+        ],
+        is_queue_open=lambda _: True
+    )
+    sent_message = SimpleNamespace(sent=True, id="queue-response")
+    chat_identity = SimpleNamespace(send_message=AsyncMock(return_value=sent_message))
+    live_chat = SimpleNamespace(tag_command_response=Mock())
+    channel = SimpleNamespace(id="channel-1")
+    services = SimpleNamespace(viewer_queue=queue, chat_identity=chat_identity, live_chat=live_chat)
+    runtime_bot = SimpleNamespace(services=services, create_partialuser=lambda _: channel)
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/viewer-queue/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_viewer_queue_action(request, "top", "csrf", 2, 0)
+
+    assert response.status_code == 200
+    chat_identity.send_message.assert_awaited_once_with(channel, "Moved alice to position 1.")
+    live_chat.tag_command_response.assert_called_once_with("channel-1", "queue-response")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_emote_catalog_is_scoped_to_authenticated_channel(monkeypatch):
+    broadcaster = SimpleNamespace(id="channel-1")
+    live_chat = SimpleNamespace(get_emote_catalog=AsyncMock(return_value={"emotes": [], "complete_twitch_catalog": True}))
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
+        live_chat=live_chat
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    request = Request({
+        "type": "http", "method": "GET", "path": "/channel/api/chat/emotes", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1"}
+    })
+
+    response = await dashboard_router.channel_chat_emotes(request)
+
+    assert response.status_code == 200
+    live_chat.get_emote_catalog.assert_awaited_once_with("channel-1")
+
+
+@pytest.mark.asyncio
+async def test_twitch_ban_slash_command_uses_moderation_api():
+    broadcaster = SimpleNamespace(ban_user=AsyncMock())
+    chatters = SimpleNamespace(resolve=AsyncMock(return_value=SimpleNamespace(id="user-1")))
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(chatters=chatters),
+        create_partialuser=lambda broadcaster_id: broadcaster
+    )
+
+    status = await dashboard_router.execute_twitch_slash_command(
+        runtime_bot, "channel-1", "/ban @actual_login repeated spam"
+    )
+
+    assert status == "/ban completed."
+    chatters.resolve.assert_awaited_once_with("channel-1", "@actual_login")
+    broadcaster.ban_user.assert_awaited_once_with(
+        moderator="channel-1", user="user-1", reason="repeated spam"
+    )
+
+
+@pytest.mark.asyncio
+async def test_dashboard_chat_users_are_scoped_to_authenticated_channel(monkeypatch):
+    broadcaster = SimpleNamespace(id="channel-1")
+    chatters = SimpleNamespace(list_channel_identities=lambda broadcaster_id: [{
+        "username": "actual_login", "display_name": "Display Name"
+    }] if broadcaster_id == "channel-1" else [])
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
+        chatters=chatters
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    request = Request({
+        "type": "http", "method": "GET", "path": "/channel/api/chat/users", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1"}
+    })
+
+    response = await dashboard_router.channel_chat_users(request)
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {
+        "users": [{"username": "actual_login", "display_name": "Display Name"}]
+    }
+
+
+@pytest.mark.asyncio
+async def test_dashboard_updates_pinned_message_duration(monkeypatch):
+    pinned = {"id": "twitch:message-1", "message": "Keep this visible"}
+    live_chat = SimpleNamespace(get_pinned_message=lambda _: pinned)
+    request_json = AsyncMock(return_value=None)
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(live_chat=live_chat),
+        _http=SimpleNamespace(request_json=request_json)
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/chat/moderate", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.moderate_channel_chat_message(
+        request, "pin-duration", "twitch:message-1", "csrf", "5"
+    )
+    payload = json.loads(response.body)
+    route = request_json.await_args.args[0]
+
+    assert response.status_code == 200
+    assert payload["duration_minutes"] == 5
+    assert route.method == "PATCH"
+    assert route.params["duration_seconds"] == "300"
+
+
+@pytest.mark.asyncio
 async def test_dashboard_both_target_uses_twitch_when_youtube_is_offline(monkeypatch):
     broadcaster = SimpleNamespace(id="channel-1")
     twitch_channel = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True)))
@@ -323,24 +881,293 @@ async def test_dashboard_youtube_target_explains_when_youtube_is_offline(monkeyp
     assert payload["errors"]["youtube"].startswith("YouTube is offline.")
 
 
+@pytest.mark.asyncio
+async def test_dashboard_header_stats_include_twitch_totals():
+    twitch_user = SimpleNamespace(
+        fetch_broadcaster_subscriptions=AsyncMock(return_value=SimpleNamespace(total=45, points=52)),
+        fetch_followers=AsyncMock(return_value=SimpleNamespace(total=6789))
+    )
+    runtime_bot = SimpleNamespace(
+        user=SimpleNamespace(id="bot-1"),
+        create_partialuser=lambda broadcaster_id: twitch_user
+    )
+    broadcaster = SimpleNamespace(id="channel-1", viewer_count=12)
+
+    stats = await dashboard_router.get_dashboard_header_stats(runtime_bot, broadcaster, points_lost=99)
+
+    assert [(stat["key"], stat["value"], stat["display_value"]) for stat in stats] == [
+        ("viewers", 12, "12"),
+        ("followers", 6789, "6,789"),
+        ("subscribers", 45, "45 (52 pts)"),
+        ("points_lost", 99, "99")
+    ]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_header_stats_can_refresh_live_viewer_count():
+    started_at = datetime.now(UTC)
+    twitch_user = SimpleNamespace(
+        fetch_stream=AsyncMock(return_value=SimpleNamespace(viewer_count=88, started_at=started_at)),
+        fetch_broadcaster_subscriptions=AsyncMock(return_value=SimpleNamespace(total=45, points=51)),
+        fetch_followers=AsyncMock(return_value=SimpleNamespace(total=67))
+    )
+    runtime_bot = SimpleNamespace(
+        user=SimpleNamespace(id="bot-1"),
+        create_partialuser=lambda broadcaster_id: twitch_user
+    )
+    broadcaster = SimpleNamespace(id="channel-1", is_live=False, viewer_count=0)
+
+    stats = await dashboard_router.get_dashboard_header_stats(runtime_bot, broadcaster, refresh_viewers=True)
+
+    assert stats[0]["value"] == 88
+    assert broadcaster.viewer_count == 88
+    assert broadcaster.is_live is True
+    assert broadcaster.stream_started_at == started_at
+    twitch_user.fetch_stream.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
+    calls = []
+
+    async def games():
+        yield SimpleNamespace(id="509658", name="Just Chatting")
+        yield SimpleNamespace(id="123", name="Retro")
+
+    def search_categories(query, **kwargs):
+        calls.append((query, kwargs))
+        return games()
+
+    monkeypatch.setattr(
+        dashboard_router,
+        "get_bot",
+        lambda: SimpleNamespace(services=SimpleNamespace(), search_categories=search_categories)
+    )
+    request = Request({
+        "type": "http", "method": "GET", "path": "/channel/api/games", "headers": [],
+        "query_string": b"query=chat", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1"}
+    })
+
+    response = await dashboard_router.search_twitch_games(request, "chat")
+
+    assert json.loads(response.body) == {"games": [
+        {"id": "509658", "name": "Just Chatting"},
+        {"id": "123", "name": "Retro"}
+    ]}
+    assert calls == [("chat", {"token_for": "channel-1", "first": 50, "max_results": 50})]
+
+
+@pytest.mark.asyncio
+async def test_pinned_chat_message_survives_service_restart(tmp_path):
+    async with asqlite.create_pool(str(tmp_path / "pinned-chat.db")) as database:
+        await run_migrations(database)
+        service = LiveChatService(database)
+        await service.setup()
+        message = twitch_payload("Pinned rat", "pin-1")
+        serialized = service.publish_twitch(message).as_dict()
+
+        await service.pin_message("channel-1", serialized)
+        restarted = LiveChatService(database)
+        await restarted.setup()
+
+        assert restarted.get_pinned_message("channel-1")["id"] == "twitch:pin-1"
+        await restarted.clear_pinned_message("channel-1")
+        assert restarted.get_pinned_message("channel-1") is None
+
+
+def test_live_chat_tracks_mod_actions_and_automod_queue():
+    service = LiveChatService(None)
+    broadcaster = SimpleNamespace(id="channel-1")
+    timeout_ends = datetime.now(UTC) + timedelta(minutes=10)
+    service.record_mod_action(SimpleNamespace(
+        broadcaster=broadcaster,
+        source_broadcaster=broadcaster,
+        moderator=SimpleNamespace(id="mod-1", name="modrat", display_name="Mod Rat"),
+        action="timeout",
+        timeout=SimpleNamespace(
+            user=SimpleNamespace(id="viewer-1", name="viewer", display_name="Viewer Name"),
+            reason="spam",
+            expires_at=timeout_ends
+        )
+    ))
+    held = SimpleNamespace(
+        broadcaster=broadcaster,
+        user=SimpleNamespace(name="viewer", display_name="Viewer"),
+        message_id="held-1",
+        text="held message",
+        reason="automod",
+        category="aggression",
+        level=2,
+        held_at=datetime.now(UTC)
+    )
+    service.hold_automod_message(held)
+
+    activity = service.get_moderation_activity("channel-1")
+
+    assert activity["mod_actions"][0] | {"timestamp": None, "id": None} == {
+        "id": None,
+        "action": "Timeout",
+        "action_key": "timeout",
+        "moderator": "Mod Rat (modrat)",
+        "moderator_login": "modrat",
+        "target": "Viewer Name (viewer)",
+        "target_login": "viewer",
+        "reason": "spam",
+        "expires_at": timeout_ends.isoformat(),
+        "message": None,
+        "note": None,
+        "follow_duration": None,
+        "wait_time": None,
+        "viewer_count": None,
+        "terms": [],
+        "term_list": None,
+        "from_automod": None,
+        "chat_rules": [],
+        "source_channel": None,
+        "timestamp": None
+    }
+    assert activity["automod"][0]["id"] == "held-1"
+    service.resolve_automod_message("channel-1", "held-1")
+    assert service.get_moderation_activity("channel-1")["automod"] == []
+
+
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    features = open("web/templates/channel/features.html", encoding="utf-8").read()
+    channel_layout = open("web/templates/channel/layout.html", encoding="utf-8").read()
     customization = open("web/templates/shared/profile_inputs.html", encoding="utf-8").read()
     dashboard_styles = open("web/static/css/style.css", encoding="utf-8").read()
     widget_styles = open("web/static/css/chat-widget.css", encoding="utf-8").read()
     chat_script = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
+    composer_script = open("web/static/js/dashboard-chat-send.js", encoding="utf-8").read()
+    sidebar_script = open("web/static/js/channel-sidebar.js", encoding="utf-8").read()
+    header_stats_script = open("web/static/js/dashboard-header-stats.js", encoding="utf-8").read()
+    ad_status_script = open("web/static/js/dashboard-ad-status.js", encoding="utf-8").read()
+    metadata_script = open("web/static/js/dashboard-channel-metadata.js", encoding="utf-8").read()
+    queue_script = open("web/static/js/dashboard-viewer-queue.js", encoding="utf-8").read()
 
-    assert 'data-stream-url="/channel/api/chat/stream?view=chat"' in dashboard
+    assert 'data-stream-url="/channel/api/chat/stream?view=both"' in dashboard
     assert 'data-stream-url="/channel/api/chat/stream?view=commands"' in dashboard
+    assert dashboard.count("data-connection-status-target") == 1
+    assert "Waiting for chat messages" not in dashboard
+    assert "Waiting for commands" not in dashboard
     assert 'data-activity-tab="redeems"' in dashboard
     assert 'data-activity-tab="checkins"' in dashboard
-    assert dashboard.index("channel-live-layout") < dashboard.index('include "channel/raid_summary.html"')
+    assert 'data-activity-tab="mod-actions"' in dashboard
+    assert 'data-activity-tab="automod"' in dashboard
+    assert dashboard.index('data-activity-tab="raid"') < dashboard.index('include "channel/raid_summary.html"')
     assert 'data-chat-composer' in dashboard
+    assert 'data-channel-id="{{ broadcaster.id }}"' in dashboard
+    assert 'data-reply-context' in dashboard
+    assert 'data-reply-cancel' in dashboard
     assert 'data-chat-target="twitch"' in dashboard
     assert 'data-chat-target="youtube"' in dashboard
     assert 'data-chat-target="both"' in dashboard
+    assert "data-emote-picker" in dashboard
+    assert "data-emote-toggle" in dashboard
+    assert "data-dashboard-header-stats" in dashboard
+    assert "data-dashboard-stat-value" in dashboard
+    assert "data-stream-status" in dashboard
+    assert 'class="dashboard-header-stat dashboard-ad-stat' in dashboard
+    assert "stream-status-card" not in dashboard
+    assert "Twitch ID:" not in dashboard
+    assert 'data-user-id="{{ broadcaster.id }}"' in dashboard
+    assert 'class="channel-heading dashboard-channel-heading"' in dashboard
+    assert "dashboard-channel-identity" in dashboard
+    assert 'aria-label="Open {{ broadcaster.name or broadcaster.login }} on Twitch"' in dashboard
+    assert "Open Twitch" not in dashboard
+    assert "Twitch + YouTube" not in dashboard
+    assert "<h3>Combined Chat</h3>" in dashboard
+    assert 'data-activity-link="commands"' not in dashboard
+    assert "Stream activity" not in dashboard
+    assert "Viewer games" not in dashboard
+    assert 'data-refresh-url="/channel/api/dashboard-stats"' in dashboard
+    assert "Back to Overview" not in features
+    assert dashboard.index("data-emote-toggle") < dashboard.index("data-chat-send-status") < dashboard.index("dashboard-chat-composer-actions")
+    assert 'fetch("/channel/api/chat/emotes")' in composer_script
+    assert 'fetch("/channel/api/chat/users"' in composer_script
+    assert 'const twitchCommands = [' in composer_script
+    assert 'value: `@${user.username}`' in composer_script
+    assert 'user.display_name.toLocaleLowerCase().includes(query)' in composer_script
+    assert 'command.name.includes(query)' in composer_script
+    assert '!key.includes(query)' in composer_script
+    assert 'inputBeforeCursor.match(/^\\/([A-Za-z]*)$/)' in composer_script
+    assert 'event.key === "Tab"' in composer_script
+    assert "navigateMessageHistory(direction)" in composer_script
+    assert "caretAtStart" in composer_script
+    assert "caretAtEnd" in composer_script
+    assert "const messageHistoryLimit = 20" in composer_script
+    assert "slice(-messageHistoryLimit)" in composer_script
+    assert "window.sessionStorage.setItem(messageHistoryKey" in composer_script
+    live_chat_script = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
+    assert '"pin-duration"' in live_chat_script
+    assert '"live-chat-pinned-action live-chat-unpin"' in live_chat_script
+    assert '["", "∞"]' in live_chat_script
+    assert 'window.requestAnimationFrame(finishScroll)' in live_chat_script
+    assert 'if (feed.followNewest) scrollToBottom(feed)' in live_chat_script
+    assert 'const shouldFollowNewest = feed.followNewest && distanceFromBottom(feed.element) <= 24' in live_chat_script
+    assert '["wheel", "touchmove"]' in live_chat_script
+    assert 'feed.followRowObserver = new ResizeObserver' in live_chat_script
+    assert 'feed.followRowObserver.observe(row)' in live_chat_script
+    assert 'new CustomEvent("dashboard-chat-reply"' in live_chat_script
+    assert '"live-chat-message-action reply"' in live_chat_script
+    assert 'row.classList.add("is-deleted")' in live_chat_script
+    assert 'row.classList.add("is-mentioned")' in live_chat_script
+    assert 'row.classList.add("is-bot")' in live_chat_script
+    assert '.live-chat-message.is-deleted' in dashboard_styles
+    assert '.live-chat-message.is-mentioned' in dashboard_styles
+    assert '.live-chat-message.is-bot:not(.is-deleted)' in dashboard_styles
+    assert 'event.key !== "Escape" || !replyMessageId.value' in composer_script
+    assert '"live-chat-pin-progress"' in live_chat_script
+    assert 'window.setInterval(() => refreshPinned(feed), 2000)' in live_chat_script
+    assert "live-chat-pin-countdown" in dashboard_styles
+    assert 'addDetail("Reason", action.reason)' in dashboard
+    assert 'addDetail("Deleted message"' in dashboard
+    assert 'addDetail("Timeout ends"' in dashboard
+    assert "Performed by ${action.moderator}" in dashboard
+    assert 'addDetail("Message ID"' not in dashboard
+    assert 'displayName.toLocaleLowerCase() !== username.toLocaleLowerCase()' in live_chat_script
     assert 'data-ad-status' in dashboard
-    assert dashboard.count("Viewer queue") == 1
+    assert dashboard.count("<h3>Viewer queue</h3>") == 1
+    assert "data-channel-metadata" in dashboard
+    assert 'data-games-url="/channel/api/games"' in dashboard
+    assert 'contenteditable="plaintext-only"' in dashboard
+    assert dashboard.count('spellcheck="false"') >= 2
+    assert "dashboard-channel-metadata.js" in dashboard
+    assert "dashboard-viewer-queue.js" in dashboard
+    assert 'data-queue-action="next4"' in dashboard
+    assert 'data-queue-action="next5"' in dashboard
+    assert 'data-queue-action="clear"' in dashboard
+    assert 'href="/channel/viewer-queue/blacklist"' in dashboard
+    assert 'data-queue-count' in dashboard
+    assert 'item.draggable = true' in queue_script
+    assert 'runAction("reorder", draggingPosition, position)' in queue_script
+    assert 'moveIcon("top")' in queue_script
+    assert 'moveIcon("bottom")' in queue_script
+    assert 'actionButton("🗑"' in queue_script
+    assert '.queue-item-action svg' in dashboard_styles
+    assert 'fetch(endpoint' in metadata_script
+    assert "searchGames" in metadata_script
+    assert 'event.key === "Tab" || event.key === "Enter"' in metadata_script
+    assert "twitch-game-suggestions" in dashboard_styles
+    assert "Bitrate" not in dashboard
+    assert 'window.setTimeout(() => status.classList.add("is-fading"), 3000)' in metadata_script
+    assert 'window.setTimeout(() => status.classList.add("is-fading"), 3000)' in queue_script
+    assert 'data-activity-notify="commands"' in dashboard
+    assert 'data-moderation-url="/channel/api/chat/moderate"' in dashboard
+    assert 'data-pinned-url="/channel/api/chat/pinned"' in dashboard
+    assert "live-chat-message-actions" in chat_script
+    assert "refreshPinned" in chat_script
+    assert 'source.onopen = () => showConnectionStatus(true)' in chat_script
+    assert 'source.onerror = () => showConnectionStatus(false)' in chat_script
+    assert 'window.setTimeout(() => connectionStatus.classList.add("is-fading"), 3000)' in chat_script
+    assert "<span>Category</span>" in dashboard
+    assert 'data-channel-field="title"' in dashboard
+    assert 'window.setInterval(() => refreshPinned(feed), 2000)' in chat_script
+    assert 'dashboard-activity-unread' in dashboard
+    assert 'dashboard-activity-unread' in chat_script
+    assert '.dashboard-tab.has-unseen:not(.active)' in dashboard_styles
     assert "Connect YouTube Channel" in customization
     assert "('chat', 'Chat'" in customization
     assert "('commands', 'Commands'" in customization
@@ -354,8 +1181,90 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "overflow-y: auto" in widget_styles
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
-    assert 'grid-template-areas: "stream gambling chat" "queue activity chat"' in dashboard_styles
-    assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
+    assert '"live-chat-jump", "↓ Jump to present"' in chat_script
+    assert 'makeElement("div", "live-chat-feed-shell")' in chat_script
+    assert 'element.addEventListener("scroll", () => {' in chat_script
+    assert "updateJumpButton(feed);" in chat_script
+    assert "feed.element.scrollTop = feed.element.scrollHeight;" in chat_script
+    assert "feed.hasUnseenMessages = true" in chat_script
+    assert 'maxMessages: Number(element.dataset.maxMessages || 100)' in chat_script
+    assert 'data-max-messages="150"' in dashboard
+    assert 'classList.toggle("has-unseen", feed.hasUnseenMessages && !atBottom)' in chat_script
+    assert "display: flex; flex: 0 0 auto;" in dashboard_styles
+    assert "display: flex; min-width: 0; flex: 1; flex-wrap: wrap;" in dashboard_styles
+    assert ".live-chat-time { position: absolute; top: 1px; right: 0;" in dashboard_styles
+    assert ".live-chat-time { position: absolute; top: 1px; right: 0;" in widget_styles
+    assert "if (timestamp) content.appendChild(timestamp);" in chat_script
+    assert ".live-chat-text { max-width: 100%; flex: 0 0 auto; margin: 0;" in dashboard_styles
+    assert ".live-chat-text { max-width: 100%; flex: 0 0 auto; margin: 0;" in widget_styles
+    assert ".live-chat-jump[hidden] { display: none; }" in dashboard_styles
+    assert ".live-chat-jump.has-unseen {" in dashboard_styles
+    assert "animation: live-chat-jump-alert 3s ease-in-out infinite" in dashboard_styles
+    assert "@keyframes live-chat-jump-alert" in dashboard_styles
+    assert "33.333% { background-color: rgba(255,59,59,.75); }" in dashboard_styles
+    assert "66.666%, 100% { background-color: var(--jump-fill); }" in dashboard_styles
+    assert chat_script.index("heading.appendChild(platform)") < chat_script.index("heading.appendChild(name)")
+    assert 'emote.srcset = emoteSrcset(url)' in chat_script
+    assert 'image.srcset = emoteSrcset(emote.url)' in composer_script
+    assert 'replace(/\\/2x\\.webp$/, "/3x.webp")' in composer_script
+    assert "data-emote-group" in dashboard
+    assert "renderGroupOptions" in composer_script
+    assert "matches.slice(0, 300)" not in composer_script
+    assert "overflow-y: auto; overscroll-behavior: contain;" in dashboard_styles
+    assert "seen.has(emote.name)" in composer_script
+    assert ".chat-emote-picker[hidden], .chat-emote-suggestions[hidden] { display: none; }" in dashboard_styles
+    assert ".chat-send-status { position: absolute;" in dashboard_styles
+    assert "text-align: right; text-overflow: ellipsis;" in dashboard_styles
+    assert "right: 15px; bottom: 11px;" in dashboard_styles
+    assert "opacity: .8;" in dashboard_styles
+    assert ".chat-send-status.is-fading { opacity: 0; }" in dashboard_styles
+    assert "height: 66px;" in dashboard_styles
+    assert "resize: none;" in dashboard_styles
+    assert 'status.dataset.connectionState === "disconnected"' in composer_script
+    assert 'status.classList.add("is-fading")' in composer_script
+    assert 'grid-template-areas: "header header chat" "channel channel chat" "queue activity chat"' in dashboard_styles
+    assert "grid-template-rows: max-content max-content minmax(540px,1fr)" in dashboard_styles
+    assert ".channel-dashboard-layout > .page-header { grid-area: header;" in dashboard_styles
+    assert 'grid-template-areas: "header" "channel" "chat" "activity" "queue"' in dashboard_styles
+    assert dashboard.index('<div class="channel-dashboard-layout">') < dashboard.index('<header class="page-header">')
+    assert 'body class="channel-page channel-page-{{ active_page }}"' in channel_layout
+    assert "data-sidebar-toggle" in channel_layout
+    assert "channel-sidebar.js" in channel_layout
+    assert 'localStorage.setItem(storageKey, String(collapsed))' in sidebar_script
+    assert ".channel-page:not(.channel-page-overview) .streamer-main-content" in dashboard_styles
+    assert "left: -36px; width: min(1250px,calc(100vw - 144px));" in dashboard_styles
+    assert "justify-content: space-evenly; gap: 0;" in dashboard_styles
+    assert ".navigation .nav-link { flex: 0 0 auto; justify-content: center; }" in dashboard_styles
+    assert ".sidebar:not(:hover) .nav-link { gap: 11px; justify-content: center; padding: 11px 13px; }" in dashboard_styles
+    assert ".sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 17px; padding-left: 17px; }" in dashboard_styles
+    assert "window.localStorage.setItem(storageKey" in header_stats_script
+    assert "dashboard-stat-visibility" in header_stats_script
+    assert "const refreshInterval = 60000" in header_stats_script
+    assert "window.setInterval(refreshStats, refreshInterval)" in header_stats_script
+    assert 'fetch(refreshUrl, {headers: {Accept: "application/json"}, cache: "no-store"})' in header_stats_script
+    assert 'streamStatus.dataset.startedAt = payload.started_at || ""' in header_stats_script
+    assert "window.setInterval(renderStreamStatus, 1000)" in header_stats_script
+    assert 'label.textContent = remaining > 0 ? `Ends in ${formatDuration(remaining)}`' in ad_status_script
+    assert 'label.textContent = remaining > 0 ? `Starts in ${formatDuration(remaining)}`' in ad_status_script
+    assert 'remaining < 60' in ad_status_script
+    assert 'setAppearance("ad-warning")' in ad_status_script
+    assert 'setAppearance("ad-running")' in ad_status_script
+    assert 'setAppearance("ad-idle")' in ad_status_script
+    assert 'container.dataset.state === "offline"' in ad_status_script
+    assert 'setAppearance("ad-neutral")' in ad_status_script
+    assert '.dashboard-ad-stat.ad-idle' in dashboard_styles
+    assert '.dashboard-ad-stat.ad-running' in dashboard_styles
+    assert 'animation: dashboard-ad-warning 1s ease-in-out 5' in dashboard_styles
+    assert "transition-delay: 1s,1s;" in dashboard_styles
+    assert ".dashboard-channel-heading { flex-direction: column; align-items: flex-start; gap: 10px; }" in dashboard_styles
+    assert ".dashboard-channel-heading > .eyebrow { margin-bottom: 0; padding-left: 12px; }" in dashboard_styles
+    assert ".dashboard-channel-identity:hover, .dashboard-channel-identity:focus-visible" in dashboard_styles
+    assert ".channel-dashboard-layout .panel-header h3 { color: #c7b7ff; }" in dashboard_styles
+    assert "width: 50px; height: 50px; flex-basis: 50px;" in dashboard_styles
+    assert ".dashboard-channel-copy .page-description { margin-top: 1px; line-height: 1.15; }" in dashboard_styles
+    assert ".channel-page-overview { height: 100dvh; overflow: hidden; }" in dashboard_styles
+    assert ".channel-page-overview .live-chat-panel { grid-row: 1 / -1; }" in dashboard_styles
+    assert ".sidebar:not(:hover) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
 
 
 @pytest.mark.asyncio

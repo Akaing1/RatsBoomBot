@@ -89,3 +89,25 @@ async def test_repeat_messages_do_not_write_every_time(tmp_path, monkeypatch) ->
         await service.observe("channel-1", chatter)
 
         assert persist_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_channel_identity_list_uses_login_for_username_completion(tmp_path) -> None:
+    database_path = tmp_path / "chatters.db"
+    localized = SimpleNamespace(id="123", name="actual_login", display_name="Display Name")
+    other_channel = SimpleNamespace(id="456", name="other_login", display_name="Other Name")
+    bot = FakeBot([localized, other_channel])
+
+    async with asqlite.create_pool(str(database_path)) as database:
+        async with database.acquire() as connection:
+            await migrate(connection)
+
+        service = ChatterIdentityService(bot, database)
+        await service.setup()
+        await service.observe("channel-1", localized)
+        await service.observe("channel-2", other_channel)
+
+        assert service.list_channel_identities("channel-1") == [{
+            "username": "actual_login",
+            "display_name": "Display Name"
+        }]

@@ -15,6 +15,8 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str):
         for message in service.history(broadcaster_id, view):
             yield f"data: {json.dumps(message, separators=(',', ':'))}\n\n"
 
+        yield "event: history-complete\ndata: {}\n\n"
+
         while not await request.is_disconnected():
             try:
                 message = await asyncio.wait_for(queue.get(), timeout=15)
