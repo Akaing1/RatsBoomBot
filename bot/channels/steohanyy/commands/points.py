@@ -54,6 +54,13 @@ class SteohanyyPointsCommands(ChannelComponent):
 
         await self.handler.gamble(ctx, amount, "drinks")
 
+    @drinks.command(name="roulette", aliases=("spin",))
+    async def drinks_roulette(self, ctx: commands.Context, color: str = None, amount: str = None) -> None:
+        if not await self.require_feature(ctx, FeatureName.POINTS):
+            return
+
+        await self.handler.roulette(ctx, color, amount, "drinks")
+
     @drinks.group(name="duel", invoke_fallback=True, case_insensitive=True)
     async def drinks_duel(self, ctx: commands.Context, opponent: LocalizedUser = None, amount: str = None) -> None:
         if not await self.require_feature(ctx, FeatureName.POINTS):
