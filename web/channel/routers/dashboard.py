@@ -8,12 +8,12 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 from twitchio import HTTPException
 from twitchio.http import Route
 
-from bot.services.channels.profile_settings import LOYALTY_GROUP
+from bot.command_registry import build_command_help_groups
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
+from bot.services.channels.profile_settings import LOYALTY_GROUP
 from config.settings import settings
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
-from web.channel.command_help import build_command_help_groups
 from web.shared.common import templates
 from web.shared.live_chat import stream_chat_events
 from web.state import get_bot
