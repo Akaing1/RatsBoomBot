@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
+from bot.command_registry import build_enabled_command_help_groups
 from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels.live_chat import normalize_chat_view
 from config.settings import settings
 from storage.patch_notes_repository import get_note, list_notes
 from web.channel.auth import CHANNEL_USER_ID_KEY
-from web.channel.command_help import build_enabled_command_help_groups
 from web.shared.common import templates
 from web.shared.live_chat import stream_chat_events
 from web.shared.markdown import render_markdown
