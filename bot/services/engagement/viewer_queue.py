@@ -262,18 +262,10 @@ class ViewerQueueService:
             )
             return False, [], "The queue is empty."
 
-        selected_count = min(count, len(state.queue))
-        selected_viewers: list[str] = []
-        selected_labels: list[str] = []
-
-        for _ in range(selected_count):
-            username = state.queue.popleft()
-            state.users.remove(username)
-            selected_viewers.append(username)
-            selected_labels.append(self._member_label(state, username))
-            state.display_names.pop(username, None)
-
-        await self._persist(broadcaster_id, state)
+        selected_members = await self.take_queue_members(broadcaster_id, count)
+        selected_count = len(selected_members)
+        selected_viewers = [member["username"] for member in selected_members]
+        selected_labels = [member["label"] for member in selected_members]
 
         LOGGER.info(
             "[Viewer Queue] Selected %d viewer(s) for broadcaster %s: %s. %d viewers remain.",
@@ -292,6 +284,38 @@ class ViewerQueueService:
             message = f"Next group: {viewers_text}!"
 
         return True, selected_viewers, message
+
+    async def take_queue_members(self, broadcaster_id: str, count: int, *, exclude: set[str] | None = None) -> list[dict[str, str]]:
+        broadcaster_id = str(broadcaster_id)
+        state = self._get_queue_state(broadcaster_id)
+
+        if count < 1 or not state.queue:
+            return []
+
+        excluded = {username.casefold() for username in (exclude or set())}
+        selected = []
+        remaining = deque()
+
+        while state.queue:
+            username = state.queue.popleft()
+
+            if len(selected) < count and username.casefold() not in excluded:
+                selected.append({
+                    "username": username,
+                    "display_name": state.display_names.get(username, username),
+                    "label": self._member_label(state, username)
+                })
+                state.users.remove(username)
+                state.display_names.pop(username, None)
+            else:
+                remaining.append(username)
+
+        state.queue = remaining
+
+        if selected:
+            await self._persist(broadcaster_id, state)
+
+        return selected
 
     async def swap(self, broadcaster_id: str, first_position: int, second_position: int) -> tuple[bool, str]:
         broadcaster_id = str(broadcaster_id)

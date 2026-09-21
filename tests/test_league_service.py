@@ -5,8 +5,8 @@ import asqlite
 import pytest
 
 from bot.profiles import ChannelProfile, LeagueConfig, activate_profile, clear_profiles
-from bot.services.engagement.league import CoreBuild, LeagueService, OpggMcpClient, RankEntry, RankProfile, RecentMatch, SeasonSummary, SeasonalChampion, parse_typed_response
-from bot.shared.commands.league import LeagueCommands
+from bot.services.engagement.league import ChampionRecommendation, CommunityRank, CoreBuild, LeagueRegistration, LeagueService, OpggMcpClient, RankEntry, RankProfile, RecentMatch, SeasonSummary, SeasonalChampion, parse_typed_response
+from bot.shared.commands.league import LeagueCommands, assign_custom_lobby_teams
 
 
 @pytest.mark.asyncio
@@ -90,6 +90,46 @@ LolGetSummonerProfile(Data(Summoner("steohany","ant",[LeagueStat("SOLORANKED",Ti
 
     import asyncio
     asyncio.run(run_test())
+
+
+@pytest.mark.asyncio
+async def test_opgg_champion_recommendation_uses_primary_role(monkeypatch) -> None:
+    position_response = """class LolListLaneMetaChampions: data
+class Data: positions
+class Positions: top,mid,jungle,adc,support
+class Top: champion,role_rate
+
+LolListLaneMetaChampions(Data(Positions([Top("Lux",0.1)],[Top("Lux",0.8)],[],[],[Top("Lux",0.2)])))"""
+    analysis_response = """class LolGetChampionAnalysis: champion,position,data
+class Data: core_items,runes
+class CoreItems: ids_names,play,win,pick_rate
+class Runes: primary_page_name,primary_rune_names,secondary_page_name,secondary_rune_names,stat_mod_names,play,win,pick_rate
+
+LolGetChampionAnalysis("LUX","MID",Data(CoreItems(["Luden's Echo","Stormsurge","Shadowflame"],8214,4342,0.18),Runes("Sorcery",["Arcane Comet","Manaflow Band","Transcendence","Scorch"],"Domination",["Ultimate Hunter","Cheap Shot"],[5008,5008,5001],29051,14775,0.39)))"""
+    client = OpggMcpClient()
+    calls = []
+
+    async def fake_call_tool(name, arguments):
+        calls.append((name, arguments))
+        return position_response if name == "lol_list_lane_meta_champions" else analysis_response
+
+    monkeypatch.setattr(client, "call_tool", fake_call_tool)
+
+    recommendation = await client.fetch_champion_recommendation("lux")
+
+    assert recommendation == ChampionRecommendation(
+        champion_name="Lux",
+        position="mid",
+        item_names=("Luden's Echo", "Stormsurge", "Shadowflame"),
+        item_pick_rate=0.18,
+        primary_rune_page="Sorcery",
+        primary_runes=("Arcane Comet", "Manaflow Band", "Transcendence", "Scorch"),
+        secondary_rune_page="Domination",
+        secondary_runes=("Ultimate Hunter", "Cheap Shot"),
+        rune_pick_rate=0.39
+    )
+    assert calls[1][1]["champion"] == "LUX"
+    assert calls[1][1]["position"] == "mid"
 
 
 def test_registration_parser_supports_spaced_names_and_optional_regions() -> None:
@@ -192,6 +232,73 @@ async def test_community_ranks_are_channel_scoped_ordered_and_removable(tmp_path
         assert await service.get_community_rank("channel-2", "user-1") is not None
 
 
+@pytest.mark.asyncio
+async def test_duo_matches_require_presence_region_and_compatible_rank(tmp_path) -> None:
+    database_path = tmp_path / "league-duos.db"
+
+    async with asqlite.create_pool(str(database_path)) as database:
+        service = LeagueService(bot=None, db=database)
+        await service.setup()
+        now = datetime.now(UTC).isoformat()
+        players = (
+            ("requester", "requester", "Requester", "NA", RankEntry("SOLORANKED", "GOLD", "I", 50, 20, 10)),
+            ("platinum", "platinum", "Platinum", "NA", RankEntry("SOLORANKED", "PLATINUM", "IV", 1, 20, 10)),
+            ("silver", "silver", "Silver", "NA", RankEntry("SOLORANKED", "SILVER", "I", 50, 20, 10)),
+            ("diamond", "diamond", "Diamond", "NA", RankEntry("SOLORANKED", "DIAMOND", "IV", 1, 20, 10)),
+            ("euw", "euw", "EUW", "EUW", RankEntry("SOLORANKED", "GOLD", "I", 49, 20, 10)),
+            ("absent", "absent", "Absent", "NA", RankEntry("SOLORANKED", "GOLD", "I", 49, 20, 10))
+        )
+
+        async with database.acquire() as connection:
+            for user_id, login, display_name, region, _rank in players:
+                await connection.execute(
+                    """
+                    INSERT INTO league_registrations (
+                        broadcaster_id, user_id, twitch_login, twitch_display_name,
+                        game_name, tag_line, region, registered_at, refreshed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    ("channel-1", user_id, login, display_name, display_name, "NA1", region, now, now)
+                )
+
+        for user_id, _login, display_name, region, rank in players:
+            await service.save_registration_ranks("channel-1", user_id, RankProfile(display_name, "NA1", region, (rank,)))
+
+        matches = await service.get_duo_matches(
+            "channel-1", "requester", {"requester", "platinum", "silver", "diamond", "euw"}
+        )
+
+        assert [match.registration.twitch_login for match in matches] == ["platinum", "silver"]
+
+
+def test_balanced_custom_lobby_uses_ranked_players_then_randomly_fills_unranked(monkeypatch) -> None:
+    monkeypatch.setattr("bot.shared.commands.league.random.shuffle", lambda values: None)
+    players = [
+        {"username": "one", "display_name": "One"},
+        {"username": "two", "display_name": "Two"},
+        {"username": "three", "display_name": "Three"},
+        {"username": "four", "display_name": "Four"},
+        {"username": "five", "display_name": "Five"},
+        {"username": "six", "display_name": "Six"}
+    ]
+    ranks = {}
+
+    for login, tier, division, lp in (
+        ("one", "DIAMOND", "I", 0),
+        ("two", "DIAMOND", "II", 0),
+        ("three", "PLATINUM", "I", 0),
+        ("four", "PLATINUM", "II", 0)
+    ):
+        registration = LeagueRegistration("channel-1", login, login, login.title(), login, "NA1", "NA", "now")
+        ranks[login] = CommunityRank(registration, RankEntry("SOLORANKED", tier, division, lp, 1, 1))
+
+    first_team, second_team = assign_custom_lobby_teams(players, ranks, balanced=True)
+
+    assert len(first_team) == len(second_team) == 3
+    assert {"One", "Two"} != set(first_team[:2])
+    assert set(first_team + second_team) == {player["display_name"] for player in players}
+
+
 class FakeLeagueService:
 
     async def get_top_champions(self, broadcaster_id: str):
@@ -199,6 +306,13 @@ class FakeLeagueService:
 
     async def get_core_build(self, broadcaster_id: str, champion: str, config: LeagueConfig):
         return CoreBuild("Lux", ("Luden's Echo", "Shadowflame", "Zhonya's Hourglass"), 6, 2)
+
+    async def get_champion_recommendation(self, champion: str):
+        return ChampionRecommendation(
+            "Lux", "mid", ("Luden's Echo", "Stormsurge", "Shadowflame"), 0.18,
+            "Sorcery", ("Arcane Comet", "Manaflow Band", "Transcendence", "Scorch"),
+            "Domination", ("Ultimate Hunter", "Cheap Shot"), 0.39
+        )
 
 
 class FakeFeatures:
@@ -215,6 +329,9 @@ class FakeContext:
         self.messages = []
 
     async def send(self, message: str) -> None:
+        self.messages.append(message)
+
+    async def reply(self, message: str) -> None:
         self.messages.append(message)
 
 
@@ -258,4 +375,25 @@ async def test_champs_command_formats_season_and_recent_build_messages() -> None
     assert context.messages == [
         "Steohany's most-played ranked champions this season: Lux (60.0% WR), Ahri (40.0% WR)",
         "Steohany's most common Lux core includes: Luden's Echo, Shadowflame, and Zhonya's Hourglass."
+    ]
+
+
+@pytest.mark.asyncio
+async def test_build_and_runes_commands_format_opgg_recommendations() -> None:
+    config = LeagueConfig(enabled=True, display_name="Steohany", game_name="Steohany", tag_line="NA1")
+    profile = ChannelProfile(channel_name="steohanyy", league=config)
+    bot = SimpleNamespace(services=SimpleNamespace(features=FakeFeatures(), league=FakeLeagueService()))
+    activate_profile("channel-1", profile)
+    component = LeagueCommands(bot)
+    context = FakeContext()
+
+    try:
+        await component.build.callback(component, context, champion="lux")
+        await component.runes.callback(component, context, champion="lux")
+    finally:
+        clear_profiles()
+
+    assert context.messages == [
+        "Most common Lux Mid core: Luden's Echo, Stormsurge, Shadowflame (18.0% pick rate).",
+        "Most common Lux Mid runes: Sorcery (Arcane Comet, Manaflow Band, Transcendence, Scorch) + Domination (Ultimate Hunter, Cheap Shot) (39.0% pick rate)."
     ]

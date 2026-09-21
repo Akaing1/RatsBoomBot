@@ -40,6 +40,24 @@ async def test_open_join_and_next_viewer(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_take_queue_members_preserves_display_names_and_excluded_users(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "queue.db")) as database:
+        await run_migrations(database)
+        service = ViewerQueueService(bot=None, db=database)
+        await service.setup()
+        await service.open_queue("channel-1")
+        await service.join("channel-1", "streamer", "Streamer")
+        await service.join("channel-1", "alice", "Alice")
+        await service.join("channel-1", "bob", "Bob")
+
+        selected = await service.take_queue_members("channel-1", 2, exclude={"streamer"})
+
+        assert [member["username"] for member in selected] == ["alice", "bob"]
+        assert [member["display_name"] for member in selected] == ["Alice", "Bob"]
+        assert service.list_queue("channel-1") == ["streamer"]
+
+
+@pytest.mark.asyncio
 async def test_duplicate_user_is_rejected_case_insensitively(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "queue.db")) as database:
         await run_migrations(database)

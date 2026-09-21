@@ -86,10 +86,15 @@ def test_command_help_includes_league_commands_for_enabled_profiles() -> None:
     assert [command.syntax for command in league.commands] == [
         "!champs",
         "!champs <champion>",
+        "!build <champion>",
+        "!runes <champion>",
         "!register <Riot ID> [region]",
         "!unregister",
         "!rank [chatter]",
-        "!ladder"
+        "!ladder",
+        "!duo",
+        "!custom lobby",
+        "!custom lobby balance"
     ]
 
 

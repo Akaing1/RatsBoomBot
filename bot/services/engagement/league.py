@@ -20,11 +20,25 @@ SEASON_REFRESH_SECONDS = 60 * 60 * 12
 ITEM_REFRESH_SECONDS = 60 * 60 * 24
 BUILD_RETENTION_DAYS = 14
 COMMUNITY_RANK_REFRESH_SECONDS = 60 * 60 * 12
+CHAMPION_RECOMMENDATION_CACHE_SECONDS = 60 * 60
 SUPPORTED_REGIONS = ("BR", "EUNE", "EUW", "JP", "KR", "LAN", "LAS", "NA", "OCE", "PH", "RU", "SG", "TH", "TR", "TW", "VN")
 RANKED_QUEUES = ("SOLORANKED", "FLEXRANKED")
 TIER_ORDER = {tier: index for index, tier in enumerate(("IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"))}
 DIVISION_ORDER = {"IV": 0, "III": 1, "II": 2, "I": 3}
 NUMBER_DIVISIONS = {1: "I", 2: "II", 3: "III", 4: "IV"}
+DUO_TIER_COMPATIBILITY = {
+    "IRON": frozenset(("IRON", "BRONZE", "SILVER")),
+    "BRONZE": frozenset(("IRON", "BRONZE", "SILVER")),
+    "SILVER": frozenset(("IRON", "BRONZE", "SILVER", "GOLD")),
+    "GOLD": frozenset(("SILVER", "GOLD", "PLATINUM")),
+    "PLATINUM": frozenset(("GOLD", "PLATINUM", "EMERALD")),
+    "EMERALD": frozenset(("PLATINUM", "EMERALD", "DIAMOND")),
+    "DIAMOND": frozenset(("EMERALD", "DIAMOND", "MASTER")),
+    "MASTER": frozenset(("DIAMOND", "MASTER", "GRANDMASTER")),
+    "GRANDMASTER": frozenset(("MASTER", "GRANDMASTER", "CHALLENGER")),
+    "CHALLENGER": frozenset(("GRANDMASTER", "CHALLENGER"))
+}
+CHAMPION_POSITIONS = ("top", "mid", "jungle", "adc", "support")
 
 
 class LeagueProviderError(RuntimeError):
@@ -74,6 +88,19 @@ class CoreBuild:
     item_names: tuple[str, str, str]
     games: int
     matching_games: int
+
+
+@dataclass(frozen=True)
+class ChampionRecommendation:
+    champion_name: str
+    position: str
+    item_names: tuple[str, ...]
+    item_pick_rate: float
+    primary_rune_page: str
+    primary_runes: tuple[str, ...]
+    secondary_rune_page: str
+    secondary_runes: tuple[str, ...]
+    rune_pick_rate: float
 
 
 @dataclass(frozen=True)
@@ -397,6 +424,70 @@ class OpggMcpClient:
 
         return tuple((payload.get("data") or {}).get("items") or ())
 
+    async def fetch_champion_recommendation(self, champion_query: str) -> ChampionRecommendation | None:
+        position_fields = [f"data.positions.{position}[].{{champion,role_rate}}" for position in CHAMPION_POSITIONS]
+        position_text = await self.call_tool("lol_list_lane_meta_champions", {
+            "position": "all",
+            "lang": "en_US",
+            "desired_output_fields": position_fields
+        })
+        position_root = parse_typed_response(position_text)
+        position_data = response_data(position_root, "LolListLaneMetaChampions")
+        position_values = unwrap_typed(unwrap_typed(position_data, "Data")[0], "Positions")
+        normalized_query = LeagueService.normalize_champion_name(champion_query)
+        matches = []
+
+        for position, champion_values in zip(CHAMPION_POSITIONS, position_values, strict=True):
+            for champion_value in champion_values:
+                champion_name, role_rate = unwrap_typed(champion_value, champion_value.name)
+
+                if LeagueService.normalize_champion_name(str(champion_name)) == normalized_query:
+                    matches.append((float(role_rate or 0), position, str(champion_name)))
+
+        if not matches:
+            return None
+
+        _role_rate, position, champion_name = max(matches)
+        champion_key = re.sub(r"[^A-Z0-9]+", "_", champion_name.upper()).strip("_")
+        analysis_text = await self.call_tool("lol_get_champion_analysis", {
+            "game_mode": "ranked",
+            "champion": champion_key,
+            "position": position,
+            "lang": "en_US",
+            "desired_output_fields": [
+                "champion",
+                "position",
+                "data.core_items.{ids_names[],pick_rate,play,win}",
+                "data.runes.{pick_rate,play,primary_page_name,primary_rune_names[],secondary_page_name,secondary_rune_names[],stat_mod_names[],win}"
+            ]
+        })
+        analysis_root = parse_typed_response(analysis_text)
+        _returned_champion, returned_position, data_value = unwrap_typed(analysis_root, "LolGetChampionAnalysis")
+        core_value, runes_value = unwrap_typed(data_value, "Data")
+        item_names, _item_play, _item_win, item_pick_rate = unwrap_typed(core_value, "CoreItems")
+        (
+            primary_page_name,
+            primary_rune_names,
+            secondary_page_name,
+            secondary_rune_names,
+            _stat_mod_names,
+            _rune_play,
+            _rune_win,
+            rune_pick_rate
+        ) = unwrap_typed(runes_value, "Runes")
+
+        return ChampionRecommendation(
+            champion_name=champion_name,
+            position=str(returned_position or position).lower(),
+            item_names=tuple(str(name) for name in item_names),
+            item_pick_rate=float(item_pick_rate or 0),
+            primary_rune_page=str(primary_page_name),
+            primary_runes=tuple(str(name) for name in primary_rune_names),
+            secondary_rune_page=str(secondary_page_name),
+            secondary_runes=tuple(str(name) for name in secondary_rune_names),
+            rune_pick_rate=float(rune_pick_rate or 0)
+        )
+
 
 class LeagueService:
 
@@ -405,6 +496,8 @@ class LeagueService:
         self.db = db
         self._task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
+        self._recommendation_cache: dict[str, tuple[datetime, ChampionRecommendation]] = {}
+        self._recommendation_lock = asyncio.Lock()
 
     async def setup(self) -> None:
         queries = (
@@ -832,6 +925,27 @@ class LeagueService:
         item_names = tuple(str(items[item_id][1]) for item_id in best_core)
         return CoreBuild(champion_name, item_names, len(matches), matching_games)
 
+    async def get_champion_recommendation(self, champion_query: str) -> ChampionRecommendation | None:
+        cache_key = self.normalize_champion_name(champion_query)
+        cached = self._recommendation_cache.get(cache_key)
+
+        if cached and datetime.now(UTC) - cached[0] < timedelta(seconds=CHAMPION_RECOMMENDATION_CACHE_SECONDS):
+            return cached[1]
+
+        async with self._recommendation_lock:
+            cached = self._recommendation_cache.get(cache_key)
+
+            if cached and datetime.now(UTC) - cached[0] < timedelta(seconds=CHAMPION_RECOMMENDATION_CACHE_SECONDS):
+                return cached[1]
+
+            async with OpggMcpClient() as client:
+                recommendation = await client.fetch_champion_recommendation(champion_query)
+
+            if recommendation is not None:
+                self._recommendation_cache[cache_key] = (datetime.now(UTC), recommendation)
+
+            return recommendation
+
     async def register_player(self, broadcaster_id: str, user_id: str, twitch_login: str, twitch_display_name: str,
                               riot_id: str, default_region: str) -> CommunityRank:
         game_name, tag_line, region = self.parse_registration(riot_id, default_region)
@@ -1038,6 +1152,69 @@ class LeagueService:
             entries.append(CommunityRank(registration, rank))
 
         return tuple(entries)
+
+    async def get_community_ranks_by_login(self, broadcaster_id: str, twitch_logins: set[str]) -> dict[str, CommunityRank]:
+        normalized_logins = {login.casefold() for login in twitch_logins if login}
+
+        if not normalized_logins:
+            return {}
+
+        placeholders = ", ".join("?" for _login in normalized_logins)
+        query = f"""
+        SELECT
+            r.broadcaster_id, r.user_id, r.twitch_login, r.twitch_display_name,
+            r.game_name, r.tag_line, r.region, r.refreshed_at,
+            c.queue_type, c.tier, c.division, c.lp, c.wins, c.losses
+        FROM league_registrations AS r
+        LEFT JOIN league_community_ranks AS c
+          ON c.broadcaster_id = r.broadcaster_id
+         AND c.user_id = r.user_id
+         AND c.queue_type = 'SOLORANKED'
+        WHERE r.broadcaster_id = ?
+          AND LOWER(r.twitch_login) IN ({placeholders})
+        """
+        parameters = (str(broadcaster_id), *sorted(normalized_logins))
+
+        async with self.db.acquire() as connection:
+            rows = await connection.fetchall(query, parameters)
+
+        entries = {}
+
+        for row in rows:
+            registration = self.registration_from_row(row[:8])
+            rank = None if row[8] is None else RankEntry(str(row[8]), str(row[9]) if row[9] else None, str(row[10]) if row[10] else None, int(row[11]), int(row[12]), int(row[13]))
+            entries[registration.twitch_login.casefold()] = CommunityRank(registration, rank)
+
+        return entries
+
+    async def get_duo_matches(self, broadcaster_id: str, requester_user_id: str, active_logins: set[str], limit: int = 3) -> tuple[CommunityRank, ...]:
+        requester = await self.get_community_rank(broadcaster_id, requester_user_id)
+
+        if requester is None or requester.rank is None or requester.rank.tier is None:
+            return ()
+
+        candidates = await self.get_community_ranks_by_login(broadcaster_id, active_logins)
+        matches = [
+            candidate
+            for candidate in candidates.values()
+            if candidate.registration.user_id != str(requester_user_id)
+            and candidate.registration.region == requester.registration.region
+            and candidate.rank is not None
+            and candidate.rank.tier is not None
+            and self.ranks_can_duo(requester.rank, candidate.rank)
+        ]
+        matches.sort(key=lambda candidate: (
+            abs(candidate.rank.score - requester.rank.score),
+            candidate.registration.twitch_display_name.casefold()
+        ))
+        return tuple(matches[:max(0, int(limit))])
+
+    @staticmethod
+    def ranks_can_duo(first: RankEntry, second: RankEntry) -> bool:
+        if first.tier is None or second.tier is None:
+            return False
+
+        return second.tier.upper() in DUO_TIER_COMPATIBILITY.get(first.tier.upper(), frozenset())
 
     @staticmethod
     def parse_registration(value: str, default_region: str) -> tuple[str, str, str]:
