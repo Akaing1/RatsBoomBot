@@ -278,6 +278,13 @@ BASE_COMMAND_GROUPS = (
 
 
 HIDDEN_SHARED_COMMANDS = (
+    CommandDefinition(
+        "!gamble [amount|all]",
+        "Show how to use the channel's grouped gamble command.",
+        feature=FeatureName.POINTS,
+        global_group=GlobalCommandGroup.POINTS,
+        visibility=CommandVisibility.HIDDEN
+    ),
     CommandDefinition("!explode", "Private shared counter.", aliases=("rat",), visibility=CommandVisibility.HIDDEN),
     CommandDefinition("!reklop", "Private shared counter.", visibility=CommandVisibility.HIDDEN),
     CommandDefinition("!randy", "Private shared counter.", visibility=CommandVisibility.HIDDEN),

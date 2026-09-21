@@ -423,6 +423,23 @@ class PointsCommandHandler:
             command=command_name
         )
 
+    async def show_grouped_gamble_usage(self, ctx: commands.Context) -> None:
+        self.log_command(ctx, "!gamble")
+
+        context = await self.get_context(ctx, "gamble")
+
+        if context is None:
+            return
+
+        _, config = context
+        command_name = config.command_name or "points"
+        await self.send_message(
+            ctx,
+            "Gambling is grouped with this channel's loyalty commands. "
+            "Use !{command} gamble <amount> or !{command} gamble all.",
+            command=command_name
+        )
+
     async def roulette(self, ctx: commands.Context, color: str | None, amount: str | None, command_name: str) -> None:
         self.log_command(ctx, f"!{command_name} roulette")
 
@@ -743,6 +760,10 @@ class PointsCommands(commands.Component):
     def __init__(self, bot):
         self.bot = bot
         self.handler = PointsCommandHandler(bot)
+
+    @commands.command(name="gamble")
+    async def gamble_usage(self, ctx: commands.Context, *, attempted_amount: str = None) -> None:
+        await self.handler.show_grouped_gamble_usage(ctx)
 
     @commands.group(name="points", invoke_fallback=True, case_insensitive=True)
     async def points(self, ctx: commands.Context, target: LocalizedUser = None) -> None:
