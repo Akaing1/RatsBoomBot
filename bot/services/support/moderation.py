@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from bot.profiles import get_active_profile
+
 LOGGER = logging.getLogger("RatBoomBot")
 
 URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
@@ -754,7 +756,11 @@ class ModerationService:
             bot_user = getattr(self.bot, "user", None)
             bot_id = getattr(bot_user, "id", None)
 
-        return bot_id is not None and user_id == str(bot_id)
+        if bot_id is not None and user_id == str(bot_id):
+            return True
+
+        profile = get_active_profile(broadcaster_id)
+        return profile is not None and profile.is_user_protected(user_id)
 
     @staticmethod
     def normalize_message(message: str) -> str:

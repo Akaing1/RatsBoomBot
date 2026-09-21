@@ -97,3 +97,36 @@ def test_loyalty_template_only_shows_names_and_responses() -> None:
         assert 'redeems.daily_amount' not in html
     finally:
         clear_profiles()
+
+
+def test_commands_card_contains_protected_user_management() -> None:
+    from bot.profiles import ChannelProfile, activate_profile, clear_profiles
+    from bot.services.channels.profile_settings import ProfileSettingsService
+    from web.shared.common import templates
+
+    activate_profile("channel-1", ChannelProfile(channel_name="example"))
+    try:
+        service = ProfileSettingsService(None)
+        groups = service.get_setting_groups("channel-1")
+        html = templates.env.get_template("shared/profile_inputs.html").render(
+            setting_groups={"Commands": groups["Commands"]},
+            protected_users=[{
+                "user_id": "123",
+                "login": "viewer",
+                "display_name": "Viewer",
+                "is_default": False,
+                "removable": True
+            }],
+            command_tab="protected",
+            show_social_links=False,
+            csrf_token="test",
+            customization_action="/channel/customization"
+        )
+
+        assert 'data-command-tab="protected"' in html
+        assert 'data-protected-user-search' in html
+        assert 'action="/channel/protected-users/add"' in html
+        assert 'action="/channel/protected-users/remove"' in html
+        assert "Viewer <span>(123)</span>" in html
+    finally:
+        clear_profiles()

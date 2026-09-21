@@ -253,14 +253,19 @@ OVERWATCH_COMMANDS = CommandGroupDefinition(
 
 LEAGUE_COMMANDS = CommandGroupDefinition(
     name="League of Legends",
-    description="Ranked champion statistics, broadcaster builds, and the channel's community League ladder.",
+    description="Ranked champion statistics, builds, runes, duo matching, custom lobbies, and the channel's community League ladder.",
     commands=(
         CommandDefinition("!champs", "Show the broadcaster's five most-played ranked champions this season.", profile_feature=ProfileFeatureName.LEAGUE),
         CommandDefinition("!champs <champion>", "Show the broadcaster's common three-item core from ranked games in the last 14 days.", profile_feature=ProfileFeatureName.LEAGUE),
+        CommandDefinition("!build <champion>", "Show OP.GG's most common three-item core for the champion's primary role.", profile_feature=ProfileFeatureName.LEAGUE),
+        CommandDefinition("!runes <champion>", "Show OP.GG's most common rune page for the champion's primary role.", profile_feature=ProfileFeatureName.LEAGUE),
         CommandDefinition("!register <Riot ID> [region]", "Register your Riot ID and join this channel's League ladder.", profile_feature=ProfileFeatureName.LEAGUE),
         CommandDefinition("!unregister", "Remove your League registration and saved rank history from this channel.", profile_feature=ProfileFeatureName.LEAGUE),
         CommandDefinition("!rank [chatter]", "Show your rank or another registered chatter's rank.", profile_feature=ProfileFeatureName.LEAGUE),
-        CommandDefinition("!ladder", "Show the channel's Solo/Duo community leaderboard.", profile_feature=ProfileFeatureName.LEAGUE)
+        CommandDefinition("!ladder", "Show the channel's Solo/Duo community leaderboard.", profile_feature=ProfileFeatureName.LEAGUE),
+        CommandDefinition("!duo", "Find up to three registered chatters in a compatible Solo/Duo ranked range.", profile_feature=ProfileFeatureName.LEAGUE),
+        CommandDefinition("!custom lobby", "Create random teams from the broadcaster and the next nine queued viewers.", CommandPermission.MODERATOR, global_group=GlobalCommandGroup.VIEWER_QUEUE, profile_feature=ProfileFeatureName.LEAGUE),
+        CommandDefinition("!custom lobby balance", "Create rank-balanced teams from the broadcaster and the next nine queued viewers.", CommandPermission.MODERATOR, global_group=GlobalCommandGroup.VIEWER_QUEUE, profile_feature=ProfileFeatureName.LEAGUE)
     )
 )
 
@@ -278,6 +283,13 @@ BASE_COMMAND_GROUPS = (
 
 
 HIDDEN_SHARED_COMMANDS = (
+    CommandDefinition(
+        "!gamble [amount|all]",
+        "Show how to use the channel's grouped gamble command.",
+        feature=FeatureName.POINTS,
+        global_group=GlobalCommandGroup.POINTS,
+        visibility=CommandVisibility.HIDDEN
+    ),
     CommandDefinition("!explode", "Private shared counter.", aliases=("rat",), visibility=CommandVisibility.HIDDEN),
     CommandDefinition("!reklop", "Private shared counter.", visibility=CommandVisibility.HIDDEN),
     CommandDefinition("!randy", "Private shared counter.", visibility=CommandVisibility.HIDDEN),

@@ -47,6 +47,34 @@ async def test_profile_override_updates_and_resets_active_profile(tmp_path) -> N
 
 
 @pytest.mark.asyncio
+async def test_protected_users_persist_and_merge_with_channel_defaults(tmp_path) -> None:
+    database_path = tmp_path / "profiles.db"
+    base_profile = ChannelProfile(channel_name="channel", protected_user_ids=("default-user",))
+
+    async with asqlite.create_pool(str(database_path)) as database:
+        service = ProfileSettingsService(database)
+        await service.setup()
+        service.apply_overrides("channel-1", base_profile)
+
+        added = await service.add_protected_user("channel-1", "123", "viewer", "Viewer")
+
+        assert added.user_id == "123"
+        assert get_active_profile("channel-1").protected_user_ids == ("default-user", "123")
+
+        reloaded = ProfileSettingsService(database)
+        await reloaded.setup()
+        effective = reloaded.apply_overrides("channel-1", base_profile)
+
+        assert effective.protected_user_ids == ("default-user", "123")
+        assert reloaded.get_added_protected_users("channel-1")[0].display_name == "Viewer"
+        assert await reloaded.remove_protected_user("channel-1", "123") is True
+        assert get_active_profile("channel-1").protected_user_ids == ("default-user",)
+
+        with pytest.raises(ValueError, match="Channel-default protected users"):
+            await reloaded.remove_protected_user("channel-1", "default-user")
+
+
+@pytest.mark.asyncio
 async def test_nested_raid_item_name_override_updates_active_profile(tmp_path) -> None:
     database_path = tmp_path / "profiles.db"
     base_profile = ChannelProfile(

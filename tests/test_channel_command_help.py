@@ -86,10 +86,15 @@ def test_command_help_includes_league_commands_for_enabled_profiles() -> None:
     assert [command.syntax for command in league.commands] == [
         "!champs",
         "!champs <champion>",
+        "!build <champion>",
+        "!runes <champion>",
         "!register <Riot ID> [region]",
         "!unregister",
         "!rank [chatter]",
-        "!ladder"
+        "!ladder",
+        "!duo",
+        "!custom lobby",
+        "!custom lobby balance"
     ]
 
 
@@ -233,6 +238,7 @@ def test_command_registry_records_operational_policies() -> None:
     definitions = {definition.syntax: definition for definition in SHARED_COMMAND_DEFINITIONS}
 
     assert definitions["!clip"].availability is CommandAvailability.LIVE_ONLY
+    assert definitions["!gamble [amount|all]"].visibility is CommandVisibility.HIDDEN
     assert definitions["!startraid <channel>"].permission is CommandPermission.BROADCASTER
     assert definitions["!kamikaze <username>"].slowmode is CommandSlowmode.EXEMPT
     assert definitions["!explode"].visibility is CommandVisibility.HIDDEN

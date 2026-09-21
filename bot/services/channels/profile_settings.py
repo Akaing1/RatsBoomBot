@@ -34,6 +34,13 @@ class ProfileSettingState:
         return parse_timers(str(self.effective_value))
 
 
+@dataclass(frozen=True)
+class ProtectedUser:
+    user_id: str
+    login: str
+    display_name: str
+
+
 PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("timer_messages", "Timers", "Timer messages", "Add, edit, or remove the automated messages that rotate in chat.", value_type="lines", maximum_length=10000, rows=6),
     ProfileSettingDefinition("lurk_message", "Commands", "Lurk message", "Sent when a viewer uses !lurk. Use {username} for the viewer name."),
@@ -88,6 +95,7 @@ class ProfileSettingsService:
     def __init__(self, db):
         self.db = db
         self.overrides: dict[str, dict[str, str | int]] = {}
+        self.protected_users: dict[str, dict[str, ProtectedUser]] = {}
         self.base_profiles: dict[str, ChannelProfile] = {}
 
     async def setup(self) -> None:
@@ -108,12 +116,24 @@ class ProfileSettingsService:
             migrated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
         """
+        protected_users_query = """
+        CREATE TABLE IF NOT EXISTS channel_protected_users (
+            broadcaster_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            login TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (broadcaster_id, user_id)
+        )
+        """
 
         async with self.db.acquire() as connection:
             await connection.execute(query)
             await connection.execute(migration_query)
+            await connection.execute(protected_users_query)
 
         await self.load_overrides()
+        await self.load_protected_users()
         LOGGER.info("[Profiles] Loaded database profile overrides for %d broadcaster(s).", len(self.overrides))
 
     async def load_overrides(self) -> None:
@@ -146,6 +166,83 @@ class ProfileSettingsService:
             loaded.setdefault(str(row["broadcaster_id"]), {})[definition.key] = value
 
         self.overrides = loaded
+
+    async def load_protected_users(self) -> None:
+        async with self.db.acquire() as connection:
+            rows = await connection.fetchall(
+                """
+                SELECT broadcaster_id, user_id, login, display_name
+                FROM channel_protected_users
+                ORDER BY display_name COLLATE NOCASE, user_id
+                """
+            )
+
+        loaded: dict[str, dict[str, ProtectedUser]] = {}
+
+        for row in rows:
+            broadcaster_id = str(row["broadcaster_id"])
+            user = ProtectedUser(
+                user_id=str(row["user_id"]),
+                login=str(row["login"]),
+                display_name=str(row["display_name"])
+            )
+            loaded.setdefault(broadcaster_id, {})[user.user_id] = user
+
+        self.protected_users = loaded
+
+    def get_added_protected_users(self, broadcaster_id: str) -> tuple[ProtectedUser, ...]:
+        users = self.protected_users.get(str(broadcaster_id), {}).values()
+        return tuple(sorted(users, key=lambda user: (user.display_name.casefold(), user.user_id)))
+
+    def get_default_protected_user_ids(self, broadcaster_id: str) -> tuple[str, ...]:
+        profile = self.base_profiles.get(str(broadcaster_id))
+        return profile.protected_user_ids if profile is not None else ()
+
+    async def add_protected_user(self, broadcaster_id: str, user_id: str, login: str, display_name: str) -> ProtectedUser:
+        broadcaster_id = str(broadcaster_id)
+        user = ProtectedUser(str(user_id), login.casefold(), display_name)
+
+        async with self.db.acquire() as connection:
+            await connection.execute(
+                """
+                INSERT INTO channel_protected_users (broadcaster_id, user_id, login, display_name, added_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
+                    login = excluded.login,
+                    display_name = excluded.display_name
+                """,
+                (broadcaster_id, user.user_id, user.login, user.display_name)
+            )
+
+        self.protected_users.setdefault(broadcaster_id, {})[user.user_id] = user
+        self.refresh_active_profile(broadcaster_id)
+        LOGGER.info("[Profiles] Added protected user %s (%s) for broadcaster %s.", user.display_name, user.user_id, broadcaster_id)
+        return user
+
+    async def remove_protected_user(self, broadcaster_id: str, user_id: str) -> bool:
+        broadcaster_id = str(broadcaster_id)
+        user_id = str(user_id)
+
+        if user_id in self.get_default_protected_user_ids(broadcaster_id):
+            raise ValueError("Channel-default protected users cannot be removed from the dashboard.")
+
+        channel_users = self.protected_users.get(broadcaster_id, {})
+        removed = user_id in channel_users
+
+        if not removed:
+            return False
+
+        async with self.db.acquire() as connection:
+            await connection.execute(
+                "DELETE FROM channel_protected_users WHERE broadcaster_id = ? AND user_id = ?",
+                (broadcaster_id, user_id)
+            )
+
+        channel_users.pop(user_id, None)
+        self.refresh_active_profile(broadcaster_id)
+        LOGGER.info("[Profiles] Removed protected user %s for broadcaster %s.", user_id, broadcaster_id)
+
+        return True
 
     async def migrate_developer_profile(self, broadcaster_id: str, profile: ChannelProfile) -> bool:
         broadcaster_id = str(broadcaster_id)
@@ -230,6 +327,12 @@ class ProfileSettingsService:
 
         if not effective_profile.points.display_name.strip():
             effective_profile = replace(effective_profile, points=replace(effective_profile.points, display_name="Points"))
+
+        protected_user_ids = tuple(dict.fromkeys((
+            *effective_profile.protected_user_ids,
+            *self.protected_users.get(broadcaster_id, {})
+        )))
+        effective_profile = replace(effective_profile, protected_user_ids=protected_user_ids)
         return effective_profile
 
     def get_setting_groups(self, broadcaster_id: str, available_integrations: set[str] | None = None) -> dict[str, list[ProfileSettingState]]:

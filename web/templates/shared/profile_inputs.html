@@ -121,6 +121,14 @@
             </div>
         </div>
 
+        {% if group_name == "Commands" %}
+            <div class="dashboard-tabs command-customization-tabs" role="tablist" aria-label="Command customization">
+                <button class="dashboard-tab{% if command_tab | default('responses') != 'protected' %} active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if command_tab | default('responses') != 'protected' else 'false' }}" data-command-tab="responses">Command responses</button>
+                <button class="dashboard-tab{% if command_tab | default('responses') == 'protected' %} active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if command_tab | default('responses') == 'protected' else 'false' }}" data-command-tab="protected">Protected users</button>
+            </div>
+        {% endif %}
+
+        <div{% if group_name == "Commands" %} data-command-panel="responses"{% if command_tab | default('responses') == 'protected' %} hidden{% endif %}{% endif %}>
         <div class="profile-settings-grid">
             {% for setting in settings %}
                 <article class="toggle-card profile-setting-card{% if setting.definition.key == 'timer_messages' %} full-width{% endif %}">
@@ -175,5 +183,67 @@
                 </article>
             {% endfor %}
         </div>
+        </div>
+
+        {% if group_name == "Commands" %}
+            <div id="protected-users" data-command-panel="protected"{% if command_tab | default('responses') != 'protected' %} hidden{% endif %}>
+                {% if protected_message %}
+                    <div class="toggle-feedback {% if protected_result == 'success' %}success{% else %}error{% endif %}" role="status">
+                        <span class="toggle-feedback-icon">{% if protected_result == "success" %}&#10003;{% else %}!{% endif %}</span>
+                        <span>{{ protected_message }}</span>
+                    </div>
+                {% endif %}
+
+                <article class="protected-users-card">
+                    <div class="toggle-card-heading">
+                        <div>
+                            <h4>Add a protected Twitch user</h4>
+                            <p>Protected users cannot be targeted by !kamikaze or automated moderation. Their own !kamikaze attacks against unprotected users are guaranteed to hit.</p>
+                        </div>
+                    </div>
+
+                    <form class="protected-user-search" data-protected-user-search data-search-url="/channel/protected-users/search">
+                        <label for="protected-user-query">Twitch username</label>
+                        <div class="protected-user-search-controls">
+                            <input id="protected-user-query" class="profile-setting-input" type="text" name="query" placeholder="Enter username" maxlength="25" autocomplete="off" required>
+                            <button class="button secondary" type="submit">Search</button>
+                        </div>
+                        <p class="protected-user-search-message" data-protected-search-message aria-live="polite"></p>
+                    </form>
+
+                    <form class="protected-user-result" method="post" action="/channel/protected-users/add" data-protected-user-result hidden>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="user_id" data-protected-result-id>
+                        <div>
+                            <span>Verified Twitch user</span>
+                            <strong data-protected-result-label></strong>
+                        </div>
+                        <button class="button primary" type="submit" data-protected-add>Add User</button>
+                    </form>
+                </article>
+
+                <div class="protected-user-list">
+                    {% for user in protected_users | default([]) %}
+                        <article class="protected-user-row">
+                            <div>
+                                <strong>{{ user.display_name }} <span>({{ user.user_id }})</span></strong>
+                                {% if user.login %}<small>@{{ user.login }}</small>{% endif %}
+                            </div>
+                            {% if user.is_default %}
+                                <span class="toggle-status">Channel default</span>
+                            {% elif user.removable %}
+                                <form method="post" action="/channel/protected-users/remove" onsubmit="return confirm('Remove {{ user.display_name }} from protected users?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <input type="hidden" name="user_id" value="{{ user.user_id }}">
+                                    <button class="button danger" type="submit">Remove</button>
+                                </form>
+                            {% endif %}
+                        </article>
+                    {% else %}
+                        <div class="protected-user-empty">No protected users have been added.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
     </section>
 {% endfor %}
