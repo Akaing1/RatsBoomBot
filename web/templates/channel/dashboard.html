@@ -90,40 +90,43 @@
 </section>
 
 <div class="channel-live-layout">
-    <section class="panel live-chat-panel">
-        <div class="dashboard-header-side">
-            <div
-                class="dashboard-header-stats"
-                data-dashboard-header-stats
-                data-channel-id="{{ broadcaster.id }}"
-                data-refresh-url="/channel/api/dashboard-stats"
-                aria-label="Channel statistics; activate a statistic to show or hide its number"
+    <div class="dashboard-chat-column">
+    <div class="dashboard-header-side">
+        <div
+            class="dashboard-header-stats"
+            data-dashboard-header-stats
+            data-channel-id="{{ broadcaster.id }}"
+            data-refresh-url="/channel/api/dashboard-stats"
+            aria-label="Channel statistics; activate a statistic to show or hide its number"
+        >
+            <button
+                class="dashboard-header-stat dashboard-stream-stat {% if broadcaster.is_live %}state-live{% else %}state-offline{% endif %}"
+                type="button"
+                data-stream-status
+                data-started-at="{{ broadcaster.stream_started_at.isoformat() if broadcaster.stream_started_at else '' }}"
+                aria-pressed="true"
+                aria-label="Hide online timer"
             >
-                <div
-                    class="dashboard-header-stat dashboard-stream-stat {% if broadcaster.is_live %}state-live{% else %}state-offline{% endif %}"
-                    data-stream-status
-                    data-started-at="{{ broadcaster.stream_started_at.isoformat() if broadcaster.stream_started_at else '' }}"
+                <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
+                <strong data-stream-status-text>{% if broadcaster.is_live %}Online{% else %}Offline{% endif %}</strong>
+            </button>
+            {% for stat in dashboard_header_stats | default([]) %}
+                {% if stat.key != "points_lost" %}
+                <button
+                    class="dashboard-header-stat"
+                    type="button"
+                    data-dashboard-stat="{{ stat.key }}"
+                    aria-pressed="false"
+                    title="Hide {{ stat.label }} count"
                 >
-                    <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
-                    <span>Stream</span>
-                    <strong data-stream-status-text>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
-                </div>
-                {% for stat in dashboard_header_stats | default([]) %}
-                    {% if stat.key != "points_lost" %}
-                    <button
-                        class="dashboard-header-stat"
-                        type="button"
-                        data-dashboard-stat="{{ stat.key }}"
-                        aria-pressed="false"
-                        title="Hide {{ stat.label }} count"
-                    >
-                        <span>{{ stat.label }}</span>
-                        <strong data-dashboard-stat-value>{{ stat.display_value }}</strong>
-                    </button>
-                    {% endif %}
-                {% endfor %}
-            </div>
+                    <span>{{ stat.label }}</span>
+                    <strong data-dashboard-stat-value>{{ stat.display_value }}</strong>
+                </button>
+                {% endif %}
+            {% endfor %}
         </div>
+    </div>
+    <section class="panel live-chat-panel">
         <div class="panel-header">
             <div>
                 <h3>Combined Chat</h3>
@@ -189,6 +192,7 @@
             </div>
         </form>
     </section>
+    </div>
 
     <div class="dashboard-activity-grid">
     <section class="panel activity-panel dashboard-activity-panel dashboard-moderation-panel" data-activity-group>
@@ -312,7 +316,12 @@
         <section class="panel dashboard-ads-panel" data-ad-panel data-action-url="/channel/api/ads/action" data-csrf-token="{{ csrf_token }}">
             <div class="panel-header">
                 <h3>Ads</h3>
-                <div class="dashboard-ad-stat state-{{ ad_status.state }}" data-ad-status data-state="{{ ad_status.state }}" data-next-ad-at="{{ ad_status.next_ad_at or '' }}" data-ends-at="{{ ad_status.ends_at or '' }}" data-snoozes-available="{{ ad_status.snoozes_available if ad_status.snoozes_available is not none else '' }}">
+                <div class="dashboard-ad-stat state-{{ ad_status.state }}" data-ad-status data-state="{{ ad_status.state }}" data-next-ad-at="{{ ad_status.next_ad_at or '' }}" data-started-at="{{ ad_status.started_at or '' }}" data-ends-at="{{ ad_status.ends_at or '' }}" data-snoozes-available="{{ ad_status.snoozes_available if ad_status.snoozes_available is not none else '' }}">
+                    <svg class="dashboard-ad-progress" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle class="dashboard-ad-progress-track" cx="12" cy="12" r="9"></circle>
+                        <circle class="dashboard-ad-progress-ring" cx="12" cy="12" r="9" data-ad-progress-ring></circle>
+                        <path class="dashboard-ad-progress-check" d="M6.5 12.5 10.5 16.5 18 8.5"></path>
+                    </svg>
                     <strong data-ad-status-text>{{ ad_status.label }}</strong>
                 </div>
             </div>

@@ -214,17 +214,24 @@ button, input { font: inherit; }
 .dashboard-points-stat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dashboard-points-stat strong { flex: 0 0 auto; color: var(--text); font-size: inherit; }
 .dashboard-ad-stat.ad-idle { border-color: rgba(34,197,94,.38); background: rgba(34,197,94,.11); }
-.dashboard-ad-stat.ad-running { border-color: rgba(59,130,246,.48); background: rgba(59,130,246,.16); }
+.dashboard-ad-stat.ad-scheduled { border-color: rgba(139,92,246,.3); background: rgba(139,92,246,.1); }
+.dashboard-ad-stat.ad-running { border-color: rgba(139,92,246,.48); background: rgba(139,92,246,.16); }
 .dashboard-ad-stat.ad-warning { border-color: rgba(239,68,68,.5); background: rgba(239,68,68,.15); animation: dashboard-ad-warning 1s ease-in-out 5; }
 @keyframes dashboard-ad-warning {
     0%, 100% { border-color: rgba(239,68,68,.5); background: rgba(239,68,68,.15); box-shadow: none; }
     50% { border-color: rgba(239,68,68,.8); background: rgba(239,68,68,.28); box-shadow: 0 0 0 2px rgba(239,68,68,.08); }
 }
 @media (prefers-reduced-motion: reduce) { .dashboard-ad-stat.ad-warning { animation: none; } }
-.dashboard-stream-stat, .dashboard-ad-stat { cursor: default; }
+.dashboard-ad-stat { cursor: default; }
 .dashboard-stream-stat.state-live strong { color: var(--success); }
 .dashboard-stream-stat.state-offline strong { color: var(--muted); }
-.dashboard-ad-stat.state-running strong { color: #f5c451; }
+.dashboard-stream-stat.state-live .status-indicator { animation: dashboard-live-pulse 1.8s ease-in-out infinite; }
+@keyframes dashboard-live-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(53,196,106,.45), 0 0 14px rgba(53,196,106,.6); }
+    50% { box-shadow: 0 0 0 6px rgba(53,196,106,0), 0 0 14px rgba(53,196,106,.6); }
+}
+@media (prefers-reduced-motion: reduce) { .dashboard-stream-stat.state-live .status-indicator { animation: none; } }
+.dashboard-ad-stat.state-running strong { color: #c7b7ff; }
 .dashboard-ad-stat.state-scheduled strong { color: #c7b7ff; }
 .dashboard-ad-stat.state-unavailable strong { color: var(--danger); }
 .channel-dashboard-layout .panel-header h3 { color: #c7b7ff; }
@@ -274,8 +281,9 @@ button, input { font: inherit; }
 .dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }
 .dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; background: #0f1115; }
 .dashboard-video-unavailable { display: grid; min-width: 0; aspect-ratio: 16 / 9; place-items: center; margin: 0; border-radius: 8px; background: #0f1115; color: var(--muted); text-align: center; }
-.live-chat-panel { grid-area: chat; }
-.live-chat-panel > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }
+.dashboard-chat-column { display: flex; grid-area: chat; min-width: 0; min-height: 0; flex-direction: column; }
+.dashboard-chat-column > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }
+.dashboard-chat-column > .live-chat-panel { grid-area: chat; min-height: 0; flex: 1 1 auto; }
 .dashboard-activity-grid > .dashboard-activity-panel { min-width: 0; }
 .admin-channel-dashboard-layout .admin-activity-panel { grid-area: activity; }
 .viewer-queue-column { grid-area: queue; }
@@ -287,14 +295,35 @@ button, input { font: inherit; }
 .dashboard-ads-panel > .panel-header, .channel-page-overview .dashboard-ads-panel > .panel-header { flex-wrap: wrap; gap: 10px; margin-bottom: 0; }
 .dashboard-ads-panel .dashboard-ad-stat { display: flex; min-height: 30px; align-items: center; margin-left: auto; padding: 5px 9px; border: 0; border-radius: 7px; background: var(--surface-raised); font-size: 13px; line-height: 1.3; white-space: nowrap; }
 .dashboard-ads-panel .dashboard-ad-stat strong { color: var(--text); font-size: inherit; font-weight: 800; }
+.dashboard-ad-progress { display: none; width: 20px; height: 20px; flex: 0 0 20px; margin-right: 6px; overflow: visible; fill: none; stroke-width: 2.5; }
+.dashboard-ad-stat:is(.ad-running, .ad-complete) .dashboard-ad-progress { display: block; }
+.dashboard-ad-progress-track { stroke: rgba(199,183,255,.3); }
+.dashboard-ad-progress-ring { stroke: #c7b7ff; stroke-dasharray: 56.55; stroke-dashoffset: 0; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+.dashboard-ad-stat.ad-ring-intro .dashboard-ad-progress-ring { animation: dashboard-ad-ring-fill .75s ease-out both; transition: none; }
+@keyframes dashboard-ad-ring-fill { from { stroke-dashoffset: 56.55; } to { stroke-dashoffset: 0; } }
+.dashboard-ad-stat.ad-ring-countdown .dashboard-ad-progress-ring { animation: dashboard-ad-ring-countdown var(--ad-ring-duration) linear forwards; }
+@keyframes dashboard-ad-ring-countdown { from { stroke-dashoffset: var(--ad-ring-from); } to { stroke-dashoffset: 56.55; } }
+.dashboard-ad-progress-check { stroke: #86efac; stroke-dasharray: 24; stroke-dashoffset: 24; stroke-linecap: round; stroke-linejoin: round; }
+.dashboard-ad-stat.ad-complete .dashboard-ad-progress-track, .dashboard-ad-stat.ad-complete .dashboard-ad-progress-ring { display: none; }
+.dashboard-ad-stat.ad-complete .dashboard-ad-progress-check { animation: dashboard-ad-check .55s ease-out forwards; }
+@keyframes dashboard-ad-check { to { stroke-dashoffset: 0; } }
 .dashboard-ads-panel .dashboard-ad-stat.ad-idle { background: rgba(34,197,94,.14); }
 .dashboard-ads-panel .dashboard-ad-stat.ad-idle strong { color: #86efac; }
-.dashboard-ads-panel .dashboard-ad-stat.ad-running { background: rgba(59,130,246,.2); }
-.dashboard-ads-panel .dashboard-ad-stat.ad-running strong { color: #bfdbfe; }
+.dashboard-ads-panel .dashboard-ad-stat.ad-scheduled { background: rgba(139,92,246,.12); }
+.dashboard-ads-panel .dashboard-ad-stat.ad-scheduled strong { color: #c7b7ff; }
+.dashboard-ads-panel .dashboard-ad-stat.ad-running { background: rgba(139,92,246,.2); }
+.dashboard-ads-panel .dashboard-ad-stat.ad-running strong { color: #c7b7ff; }
+.dashboard-ads-panel .dashboard-ad-stat.ad-complete { background: rgba(34,197,94,.2); }
+.dashboard-ads-panel .dashboard-ad-stat.ad-complete strong { color: #86efac; }
 .dashboard-ads-panel .dashboard-ad-stat.ad-warning { background: rgba(239,68,68,.2); }
 .dashboard-ads-panel .dashboard-ad-stat.ad-warning strong { color: #fca5a5; }
 .dashboard-ads-panel .dashboard-ad-stat.state-offline strong { color: var(--muted); }
 .dashboard-ads-panel .dashboard-ad-stat.state-unavailable strong { color: #fca5a5; }
+@media (prefers-reduced-motion: reduce) {
+    .dashboard-ad-stat.ad-ring-intro .dashboard-ad-progress-ring { animation: none; }
+    .dashboard-ad-stat.ad-ring-countdown .dashboard-ad-progress-ring { animation: none; }
+    .dashboard-ad-stat.ad-complete .dashboard-ad-progress-check { animation: none; stroke-dashoffset: 0; }
+}
 .dashboard-ad-actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
 .dashboard-ad-actions button { min-height: 34px; padding: 5px 6px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--text); font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
 .dashboard-ad-actions button:hover:not(:disabled), .dashboard-ad-actions button:focus-visible:not(:disabled) { border-color: var(--accent); background: rgba(139,92,246,.12); }
@@ -351,7 +380,7 @@ button, input { font: inherit; }
     .channel-page-overview .channel-heading-placeholder { width: 50px; height: 50px; flex-basis: 50px; }
     .channel-page-overview .page-header h2 { font-size: 28px; }
     .channel-page-overview .page-description { margin-top: 5px; line-height: 1.35; }
-    .channel-page-overview .channel-dashboard-layout { min-width: 0; min-height: 0; flex: 1; grid-template-columns: minmax(600px,1.35fr) minmax(260px,.65fr) minmax(340px,.8fr); grid-template-rows: max-content minmax(0,1fr); margin-bottom: 0; overflow: hidden; }
+    .channel-page-overview .channel-dashboard-layout { min-width: 0; min-height: 0; flex: 1; grid-template-columns: minmax(600px,1.35fr) minmax(260px,.65fr) minmax(340px,.8fr); grid-template-rows: max-content minmax(0,1fr); grid-template-areas: "player queue chat" "activities activities chat"; margin-bottom: 0; overflow: hidden; }
     .channel-page-overview .status-card { min-width: 0; padding: 16px; }
     .channel-page-overview .card-label { margin-bottom: 10px; }
     .channel-page-overview .card-detail { margin-top: 8px; }
@@ -361,7 +390,7 @@ button, input { font: inherit; }
     .channel-page-overview .viewer-queue-column,
     .channel-page-overview .viewer-queue-column > [data-viewer-queue-panel] { min-height: 0; overflow: hidden; }
     .channel-page-overview .panel-header { flex: 0 0 auto; margin-bottom: 12px; }
-    .channel-page-overview .live-chat-panel { grid-row: 1 / -1; }
+    .channel-page-overview .dashboard-chat-column { grid-row: 1 / -1; }
     .channel-page-overview .dashboard-chat-feed { min-height: 0; }
     .channel-page-overview .dashboard-chat-composer { flex: 0 0 auto; }
     .channel-page-overview .dashboard-activity-panel > [data-activity-panel]:not([hidden]) { display: flex; min-height: 0; flex: 1; flex-direction: column; }
@@ -375,7 +404,8 @@ button, input { font: inherit; }
     .channel-page-overview .sidebar { height: auto; min-height: 100dvh; }
     .channel-page-overview .streamer-main-content { height: auto; min-height: 100dvh; overflow: visible; }
     .channel-page-overview .channel-dashboard-layout { flex: none; grid-template-columns: minmax(534px,1.1fr) minmax(300px,.9fr); grid-template-rows: max-content max-content minmax(540px,auto); grid-template-areas: "player queue" "activities activities" "chat chat"; overflow: visible; }
-    .channel-page-overview .live-chat-panel { height: auto; min-height: 540px; grid-row: auto; overflow: visible; }
+    .channel-page-overview .dashboard-chat-column { height: auto; grid-row: auto; overflow: visible; }
+    .channel-page-overview .live-chat-panel { height: auto; min-height: 540px; overflow: visible; }
     .channel-page-overview .dashboard-activity-grid,
     .channel-page-overview .dashboard-activity-panel { height: auto; min-height: 540px; overflow: visible; }
     .channel-page-overview .viewer-queue-column,
@@ -386,11 +416,14 @@ button, input { font: inherit; }
     .channel-page-overview .sidebar { height: auto; min-height: 100dvh; }
     .channel-page-overview .streamer-main-content { height: auto; min-height: 100dvh; overflow: visible; }
     .channel-page-overview .channel-dashboard-layout { min-height: 0; flex: none; grid-template-columns: minmax(0,1fr); grid-template-rows: none; grid-template-areas: "player" "queue" "activities" "chat"; overflow: visible; }
-    .channel-page-overview .live-chat-panel { min-height: 540px; grid-row: auto; }
-    .channel-page-overview .dashboard-activity-grid { height: auto; }
+    .channel-page-overview .dashboard-chat-column { height: auto; grid-row: auto; overflow: visible; }
+    .channel-page-overview .live-chat-panel { height: auto; min-height: 540px; overflow: visible; }
+    .channel-page-overview .dashboard-activity-grid { height: auto; overflow: visible; }
     .channel-page-overview .dashboard-activity-panel,
     .channel-page-overview .viewer-queue-column,
     .channel-page-overview .viewer-queue-column > [data-viewer-queue-panel] { height: auto; min-height: 460px; overflow: visible; }
+    .channel-page-overview .viewer-queue-column { max-height: none; }
+    .channel-page-overview #viewer-queue-content { max-height: 430px; flex: 0 1 auto; }
 }
 @media (max-width: 600px) {
     .dashboard-video-header { grid-template-columns: minmax(0,1fr); }
