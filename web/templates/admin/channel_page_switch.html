@@ -5,10 +5,9 @@
         <a class="button primary" href="https://twitch.tv/{{ broadcaster.login }}" target="_blank" rel="noopener noreferrer">Open Twitch</a>
         {% endif %}
     </div>
-    <form method="get" action="/admin/channels/{{ broadcaster.id }}{% if not customization_active %}/customization{% endif %}">
-        <button type="submit" class="channel-page-switch" role="switch" aria-checked="{{ 'true' if customization_active else 'false' }}" aria-label="Customization">
-            <span class="channel-page-switch-track" aria-hidden="true"><span></span></span>
-            <span>Customization</span>
-        </button>
-    </form>
+    <nav class="channel-page-tabs" aria-label="Channel management sections">
+        <a class="channel-page-tab {% if channel_section == 'overview' %}active{% endif %}" href="/admin/channels/{{ broadcaster.id }}" {% if channel_section == 'overview' %}aria-current="page"{% endif %}>Overview</a>
+        <a class="channel-page-tab {% if channel_section == 'features' %}active{% endif %}" href="/admin/channels/{{ broadcaster.id }}/features" {% if channel_section == 'features' %}aria-current="page"{% endif %}>Features</a>
+        <a class="channel-page-tab {% if channel_section == 'customization' %}active{% endif %}" href="/admin/channels/{{ broadcaster.id }}/customization" {% if channel_section == 'customization' %}aria-current="page"{% endif %}>Customization</a>
+    </nav>
 </div>

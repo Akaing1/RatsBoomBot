@@ -73,6 +73,7 @@
 {% block title %}{{ broadcaster.name or "Channel" }} | RatsBoomBot{% endblock %}
 
 {% block content %}
+{% if channel_section == "overview" %}<div class="channel-dashboard-layout admin-channel-dashboard-layout">{% endif %}
 <header class="page-header admin-channel-header">
     <div class="channel-heading dashboard-channel-heading">
         <p class="eyebrow">Channel management</p>
@@ -104,6 +105,7 @@
     </div>
 
     <div class="admin-channel-header-side">
+        {% if channel_section == "overview" %}
         <div class="dashboard-header-stats" aria-label="Channel status">
             <div class="dashboard-header-stat dashboard-stream-stat {% if broadcaster.is_live %}state-live{% else %}state-offline{% endif %}">
                 <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span><span>Stream</span><strong>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
@@ -115,23 +117,22 @@
             </div>
             <div class="dashboard-header-stat"><span>Points lost</span><strong>{{ gambling_loss_total }}</strong></div>
         </div>
-        {% set customization_active = false %}
+        {% endif %}
         {% include "admin/channel_page_switch.html" %}
     </div>
 </header>
 
-{% if toggle_message %}
-    <div class="toggle-feedback {% if toggle_result == 'success' %}success{% else %}error{% endif %}" role="status">
-        <span class="toggle-feedback-icon">
-            {% if toggle_result == "success" %}&#10003;{% else %}!{% endif %}
-        </span>
+{% if channel_section == "overview" %}
+<section class="status-grid channel-status-grid">
+    <article class="status-card twitch-channel-card admin-twitch-channel-card">
+        <div class="panel-header twitch-channel-header"><h3>Twitch stream</h3></div>
+        <div class="twitch-channel-field"><span>Title</span><strong>{{ twitch_channel_metadata.title }}</strong></div>
+        <div class="twitch-channel-field"><span>Category</span><strong>{{ twitch_channel_metadata.game }}</strong></div>
+    </article>
+</section>
 
-        <span>{{ toggle_message }}</span>
-    </div>
-{% endif %}
-
-<div class="admin-channel-live-grid">
-    <div class="channel-dashboard-side admin-viewer-queue-column">
+<div class="channel-live-layout">
+    <div class="channel-dashboard-side viewer-queue-column admin-viewer-queue-column">
         <section class="panel">
             <div class="panel-header">
                 <div><p class="eyebrow">Viewer games</p><h3>Viewer queue</h3></div>
@@ -167,7 +168,7 @@
         </section>
     </div>
 
-    <section class="panel activity-panel admin-activity-panel">
+    <section class="panel activity-panel dashboard-activity-panel admin-activity-panel">
         <div class="panel-header">
             <div><p class="eyebrow">Account activity</p><h3>Activity</h3></div>
             <span class="channel-state">Account</span>
@@ -179,9 +180,6 @@
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-admin-activity-tab="commands">Commands</button>
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-admin-activity-tab="mod-actions">Mod actions</button>
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-admin-activity-tab="automod">AutoMod</button>
-            {% if raid_configured %}
-                <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-admin-activity-tab="raid">Raid</button>
-            {% endif %}
         </div>
 
         <div data-admin-activity-panel="redeems">
@@ -244,40 +242,6 @@
             </div>
         </div>
 
-        {% if raid_configured %}
-            <div class="admin-dashboard-raid-tab" data-admin-activity-panel="raid" hidden>
-                <div class="raid-monitor-panel">
-                    <div class="panel-header">
-                        <div><p class="eyebrow">Raid activity</p><h3>Raid encounter monitor</h3></div>
-                        <span id="raid-monitor-status" class="channel-state {% if raid_metrics and raid_metrics.status == 'active' %}live{% endif %}">{% if raid_metrics %}{{ raid_metrics.status | title }}{% else %}Waiting{% endif %}</span>
-                    </div>
-
-                    <div id="raid-monitor-empty" class="compact-empty-state" {% if raid_metrics %}hidden{% endif %}>
-                        <h4>No raid encounter recorded</h4><p>Spawn a mini or main boss to begin tracking raid activity.</p>
-                    </div>
-
-                    <div id="raid-monitor-details" {% if not raid_metrics %}hidden{% endif %}>
-                        <div class="raid-monitor-heading">
-                            <div><strong id="raid-boss-name">{% if raid_metrics %}{{ raid_metrics.boss_name }}{% endif %}</strong><p id="raid-boss-meta">{% if raid_metrics %}{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; {% if raid_metrics.boss_tier == 'tutorial' %}Active until defeated &middot; Stream {{ raid_metrics.streams_used }}{% else %}{{ raid_metrics.streams_used }}/{{ raid_metrics.stream_limit }} streams{% endif %}{% endif %}</p></div>
-                            <strong id="raid-hp-label">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.current_hp) }}/{{ "{:,}".format(raid_metrics.max_hp) }} HP{% endif %}</strong>
-                        </div>
-
-                        <div class="progress-track raid-hp-track"><span id="raid-hp-progress" style="width: {% if raid_metrics %}{{ raid_metrics.hp_percent }}{% else %}0{% endif %}%"></span></div>
-
-                        <div class="raid-metric-grid">
-                            <article><span>Unique attackers</span><strong id="raid-unique-attackers">{% if raid_metrics %}{{ raid_metrics.unique_attackers }}{% else %}0{% endif %}</strong></article>
-                            <article><span>Total attacks</span><strong id="raid-total-attacks">{% if raid_metrics %}{{ raid_metrics.total_attacks }}{% else %}0{% endif %}</strong></article>
-                            <article><span>Average damage</span><strong id="raid-average-damage">{% if raid_metrics %}{{ raid_metrics.average_damage }}{% else %}0{% endif %}</strong></article>
-                            <article><span>Total damage</span><strong id="raid-total-damage">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.total_damage) }}{% else %}0{% endif %}</strong></article>
-                            <article><span>Weapon attacks</span><strong id="raid-weapon-attacks">{% if raid_metrics %}{{ raid_metrics.weapon_attacks }}{% else %}0{% endif %}</strong></article>
-                            <article><span>Potion attacks</span><strong id="raid-potion-attacks">{% if raid_metrics %}{{ raid_metrics.potion_attacks }}{% else %}0{% endif %}</strong></article>
-                            <article><span>Critical hits</span><strong id="raid-critical-hits">{% if raid_metrics %}{{ raid_metrics.critical_hits }}{% else %}0{% endif %}</strong></article>
-                            <article><span>Base reward</span><strong id="raid-reward-pool">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.max_hp) }}{% else %}0{% endif %}</strong></article>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
     </section>
 
     <section class="panel live-chat-panel admin-readonly-chat-panel">
@@ -294,6 +258,49 @@
         ></div>
     </section>
 </div>
+</div>
+
+{% if raid_configured %}
+    <section class="panel raid-monitor-panel admin-overview-raid-panel">
+        <div class="panel-header">
+            <div><p class="eyebrow">Raid activity</p><h3>Raid encounter monitor</h3></div>
+            <span id="raid-monitor-status" class="channel-state {% if raid_metrics and raid_metrics.status == 'active' %}live{% endif %}">{% if raid_metrics %}{{ raid_metrics.status | title }}{% else %}Waiting{% endif %}</span>
+        </div>
+
+        <div id="raid-monitor-empty" class="compact-empty-state" {% if raid_metrics %}hidden{% endif %}>
+            <h4>No raid encounter recorded</h4><p>Spawn a mini or main boss to begin tracking raid activity.</p>
+        </div>
+
+        <div id="raid-monitor-details" {% if not raid_metrics %}hidden{% endif %}>
+            <div class="raid-monitor-heading">
+                <div><strong id="raid-boss-name">{% if raid_metrics %}{{ raid_metrics.boss_name }}{% endif %}</strong><p id="raid-boss-meta">{% if raid_metrics %}{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; {% if raid_metrics.boss_tier == 'tutorial' %}Active until defeated &middot; Stream {{ raid_metrics.streams_used }}{% else %}{{ raid_metrics.streams_used }}/{{ raid_metrics.stream_limit }} streams{% endif %}{% endif %}</p></div>
+                <strong id="raid-hp-label">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.current_hp) }}/{{ "{:,}".format(raid_metrics.max_hp) }} HP{% endif %}</strong>
+            </div>
+
+            <div class="progress-track raid-hp-track"><span id="raid-hp-progress" style="width: {% if raid_metrics %}{{ raid_metrics.hp_percent }}{% else %}0{% endif %}%"></span></div>
+
+            <div class="raid-metric-grid">
+                <article><span>Unique attackers</span><strong id="raid-unique-attackers">{% if raid_metrics %}{{ raid_metrics.unique_attackers }}{% else %}0{% endif %}</strong></article>
+                <article><span>Total attacks</span><strong id="raid-total-attacks">{% if raid_metrics %}{{ raid_metrics.total_attacks }}{% else %}0{% endif %}</strong></article>
+                <article><span>Average damage</span><strong id="raid-average-damage">{% if raid_metrics %}{{ raid_metrics.average_damage }}{% else %}0{% endif %}</strong></article>
+                <article><span>Total damage</span><strong id="raid-total-damage">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.total_damage) }}{% else %}0{% endif %}</strong></article>
+                <article><span>Weapon attacks</span><strong id="raid-weapon-attacks">{% if raid_metrics %}{{ raid_metrics.weapon_attacks }}{% else %}0{% endif %}</strong></article>
+                <article><span>Potion attacks</span><strong id="raid-potion-attacks">{% if raid_metrics %}{{ raid_metrics.potion_attacks }}{% else %}0{% endif %}</strong></article>
+                <article><span>Critical hits</span><strong id="raid-critical-hits">{% if raid_metrics %}{{ raid_metrics.critical_hits }}{% else %}0{% endif %}</strong></article>
+                <article><span>Base reward</span><strong id="raid-reward-pool">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.max_hp) }}{% else %}0{% endif %}</strong></article>
+            </div>
+        </div>
+    </section>
+{% endif %}
+
+{% else %}
+
+{% if toggle_message %}
+    <div class="toggle-feedback {% if toggle_result == 'success' %}success{% else %}error{% endif %}" role="status">
+        <span class="toggle-feedback-icon">{% if toggle_result == "success" %}&#10003;{% else %}!{% endif %}</span>
+        <span>{{ toggle_message }}</span>
+    </div>
+{% endif %}
 
 <section class="panel toggle-management-panel">
     <div class="panel-header">
@@ -604,6 +611,9 @@
     </section>
 </div>
 
+{% endif %}
+
+{% if channel_section == "overview" %}
 <script>
     (() => {
         const endpoint = "/admin/channels/{{ broadcaster.id }}/api/activity";
@@ -907,10 +917,13 @@
         document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
     })();
 </script>
+{% endif %}
 {% endblock %}
 
 {% block page_scripts %}
+{% if channel_section == "overview" %}
 <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
+{% else %}
 <script>
     (() => {
         const scrollKey = `ratsboombot-toggle-scroll:${window.location.pathname}`;
@@ -928,4 +941,5 @@
         });
     })();
 </script>
+{% endif %}
 {% endblock %}
