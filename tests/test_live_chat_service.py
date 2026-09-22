@@ -647,8 +647,59 @@ async def test_ad_status_reports_running_and_offline_states():
     offline_status = await get_ad_status(offline)
 
     assert running["state"] == "running"
+    assert running["started_at"] == (now - timedelta(seconds=10)).isoformat()
     assert running["ends_at"] is not None
     assert offline_status["state"] == "offline"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action,length", [("run-90", 90), ("run-180", 180)])
+async def test_dashboard_ad_action_starts_commercial_for_connected_channel(monkeypatch, action, length):
+    broadcaster = SimpleNamespace(id="channel-1", is_live=True)
+    twitch_channel = SimpleNamespace(start_commercial=AsyncMock(return_value=SimpleNamespace(length=length, message="")))
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster})),
+        create_partialuser=lambda _: twitch_channel
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/ads/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_ad_action(request, action, "csrf")
+
+    assert response.status_code == 200
+    status = json.loads(response.body)["status"]
+    assert status["state"] == "running"
+    assert (datetime.fromisoformat(status["ends_at"]) - datetime.fromisoformat(status["started_at"])) == timedelta(seconds=length)
+    twitch_channel.start_commercial.assert_awaited_once_with(length=length)
+
+
+@pytest.mark.asyncio
+async def test_dashboard_ad_action_snoozes_next_ad(monkeypatch):
+    next_ad_at = datetime.now(UTC) + timedelta(minutes=15)
+    broadcaster = SimpleNamespace(id="channel-1", is_live=True)
+    twitch_channel = SimpleNamespace(snooze_next_ad=AsyncMock(return_value=SimpleNamespace(
+        next_ad_at=next_ad_at, snooze_count=2
+    )))
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster})),
+        create_partialuser=lambda _: twitch_channel
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/ads/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_ad_action(request, "snooze", "csrf")
+
+    assert response.status_code == 200
+    assert json.loads(response.body)["status"]["next_ad_at"] == next_ad_at.isoformat()
+    twitch_channel.snooze_next_ad.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -736,6 +787,155 @@ async def test_dashboard_viewer_queue_actions_send_their_chat_response(monkeypat
     assert response.status_code == 200
     chat_identity.send_message.assert_awaited_once_with(channel, "Moved alice to position 1.")
     live_chat.tag_command_response.assert_called_once_with("channel-1", "queue-response")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("next_count", [1, 4, 10])
+async def test_dashboard_viewer_queue_next_uses_selected_count(monkeypatch, next_count):
+    queue = SimpleNamespace(
+        next_viewers=AsyncMock(return_value=(True, ["alice"], "Selected alice.")),
+        list_queue=lambda _: [], list_queue_members=lambda _: [], is_queue_open=lambda _: True
+    )
+    services = SimpleNamespace(
+        viewer_queue=queue,
+        chat_identity=SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=False)))
+    )
+    runtime_bot = SimpleNamespace(services=services, create_partialuser=lambda _: SimpleNamespace(id="channel-1"))
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/viewer-queue/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_viewer_queue_action(request, "next", "csrf", 0, 0, next_count)
+
+    assert response.status_code == 200
+    queue.next_viewers.assert_awaited_once_with("channel-1", next_count)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("next_count", [0, 11])
+async def test_dashboard_viewer_queue_next_rejects_out_of_range_count(monkeypatch, next_count):
+    queue = SimpleNamespace(next_viewers=AsyncMock())
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=SimpleNamespace(viewer_queue=queue)))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/viewer-queue/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_viewer_queue_action(request, "next", "csrf", 0, 0, next_count)
+
+    assert response.status_code == 400
+    queue.next_viewers.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field", "value", "expected_update", "expected_announcement", "expected_value"),
+    [
+        ("title", "New stream title", {"title": "New stream title"}, 'Stream title updated to "New stream title".', "New stream title"),
+        ("game", "Just Chatting", {"game_id": "509658"}, 'Stream game updated to "Just Chatting".', "Just Chatting"),
+        ("game", "", {"game_id": "0"}, "Stream category cleared.", "No category")
+    ]
+)
+async def test_dashboard_metadata_edits_announce_changes_in_chat(
+    monkeypatch, field, value, expected_update, expected_announcement, expected_value
+):
+    twitch_channel = SimpleNamespace(id="channel-1", modify_channel=AsyncMock())
+    sent_message = SimpleNamespace(sent=True, id="metadata-response")
+    chat_identity = SimpleNamespace(send_message=AsyncMock(return_value=sent_message))
+    live_chat = SimpleNamespace(tag_command_response=Mock())
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(chat_identity=chat_identity, live_chat=live_chat),
+        create_partialuser=lambda _: twitch_channel,
+        fetch_game=AsyncMock(return_value=SimpleNamespace(id="509658", name="Just Chatting"))
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/channel-metadata", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.update_twitch_channel_metadata(request, field, value, "csrf")
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {"field": field, "value": expected_value, "announcement_sent": True}
+    twitch_channel.modify_channel.assert_awaited_once_with(**expected_update)
+    chat_identity.send_message.assert_awaited_once_with(twitch_channel, expected_announcement)
+    live_chat.tag_command_response.assert_called_once_with("channel-1", "metadata-response")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_metadata_chat_failure_does_not_undo_successful_twitch_edit(monkeypatch):
+    twitch_channel = SimpleNamespace(id="channel-1", modify_channel=AsyncMock())
+    chat_identity = SimpleNamespace(send_message=AsyncMock(side_effect=RuntimeError("Chat unavailable")))
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(chat_identity=chat_identity),
+        create_partialuser=lambda _: twitch_channel
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/channel-metadata", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.update_twitch_channel_metadata(request, "title", "New title", "csrf")
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {"field": "title", "value": "New title", "announcement_sent": False}
+    twitch_channel.modify_channel.assert_awaited_once_with(title="New title")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_rejects_title_over_140_characters(monkeypatch):
+    twitch_channel = SimpleNamespace(id="channel-1", modify_channel=AsyncMock())
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(),
+        create_partialuser=lambda _: twitch_channel
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/channel-metadata", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.update_twitch_channel_metadata(request, "title", "x" * 141, "csrf")
+
+    assert response.status_code == 400
+    assert json.loads(response.body) == {"detail": "Titles must contain 1 to 140 characters."}
+    twitch_channel.modify_channel.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_dashboard_unknown_category_returns_distinct_error_without_saving(monkeypatch):
+    twitch_channel = SimpleNamespace(id="channel-1", modify_channel=AsyncMock())
+    chat_identity = SimpleNamespace(send_message=AsyncMock())
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(chat_identity=chat_identity),
+        create_partialuser=lambda _: twitch_channel,
+        fetch_game=AsyncMock(return_value=None)
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/channel-metadata", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.update_twitch_channel_metadata(request, "game", "Unknown category", "csrf")
+
+    assert response.status_code == 400
+    assert json.loads(response.body) == {
+        "detail": "Twitch could not find that game or category.",
+        "code": "category_not_found"
+    }
+    twitch_channel.modify_channel.assert_not_awaited()
+    chat_identity.send_message.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -931,8 +1131,9 @@ async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
     calls = []
 
     async def games():
-        yield SimpleNamespace(id="509658", name="Just Chatting")
         yield SimpleNamespace(id="123", name="Retro")
+        yield SimpleNamespace(id="509658", name="Just Chatting")
+        yield SimpleNamespace(id="456", name="Chat")
 
     def search_categories(query, **kwargs):
         calls.append((query, kwargs))
@@ -952,10 +1153,87 @@ async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
     response = await dashboard_router.search_twitch_games(request, "chat")
 
     assert json.loads(response.body) == {"games": [
+        {"id": "456", "name": "Chat"},
         {"id": "509658", "name": "Just Chatting"},
         {"id": "123", "name": "Retro"}
     ]}
     assert calls == [("chat", {"token_for": "channel-1", "first": 50, "max_results": 50})]
+
+
+def test_dashboard_game_search_ranks_name_matches_and_preserves_top_games_order():
+    games = [
+        {"id": "1", "name": "Superchat"},
+        {"id": "2", "name": "Just Chatting"},
+        {"id": "3", "name": "Chatters"},
+        {"id": "4", "name": "Chat"},
+        {"id": "5", "name": "Retro"}
+    ]
+
+    ranked = dashboard_router.sort_twitch_games_by_match(games, "CHAT")
+
+    assert [game["name"] for game in ranked] == [
+        "Chat", "Chatters", "Just Chatting", "Superchat", "Retro"
+    ]
+    assert dashboard_router.sort_twitch_games_by_match(games, "") == games
+
+
+@pytest.mark.parametrize(
+    ("query", "literal_name", "popular_name"),
+    [
+        ("lol", "LOL", "League of Legends"),
+        ("league", "League", "League of Legends"),
+        ("wow", "WOW", "World of Warcraft"),
+        ("dbd", "DBD", "Dead by Daylight")
+    ]
+)
+def test_dashboard_game_search_uses_abbreviations_and_popularity(query, literal_name, popular_name):
+    games = [
+        {"id": "1", "name": literal_name},
+        {"id": "2", "name": popular_name}
+    ]
+
+    ranked = dashboard_router.sort_twitch_games_by_match(games, query, [games[1]])
+
+    assert ranked[0]["name"] == popular_name
+    assert ranked[1] == games[0]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_game_search_adds_matching_popular_category_when_search_omits_it(monkeypatch):
+    async def games():
+        yield SimpleNamespace(id="1", name="LOL")
+
+    async def top_games():
+        yield SimpleNamespace(id="21779", name="League of Legends")
+
+    top_calls = []
+
+    def fetch_top_games(**kwargs):
+        top_calls.append(kwargs)
+        return top_games()
+
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(),
+        search_categories=lambda query, **kwargs: games(),
+        fetch_top_games=fetch_top_games
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "GET", "path": "/channel/api/games", "headers": [],
+        "query_string": b"query=lol", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1"}
+    })
+
+    response = await dashboard_router.search_twitch_games(request, "lol")
+
+    assert json.loads(response.body) == {"games": [
+        {"id": "21779", "name": "League of Legends"},
+        {"id": "1", "name": "LOL"}
+    ]}
+    assert top_calls == [{"token_for": "channel-1", "first": 100, "max_results": 100}]
+
+    await dashboard_router.search_twitch_games(request, "lol")
+    assert len(top_calls) == 1
 
 
 @pytest.mark.asyncio
@@ -1043,6 +1321,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     composer_script = open("web/static/js/dashboard-chat-send.js", encoding="utf-8").read()
     sidebar_script = open("web/static/js/channel-sidebar.js", encoding="utf-8").read()
     header_stats_script = open("web/static/js/dashboard-header-stats.js", encoding="utf-8").read()
+    stream_player_script = open("web/static/js/dashboard-stream-player.js", encoding="utf-8").read()
     ad_status_script = open("web/static/js/dashboard-ad-status.js", encoding="utf-8").read()
     metadata_script = open("web/static/js/dashboard-channel-metadata.js", encoding="utf-8").read()
     queue_script = open("web/static/js/dashboard-viewer-queue.js", encoding="utf-8").read()
@@ -1054,8 +1333,21 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "Waiting for commands" not in dashboard
     assert 'data-activity-tab="redeems"' in dashboard
     assert 'data-activity-tab="checkins"' in dashboard
+    assert '<h4 class="activity-subheading">Check-ins</h4>' not in dashboard
+    assert '<h4>No commands yet</h4>' in dashboard
+    assert '<p>Chat commands will appear here.</p>' in dashboard
     assert 'data-activity-tab="mod-actions"' in dashboard
     assert 'data-activity-tab="automod"' in dashboard
+    assert '.dashboard-tabs.activity-tabs { flex-wrap: nowrap;' in dashboard_styles
+    assert '.dashboard-tabs.activity-tabs .dashboard-tab { min-width: max-content; min-height: 34px; flex: 1 0 auto;' in dashboard_styles
+    assert '.queue-toolbar button, .queue-toolbar a { display: inline-flex; width: 100%;' in dashboard_styles
+    assert '@container (max-width: 500px)' not in dashboard_styles
+    assert dashboard.count('data-activity-group>') == 2
+    assert 'selectActivity(group, selected)' in dashboard
+    assert 'tab.closest("[data-activity-group]")' in dashboard
+    assert '.queue-toolbar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr));' in dashboard_styles
+    assert '.queue-toolbar .queue-next-control > button { min-width: 0; flex: 1; width: auto; gap: 4px;' in dashboard_styles
+    assert '.queue-next-picker select' in dashboard_styles
     assert dashboard.index('data-activity-tab="raid"') < dashboard.index('include "channel/raid_summary.html"')
     assert 'data-chat-composer' in dashboard
     assert 'data-channel-id="{{ broadcaster.id }}"' in dashboard
@@ -1068,8 +1360,28 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "data-emote-toggle" in dashboard
     assert "data-dashboard-header-stats" in dashboard
     assert "data-dashboard-stat-value" in dashboard
+    assert '{% if stat.key != "points_lost" %}' in dashboard
+    assert '{% if stat.key == "points_lost" %}' in dashboard
+    assert 'class="dashboard-points-stat" data-dashboard-points-lost' in dashboard
+    assert 'class="dashboard-header-stat dashboard-points-stat"' not in dashboard
+    assert '.dashboard-header-stats > .dashboard-header-stat { flex: 1 0 auto; justify-content: center; }' in dashboard_styles
+    assert '.dashboard-points-stat { display: inline-flex; max-width: 65%; min-width: 0; min-height: 30px; align-items: center; gap: 6px; margin-left: auto; padding: 5px 9px; border: 0;' in dashboard_styles
+    assert 'dashboard.querySelectorAll("[data-dashboard-stat]")' in header_stats_script
+    assert 'dashboard.querySelector("[data-dashboard-points-lost]")' in header_stats_script
     assert "data-stream-status" in dashboard
-    assert 'class="dashboard-header-stat dashboard-ad-stat' in dashboard
+    assert 'class="dashboard-ad-stat state-{{ ad_status.state }}"' in dashboard
+    assert 'class="dashboard-header-stat dashboard-ad-stat' not in dashboard
+    assert 'data-ad-panel' in dashboard
+    assert 'data-started-at="{{ ad_status.started_at or \'\' }}"' in dashboard
+    assert 'data-ad-progress-ring' in dashboard
+    assert dashboard.index('<h3>Ads</h3>') < dashboard.index('data-ad-status data-state=') < dashboard.index('data-ad-action="run-90"')
+    assert '.channel-dashboard-layout .panel { margin-bottom: 0; padding: 16px; }' in dashboard_styles
+    assert '.channel-page-overview .streamer-main-content { padding: 16px; }' in dashboard_styles
+    assert 'align-items: stretch; gap: 12px; margin-bottom: 16px;' in dashboard_styles
+    assert 'padding: 5px 9px; border: 0;' in dashboard_styles
+    assert 'data-ad-action="run-90"' in dashboard
+    assert 'data-ad-action="run-180"' in dashboard
+    assert 'data-ad-action="snooze"' in dashboard
     assert "stream-status-card" not in dashboard
     assert "Twitch ID:" not in dashboard
     assert 'data-user-id="{{ broadcaster.id }}"' in dashboard
@@ -1115,6 +1427,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'row.classList.add("is-deleted")' in live_chat_script
     assert 'row.classList.add("is-mentioned")' in live_chat_script
     assert 'row.classList.add("is-bot")' in live_chat_script
+    assert 'feed.element.querySelector(".compact-empty-state")?.remove()' in live_chat_script
     assert '.live-chat-message.is-deleted' in dashboard_styles
     assert '.live-chat-message.is-mentioned' in dashboard_styles
     assert '.live-chat-message.is-bot:not(.is-deleted)' in dashboard_styles
@@ -1136,11 +1449,15 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert dashboard.count('spellcheck="false"') >= 2
     assert "dashboard-channel-metadata.js" in dashboard
     assert "dashboard-viewer-queue.js" in dashboard
-    assert 'data-queue-action="next4"' in dashboard
-    assert 'data-queue-action="next5"' in dashboard
+    assert 'data-queue-action="next"' in dashboard
+    assert 'data-queue-next-select' in dashboard
+    assert 'data-queue-next-count>4</span>' in dashboard
+    assert 'range(1, 11)' in dashboard
     assert 'data-queue-action="clear"' in dashboard
     assert 'href="/channel/viewer-queue/blacklist"' in dashboard
     assert 'data-queue-count' in dashboard
+    assert '.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-inline: auto; padding: 5px 9px; border: 0;' in dashboard_styles
+    assert 'color: var(--text); font-size: 13px; font-weight: 800;' in dashboard_styles
     assert 'item.draggable = true' in queue_script
     assert 'runAction("reorder", draggingPosition, position)' in queue_script
     assert 'moveIcon("top")' in queue_script
@@ -1149,7 +1466,24 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.queue-item-action svg' in dashboard_styles
     assert 'fetch(endpoint' in metadata_script
     assert "searchGames" in metadata_script
-    assert 'event.key === "Tab" || event.key === "Enter"' in metadata_script
+    assert 'event.key === "Tab" || event.key === "Enter"' not in metadata_script
+    assert 'button.addEventListener("pointerdown"' in metadata_script
+    assert 'gameField.dataset.commitEdit = "true"' in metadata_script
+    assert 'const shouldCommit = field.dataset.commitEdit === "true"' in metadata_script
+    assert 'let savedValue = field.textContent.trim();' in metadata_script
+    assert 'field.dataset.hasDraft = "true";' in metadata_script
+    assert 'field.addEventListener("input", () => {' in metadata_script
+    assert '.twitch-channel-field strong[data-has-draft="true"]' in dashboard_styles
+    assert 'if (message !== "Unsaved. Press Enter to save.")' in metadata_script
+    assert 'function refreshDraftWarning()' in metadata_script
+    assert 'showStatus("Unsaved. Press Enter to save.", "warning")' in metadata_script
+    assert 'field.textContent = savedValue;' in metadata_script
+    assert 'error.code = result.code;' in metadata_script
+    assert 'field === gameField && error.code === "category_not_found"' in metadata_script
+    assert 'delete field.dataset.hasDraft;' in metadata_script
+    assert 'field.textContent = originalValue;' not in metadata_script
+    assert 'gameSearchController?.abort();' in metadata_script
+    assert 'document.activeElement !== gameField' in metadata_script
     assert "twitch-game-suggestions" in dashboard_styles
     assert "Bitrate" not in dashboard
     assert 'window.setTimeout(() => status.classList.add("is-fading"), 3000)' in metadata_script
@@ -1162,8 +1496,16 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'source.onopen = () => showConnectionStatus(true)' in chat_script
     assert 'source.onerror = () => showConnectionStatus(false)' in chat_script
     assert 'window.setTimeout(() => connectionStatus.classList.add("is-fading"), 3000)' in chat_script
-    assert "<span>Category</span>" in dashboard
+    assert "<h3>Category</h3>" in dashboard
+    assert '.twitch-channel-field [data-channel-field="title"], .twitch-channel-field [data-channel-field="game"] { color: var(--text); font-size: 17px; font-weight: 700;' in dashboard_styles
     assert 'data-channel-field="title"' in dashboard
+    assert 'aria-label="Stream title (140 characters maximum)"' in dashboard
+    assert 'titleField.addEventListener("beforeinput"' in metadata_script
+    assert 'titleField.addEventListener("paste"' in metadata_script
+    assert 'titleField.addEventListener("input"' in metadata_script
+    assert 'selection.setBaseAndExtent(field, 0, field, field.childNodes.length);' in metadata_script
+    assert 'field.scrollLeft = field.scrollWidth;' in metadata_script
+    assert 'Array.from(titleField.textContent).slice(0, 140).join("")' in metadata_script
     assert 'window.setInterval(() => refreshPinned(feed), 2000)' in chat_script
     assert 'dashboard-activity-unread' in dashboard
     assert 'dashboard-activity-unread' in chat_script
@@ -1222,16 +1564,50 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "resize: none;" in dashboard_styles
     assert 'status.dataset.connectionState === "disconnected"' in composer_script
     assert 'status.classList.add("is-fading")' in composer_script
-    assert 'grid-template-areas: "header header chat" "channel channel chat" "queue activity chat"' in dashboard_styles
-    assert "grid-template-rows: max-content max-content minmax(540px,1fr)" in dashboard_styles
-    assert ".channel-dashboard-layout > .page-header { grid-area: header;" in dashboard_styles
-    assert 'grid-template-areas: "header" "channel" "chat" "activity" "queue"' in dashboard_styles
-    assert dashboard.index('<div class="channel-dashboard-layout">') < dashboard.index('<header class="page-header">')
-    assert 'body class="channel-page channel-page-{{ active_page }}"' in channel_layout
+    assert 'grid-template-areas: "player queue chat" "activities activities chat"' in dashboard_styles
+    assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
+    assert '.channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }' in dashboard_styles
+    assert 'grid-template-areas: "player" "queue" "activities" "chat"' in dashboard_styles
+    assert 'grid-template-areas: "player queue" "activities activities" "chat chat"' in dashboard_styles
+    assert '.dashboard-activity-grid { display: grid; grid-area: activities;' in dashboard_styles
+    assert '<header class="page-header dashboard-channel-profile" hidden>' in dashboard
+    assert dashboard.index('class="panel dashboard-video-card"') < dashboard.index('class="panel live-chat-panel"')
+    assert dashboard.index('class="panel dashboard-video-card"') < dashboard.index('class="dashboard-chat-column"') < dashboard.index('class="dashboard-header-side"') < dashboard.index('class="panel live-chat-panel"')
+    assert '<span>Stream</span>' not in dashboard
+    assert '{% if broadcaster.is_live %}Online{% else %}Offline{% endif %}' in dashboard
+    assert 'data-stream-status' in dashboard and 'aria-pressed="true"' in dashboard
+    assert 'class="panel-header dashboard-video-header"' in dashboard
+    assert '.dashboard-video-header { display: grid; min-width: 0; grid-template-columns: minmax(0,2fr) minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header [data-channel-field="title"]:is(:focus, .editing) { position: relative; z-index: 10; }' in dashboard_styles
+    assert 'const maxWidth = Math.max(0, cardBounds.right - rightPadding - fieldBounds.left);' in metadata_script
+    assert 'Math.max(fieldBounds.width, titleField.scrollWidth + 2)' in metadata_script
+    assert 'titleField.style.removeProperty("width")' in metadata_script
+    assert '[data-channel-field].metadata-truncated:not(:focus):not(.editing)::after' in dashboard_styles
+    assert '[titleField, gameField].filter(Boolean).forEach(field => {' in metadata_script
+    assert 'new MutationObserver(updateFieldPencil)' in metadata_script
+    assert 'new ResizeObserver(updateFieldPencil)' in metadata_script
+    assert 'if (document.activeElement !== gameField) gameField.scrollLeft = 0;' in metadata_script
+    assert '<h3>Title</h3>' in dashboard
+    assert '<h3>Category</h3>' in dashboard
+    assert '<h3>Twitch stream</h3>' not in dashboard
+    assert '<h3>Stream preview</h3>' not in dashboard
+    assert '.dashboard-header-stats { display: flex; width: 100%; min-width: 0; flex-wrap: wrap; justify-content: flex-start; gap: 6px; }' in dashboard_styles
+    assert 'dashboard-header-stat-break' not in dashboard
+    assert 'data-stream-player' in dashboard
+    assert 'dashboard-stream-player.js' in dashboard
+    assert 'url.searchParams.set("parent", window.location.hostname)' in stream_player_script
+    assert 'url.searchParams.set("autoplay", "false")' in stream_player_script
+    assert 'url.searchParams.set("muted", "true")' in stream_player_script
+    assert '.dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }' in dashboard_styles
+    assert '.dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9;' in dashboard_styles
+    assert 'aspect-ratio: 16 / 9;' in dashboard_styles
+    assert 'grid-template-columns: minmax(0,1.3fr) minmax(0,1fr)' in dashboard_styles
+    assert dashboard.index('<div class="channel-dashboard-layout">') < dashboard.index('<header class="page-header dashboard-channel-profile" hidden>')
+    assert 'body class="dashboard-page channel-page channel-page-{{ active_page }}"' in channel_layout
     assert "data-sidebar-toggle" in channel_layout
     assert "channel-sidebar.js" in channel_layout
     assert 'localStorage.setItem(storageKey, String(collapsed))' in sidebar_script
-    assert ".channel-page:not(.channel-page-overview) .streamer-main-content" in dashboard_styles
+    assert ".dashboard-page:not(.channel-page-overview) .main-content" in dashboard_styles
     assert "left: -36px; width: min(1250px,calc(100vw - 144px));" in dashboard_styles
     assert "justify-content: space-evenly; gap: 0;" in dashboard_styles
     assert ".navigation .nav-link { flex: 0 0 auto; justify-content: center; }" in dashboard_styles
@@ -1242,18 +1618,36 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "const refreshInterval = 60000" in header_stats_script
     assert "window.setInterval(refreshStats, refreshInterval)" in header_stats_script
     assert 'fetch(refreshUrl, {headers: {Accept: "application/json"}, cache: "no-store"})' in header_stats_script
-    assert 'streamStatus.dataset.startedAt = payload.started_at || ""' in header_stats_script
+    assert 'actualStreamStatus = {isLive: payload.is_live, startedAt: payload.started_at || ""};' in header_stats_script
     assert "window.setInterval(renderStreamStatus, 1000)" in header_stats_script
-    assert 'label.textContent = remaining > 0 ? `Ends in ${formatDuration(remaining)}`' in ad_status_script
+    assert 'label.textContent = `Ends in ${formatDuration(remaining)}`' in ad_status_script
     assert 'label.textContent = remaining > 0 ? `Starts in ${formatDuration(remaining)}`' in ad_status_script
     assert 'remaining < 60' in ad_status_script
     assert 'setAppearance("ad-warning")' in ad_status_script
     assert 'setAppearance("ad-running")' in ad_status_script
+    assert 'setAppearance("ad-scheduled")' in ad_status_script
+    assert 'progressRing.style.strokeDashoffset = String(ringCircumference * (1 - fraction))' in ad_status_script
+    assert 'if (progressRing && !ringIntroActive && !ringCountdownActive)' in ad_status_script
+    assert 'if (enteringRunning && container.dataset.state === "running") beginRingIntro();' in ad_status_script
+    assert '@keyframes dashboard-ad-ring-fill { from { stroke-dashoffset: 56.55; } to { stroke-dashoffset: 0; } }' in dashboard_styles
+    assert 'animation: dashboard-ad-ring-countdown var(--ad-ring-duration) linear forwards;' in dashboard_styles
+    assert 'progressRing.style.setProperty("--ad-ring-duration", `${remainingMs}ms`);' in ad_status_script
+    assert 'window.dashboardAdTest = {' in ad_status_script
+    assert 'schedule(secondsUntilStart = 5, durationSeconds = 15)' in ad_status_script
+    assert 'if (simulationActive) startSimulatedAd(duration);' in ad_status_script
+    assert 'scheduledRefreshAt = container.dataset.nextAdAt;' in ad_status_script
+    assert 'displayStatus({state: "complete", label: "Ads finished"});' in ad_status_script
+    assert 'window.getComputedStyle(completionCheck).animationDuration' in ad_status_script
+    assert '}, 5000 + animationSeconds * 1000);' in ad_status_script
+    assert '.dashboard-ad-stat.ad-complete .dashboard-ad-progress-check' in dashboard_styles
     assert 'setAppearance("ad-idle")' in ad_status_script
     assert 'container.dataset.state === "offline"' in ad_status_script
     assert 'setAppearance("ad-neutral")' in ad_status_script
     assert '.dashboard-ad-stat.ad-idle' in dashboard_styles
     assert '.dashboard-ad-stat.ad-running' in dashboard_styles
+    assert '.dashboard-ads-panel .dashboard-ad-stat.ad-scheduled { background: rgba(139,92,246,.12); }' in dashboard_styles
+    assert '.dashboard-ads-panel .dashboard-ad-stat.ad-running { background: rgba(139,92,246,.2); }' in dashboard_styles
+    assert '.dashboard-ad-progress-ring { stroke: #c7b7ff;' in dashboard_styles
     assert 'animation: dashboard-ad-warning 1s ease-in-out 5' in dashboard_styles
     assert "transition-delay: 1s,1s;" in dashboard_styles
     assert ".dashboard-channel-heading { flex-direction: column; align-items: flex-start; gap: 10px; }" in dashboard_styles
@@ -1263,7 +1657,23 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "width: 50px; height: 50px; flex-basis: 50px;" in dashboard_styles
     assert ".dashboard-channel-copy .page-description { margin-top: 1px; line-height: 1.15; }" in dashboard_styles
     assert ".channel-page-overview { height: 100dvh; overflow: hidden; }" in dashboard_styles
-    assert ".channel-page-overview .live-chat-panel { grid-row: 1 / -1; }" in dashboard_styles
+    assert ".channel-page-overview .dashboard-chat-column { grid-row: 1 / -1; }" in dashboard_styles
+    assert 'grid-template-areas: "player queue chat" "activities activities chat";' in dashboard_styles
+    assert '.dashboard-chat-column > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }' in dashboard_styles
+    assert 'grid-template-rows: max-content max-content minmax(540px,auto)' in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column { height: auto; grid-row: auto; overflow: visible; }' in dashboard_styles
+    assert ".dashboard-chat-column { display: flex; grid-area: chat;" in dashboard_styles
+    assert 'showTimer && streamStatus.dataset.startedAt ? ` · ${formatUptime(streamStatus.dataset.startedAt)}`' in header_stats_script
+    assert 'container.querySelector("[data-stream-status]")?.addEventListener("click", () => {' in header_stats_script
+    assert 'hiddenStats.has("stream_timer")' in header_stats_script
+    assert 'window.dashboardLiveTest = {' in header_stats_script
+    assert 'applyStreamStatus(true, new Date(Date.now() - elapsedMinutes * 60000).toISOString());' in header_stats_script
+    assert 'viewerValue.textContent = (Math.floor(Math.random() * 500) + 1).toLocaleString();' in header_stats_script
+    assert 'viewerValue.textContent = actualViewerCount;' in header_stats_script
+    assert 'if (value && !(previewActive && stat.key === "viewers")) value.textContent = displayValue;' in header_stats_script
+    assert 'if (!previewActive) applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
+    assert 'applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
+    assert ".dashboard-stream-stat.state-live .status-indicator { animation: dashboard-live-pulse" in dashboard_styles
     assert ".sidebar:not(:hover) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
 
 

@@ -12,21 +12,24 @@
         {% block title %}RatsBoomBot Admin{% endblock %}
     </title>
 
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+
     <link
         rel="stylesheet"
         href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}"
     >
 </head>
 
-<body>
-    <div class="app-shell">
+<body class="dashboard-page admin-page admin-page-{{ active_page }}{% if channel_section == 'overview' %} admin-channel-overview{% endif %}">
+    <div class="app-shell" data-dashboard-shell data-sidebar-storage-key="ratsboombot-admin-sidebar-collapsed">
         <aside class="sidebar">
+            <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-expanded="true" aria-label="Collapse navigation" title="Collapse navigation"><span aria-hidden="true">‹</span></button>
             <div class="brand">
-                <div class="brand-mark">R</div>
+                <img class="brand-mark" src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
 
-                <div>
+                <div class="brand-copy">
                     <h1>RatsBoomBot</h1>
-                    <p>Local Admin Control</p>
+                    <p>Admin Control</p>
                 </div>
             </div>
 
@@ -35,14 +38,14 @@
                     class="nav-link {% if active_page == 'dashboard' %}active{% endif %}"
                     href="/admin"
                 >
-                    Dashboard
+                    <span class="nav-link-icon" aria-hidden="true">⌂</span><span class="nav-link-label">Dashboard</span>
                 </a>
 
                 <a
                     class="nav-link {% if active_page == 'channels' %}active{% endif %}"
                     href="/admin/channels"
                 >
-                    Channels
+                    <span class="nav-link-icon" aria-hidden="true">◉</span><span class="nav-link-label">Channels</span>
                 </a>
 
                 {% if administrator and administrator.role == "owner" %}
@@ -50,7 +53,7 @@
                         class="nav-link {% if active_page == 'users' %}active{% endif %}"
                         href="/admin/users"
                     >
-                        Users
+                        <span class="nav-link-icon" aria-hidden="true">♙</span><span class="nav-link-label">Users</span>
                     </a>
                 {% endif %}
 
@@ -58,29 +61,29 @@
                     class="nav-link {% if active_page == 'performance' %}active{% endif %}"
                     href="/admin/performance"
                 >
-                    Performance
+                    <span class="nav-link-icon" aria-hidden="true">⌁</span><span class="nav-link-label">Performance</span>
                 </a>
 
                 <a
                     class="nav-link {% if active_page == 'runtime_logs' %}active{% endif %}"
                     href="/admin/runtime-logs"
                 >
-                    Runtime Logs
+                    <span class="nav-link-icon" aria-hidden="true">≡</span><span class="nav-link-label">Runtime Logs</span>
                 </a>
 
                 <a
                     class="nav-link {% if active_page == 'logs' %}active{% endif %}"
                     href="/admin/logs"
                 >
-                    Stream Logs
+                    <span class="nav-link-icon" aria-hidden="true">▤</span><span class="nav-link-label">Stream Logs</span>
                 </a>
-                <a class="nav-link {% if active_page == 'patch_notes' %}active{% endif %}" href="/admin/patch-notes">Patch Notes</a>
+                <a class="nav-link {% if active_page == 'patch_notes' %}active{% endif %}" href="/admin/patch-notes"><span class="nav-link-icon" aria-hidden="true">✎</span><span class="nav-link-label">Patch Notes</span></a>
 
                 <a
                     class="nav-link {% if active_page == 'account' %}active{% endif %}"
                     href="/admin/account/password"
                 >
-                    Account
+                    <span class="nav-link-icon" aria-hidden="true">⚙</span><span class="nav-link-label">Account</span>
                 </a>
             </nav>
 
@@ -92,17 +95,18 @@
                 >
 
                 <button class="button secondary" type="submit">
-                    Log Out
+                    <span class="nav-link-icon" aria-hidden="true">↪</span><span class="sidebar-button-label">Log Out</span>
                 </button>
             </form>
 
             <p class="deployment-stamp">{{ deployment_stamp() }}</p>
         </aside>
 
-        <main class="main-content">
+        <main class="main-content admin-main-content">
             {% block content %}{% endblock %}
         </main>
     </div>
+    <script src="{{ url_for('static', path='/js/channel-sidebar.js') }}?v={{ deployment_stamp() }}" defer></script>
     {% block page_scripts %}{% endblock %}
 </body>
 </html>

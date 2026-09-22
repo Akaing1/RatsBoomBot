@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import re
+import time
 from datetime import UTC, datetime, timedelta
+from difflib import SequenceMatcher
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Form, Request
@@ -12,17 +14,28 @@ from twitchio.http import Route
 from bot.command_registry import build_command_help_groups
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
 from bot.services.channels.profile_settings import LOYALTY_GROUP
+from bot.services.channels.stream_metadata import (
+    StreamCategoryNotFoundError, clear_stream_category, update_stream_game, update_stream_title
+)
 from config.settings import settings
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.shared.common import templates
 from web.shared.live_chat import stream_chat_events
+from web.shared.protected_users import (
+    ProtectedUserError,
+    add_protected_user,
+    get_protected_user_rows,
+    lookup_protected_user,
+    remove_protected_user
+)
 from web.state import get_bot
 
 router = APIRouter()
 LOGGER = logging.getLogger("RatBoomBot")
 CHAT_SEND_TARGETS = {"twitch", "youtube", "both"}
 CHAT_MESSAGE_MAX_LENGTH = 200
+TOP_GAMES_CACHE_SECONDS = 300
 
 
 def protected_users_redirect(result: str, message: str) -> RedirectResponse:
@@ -30,37 +43,6 @@ def protected_users_redirect(result: str, message: str) -> RedirectResponse:
         url=f"/channel/customization?protected_result={result}&protected_message={quote_plus(message)}&command_tab=protected#protected-users",
         status_code=303
     )
-
-
-async def get_protected_user_rows(runtime_bot, broadcaster_id: str) -> list[dict[str, object]]:
-    services = runtime_bot.services
-    profile_settings = services.profile_settings
-    default_ids = set(profile_settings.get_default_protected_user_ids(broadcaster_id))
-    added_users = {user.user_id: user for user in profile_settings.get_added_protected_users(broadcaster_id)}
-    resolved_defaults = {}
-
-    if default_ids:
-        try:
-            resolved_defaults = {str(user.id): user for user in await runtime_bot.fetch_users(ids=sorted(default_ids))}
-        except Exception:
-            LOGGER.exception("[Profiles] Failed to resolve default protected users for broadcaster %s.", broadcaster_id)
-
-    rows = []
-
-    for user_id in sorted(default_ids | set(added_users)):
-        added = added_users.get(user_id)
-        resolved = resolved_defaults.get(user_id)
-        login = added.login if added is not None else str(getattr(resolved, "name", "") or "")
-        display_name = added.display_name if added is not None else str(getattr(resolved, "display_name", "") or login or "Unknown user")
-        rows.append({
-            "user_id": user_id,
-            "login": login,
-            "display_name": display_name,
-            "is_default": user_id in default_ids,
-            "removable": user_id not in default_ids
-        })
-
-    return sorted(rows, key=lambda user: (str(user["display_name"]).casefold(), str(user["user_id"])))
 
 
 async def execute_twitch_slash_command(runtime_bot, broadcaster_id: str, message: str) -> str | None:
@@ -219,6 +201,52 @@ async def get_twitch_channel_metadata(runtime_bot, broadcaster_id: str) -> dict[
         return {"title": "Unavailable", "game": "Unavailable"}
 
 
+def category_match_type(name: str, query: str) -> int:
+    if name == query:
+        return 0
+    words = re.findall(r"[\w]+", name)
+    if len(words) > 1 and "".join(word[0] for word in words) == query:
+        return 1
+    if name.startswith(query):
+        return 2
+    if re.search(rf"(?<!\w){re.escape(query)}", name):
+        return 3
+    if query in name:
+        return 4
+    return 5
+
+
+def sort_twitch_games_by_match(
+    games: list[dict[str, str]], query: str, popular_games: list[dict[str, str]] | None = None
+) -> list[dict[str, str]]:
+    normalized_query = " ".join(query.casefold().split())
+    if not normalized_query:
+        return games
+    popular_positions = {game["id"]: index for index, game in enumerate(popular_games or ())}
+
+    def rank(game: dict[str, str]) -> tuple[float, float, int, str]:
+        name = " ".join(game["name"].casefold().split())
+        match_type = category_match_type(name, normalized_query)
+        similarity = SequenceMatcher(None, normalized_query, name).ratio()
+        match_score = (100, 95, 80, 70, 55, 0)[match_type]
+        position = popular_positions.get(game["id"])
+        popularity_bonus = max(0, 40 - position * 0.2) if position is not None else 0
+        return -(match_score + popularity_bonus), -similarity, len(name), name
+
+    return sorted(games, key=rank)
+
+
+async def get_top_games_for_search(runtime_bot, broadcaster_id: str) -> list[dict[str, str]]:
+    cached = getattr(runtime_bot, "_dashboard_top_games_cache", None)
+    now = time.monotonic()
+    if cached is not None and cached[0] > now:
+        return cached[1]
+    iterator = runtime_bot.fetch_top_games(token_for=str(broadcaster_id), first=100, max_results=100)
+    games = [{"id": str(game.id), "name": str(game.name)} async for game in iterator]
+    runtime_bot._dashboard_top_games_cache = (now + TOP_GAMES_CACHE_SECONDS, games)
+    return games
+
+
 def format_dashboard_username(services, broadcaster_id: str, username: str) -> str:
     formatter = getattr(getattr(services, "chatters", None), "format_name", None)
     return formatter(str(broadcaster_id), str(username)) if callable(formatter) else str(username)
@@ -275,25 +303,26 @@ async def get_raid_contributor_data(services, broadcaster_id: str) -> dict[str, 
 
 async def get_ad_status(broadcaster, twitch_user=None) -> dict[str, object]:
     if not broadcaster.is_live:
-        return {"state": "offline", "label": "Stream offline", "next_ad_at": None, "ends_at": None}
+        return {"state": "offline", "label": "Stream offline", "next_ad_at": None, "ends_at": None, "snoozes_available": None}
 
     try:
         schedule = await (twitch_user or broadcaster).fetch_ad_schedule()
     except Exception:
         LOGGER.exception("[Dashboard] Failed to fetch ad schedule for broadcaster %s.", broadcaster.id)
-        return {"state": "unavailable", "label": "Ad schedule unavailable", "next_ad_at": None, "ends_at": None}
+        return {"state": "unavailable", "label": "Ad schedule unavailable", "next_ad_at": None, "ends_at": None, "snoozes_available": None}
 
     now = datetime.now(UTC)
+    snoozes_available = getattr(schedule, "snooze_count", None)
     last_ad_at = schedule.last_ad_at
     ends_at = last_ad_at + timedelta(seconds=schedule.duration) if last_ad_at is not None else None
 
     if ends_at is not None and last_ad_at <= now < ends_at:
-        return {"state": "running", "label": "Ad running", "next_ad_at": None, "ends_at": ends_at.isoformat()}
+        return {"state": "running", "label": "Ad running", "next_ad_at": None, "started_at": last_ad_at.isoformat(), "ends_at": ends_at.isoformat(), "snoozes_available": snoozes_available}
 
     if schedule.next_ad_at is not None:
-        return {"state": "scheduled", "label": "Next ad", "next_ad_at": schedule.next_ad_at.isoformat(), "ends_at": None}
+        return {"state": "scheduled", "label": "Next ad", "next_ad_at": schedule.next_ad_at.isoformat(), "ends_at": None, "snoozes_available": snoozes_available}
 
-    return {"state": "none", "label": "No ad scheduled", "next_ad_at": None, "ends_at": None}
+    return {"state": "none", "label": "No ad scheduled", "next_ad_at": None, "ends_at": None, "snoozes_available": snoozes_available}
 
 
 @router.get("/channel/api/raid-contributors", response_class=JSONResponse)
@@ -403,7 +432,8 @@ async def channel_viewer_queue_action(
     action: str = Form(...),
     csrf_token: str = Form(...),
     position: int = Form(0),
-    new_position: int = Form(0)
+    new_position: int = Form(0),
+    count: int = Form(4)
 ):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
     if not broadcaster_id:
@@ -418,8 +448,11 @@ async def channel_viewer_queue_action(
 
     if action == "toggle":
         message = await (queue.close_queue(broadcaster_id) if queue.is_queue_open(broadcaster_id) else queue.open_queue(broadcaster_id))
-    elif action in {"next4", "next5"}:
-        _, selected, message = await queue.next_viewers(broadcaster_id, 4 if action == "next4" else 5)
+    elif action in {"next", "next4", "next5"}:
+        next_count = count if action == "next" else (4 if action == "next4" else 5)
+        if not 1 <= next_count <= 10:
+            return JSONResponse({"detail": "Choose between 1 and 10 viewers."}, status_code=400)
+        _, selected, message = await queue.next_viewers(broadcaster_id, next_count)
     elif action == "clear":
         message = await queue.clear(broadcaster_id)
     elif action == "remove":
@@ -471,32 +504,42 @@ async def update_twitch_channel_metadata(
     if runtime_bot is None or runtime_bot.services is None:
         return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
     value = value.strip()
-    twitch_user = runtime_bot.create_partialuser(str(broadcaster_id))
 
     try:
         if field == "title":
             if not value or len(value) > 140:
                 return JSONResponse({"detail": "Titles must contain 1 to 140 characters."}, status_code=400)
-            await twitch_user.modify_channel(title=value)
+            update = await update_stream_title(runtime_bot, broadcaster_id, value)
         elif field == "game":
             if len(value) > 100:
                 return JSONResponse({"detail": "Category names are limited to 100 characters."}, status_code=400)
             if value:
-                game = await runtime_bot.fetch_game(name=value, token_for=str(broadcaster_id))
-                if game is None:
-                    return JSONResponse({"detail": "Twitch could not find that game or category."}, status_code=400)
-                await twitch_user.modify_channel(game_id=str(game.id))
-                value = str(game.name)
+                update = await update_stream_game(runtime_bot, broadcaster_id, value, token_for=broadcaster_id)
             else:
-                await twitch_user.modify_channel(game_id="0")
-                value = "No category"
+                update = await clear_stream_category(runtime_bot, broadcaster_id)
         else:
             return JSONResponse({"detail": "Only the title and game can be edited."}, status_code=400)
+    except StreamCategoryNotFoundError:
+        return JSONResponse({"detail": "Twitch could not find that game or category.", "code": "category_not_found"}, status_code=400)
     except Exception:
         LOGGER.exception("[Dashboard] Failed to update Twitch %s for broadcaster %s.", field, broadcaster_id)
         return JSONResponse({"detail": f"The Twitch {field} could not be updated."}, status_code=502)
 
-    return JSONResponse({"field": field, "value": value})
+    announcement_sent = False
+    try:
+        twitch_user = runtime_bot.create_partialuser(str(broadcaster_id))
+        sent_message = await runtime_bot.services.chat_identity.send_message(twitch_user, update.announcement)
+        announcement_sent = bool(getattr(sent_message, "sent", getattr(sent_message, "is_sent", False)))
+        sent_message_id = getattr(sent_message, "id", None)
+        if announcement_sent and sent_message_id:
+            runtime_bot.services.live_chat.tag_command_response(str(broadcaster_id), str(sent_message_id))
+    except Exception:
+        LOGGER.exception(
+            "[Dashboard] Twitch %s updated, but its chat announcement could not be sent for broadcaster %s.",
+            field, broadcaster_id
+        )
+
+    return JSONResponse({"field": field, "value": update.value, "announcement_sent": announcement_sent})
 
 
 @router.get("/channel/api/chat/pinned", response_class=JSONResponse)
@@ -705,12 +748,27 @@ async def search_twitch_games(request: Request, query: str = ""):
 
     try:
         normalized_query = query.strip()
-        iterator = (
-            runtime_bot.search_categories(normalized_query, token_for=str(broadcaster_id), first=50, max_results=50)
-            if normalized_query
-            else runtime_bot.fetch_top_games(token_for=str(broadcaster_id), first=50, max_results=50)
+        if not normalized_query:
+            return JSONResponse({"games": (await get_top_games_for_search(runtime_bot, broadcaster_id))[:50]})
+
+        iterator = runtime_bot.search_categories(
+            normalized_query, token_for=str(broadcaster_id), first=50, max_results=50
         )
         games = [{"id": str(game.id), "name": str(game.name)} async for game in iterator]
+        popular_games = []
+        if callable(getattr(runtime_bot, "fetch_top_games", None)):
+            try:
+                popular_games = await get_top_games_for_search(runtime_bot, broadcaster_id)
+            except Exception:
+                LOGGER.warning("[Dashboard] Could not rank categories by current popularity.", exc_info=True)
+
+        existing_ids = {game["id"] for game in games}
+        normalized_name = " ".join(normalized_query.casefold().split())
+        for game in popular_games:
+            if game["id"] not in existing_ids and category_match_type(game["name"].casefold(), normalized_name) < 5:
+                games.append(game)
+                existing_ids.add(game["id"])
+        games = sort_twitch_games_by_match(games, normalized_query, popular_games)[:50]
         return JSONResponse({"games": games})
     except Exception:
         LOGGER.exception("[Dashboard] Failed to search Twitch games for broadcaster %s.", broadcaster_id)
@@ -800,6 +858,70 @@ async def channel_ad_status(request: Request):
 
     twitch_user = runtime_bot.create_partialuser(str(broadcaster_id))
     return JSONResponse(await get_ad_status(broadcaster, twitch_user))
+
+
+@router.post("/channel/api/ads/action", response_class=JSONResponse)
+async def channel_ad_action(request: Request, action: str = Form(...), csrf_token: str = Form(...)):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    validate_csrf_token(request, csrf_token)
+    if action not in {"run-90", "run-180", "snooze"}:
+        return JSONResponse({"detail": "Unknown ad action."}, status_code=400)
+
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster = runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+    if broadcaster is None:
+        logout_channel_user(request)
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    twitch_user = runtime_bot.create_partialuser(str(broadcaster_id))
+    try:
+        if action == "snooze":
+            result = await twitch_user.snooze_next_ad()
+            return JSONResponse({
+                "message": "Next ad snoozed by 5 minutes.",
+                "status": {
+                    "state": "scheduled" if result.next_ad_at else "none",
+                    "label": "Next ad" if result.next_ad_at else "No ad scheduled",
+                    "next_ad_at": result.next_ad_at.isoformat() if result.next_ad_at else None, "ends_at": None,
+                    "snoozes_available": result.snooze_count
+                }
+            })
+
+        duration = 90 if action == "run-90" else 180
+        result = await twitch_user.start_commercial(length=duration)
+        if result.message:
+            return JSONResponse({"detail": result.message}, status_code=409)
+        actual_duration = result.length or duration
+        started_at = datetime.now(UTC)
+        return JSONResponse({
+            "message": f"{actual_duration}-second ad started.",
+            "status": {
+                "state": "running", "label": "Ad running", "next_ad_at": None,
+                "started_at": started_at.isoformat(),
+                "ends_at": (started_at + timedelta(seconds=actual_duration)).isoformat(),
+                "snoozes_available": None
+            }
+        })
+    except HTTPException as error:
+        LOGGER.warning("[Dashboard] Twitch rejected ad action %s for %s with status %s: %s", action, broadcaster_id, error.status, error)
+        if error.status == 401:
+            detail = "Reconnect Twitch to grant the permission required to manage ads."
+        elif error.status == 403:
+            detail = "Twitch says this account cannot manage ads for this channel."
+        elif error.status == 429:
+            detail = "No ad snoozes are available, or the ad cooldown has not ended."
+        elif error.status == 400:
+            detail = "This ad action is unavailable while offline or at this point in the ad schedule."
+        else:
+            detail = "Twitch rejected the ad action."
+        return JSONResponse({"detail": detail}, status_code=error.status if 400 <= error.status < 600 else 502)
+    except Exception:
+        LOGGER.exception("[Dashboard] Failed ad action %s for %s.", action, broadcaster_id)
+        return JSONResponse({"detail": "Could not manage ads right now."}, status_code=502)
 
 
 @router.post("/channel/api/chat/send", response_class=JSONResponse)
@@ -1227,39 +1349,17 @@ async def search_channel_protected_user(request: Request, query: str = ""):
     if not broadcaster_id:
         return JSONResponse({"detail": "Connect your Twitch channel first."}, status_code=401)
 
-    normalized_login = query.strip().lstrip("@").casefold()
-
-    if not re.fullmatch(r"[a-z0-9_]{3,25}", normalized_login):
-        return JSONResponse({"detail": "Enter a valid Twitch username."}, status_code=400)
-
     runtime_bot = get_bot()
 
     if runtime_bot is None or runtime_bot.services is None:
         return JSONResponse({"detail": "The bot runtime is unavailable."}, status_code=503)
 
     try:
-        user = await runtime_bot.fetch_user(login=normalized_login)
-    except Exception:
-        LOGGER.exception("[Profiles] Twitch user lookup failed for %s.", normalized_login)
-        return JSONResponse({"detail": "Twitch could not verify that user. Please try again."}, status_code=502)
+        user = await lookup_protected_user(runtime_bot, str(broadcaster_id), query)
+    except ProtectedUserError as error:
+        return JSONResponse({"detail": str(error)}, status_code=error.status_code)
 
-    if user is None:
-        return JSONResponse({"detail": f"Twitch user @{normalized_login} was not found."}, status_code=404)
-
-    user_id = str(user.id)
-    profile = get_active_profile(str(broadcaster_id))
-    automatically_protected = user_id in {str(broadcaster_id), str(runtime_bot.bot_id)}
-    already_protected = automatically_protected or (profile is not None and profile.is_user_protected(user_id))
-
-    return JSONResponse({
-        "user": {
-            "id": user_id,
-            "login": str(user.name),
-            "display_name": str(getattr(user, "display_name", None) or user.name),
-            "already_protected": already_protected,
-            "automatic": automatically_protected
-        }
-    })
+    return JSONResponse({"user": user})
 
 
 @router.post("/channel/protected-users/add")
@@ -1275,42 +1375,12 @@ async def add_channel_protected_user(request: Request, user_id: str = Form(...),
     if runtime_bot is None or runtime_bot.services is None:
         return protected_users_redirect("error", "The bot runtime is unavailable.")
 
-    if not user_id.isdigit():
-        return protected_users_redirect("error", "Twitch returned an invalid user ID.")
-
     try:
-        users = await runtime_bot.fetch_users(ids=[user_id])
-    except Exception:
-        LOGGER.exception("[Profiles] Twitch user validation failed for %s.", user_id)
-        return protected_users_redirect("error", "Twitch could not verify that user. Please try again.")
+        message = await add_protected_user(runtime_bot, str(broadcaster_id), user_id)
+    except ProtectedUserError as error:
+        return protected_users_redirect("error", str(error))
 
-    user = users[0] if users else None
-
-    if user is None:
-        return protected_users_redirect("error", "That Twitch user no longer exists.")
-
-    resolved_user_id = str(user.id)
-
-    if resolved_user_id in {str(broadcaster_id), str(runtime_bot.bot_id)}:
-        return protected_users_redirect("error", "The broadcaster and bot account are already protected automatically.")
-
-    profile = get_active_profile(str(broadcaster_id))
-
-    if profile is not None and profile.is_user_protected(resolved_user_id):
-        return protected_users_redirect("success", f"{getattr(user, 'display_name', None) or user.name} is already protected.")
-
-    try:
-        await runtime_bot.services.profile_settings.add_protected_user(
-            str(broadcaster_id),
-            resolved_user_id,
-            str(user.name),
-            str(getattr(user, "display_name", None) or user.name)
-        )
-    except Exception:
-        LOGGER.exception("[Profiles] Failed to add protected user %s for broadcaster %s.", resolved_user_id, broadcaster_id)
-        return protected_users_redirect("error", "The protected user could not be saved. Please try again.")
-
-    return protected_users_redirect("success", f"{getattr(user, 'display_name', None) or user.name} was added to protected users.")
+    return protected_users_redirect("success", message)
 
 
 @router.post("/channel/protected-users/remove")
@@ -1327,17 +1397,11 @@ async def remove_channel_protected_user(request: Request, user_id: str = Form(..
         return protected_users_redirect("error", "The bot runtime is unavailable.")
 
     try:
-        removed = await runtime_bot.services.profile_settings.remove_protected_user(str(broadcaster_id), user_id)
-    except ValueError as error:
+        message = await remove_protected_user(runtime_bot, str(broadcaster_id), user_id)
+    except ProtectedUserError as error:
         return protected_users_redirect("error", str(error))
-    except Exception:
-        LOGGER.exception("[Profiles] Failed to remove protected user %s for broadcaster %s.", user_id, broadcaster_id)
-        return protected_users_redirect("error", "The protected user could not be removed. Please try again.")
 
-    if not removed:
-        return protected_users_redirect("error", "That user is not in the protected-user list.")
-
-    return protected_users_redirect("success", "The user was removed from protected users.")
+    return protected_users_redirect("success", message)
 
 
 @router.post("/channel/features/toggles")

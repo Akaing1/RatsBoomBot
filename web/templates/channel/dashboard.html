@@ -6,7 +6,7 @@
 
 {% block content %}
 <div class="channel-dashboard-layout">
-<header class="page-header">
+<header class="page-header dashboard-channel-profile" hidden>
     <div class="channel-heading dashboard-channel-heading">
         <p class="eyebrow">Rat's Boom Bot</p>
         {% if broadcaster.login %}
@@ -47,6 +47,50 @@
         {% if broadcaster.login %}</a>{% else %}</div>{% endif %}
     </div>
 
+</header>
+
+<section
+    class="panel dashboard-video-card"
+    data-channel-metadata
+    data-update-url="/channel/api/channel-metadata"
+    data-games-url="/channel/api/games"
+    data-csrf-token="{{ csrf_token }}"
+    aria-label="Twitch stream preview and metadata"
+>
+    <div class="panel-header dashboard-video-header">
+        <div class="twitch-channel-field">
+            <h3>Title</h3>
+            <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" aria-label="Stream title (140 characters maximum)" data-channel-field="title">{{ twitch_channel_metadata.title }}</strong>
+        </div>
+        <div class="twitch-channel-field twitch-game-field">
+            <h3>Category</h3>
+            <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" data-channel-field="game">{{ twitch_channel_metadata.game }}</strong>
+            <div class="twitch-game-suggestions" data-game-suggestions role="listbox" hidden></div>
+        </div>
+    </div>
+    <div class="dashboard-video-frame">
+        {% if broadcaster.login %}
+            <iframe
+                class="dashboard-video-player"
+                data-stream-player
+                data-channel="{{ broadcaster.login }}"
+                title="{{ broadcaster.name or broadcaster.login }} live stream preview"
+                width="640"
+                height="360"
+                loading="lazy"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowfullscreen
+                referrerpolicy="strict-origin-when-cross-origin"
+            ></iframe>
+        {% else %}
+            <p class="dashboard-video-unavailable">A Twitch channel login is needed to show the stream preview.</p>
+        {% endif %}
+    </div>
+    <p class="channel-metadata-status" data-channel-metadata-status aria-live="polite">Click the title or game to edit.</p>
+</section>
+
+<div class="channel-live-layout">
+    <div class="dashboard-chat-column">
     <div class="dashboard-header-side">
         <div
             class="dashboard-header-stats"
@@ -55,29 +99,19 @@
             data-refresh-url="/channel/api/dashboard-stats"
             aria-label="Channel statistics; activate a statistic to show or hide its number"
         >
-            <div
+            <button
                 class="dashboard-header-stat dashboard-stream-stat {% if broadcaster.is_live %}state-live{% else %}state-offline{% endif %}"
+                type="button"
                 data-stream-status
                 data-started-at="{{ broadcaster.stream_started_at.isoformat() if broadcaster.stream_started_at else '' }}"
+                aria-pressed="true"
+                aria-label="Hide online timer"
             >
                 <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
-                <span>Stream</span>
-                <strong data-stream-status-text>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
-            </div>
+                <strong data-stream-status-text>{% if broadcaster.is_live %}Online{% else %}Offline{% endif %}</strong>
+            </button>
             {% for stat in dashboard_header_stats | default([]) %}
-                {% if stat.key == "points_lost" %}
-                    <div
-                        class="dashboard-header-stat dashboard-ad-stat state-{{ ad_status.state }}"
-                        data-ad-status
-                        data-state="{{ ad_status.state }}"
-                        data-next-ad-at="{{ ad_status.next_ad_at or '' }}"
-                        data-ends-at="{{ ad_status.ends_at or '' }}"
-                    >
-                        <span>Ads</span>
-                        <strong data-ad-status-text>{{ ad_status.label }}</strong>
-                    </div>
-                    <span class="dashboard-header-stat-break" aria-hidden="true"></span>
-                {% endif %}
+                {% if stat.key != "points_lost" %}
                 <button
                     class="dashboard-header-stat"
                     type="button"
@@ -88,36 +122,10 @@
                     <span>{{ stat.label }}</span>
                     <strong data-dashboard-stat-value>{{ stat.display_value }}</strong>
                 </button>
+                {% endif %}
             {% endfor %}
         </div>
     </div>
-</header>
-
-<section class="status-grid channel-status-grid">
-    <article
-        class="status-card twitch-channel-card"
-        data-channel-metadata
-        data-update-url="/channel/api/channel-metadata"
-        data-games-url="/channel/api/games"
-        data-csrf-token="{{ csrf_token }}"
-    >
-        <div class="panel-header twitch-channel-header">
-            <h3>Twitch stream</h3>
-        </div>
-        <div class="twitch-channel-field">
-            <span>Title</span>
-            <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" data-channel-field="title">{{ twitch_channel_metadata.title }}</strong>
-        </div>
-        <div class="twitch-channel-field twitch-game-field">
-            <span>Category</span>
-            <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" data-channel-field="game">{{ twitch_channel_metadata.game }}</strong>
-            <div class="twitch-game-suggestions" data-game-suggestions role="listbox" hidden></div>
-        </div>
-        <p class="channel-metadata-status" data-channel-metadata-status aria-live="polite">Click the title or game to edit.</p>
-    </article>
-</section>
-
-<div class="channel-live-layout">
     <section class="panel live-chat-panel">
         <div class="panel-header">
             <div>
@@ -184,20 +192,46 @@
             </div>
         </form>
     </section>
+    </div>
 
-    <section class="panel activity-panel dashboard-activity-panel">
+    <div class="dashboard-activity-grid">
+    <section class="panel activity-panel dashboard-activity-panel dashboard-moderation-panel" data-activity-group>
+        <div class="panel-header"><h3>Moderation</h3></div>
+        <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Moderation activity">
+            <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-activity-tab="mod-actions">Mod actions</button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="automod">AutoMod</button>
+        </div>
+        <div data-activity-panel="mod-actions">
+            <div id="mod-action-activity-content" class="activity-scroll">
+                <div class="compact-empty-state"><h4>No moderation actions yet</h4><p>Moderator actions will appear here.</p></div>
+            </div>
+        </div>
+        <div data-activity-panel="automod" hidden>
+            <div id="automod-activity-content" class="activity-scroll">
+                <div class="compact-empty-state"><h4>AutoMod queue is clear</h4><p>Held messages will appear here for review.</p></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel activity-panel dashboard-activity-panel dashboard-community-panel {% if raid_enabled %}has-raid{% endif %}" data-activity-group>
         <div class="panel-header">
             <div>
                 <h3>Activity</h3>
             </div>
+            {% for stat in dashboard_header_stats | default([]) %}
+                {% if stat.key == "points_lost" %}
+                    <div class="dashboard-points-stat" data-dashboard-points-lost>
+                        <span>{{ stat.label }}</span>
+                        <strong data-dashboard-stat-value>{{ stat.display_value }}</strong>
+                    </div>
+                {% endif %}
+            {% endfor %}
         </div>
 
         <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Activity feed">
             <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-activity-tab="redeems">Redeems</button>
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="checkins">Check-ins</button>
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="commands">Commands</button>
-            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="mod-actions">Mod actions</button>
-            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="automod">AutoMod</button>
             {% if raid_enabled %}
                 <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="raid">Raid</button>
             {% endif %}
@@ -230,9 +264,6 @@
         </div>
 
         <div data-activity-panel="checkins" hidden>
-            <div class="panel-header">
-                <h4 class="activity-subheading">Check-ins</h4>
-            </div>
             <div id="checkin-activity-content" class="activity-scroll">
                 {% if redemption_activity.checkins %}
                     <ul class="activity-list">
@@ -265,18 +296,11 @@
                 data-stream-url="/channel/api/chat/stream?view=commands"
                 data-activity-notify="commands"
                 data-max-messages="100"
-            ></div>
-        </div>
-
-        <div data-activity-panel="mod-actions" hidden>
-            <div id="mod-action-activity-content" class="activity-scroll">
-                <div class="compact-empty-state"><h4>No moderation actions yet</h4><p>Moderator actions will appear here.</p></div>
-            </div>
-        </div>
-
-        <div data-activity-panel="automod" hidden>
-            <div id="automod-activity-content" class="activity-scroll">
-                <div class="compact-empty-state"><h4>AutoMod queue is clear</h4><p>Held messages will appear here for review.</p></div>
+            >
+                <div class="compact-empty-state">
+                    <h4>No commands yet</h4>
+                    <p>Chat commands will appear here.</p>
+                </div>
             </div>
         </div>
 
@@ -286,20 +310,39 @@
             </div>
         {% endif %}
     </section>
+    </div>
 
     <div class="channel-dashboard-side viewer-queue-column">
+        <section class="panel dashboard-ads-panel" data-ad-panel data-action-url="/channel/api/ads/action" data-csrf-token="{{ csrf_token }}">
+            <div class="panel-header">
+                <h3>Ads</h3>
+                <div class="dashboard-ad-stat state-{{ ad_status.state }}" data-ad-status data-state="{{ ad_status.state }}" data-next-ad-at="{{ ad_status.next_ad_at or '' }}" data-started-at="{{ ad_status.started_at or '' }}" data-ends-at="{{ ad_status.ends_at or '' }}" data-snoozes-available="{{ ad_status.snoozes_available if ad_status.snoozes_available is not none else '' }}">
+                    <svg class="dashboard-ad-progress" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle class="dashboard-ad-progress-track" cx="12" cy="12" r="9"></circle>
+                        <circle class="dashboard-ad-progress-ring" cx="12" cy="12" r="9" data-ad-progress-ring></circle>
+                        <path class="dashboard-ad-progress-check" d="M6.5 12.5 10.5 16.5 18 8.5"></path>
+                    </svg>
+                    <strong data-ad-status-text>{{ ad_status.label }}</strong>
+                </div>
+            </div>
+            <div class="dashboard-ad-actions" aria-label="Ad controls">
+                <button type="button" data-ad-action="run-90" title="Start a 90-second ad now">+1.5 min</button>
+                <button type="button" data-ad-action="run-180" title="Start a 3-minute ad now">+3 min</button>
+                <button type="button" data-ad-action="snooze" title="Delay the next scheduled ad by 5 minutes">Snooze ads</button>
+            </div>
+            <p class="dashboard-ad-action-status" data-ad-action-status role="status" aria-live="polite"></p>
+        </section>
         <section
             class="panel"
             data-viewer-queue-panel
             data-state-url="/channel/api/viewer-queue"
             data-action-url="/channel/api/viewer-queue/action"
             data-csrf-token="{{ csrf_token }}"
+            data-channel-id="{{ broadcaster.id }}"
         >
             <div class="panel-header queue-panel-header">
-                <div class="queue-heading-row">
-                    <h3>Viewer queue</h3>
-                    <small data-queue-count>{{ queue_size }} queued</small>
-                </div>
+                <h3>Viewer queue</h3>
+                <small data-queue-count>{{ queue_size }} queued</small>
 
                 <button id="queue-panel-state" class="queue-state-toggle {% if queue_open %}live{% endif %}" type="button" data-queue-toggle data-open="{{ 'true' if queue_open else 'false' }}">
                     <span class="queue-state-current">{% if queue_open %}Open{% else %}Closed{% endif %}</span>
@@ -308,8 +351,17 @@
             </div>
 
             <div class="queue-toolbar" aria-label="Viewer queue actions">
-                <button type="button" data-queue-action="next4">Next 4</button>
-                <button type="button" data-queue-action="next5">Next 5</button>
+                <div class="queue-next-control">
+                    <button type="button" data-queue-action="next">Next <span data-queue-next-count>4</span></button>
+                    <label class="queue-next-picker" title="Choose how many viewers to take next">
+                        <select data-queue-next-select aria-label="Number of viewers to take next">
+                            {% for next_count in range(1, 11) %}
+                                <option value="{{ next_count }}" {% if next_count == 4 %}selected{% endif %}>{{ next_count }}</option>
+                            {% endfor %}
+                        </select>
+                        <span aria-hidden="true">▾</span>
+                    </label>
+                </div>
                 <button type="button" data-queue-action="clear" class="danger">Clear queue</button>
                 <a href="/channel/viewer-queue/blacklist">Blacklist</a>
             </div>
@@ -377,16 +429,17 @@
 <script>
     (() => {
         const tabs = Array.from(document.querySelectorAll("[data-activity-tab]"));
-        const panels = Array.from(document.querySelectorAll("[data-activity-panel]"));
 
-        function selectActivity(selected) {
-            tabs.forEach(candidate => {
+        function selectActivity(group, selected) {
+            group.querySelectorAll("[data-activity-tab]").forEach(candidate => {
                 const active = candidate.dataset.activityTab === selected;
                 candidate.classList.toggle("active", active);
                 if (active) candidate.classList.remove("has-unseen");
                 candidate.setAttribute("aria-selected", String(active));
             });
-            panels.forEach(panel => { panel.hidden = panel.dataset.activityPanel !== selected; });
+            group.querySelectorAll("[data-activity-panel]").forEach(panel => {
+                panel.hidden = panel.dataset.activityPanel !== selected;
+            });
         }
 
         function markActivityUnread(activity) {
@@ -395,7 +448,7 @@
         }
 
         tabs.forEach(tab => {
-            tab.addEventListener("click", () => selectActivity(tab.dataset.activityTab));
+            tab.addEventListener("click", () => selectActivity(tab.closest("[data-activity-group]"), tab.dataset.activityTab));
         });
         document.addEventListener("dashboard-activity-unread", event => {
             markActivityUnread(event.detail?.activity);
@@ -857,6 +910,7 @@
 
 {% block page_scripts %}
     <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-stream-player.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-channel-metadata.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-viewer-queue.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>

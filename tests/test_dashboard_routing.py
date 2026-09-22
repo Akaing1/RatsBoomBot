@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
 from config.settings import settings
-from config.version import APP_VERSION
 from web.app import app, create_app
+from web.shared.common import templates
 
 
 def test_root_is_the_public_landing_page() -> None:
@@ -12,12 +12,24 @@ def test_root_is_the_public_landing_page() -> None:
     assert response.status_code == 200
     assert "An all-in-one bot tailored to your needs" in response.text
     assert "What’s new in RatsBoomBot." in response.text
-    assert f"v{APP_VERSION}" in response.text
+    assert "v12.2.0" in response.text
+    assert "The streamer dashboard gets sharper" in response.text
+    assert "v12.0.0" in response.text
+    assert "Twitch and YouTube chat come together" in response.text
     assert "Highlights of the last few patches~" in response.text
-    assert "https://github.com/Akaing1/RatsBoomBot/releases" in response.text
+    assert 'href="/patch-notes"' in response.text
+    assert "https://github.com/Akaing1/RatsBoomBot/releases" not in response.text
     assert '<details class="landing-feature-card">' in response.text
     assert "!register &lt;Riot ID&gt; [region]" in response.text
-    assert "please contact the developer" in response.text.lower()
+    assert "!custom lobby balance" in response.text
+    assert "!raid repair &lt;weapon&gt;" in response.text
+    assert "Connect with Twitch" in response.text
+    assert "Make the dashboard yours" in response.text
+    assert "Connect and go live" in response.text
+    assert "Core onboarding is self-service." in response.text
+    assert "Twitch stream" in response.text
+    assert "Combined Chat" in response.text
+    assert "Viewer queue" in response.text
     assert "Help keep RatsBoomBot growing." in response.text
     assert 'href="https://ko-fi.com/ninjakaing"' in response.text
     assert "Support never affects features, points, achievements, or raid odds." in response.text
@@ -34,6 +46,20 @@ def test_admin_dashboard_uses_admin_prefix() -> None:
     assert response.headers["location"] == "/admin/login"
     assert login.status_code == 200
     assert legacy_login.status_code == 404
+
+
+def test_admin_layout_uses_standard_dashboard_navigation() -> None:
+    layout = templates.env.get_template("admin/layout.html").render(
+        active_page="dashboard", administrator=None, csrf_token="test",
+        url_for=lambda *args, **kwargs: kwargs.get("path", "/static/resource"),
+        deployment_stamp=lambda: "test"
+    )
+
+    assert 'class="dashboard-page admin-page admin-page-dashboard"' in layout
+    assert "data-dashboard-shell" in layout
+    assert 'data-sidebar-storage-key="ratsboombot-admin-sidebar-collapsed"' in layout
+    assert "data-sidebar-toggle" in layout
+    assert "channel-sidebar.js" in layout
 
 
 def test_channel_oauth_session_cookie_is_persistent() -> None:

@@ -27,7 +27,9 @@ async def dashboard(request: Request):
         services = runtime_bot.services
 
         if services is not None:
+            await services.broadcasters.refresh_live_statuses()
             broadcasters = list(services.broadcasters.get_broadcasters().values())
+            broadcasters.sort(key=lambda broadcaster: (not broadcaster.is_live, (broadcaster.name or broadcaster.id).casefold()))
 
     return templates.TemplateResponse(
         request=request,

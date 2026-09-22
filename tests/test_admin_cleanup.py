@@ -1,6 +1,7 @@
+import json
 import os
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException
@@ -91,3 +92,93 @@ def test_shared_editor_uses_admin_action_and_timer_script():
     assert 'action="/admin/channels/123/customization"' in html
     assert 'action="/channel/customization"' not in html
     assert 'id="timer-message-template"' in html
+
+
+def test_admin_customization_uses_admin_protected_user_endpoints_and_script():
+    html = templates.env.get_template("admin/channel_customization.html").render(
+        active_page="channels", broadcaster=SimpleNamespace(id="123", name="Test"), administrator=None,
+        url_for=lambda *args, **kwargs: kwargs.get("path", "/static/resource"),
+        deployment_stamp=lambda: "test",
+        customization_action="/admin/channels/123/customization", csrf_token="csrf",
+        setting_groups={"Commands": []}, channel_settings=SimpleNamespace(discord_url="", youtube_url=""),
+        command_tab="protected", protected_users=[],
+        protected_search_url="/admin/channels/123/protected-users/search",
+        protected_add_url="/admin/channels/123/protected-users/add",
+        protected_remove_url="/admin/channels/123/protected-users/remove"
+    )
+
+    assert 'data-search-url="/admin/channels/123/protected-users/search"' in html
+    assert 'action="/admin/channels/123/protected-users/add"' in html
+    assert "protected-users.js" in html
+    assert 'data-command-panel="protected"' in html
+
+
+@pytest.mark.asyncio
+async def test_admin_protected_user_search_uses_selected_channel(monkeypatch):
+    monkeypatch.setattr(channels, "require_admin", AsyncMock(return_value=None))
+    services = SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {"123": object()}))
+    runtime_bot = SimpleNamespace(services=services)
+    resolved = {"id": "456", "login": "viewer", "display_name": "Viewer", "already_protected": False, "automatic": False}
+    lookup = AsyncMock(return_value=resolved)
+    monkeypatch.setattr(channels, "get_bot", lambda: runtime_bot)
+    monkeypatch.setattr(channels, "lookup_protected_user", lookup)
+
+    response = await channels.search_admin_protected_user(make_request(), "123", "@Viewer")
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {"user": resolved}
+    lookup.assert_awaited_once_with(runtime_bot, "123", "@Viewer")
+
+
+@pytest.mark.asyncio
+async def test_admin_chat_stream_requires_admin(monkeypatch):
+    monkeypatch.setattr(channels, "require_admin", AsyncMock(return_value=RedirectResponse("/admin/login")))
+
+    response = await channels.admin_channel_chat_stream(make_request(), "123")
+
+    assert response.status_code == 401
+    assert json.loads(response.body) == {"detail": "Administrator authentication required."}
+
+
+@pytest.mark.asyncio
+async def test_admin_chat_stream_uses_selected_channel_history(monkeypatch):
+    monkeypatch.setattr(channels, "require_admin", AsyncMock(return_value=None))
+    live_chat = object()
+    services = SimpleNamespace(
+        live_chat=live_chat,
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"123": object()})
+    )
+    monkeypatch.setattr(channels, "get_bot", lambda: SimpleNamespace(services=services))
+
+    async def events():
+        yield "event: history-complete\ndata: {}\n\n"
+
+    stream = Mock(return_value=events())
+    monkeypatch.setattr(channels, "stream_chat_events", stream)
+    request = make_request()
+
+    response = await channels.admin_channel_chat_stream(request, "123", "both")
+
+    assert response.status_code == 200
+    assert response.media_type == "text/event-stream"
+    assert response.headers["cache-control"] == "no-cache"
+    assert response.headers["x-accel-buffering"] == "no"
+    stream.assert_called_once_with(request, live_chat, "123", "both")
+
+
+@pytest.mark.asyncio
+async def test_admin_activity_includes_moderation_feeds():
+    moderation = {
+        "mod_actions": [{"action": "timeout", "target": "viewer"}],
+        "automod": [{"id": "held-1", "message": "review me"}]
+    }
+    services = SimpleNamespace(
+        redeems=SimpleNamespace(get_dashboard_activity=AsyncMock(return_value={"checkins": [], "redemptions": []})),
+        live_chat=SimpleNamespace(get_moderation_activity=Mock(return_value=moderation))
+    )
+
+    activity = await channels.get_redemption_dashboard_data(services, "123")
+
+    assert activity["mod_actions"] == moderation["mod_actions"]
+    assert activity["automod"] == moderation["automod"]
+    services.live_chat.get_moderation_activity.assert_called_once_with("123")

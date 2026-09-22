@@ -4,6 +4,14 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_admin_overview_uses_available_width_in_both_sidebar_states() -> None:
+    layout = (PROJECT_ROOT / "web/templates/admin/layout.html").read_text(encoding="utf-8")
+    css = (PROJECT_ROOT / "web/static/css/style.css").read_text(encoding="utf-8")
+    assert "{% if channel_section == 'overview' %} admin-channel-overview" in layout
+    assert ".dashboard-page.admin-channel-overview .app-shell .admin-main-content," in css
+    assert ".dashboard-page.admin-channel-overview .app-shell.sidebar-collapsed .admin-main-content { position: static; left: auto; width: 100%; max-width: none;" in css
+
+
 def test_admin_channel_toggles_preserve_scroll_position() -> None:
     template = (PROJECT_ROOT / "web/templates/admin/channel_details.html").read_text(encoding="utf-8")
 
@@ -39,6 +47,41 @@ def test_admin_feature_page_lists_unique_profile_integrations() -> None:
     assert "Premium feature" in template
     assert "Enable Premium Access" in template
     assert "/admin/channels/{{ broadcaster.id }}/custom-bot/connect" not in template
+
+
+def test_admin_channel_chat_is_read_only() -> None:
+    template = (PROJECT_ROOT / "web/templates/admin/channel_details.html").read_text(encoding="utf-8")
+
+    assert 'data-stream-url="/admin/channels/{{ broadcaster.id }}/api/chat/stream?view=both"' in template
+    assert "live-chat-feed.js" in template
+    assert "data-chat-composer" not in template
+    assert "data-moderation-url" not in template
+    assert "data-pinned-url" not in template
+
+
+def test_admin_activity_matches_channel_dashboard_feeds() -> None:
+    template = (PROJECT_ROOT / "web/templates/admin/channel_details.html").read_text(encoding="utf-8")
+
+    for activity in ("redeems", "checkins", "commands", "mod-actions", "automod"):
+        assert f'data-admin-activity-tab="{activity}"' in template
+        assert f'data-admin-activity-panel="{activity}"' in template
+
+    assert "api/chat/stream?view=commands" in template
+    assert 'class="channel-dashboard-layout admin-channel-dashboard-layout"' in template
+    assert 'class="channel-live-layout"' in template
+    assert 'class="panel raid-monitor-panel admin-overview-raid-panel"' in template
+    assert template.index('class="channel-live-layout"') < template.index("admin-overview-raid-panel")
+
+
+def test_admin_channel_navigation_has_three_sections() -> None:
+    navigation = (PROJECT_ROOT / "web/templates/admin/channel_page_switch.html").read_text(encoding="utf-8")
+
+    assert ">Overview</a>" in navigation
+    assert "/features" in navigation
+    assert ">Features</a>" in navigation
+    assert "/customization" in navigation
+    assert ">Customization</a>" in navigation
+    assert "channel-page-switch" not in navigation
 
 
 def test_streamer_dashboard_has_profile_customization_page() -> None:
