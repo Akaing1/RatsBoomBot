@@ -739,6 +739,92 @@ async def test_dashboard_viewer_queue_actions_send_their_chat_response(monkeypat
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field", "value", "expected_update", "expected_announcement", "expected_value"),
+    [
+        ("title", "New stream title", {"title": "New stream title"}, 'Stream title updated to "New stream title".', "New stream title"),
+        ("game", "Just Chatting", {"game_id": "509658"}, 'Stream game updated to "Just Chatting".', "Just Chatting"),
+        ("game", "", {"game_id": "0"}, "Stream category cleared.", "No category")
+    ]
+)
+async def test_dashboard_metadata_edits_announce_changes_in_chat(
+    monkeypatch, field, value, expected_update, expected_announcement, expected_value
+):
+    twitch_channel = SimpleNamespace(id="channel-1", modify_channel=AsyncMock())
+    sent_message = SimpleNamespace(sent=True, id="metadata-response")
+    chat_identity = SimpleNamespace(send_message=AsyncMock(return_value=sent_message))
+    live_chat = SimpleNamespace(tag_command_response=Mock())
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(chat_identity=chat_identity, live_chat=live_chat),
+        create_partialuser=lambda _: twitch_channel,
+        fetch_game=AsyncMock(return_value=SimpleNamespace(id="509658", name="Just Chatting"))
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/channel-metadata", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.update_twitch_channel_metadata(request, field, value, "csrf")
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {"field": field, "value": expected_value, "announcement_sent": True}
+    twitch_channel.modify_channel.assert_awaited_once_with(**expected_update)
+    chat_identity.send_message.assert_awaited_once_with(twitch_channel, expected_announcement)
+    live_chat.tag_command_response.assert_called_once_with("channel-1", "metadata-response")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_metadata_chat_failure_does_not_undo_successful_twitch_edit(monkeypatch):
+    twitch_channel = SimpleNamespace(id="channel-1", modify_channel=AsyncMock())
+    chat_identity = SimpleNamespace(send_message=AsyncMock(side_effect=RuntimeError("Chat unavailable")))
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(chat_identity=chat_identity),
+        create_partialuser=lambda _: twitch_channel
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/channel-metadata", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.update_twitch_channel_metadata(request, "title", "New title", "csrf")
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {"field": "title", "value": "New title", "announcement_sent": False}
+    twitch_channel.modify_channel.assert_awaited_once_with(title="New title")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_unknown_category_returns_distinct_error_without_saving(monkeypatch):
+    twitch_channel = SimpleNamespace(id="channel-1", modify_channel=AsyncMock())
+    chat_identity = SimpleNamespace(send_message=AsyncMock())
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(chat_identity=chat_identity),
+        create_partialuser=lambda _: twitch_channel,
+        fetch_game=AsyncMock(return_value=None)
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/channel-metadata", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.update_twitch_channel_metadata(request, "game", "Unknown category", "csrf")
+
+    assert response.status_code == 400
+    assert json.loads(response.body) == {
+        "detail": "Twitch could not find that game or category.",
+        "code": "category_not_found"
+    }
+    twitch_channel.modify_channel.assert_not_awaited()
+    chat_identity.send_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_dashboard_emote_catalog_is_scoped_to_authenticated_channel(monkeypatch):
     broadcaster = SimpleNamespace(id="channel-1")
     live_chat = SimpleNamespace(get_emote_catalog=AsyncMock(return_value={"emotes": [], "complete_twitch_catalog": True}))
@@ -931,8 +1017,9 @@ async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
     calls = []
 
     async def games():
-        yield SimpleNamespace(id="509658", name="Just Chatting")
         yield SimpleNamespace(id="123", name="Retro")
+        yield SimpleNamespace(id="509658", name="Just Chatting")
+        yield SimpleNamespace(id="456", name="Chat")
 
     def search_categories(query, **kwargs):
         calls.append((query, kwargs))
@@ -952,10 +1039,87 @@ async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
     response = await dashboard_router.search_twitch_games(request, "chat")
 
     assert json.loads(response.body) == {"games": [
+        {"id": "456", "name": "Chat"},
         {"id": "509658", "name": "Just Chatting"},
         {"id": "123", "name": "Retro"}
     ]}
     assert calls == [("chat", {"token_for": "channel-1", "first": 50, "max_results": 50})]
+
+
+def test_dashboard_game_search_ranks_name_matches_and_preserves_top_games_order():
+    games = [
+        {"id": "1", "name": "Superchat"},
+        {"id": "2", "name": "Just Chatting"},
+        {"id": "3", "name": "Chatters"},
+        {"id": "4", "name": "Chat"},
+        {"id": "5", "name": "Retro"}
+    ]
+
+    ranked = dashboard_router.sort_twitch_games_by_match(games, "CHAT")
+
+    assert [game["name"] for game in ranked] == [
+        "Chat", "Chatters", "Just Chatting", "Superchat", "Retro"
+    ]
+    assert dashboard_router.sort_twitch_games_by_match(games, "") == games
+
+
+@pytest.mark.parametrize(
+    ("query", "literal_name", "popular_name"),
+    [
+        ("lol", "LOL", "League of Legends"),
+        ("league", "League", "League of Legends"),
+        ("wow", "WOW", "World of Warcraft"),
+        ("dbd", "DBD", "Dead by Daylight")
+    ]
+)
+def test_dashboard_game_search_uses_abbreviations_and_popularity(query, literal_name, popular_name):
+    games = [
+        {"id": "1", "name": literal_name},
+        {"id": "2", "name": popular_name}
+    ]
+
+    ranked = dashboard_router.sort_twitch_games_by_match(games, query, [games[1]])
+
+    assert ranked[0]["name"] == popular_name
+    assert ranked[1] == games[0]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_game_search_adds_matching_popular_category_when_search_omits_it(monkeypatch):
+    async def games():
+        yield SimpleNamespace(id="1", name="LOL")
+
+    async def top_games():
+        yield SimpleNamespace(id="21779", name="League of Legends")
+
+    top_calls = []
+
+    def fetch_top_games(**kwargs):
+        top_calls.append(kwargs)
+        return top_games()
+
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(),
+        search_categories=lambda query, **kwargs: games(),
+        fetch_top_games=fetch_top_games
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "GET", "path": "/channel/api/games", "headers": [],
+        "query_string": b"query=lol", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1"}
+    })
+
+    response = await dashboard_router.search_twitch_games(request, "lol")
+
+    assert json.loads(response.body) == {"games": [
+        {"id": "21779", "name": "League of Legends"},
+        {"id": "1", "name": "LOL"}
+    ]}
+    assert top_calls == [{"token_for": "channel-1", "first": 100, "max_results": 100}]
+
+    await dashboard_router.search_twitch_games(request, "lol")
+    assert len(top_calls) == 1
 
 
 @pytest.mark.asyncio
@@ -1054,8 +1218,17 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "Waiting for commands" not in dashboard
     assert 'data-activity-tab="redeems"' in dashboard
     assert 'data-activity-tab="checkins"' in dashboard
+    assert '<h4 class="activity-subheading">Check-ins</h4>' not in dashboard
+    assert '<h4>No commands yet</h4>' in dashboard
+    assert '<p>Chat commands will appear here.</p>' in dashboard
     assert 'data-activity-tab="mod-actions"' in dashboard
     assert 'data-activity-tab="automod"' in dashboard
+    assert '.dashboard-activity-panel, .viewer-queue-column > .panel { container-type: inline-size; }' in dashboard_styles
+    assert '.dashboard-tabs.activity-tabs .dashboard-tab { min-width: 0; min-height: 34px; flex: 1 1 0;' in dashboard_styles
+    assert '.queue-toolbar button, .queue-toolbar a { display: inline-flex; width: 100%;' in dashboard_styles
+    assert '.dashboard-tabs.activity-tabs { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); overflow: visible; }' in dashboard_styles
+    assert '.dashboard-tabs.activity-tabs .dashboard-tab:nth-child(4):nth-last-child(2)' in dashboard_styles
+    assert '.queue-toolbar { grid-template-columns: repeat(2,minmax(0,1fr)); }' in dashboard_styles
     assert dashboard.index('data-activity-tab="raid"') < dashboard.index('include "channel/raid_summary.html"')
     assert 'data-chat-composer' in dashboard
     assert 'data-channel-id="{{ broadcaster.id }}"' in dashboard
@@ -1115,6 +1288,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'row.classList.add("is-deleted")' in live_chat_script
     assert 'row.classList.add("is-mentioned")' in live_chat_script
     assert 'row.classList.add("is-bot")' in live_chat_script
+    assert 'feed.element.querySelector(".compact-empty-state")?.remove()' in live_chat_script
     assert '.live-chat-message.is-deleted' in dashboard_styles
     assert '.live-chat-message.is-mentioned' in dashboard_styles
     assert '.live-chat-message.is-bot:not(.is-deleted)' in dashboard_styles
@@ -1141,6 +1315,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'data-queue-action="clear"' in dashboard
     assert 'href="/channel/viewer-queue/blacklist"' in dashboard
     assert 'data-queue-count' in dashboard
+    assert '.queue-heading-row small { padding: 3px 7px;' in dashboard_styles
+    assert 'color: var(--text); font-size: 12px; font-weight: 700;' in dashboard_styles
     assert 'item.draggable = true' in queue_script
     assert 'runAction("reorder", draggingPosition, position)' in queue_script
     assert 'moveIcon("top")' in queue_script
@@ -1149,7 +1325,24 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.queue-item-action svg' in dashboard_styles
     assert 'fetch(endpoint' in metadata_script
     assert "searchGames" in metadata_script
-    assert 'event.key === "Tab" || event.key === "Enter"' in metadata_script
+    assert 'event.key === "Tab" || event.key === "Enter"' not in metadata_script
+    assert 'button.addEventListener("pointerdown"' in metadata_script
+    assert 'gameField.dataset.commitEdit = "true"' in metadata_script
+    assert 'const shouldCommit = field.dataset.commitEdit === "true"' in metadata_script
+    assert 'let savedValue = field.textContent.trim();' in metadata_script
+    assert 'field.dataset.hasDraft = "true";' in metadata_script
+    assert 'field.addEventListener("input", () => {' in metadata_script
+    assert '.twitch-channel-field strong[data-has-draft="true"]' in dashboard_styles
+    assert 'if (message !== "Unsaved. Press Enter to save.")' in metadata_script
+    assert 'function refreshDraftWarning()' in metadata_script
+    assert 'showStatus("Unsaved. Press Enter to save.", "warning")' in metadata_script
+    assert 'field.textContent = savedValue;' in metadata_script
+    assert 'error.code = result.code;' in metadata_script
+    assert 'field === gameField && error.code === "category_not_found"' in metadata_script
+    assert 'delete field.dataset.hasDraft;' in metadata_script
+    assert 'field.textContent = originalValue;' not in metadata_script
+    assert 'gameSearchController?.abort();' in metadata_script
+    assert 'document.activeElement !== gameField' in metadata_script
     assert "twitch-game-suggestions" in dashboard_styles
     assert "Bitrate" not in dashboard
     assert 'window.setTimeout(() => status.classList.add("is-fading"), 3000)' in metadata_script
@@ -1163,6 +1356,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'source.onerror = () => showConnectionStatus(false)' in chat_script
     assert 'window.setTimeout(() => connectionStatus.classList.add("is-fading"), 3000)' in chat_script
     assert "<span>Category</span>" in dashboard
+    assert '.twitch-channel-field [data-channel-field="game"] { color: color-mix(in srgb, var(--text) 70%, var(--muted)); font-size: 16px; font-weight: 600;' in dashboard_styles
     assert 'data-channel-field="title"' in dashboard
     assert 'window.setInterval(() => refreshPinned(feed), 2000)' in chat_script
     assert 'dashboard-activity-unread' in dashboard

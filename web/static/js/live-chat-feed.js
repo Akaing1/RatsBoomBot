@@ -190,6 +190,7 @@
         if (feed.seen.has(message.id)) return;
         const shouldFollowNewest = distanceFromBottom(feed.element) <= 24;
         feed.seen.add(message.id);
+        feed.element.querySelector(".compact-empty-state")?.remove();
 
         const row = makeElement("article", `live-chat-message platform-${message.platform} kind-${message.kind}`);
         if (message.deleted) row.classList.add("is-deleted");

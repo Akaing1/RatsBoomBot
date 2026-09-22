@@ -230,9 +230,6 @@
         </div>
 
         <div data-activity-panel="checkins" hidden>
-            <div class="panel-header">
-                <h4 class="activity-subheading">Check-ins</h4>
-            </div>
             <div id="checkin-activity-content" class="activity-scroll">
                 {% if redemption_activity.checkins %}
                     <ul class="activity-list">
@@ -265,7 +262,12 @@
                 data-stream-url="/channel/api/chat/stream?view=commands"
                 data-activity-notify="commands"
                 data-max-messages="100"
-            ></div>
+            >
+                <div class="compact-empty-state">
+                    <h4>No commands yet</h4>
+                    <p>Chat commands will appear here.</p>
+                </div>
+            </div>
         </div>
 
         <div data-activity-panel="mod-actions" hidden>

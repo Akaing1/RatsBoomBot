@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import re
+import time
 from datetime import UTC, datetime, timedelta
+from difflib import SequenceMatcher
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Form, Request
@@ -12,6 +14,9 @@ from twitchio.http import Route
 from bot.command_registry import build_command_help_groups
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
 from bot.services.channels.profile_settings import LOYALTY_GROUP
+from bot.services.channels.stream_metadata import (
+    StreamCategoryNotFoundError, clear_stream_category, update_stream_game, update_stream_title
+)
 from config.settings import settings
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
@@ -23,6 +28,7 @@ router = APIRouter()
 LOGGER = logging.getLogger("RatBoomBot")
 CHAT_SEND_TARGETS = {"twitch", "youtube", "both"}
 CHAT_MESSAGE_MAX_LENGTH = 200
+TOP_GAMES_CACHE_SECONDS = 300
 
 
 def protected_users_redirect(result: str, message: str) -> RedirectResponse:
@@ -217,6 +223,52 @@ async def get_twitch_channel_metadata(runtime_bot, broadcaster_id: str) -> dict[
     except Exception as exc:
         LOGGER.warning("[Dashboard] Failed to fetch Twitch channel metadata for broadcaster %s: %s", broadcaster_id, exc)
         return {"title": "Unavailable", "game": "Unavailable"}
+
+
+def category_match_type(name: str, query: str) -> int:
+    if name == query:
+        return 0
+    words = re.findall(r"[\w]+", name)
+    if len(words) > 1 and "".join(word[0] for word in words) == query:
+        return 1
+    if name.startswith(query):
+        return 2
+    if re.search(rf"(?<!\w){re.escape(query)}", name):
+        return 3
+    if query in name:
+        return 4
+    return 5
+
+
+def sort_twitch_games_by_match(
+    games: list[dict[str, str]], query: str, popular_games: list[dict[str, str]] | None = None
+) -> list[dict[str, str]]:
+    normalized_query = " ".join(query.casefold().split())
+    if not normalized_query:
+        return games
+    popular_positions = {game["id"]: index for index, game in enumerate(popular_games or ())}
+
+    def rank(game: dict[str, str]) -> tuple[float, float, int, str]:
+        name = " ".join(game["name"].casefold().split())
+        match_type = category_match_type(name, normalized_query)
+        similarity = SequenceMatcher(None, normalized_query, name).ratio()
+        match_score = (100, 95, 80, 70, 55, 0)[match_type]
+        position = popular_positions.get(game["id"])
+        popularity_bonus = max(0, 40 - position * 0.2) if position is not None else 0
+        return -(match_score + popularity_bonus), -similarity, len(name), name
+
+    return sorted(games, key=rank)
+
+
+async def get_top_games_for_search(runtime_bot, broadcaster_id: str) -> list[dict[str, str]]:
+    cached = getattr(runtime_bot, "_dashboard_top_games_cache", None)
+    now = time.monotonic()
+    if cached is not None and cached[0] > now:
+        return cached[1]
+    iterator = runtime_bot.fetch_top_games(token_for=str(broadcaster_id), first=100, max_results=100)
+    games = [{"id": str(game.id), "name": str(game.name)} async for game in iterator]
+    runtime_bot._dashboard_top_games_cache = (now + TOP_GAMES_CACHE_SECONDS, games)
+    return games
 
 
 def format_dashboard_username(services, broadcaster_id: str, username: str) -> str:
@@ -471,32 +523,42 @@ async def update_twitch_channel_metadata(
     if runtime_bot is None or runtime_bot.services is None:
         return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
     value = value.strip()
-    twitch_user = runtime_bot.create_partialuser(str(broadcaster_id))
 
     try:
         if field == "title":
             if not value or len(value) > 140:
                 return JSONResponse({"detail": "Titles must contain 1 to 140 characters."}, status_code=400)
-            await twitch_user.modify_channel(title=value)
+            update = await update_stream_title(runtime_bot, broadcaster_id, value)
         elif field == "game":
             if len(value) > 100:
                 return JSONResponse({"detail": "Category names are limited to 100 characters."}, status_code=400)
             if value:
-                game = await runtime_bot.fetch_game(name=value, token_for=str(broadcaster_id))
-                if game is None:
-                    return JSONResponse({"detail": "Twitch could not find that game or category."}, status_code=400)
-                await twitch_user.modify_channel(game_id=str(game.id))
-                value = str(game.name)
+                update = await update_stream_game(runtime_bot, broadcaster_id, value, token_for=broadcaster_id)
             else:
-                await twitch_user.modify_channel(game_id="0")
-                value = "No category"
+                update = await clear_stream_category(runtime_bot, broadcaster_id)
         else:
             return JSONResponse({"detail": "Only the title and game can be edited."}, status_code=400)
+    except StreamCategoryNotFoundError:
+        return JSONResponse({"detail": "Twitch could not find that game or category.", "code": "category_not_found"}, status_code=400)
     except Exception:
         LOGGER.exception("[Dashboard] Failed to update Twitch %s for broadcaster %s.", field, broadcaster_id)
         return JSONResponse({"detail": f"The Twitch {field} could not be updated."}, status_code=502)
 
-    return JSONResponse({"field": field, "value": value})
+    announcement_sent = False
+    try:
+        twitch_user = runtime_bot.create_partialuser(str(broadcaster_id))
+        sent_message = await runtime_bot.services.chat_identity.send_message(twitch_user, update.announcement)
+        announcement_sent = bool(getattr(sent_message, "sent", getattr(sent_message, "is_sent", False)))
+        sent_message_id = getattr(sent_message, "id", None)
+        if announcement_sent and sent_message_id:
+            runtime_bot.services.live_chat.tag_command_response(str(broadcaster_id), str(sent_message_id))
+    except Exception:
+        LOGGER.exception(
+            "[Dashboard] Twitch %s updated, but its chat announcement could not be sent for broadcaster %s.",
+            field, broadcaster_id
+        )
+
+    return JSONResponse({"field": field, "value": update.value, "announcement_sent": announcement_sent})
 
 
 @router.get("/channel/api/chat/pinned", response_class=JSONResponse)
@@ -705,12 +767,27 @@ async def search_twitch_games(request: Request, query: str = ""):
 
     try:
         normalized_query = query.strip()
-        iterator = (
-            runtime_bot.search_categories(normalized_query, token_for=str(broadcaster_id), first=50, max_results=50)
-            if normalized_query
-            else runtime_bot.fetch_top_games(token_for=str(broadcaster_id), first=50, max_results=50)
+        if not normalized_query:
+            return JSONResponse({"games": (await get_top_games_for_search(runtime_bot, broadcaster_id))[:50]})
+
+        iterator = runtime_bot.search_categories(
+            normalized_query, token_for=str(broadcaster_id), first=50, max_results=50
         )
         games = [{"id": str(game.id), "name": str(game.name)} async for game in iterator]
+        popular_games = []
+        if callable(getattr(runtime_bot, "fetch_top_games", None)):
+            try:
+                popular_games = await get_top_games_for_search(runtime_bot, broadcaster_id)
+            except Exception:
+                LOGGER.warning("[Dashboard] Could not rank categories by current popularity.", exc_info=True)
+
+        existing_ids = {game["id"] for game in games}
+        normalized_name = " ".join(normalized_query.casefold().split())
+        for game in popular_games:
+            if game["id"] not in existing_ids and category_match_type(game["name"].casefold(), normalized_name) < 5:
+                games.append(game)
+                existing_ids.add(game["id"])
+        games = sort_twitch_games_by_match(games, normalized_query, popular_games)[:50]
         return JSONResponse({"games": games})
     except Exception:
         LOGGER.exception("[Dashboard] Failed to search Twitch games for broadcaster %s.", broadcaster_id)
