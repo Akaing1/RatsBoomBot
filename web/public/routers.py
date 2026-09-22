@@ -60,40 +60,40 @@ async def chat_widget_events(request: Request, token: str, view: str = "both"):
 
 
 # Keep this intentionally curated. Homepage highlights change for minor and major
-# releases; patch-level fixes remain in the complete GitHub release history.
+# releases; patch-level fixes remain in the complete public patch-note history.
 HOME_RELEASE_HIGHLIGHTS = (
     {
-        "version": "v8.10.0",
-        "title": "Crafting and consumables arrive",
-        "summary": "Build a long-term raid loadout, spend points on tactical buffs, and follow every raid detail from one guide.",
+        "version": "v12.2.0",
+        "title": "The streamer dashboard gets sharper",
+        "summary": "Run the channel from a faster live workspace with more chat, stream, moderation, and viewer-queue controls close at hand.",
         "highlights": (
-            "Basic weapons now craft into Refined and Masterwork gear.",
-            "Second Wind, Berserk, and Blessing add new raid decisions.",
-            "Mythical weapons now add +225 damage."
+            "Edit the stream title and category directly from the dashboard.",
+            "Pin and moderate messages, use emotes, and follow live stream and ad status.",
+            "Move, swap, remove, and manage queued viewers without leaving the page."
         )
     },
     {
-        "version": "v8.7.0",
-        "title": "A bot identity that is yours",
-        "summary": "Premium channels can securely connect a dedicated Twitch account to speak as their own bot identity.",
+        "version": "v12.0.0",
+        "title": "Twitch and YouTube chat come together",
+        "summary": "Follow both communities from one live dashboard, reply without leaving RatsBoomBot, and bring the combined feed into OBS.",
         "highlights": (
-            "Streamer-managed custom bot onboarding.",
-            "Secure reconnect links for dedicated accounts.",
-            "Automatic RatsBoomBot fallback when needed."
+            "Combined Twitch and YouTube messages in one live feed.",
+            "Separate chat, command, and combined OBS browser views.",
+            "Broadcaster replies, emotes, scrolling docks, and live ad status."
         )
     },
     {
-        "version": "v8.6.0",
-        "title": "Raid information goes public",
-        "summary": "View live encounters, rewards, shop options, and raid history without having to parse chat commands.",
+        "version": "v11.6.5",
+        "title": "Levels, loot, and loyalty",
+        "summary": "Community participation now builds a lasting profile through chatter levels, achievements, raid progress, and channel loyalty.",
         "highlights": (
-            "Public raid guide pages for enabled channels.",
-            "Live boss progress and contributor rankings.",
-            "Raid history, mechanics, and reward details."
+            "Global chatter levels earned from achievements and raids.",
+            "Channel-specific badges and secret challenges.",
+            "Streamer controls for loyalty responses and command slowmode."
         )
     }
 )
-GITHUB_RELEASE_HISTORY_URL = "https://github.com/Akaing1/RatsBoomBot/releases"
+PUBLIC_RELEASE_HISTORY_URL = "/patch-notes"
 
 
 @router.get("/chatters", response_class=HTMLResponse)
@@ -155,7 +155,7 @@ async def landing_page(request: Request):
             "is_authenticated": is_authenticated,
             "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
             "release_highlights": HOME_RELEASE_HIGHLIGHTS,
-            "release_history_url": GITHUB_RELEASE_HISTORY_URL
+            "release_history_url": PUBLIC_RELEASE_HISTORY_URL
         }
     )
 

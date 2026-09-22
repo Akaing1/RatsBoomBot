@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="RatsBoomBot gives Twitch communities custom chat commands, loyalty tools, stream dashboards, viewer games, and personalized automation.">
+    <meta name="description" content="RatsBoomBot gives stream communities customizable commands, loyalty tools, RPG raids, streamer dashboards, and combined Twitch and YouTube chat.">
 
-    <title>RatsBoomBot | Built for Your Twitch Community</title>
+    <title>RatsBoomBot | Built for Stream Communities</title>
 
     <link rel="canonical" href="{{ public_base_url }}/">
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
@@ -37,14 +37,14 @@
     <main>
         <section class="landing-hero">
             <div class="hero-copy">
-                <p class="eyebrow">A Twitch bot with personality</p>
+                <p class="eyebrow">A stream bot with personality</p>
 
                 <h1>An all-in-one bot tailored to your needs—make the bot your own.</h1>
 
                 <p class="hero-description">
-                    RatsBoomBot combines custom chat interactions, loyalty systems,
-                    viewer activities, moderation tools, game integrations, and a
-                    live channel dashboard in one personalized bot.
+                    RatsBoomBot combines Twitch and YouTube chat, custom interactions,
+                    loyalty systems, viewer activities, moderation tools, game integrations,
+                    and a live channel dashboard in one personalized bot.
                 </p>
 
                 <div class="hero-actions">
@@ -69,7 +69,7 @@
                         <div>
                             <small>RAT'S BOOM BOT</small>
                             <strong>Your community dashboard</strong>
-                            <p>Live status, viewer activities, redeems, and commands.</p>
+                            <p>Live chat, ad status, viewer activities, and commands.</p>
                         </div>
                     </div>
 
@@ -123,7 +123,7 @@
                 {% endfor %}
             </div>
 
-            <a class="whats-new-history-link" href="{{ release_history_url }}" target="_blank" rel="noreferrer">View full release history <span aria-hidden="true">→</span></a>
+            <a class="whats-new-history-link" href="{{ release_history_url }}">View full release history <span aria-hidden="true">→</span></a>
         </section>
 
         <section class="landing-section" id="features">
@@ -138,8 +138,8 @@
                     <summary>
                         <span class="feature-number">01</span>
                         <span class="feature-heading">
-                            <h3>Personalized chat</h3>
-                            <p>Custom interactions, social links, timers, and community messages written for each channel.</p>
+                            <h3>Live chat and automation</h3>
+                            <p>Combined Twitch and YouTube chat, dashboard replies, OBS views, timers, and community messages tailored to each channel.</p>
                         </span>
                         <span class="feature-toggle" aria-hidden="true"></span>
                     </summary>
@@ -149,7 +149,7 @@
                             <code>!hi [username]</code><code>!choice &lt;options&gt;</code><code>!kaboom [username]</code>
                             <code>!stinky [username]</code><code>!lucky [username]</code><code>!smart [username]</code>
                             <code>!height [username]</code><code>!pp [username]</code><code>!lurk</code><code>!help</code>
-                            <code>!socials</code><code>!socials discord</code><code>!socials youtube</code>
+                            <code>!stats [username]</code><code>!socials</code><code>!socials discord</code><code>!socials youtube</code>
                             <code>!set game &lt;game name&gt;</code><code>!set title &lt;stream title&gt;</code><code>!set discord &lt;url&gt;</code><code>!set youtube &lt;url&gt;</code><code>!timers [on|off]</code>
                         </div>
                     </div>
@@ -159,8 +159,8 @@
                     <summary>
                         <span class="feature-number">02</span>
                         <span class="feature-heading">
-                            <h3>Loyalty and redeems</h3>
-                            <p>Channel-specific currencies, viewer balances, games, daily check-ins, redeem history, and milestones.</p>
+                            <h3>Loyalty and achievements</h3>
+                            <p>Channel-specific currencies, games, daily check-ins, chatter levels, achievements, public profiles, and redeem history.</p>
                         </span>
                         <span class="feature-toggle" aria-hidden="true"></span>
                     </summary>
@@ -168,7 +168,8 @@
                         <p class="feature-command-label">Currency command</p>
                         <div class="feature-command-list">
                             <code>!currency [username]</code><code>!currency leaderboard</code>
-                            <code>!currency gamble &lt;amount|all&gt;</code><code>!currency duel &lt;username&gt; &lt;amount&gt;</code>
+                            <code>!currency gamble &lt;amount|all&gt;</code><code>!currency roulette &lt;red|black|green&gt; &lt;amount&gt;</code>
+                            <code>!currency duel &lt;username&gt; &lt;amount&gt;</code><code>!currency give &lt;username&gt; &lt;amount&gt;</code>
                             <code>!currency duel accept</code><code>!currency duel decline</code>
                             <code>!currency add &lt;username&gt; &lt;amount&gt;</code><code>!currency reset</code>
                         </div>
@@ -189,7 +190,8 @@
                         <p class="feature-command-label">Available commands</p>
                         <div class="feature-command-list">
                             <code>!open</code><code>!close</code><code>!join</code><code>!leave</code><code>!queue</code>
-                            <code>!next</code><code>!remove &lt;position&gt;</code><code>!clear</code>
+                            <code>!next</code><code>!swap &lt;position&gt; &lt;position&gt;</code><code>!requeue &lt;position&gt; &lt;new position&gt;</code>
+                            <code>!remove &lt;position&gt;</code><code>!clear</code>
                             <code>!clip</code><code>!clip short</code><code>!startraid &lt;channel&gt;</code>
                         </div>
                     </div>
@@ -209,6 +211,8 @@
                         <div class="feature-command-list">
                             <code>!champs</code><code>!champs &lt;champion&gt;</code><code>!register &lt;Riot ID&gt; [region]</code>
                             <code>!unregister</code><code>!rank [chatter]</code><code>!ladder</code>
+                            <code>!build &lt;champion&gt;</code><code>!runes &lt;champion&gt;</code><code>!duo</code>
+                            <code>!custom lobby</code><code>!custom lobby balance</code>
                         </div>
                         <p class="feature-command-label">Overwatch</p>
                         <div class="feature-command-list">
@@ -230,7 +234,8 @@
                         <p class="feature-command-label">Raid commands</p>
                         <div class="feature-command-list">
                             <code>!raid</code><code>!raid attack</code><code>!raid shop</code><code>!raid buy &lt;item&gt;</code>
-                            <code>!raid craft &lt;sword|bow|tome&gt;</code><code>!raid equip &lt;weapon&gt;</code>
+                            <code>!raid craft &lt;sword|bow|tome&gt;</code><code>!raid equip &lt;weapon&gt;</code><code>!raid unequip</code>
+                            <code>!raid sell &lt;weapon&gt;</code><code>!raid repair &lt;weapon&gt;</code><code>!raid loot</code>
                             <code>!raid inventory</code><code>!raid leaderboard</code><code>!raid help</code>
                         </div>
                     </div>
@@ -248,7 +253,7 @@
                     <div class="feature-command-panel">
                         <p class="feature-command-label">Available commands</p>
                         <div class="feature-command-list">
-                            <code>!so &lt;username&gt;</code><code>!kamikaze &lt;username&gt;</code>
+                            <code>!so &lt;username&gt;</code><code>!kamikaze &lt;username&gt;</code><code>!set slowmode &lt;on|off&gt;</code>
                         </div>
                         <p class="feature-command-note">Permission-sensitive actions are restricted to moderators or the broadcaster when appropriate.</p>
                     </div>
@@ -260,28 +265,28 @@
 
         <section class="landing-section landing-process" id="how-it-works">
             <div class="landing-section-heading">
-                <p class="eyebrow">Manual enrollment while we grow</p>
-                <h2>A tailored profile comes before Twitch sign-in.</h2>
-                <p class="enrollment-notice"><strong>Work in progress:</strong> Some features are only available through manual intervention: please contact the developer for more information</p>
+                <p class="eyebrow">Simple streamer onboarding</p>
+                <h2>Connect, customize, and go live.</h2>
+                <p class="enrollment-notice">Core onboarding is self-service. Specialized integrations and premium features may still require help from the developer through Discord.</p>
             </div>
 
             <div class="landing-step-grid">
                 <article>
                     <span>1</span>
-                    <h3>Proceed to your dashboard</h3>
-                    <p>Authorize the bot to the account you want and get started-no password required.</p>
+                    <h3>Connect with Twitch</h3>
+                    <p>Authorize the channel you want to manage. RatsBoomBot never handles your Twitch password.</p>
                 </article>
 
                 <article>
                     <span>2</span>
-                    <h3>Build your profile</h3>
-                    <p>Your messages, currency, redeems, commands, integrations, and permissions can be configured on the dashboard.</p>
+                    <h3>Make the dashboard yours</h3>
+                    <p>Choose features and configure your messages, currency, social links, commands, and permissions from the dashboard.</p>
                 </article>
 
                 <article>
                     <span>3</span>
-                    <h3>Go live</h3>
-                    <p>Once your profile is ready, boot up stream and you are all set to go!</p>
+                    <h3>Connect and go live</h3>
+                    <p>Add optional YouTube or custom bot integrations, open your dashboard or OBS dock, and start streaming.</p>
                 </article>
             </div>
         </section>
@@ -290,7 +295,7 @@
             <div>
                 <p class="eyebrow">Ready when you are</p>
                 <h2>{% if is_authenticated %}Your dashboard is waiting.{% else %}Bring your community into the fun.{% endif %}</h2>
-                <p>No more opening 100 applications to start stream - everything in one place ready to go.</p>
+                <p>Manage chat, viewer activities, loyalty tools, and stream controls from one place.</p>
             </div>
 
             <a class="button primary landing-primary-action" href="{{ dashboard_url }}">
@@ -323,7 +328,7 @@
     <footer class="landing-footer">
         <a class="landing-brand" href="/">
             <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="">
-            <span><strong>RatsBoomBot</strong><small>Community-first driven Twitch Bot</small></span>
+            <span><strong>RatsBoomBot</strong><small>Community-first Twitch bot</small></span>
         </a>
 
         <p>Not affiliated with Twitch. Personal project conducted by Ninjakaing</p>
