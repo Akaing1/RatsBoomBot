@@ -77,7 +77,7 @@ class Settings:
 
     BOT_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('BOT_SCOPES') or DEFAULT_BOT_SCOPES} moderator:manage:announcements moderator:read:chatters".split()))
 
-    CHANNEL_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('CHANNEL_SCOPES') or DEFAULT_CHANNEL_SCOPES} user:write:chat user:read:emotes channel:manage:broadcast channel:edit:commercial channel:manage:vips channel:manage:moderators moderator:manage:automod moderator:manage:chat_messages moderator:manage:chat_settings moderator:manage:warnings".split()))
+    CHANNEL_SCOPES = " ".join(dict.fromkeys(f"{os.getenv('CHANNEL_SCOPES') or DEFAULT_CHANNEL_SCOPES} user:write:chat user:read:emotes channel:manage:broadcast channel:edit:commercial channel:manage:ads channel:manage:vips channel:manage:moderators moderator:manage:automod moderator:manage:chat_messages moderator:manage:chat_settings moderator:manage:warnings".split()))
 
     IGNORED_USERS = {
         user.strip().lower()

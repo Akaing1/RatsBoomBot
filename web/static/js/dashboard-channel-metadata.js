@@ -5,6 +5,7 @@
     const gamesEndpoint = card.dataset.gamesUrl;
     const csrfToken = card.dataset.csrfToken;
     const status = card.querySelector("[data-channel-metadata-status]");
+    const titleField = card.querySelector('[data-channel-field="title"]');
     const gameField = card.querySelector('[data-channel-field="game"]');
     const gameSuggestions = card.querySelector("[data-game-suggestions]");
     let statusFadeTimer = null;
@@ -37,6 +38,76 @@
     }
 
     statusFadeTimer = window.setTimeout(() => status.classList.add("is-fading"), 3000);
+
+    [titleField, gameField].filter(Boolean).forEach(field => {
+        function updateFieldPencil() {
+            field.classList.remove("metadata-truncated");
+            field.classList.toggle("metadata-truncated", field.scrollWidth > field.clientWidth + 1);
+        }
+        new MutationObserver(updateFieldPencil).observe(field, {childList: true, characterData: true, subtree: true});
+        new ResizeObserver(updateFieldPencil).observe(field, {box: "border-box"});
+        field.addEventListener("blur", () => window.requestAnimationFrame(updateFieldPencil));
+        window.requestAnimationFrame(updateFieldPencil);
+    });
+
+    if (titleField) {
+        const titleLength = text => Array.from(text).length;
+        titleField.addEventListener("beforeinput", event => {
+            if (!event.inputType?.startsWith("insert") || !event.data || event.isComposing) return;
+            const selection = window.getSelection();
+            const selectedLength = selection && titleField.contains(selection.anchorNode) && titleField.contains(selection.focusNode)
+                ? titleLength(selection.toString()) : 0;
+            if (titleLength(titleField.textContent) - selectedLength + titleLength(event.data) > 140) {
+                event.preventDefault();
+                showStatus("Titles are limited to 140 characters.", "warning");
+            }
+        });
+        titleField.addEventListener("paste", event => {
+            const selection = window.getSelection();
+            if (!selection?.rangeCount || !titleField.contains(selection.getRangeAt(0).commonAncestorContainer)) return;
+            event.preventDefault();
+            const range = selection.getRangeAt(0);
+            const pasted = (event.clipboardData?.getData("text/plain") || "").replace(/\r?\n/g, " ");
+            const available = Math.max(0, 140 - titleLength(titleField.textContent) + titleLength(range.toString()));
+            const inserted = Array.from(pasted).slice(0, available).join("");
+            if (inserted) {
+                range.deleteContents();
+                const node = document.createTextNode(inserted);
+                range.insertNode(node);
+                range.setStartAfter(node);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                titleField.dispatchEvent(new Event("input", {bubbles: true}));
+            }
+            if (titleLength(pasted) > available) showStatus("Titles are limited to 140 characters.", "warning");
+        });
+        titleField.addEventListener("input", () => {
+            if (titleLength(titleField.textContent) <= 140) return;
+            titleField.textContent = Array.from(titleField.textContent).slice(0, 140).join("");
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(titleField);
+            range.collapse(false);
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+            showStatus("Titles are limited to 140 characters.", "warning");
+        });
+        function updateTitleEditingWidth() {
+            if (document.activeElement !== titleField) return;
+            titleField.style.removeProperty("width");
+            const fieldBounds = titleField.getBoundingClientRect();
+            const cardBounds = card.getBoundingClientRect();
+            const rightPadding = parseFloat(window.getComputedStyle(card).paddingRight) || 0;
+            const maxWidth = Math.max(0, cardBounds.right - rightPadding - fieldBounds.left);
+            const width = Math.min(maxWidth, Math.max(fieldBounds.width, titleField.scrollWidth + 2));
+            titleField.style.width = `${width}px`;
+        }
+        titleField.addEventListener("focus", updateTitleEditingWidth);
+        titleField.addEventListener("input", updateTitleEditingWidth);
+        titleField.addEventListener("blur", () => titleField.style.removeProperty("width"));
+        new ResizeObserver(updateTitleEditingWidth).observe(card, {box: "border-box"});
+    }
 
     function renderGameOptions(games) {
         gameOptions = Array.isArray(games) ? games : [];
@@ -127,6 +198,13 @@
 
         field.addEventListener("focus", () => {
             field.classList.add("editing");
+            window.requestAnimationFrame(() => {
+                if (document.activeElement !== field) return;
+                const selection = window.getSelection();
+                if (!selection) return;
+                selection.setBaseAndExtent(field, 0, field, field.childNodes.length);
+                field.scrollLeft = field.scrollWidth;
+            });
         });
         field.addEventListener("input", () => {
             if (field.textContent.trim() !== savedValue) {
@@ -155,6 +233,9 @@
                 window.clearTimeout(gameSearchTimer);
                 gameSearchController?.abort();
                 gameSuggestions.hidden = true;
+                window.requestAnimationFrame(() => {
+                    if (document.activeElement !== gameField) gameField.scrollLeft = 0;
+                });
             }
             if (field.dataset.cancelEdit) {
                 delete field.dataset.cancelEdit;

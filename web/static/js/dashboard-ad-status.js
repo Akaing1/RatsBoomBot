@@ -3,7 +3,11 @@
     if (!container) return;
 
     const label = container.querySelector("[data-ad-status-text]");
+    const panel = document.querySelector("[data-ad-panel]");
+    const actionStatus = panel?.querySelector("[data-ad-action-status]");
+    const actionButtons = Array.from(panel?.querySelectorAll("[data-ad-action]") || []);
     let refreshInProgress = false;
+    let actionInProgress = false;
     const appearanceClasses = ["ad-neutral", "ad-idle", "ad-warning", "ad-running"];
 
     function formatDuration(totalSeconds) {
@@ -43,6 +47,14 @@
         } else {
             setAppearance("ad-idle");
         }
+        const state = container.dataset.state;
+        const snoozes = container.dataset.snoozesAvailable;
+        actionButtons.forEach(button => {
+            button.disabled = actionInProgress || state === "offline" ||
+                (button.dataset.adAction === "snooze" &&
+                    (state !== "scheduled" || (snoozes !== "" && Number(snoozes) <= 0))) ||
+                (button.dataset.adAction !== "snooze" && state === "running");
+        });
     }
 
     function applyStatus(data) {
@@ -51,8 +63,35 @@
         container.dataset.state = data.state;
         container.dataset.nextAdAt = data.next_ad_at || "";
         container.dataset.endsAt = data.ends_at || "";
+        container.dataset.snoozesAvailable = data.snoozes_available ?? "";
         label.textContent = data.label;
         render();
+    }
+
+    async function runAction(action) {
+        if (actionInProgress) return;
+        if (action !== "snooze" && !window.confirm(`Start a ${action === "run-90" ? "90-second" : "3-minute"} ad now?`)) return;
+        actionInProgress = true;
+        actionStatus.textContent = "Working…";
+        actionStatus.className = "dashboard-ad-action-status";
+        render();
+        const body = new FormData();
+        body.set("action", action);
+        body.set("csrf_token", panel.dataset.csrfToken);
+        try {
+            const response = await fetch(panel.dataset.actionUrl, {method: "POST", body, headers: {Accept: "application/json"}});
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || "Twitch could not complete that ad action.");
+            if (data.status) applyStatus(data.status);
+            actionStatus.textContent = data.message || "Ad action completed.";
+            actionStatus.classList.add("success");
+        } catch (error) {
+            actionStatus.textContent = error.message || "Ad action failed.";
+            actionStatus.classList.add("error");
+        } finally {
+            actionInProgress = false;
+            render();
+        }
     }
 
     async function refresh() {
@@ -69,6 +108,7 @@
     }
 
     render();
+    actionButtons.forEach(button => button.addEventListener("click", () => runAction(button.dataset.adAction)));
     window.setInterval(render, 1000);
     window.setInterval(refresh, 30000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
