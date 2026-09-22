@@ -37,6 +37,7 @@ env/
 
 .vscode/
 .idea/
+*.code-workspace
 
 # ==========================================
 # OS Files

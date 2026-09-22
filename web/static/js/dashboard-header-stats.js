@@ -1,6 +1,7 @@
 (() => {
     const container = document.querySelector("[data-dashboard-header-stats]");
     if (!container) return;
+    const dashboard = container.closest(".channel-dashboard-layout") || document;
 
     const storageKey = `ratsboombot:dashboard-stat-visibility:${container.dataset.channelId || "channel"}`;
     const refreshUrl = container.dataset.refreshUrl;
@@ -44,7 +45,7 @@
             : "Offline";
     }
 
-    container.querySelectorAll("[data-dashboard-stat]").forEach(button => {
+    dashboard.querySelectorAll("[data-dashboard-stat]").forEach(button => {
         const key = button.dataset.dashboardStat;
         applyVisibility(button, hiddenStats.has(key));
         button.addEventListener("click", () => {
@@ -67,8 +68,10 @@
             if (!response.ok) return;
             const payload = await response.json();
             (Array.isArray(payload.stats) ? payload.stats : []).forEach(stat => {
-                const button = container.querySelector(`[data-dashboard-stat="${CSS.escape(String(stat.key || ""))}"]`);
-                const value = button?.querySelector("[data-dashboard-stat-value]");
+                const statContainer = stat.key === "points_lost"
+                    ? dashboard.querySelector("[data-dashboard-points-lost]")
+                    : dashboard.querySelector(`[data-dashboard-stat="${CSS.escape(String(stat.key || ""))}"]`);
+                const value = statContainer?.querySelector("[data-dashboard-stat-value]");
                 if (value) value.textContent = String(stat.display_value ?? "—");
             });
             const streamStatus = container.querySelector("[data-stream-status]");

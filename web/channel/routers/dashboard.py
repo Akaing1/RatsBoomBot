@@ -303,25 +303,26 @@ async def get_raid_contributor_data(services, broadcaster_id: str) -> dict[str, 
 
 async def get_ad_status(broadcaster, twitch_user=None) -> dict[str, object]:
     if not broadcaster.is_live:
-        return {"state": "offline", "label": "Stream offline", "next_ad_at": None, "ends_at": None}
+        return {"state": "offline", "label": "Stream offline", "next_ad_at": None, "ends_at": None, "snoozes_available": None}
 
     try:
         schedule = await (twitch_user or broadcaster).fetch_ad_schedule()
     except Exception:
         LOGGER.exception("[Dashboard] Failed to fetch ad schedule for broadcaster %s.", broadcaster.id)
-        return {"state": "unavailable", "label": "Ad schedule unavailable", "next_ad_at": None, "ends_at": None}
+        return {"state": "unavailable", "label": "Ad schedule unavailable", "next_ad_at": None, "ends_at": None, "snoozes_available": None}
 
     now = datetime.now(UTC)
+    snoozes_available = getattr(schedule, "snooze_count", None)
     last_ad_at = schedule.last_ad_at
     ends_at = last_ad_at + timedelta(seconds=schedule.duration) if last_ad_at is not None else None
 
     if ends_at is not None and last_ad_at <= now < ends_at:
-        return {"state": "running", "label": "Ad running", "next_ad_at": None, "ends_at": ends_at.isoformat()}
+        return {"state": "running", "label": "Ad running", "next_ad_at": None, "ends_at": ends_at.isoformat(), "snoozes_available": snoozes_available}
 
     if schedule.next_ad_at is not None:
-        return {"state": "scheduled", "label": "Next ad", "next_ad_at": schedule.next_ad_at.isoformat(), "ends_at": None}
+        return {"state": "scheduled", "label": "Next ad", "next_ad_at": schedule.next_ad_at.isoformat(), "ends_at": None, "snoozes_available": snoozes_available}
 
-    return {"state": "none", "label": "No ad scheduled", "next_ad_at": None, "ends_at": None}
+    return {"state": "none", "label": "No ad scheduled", "next_ad_at": None, "ends_at": None, "snoozes_available": snoozes_available}
 
 
 @router.get("/channel/api/raid-contributors", response_class=JSONResponse)
@@ -431,7 +432,8 @@ async def channel_viewer_queue_action(
     action: str = Form(...),
     csrf_token: str = Form(...),
     position: int = Form(0),
-    new_position: int = Form(0)
+    new_position: int = Form(0),
+    count: int = Form(4)
 ):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
     if not broadcaster_id:
@@ -446,8 +448,11 @@ async def channel_viewer_queue_action(
 
     if action == "toggle":
         message = await (queue.close_queue(broadcaster_id) if queue.is_queue_open(broadcaster_id) else queue.open_queue(broadcaster_id))
-    elif action in {"next4", "next5"}:
-        _, selected, message = await queue.next_viewers(broadcaster_id, 4 if action == "next4" else 5)
+    elif action in {"next", "next4", "next5"}:
+        next_count = count if action == "next" else (4 if action == "next4" else 5)
+        if not 1 <= next_count <= 10:
+            return JSONResponse({"detail": "Choose between 1 and 10 viewers."}, status_code=400)
+        _, selected, message = await queue.next_viewers(broadcaster_id, next_count)
     elif action == "clear":
         message = await queue.clear(broadcaster_id)
     elif action == "remove":
@@ -853,6 +858,68 @@ async def channel_ad_status(request: Request):
 
     twitch_user = runtime_bot.create_partialuser(str(broadcaster_id))
     return JSONResponse(await get_ad_status(broadcaster, twitch_user))
+
+
+@router.post("/channel/api/ads/action", response_class=JSONResponse)
+async def channel_ad_action(request: Request, action: str = Form(...), csrf_token: str = Form(...)):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    validate_csrf_token(request, csrf_token)
+    if action not in {"run-90", "run-180", "snooze"}:
+        return JSONResponse({"detail": "Unknown ad action."}, status_code=400)
+
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster = runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+    if broadcaster is None:
+        logout_channel_user(request)
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    twitch_user = runtime_bot.create_partialuser(str(broadcaster_id))
+    try:
+        if action == "snooze":
+            result = await twitch_user.snooze_next_ad()
+            return JSONResponse({
+                "message": "Next ad snoozed by 5 minutes.",
+                "status": {
+                    "state": "scheduled" if result.next_ad_at else "none",
+                    "label": "Next ad" if result.next_ad_at else "No ad scheduled",
+                    "next_ad_at": result.next_ad_at.isoformat() if result.next_ad_at else None, "ends_at": None,
+                    "snoozes_available": result.snooze_count
+                }
+            })
+
+        duration = 90 if action == "run-90" else 180
+        result = await twitch_user.start_commercial(length=duration)
+        if result.message:
+            return JSONResponse({"detail": result.message}, status_code=409)
+        actual_duration = result.length or duration
+        return JSONResponse({
+            "message": f"{actual_duration}-second ad started.",
+            "status": {
+                "state": "running", "label": "Ad running", "next_ad_at": None,
+                "ends_at": (datetime.now(UTC) + timedelta(seconds=actual_duration)).isoformat(),
+                "snoozes_available": None
+            }
+        })
+    except HTTPException as error:
+        LOGGER.warning("[Dashboard] Twitch rejected ad action %s for %s with status %s: %s", action, broadcaster_id, error.status, error)
+        if error.status == 401:
+            detail = "Reconnect Twitch to grant the permission required to manage ads."
+        elif error.status == 403:
+            detail = "Twitch says this account cannot manage ads for this channel."
+        elif error.status == 429:
+            detail = "No ad snoozes are available, or the ad cooldown has not ended."
+        elif error.status == 400:
+            detail = "This ad action is unavailable while offline or at this point in the ad schedule."
+        else:
+            detail = "Twitch rejected the ad action."
+        return JSONResponse({"detail": detail}, status_code=error.status if 400 <= error.status < 600 else 502)
+    except Exception:
+        LOGGER.exception("[Dashboard] Failed ad action %s for %s.", action, broadcaster_id)
+        return JSONResponse({"detail": "Could not manage ads right now."}, status_code=502)
 
 
 @router.post("/channel/api/chat/send", response_class=JSONResponse)

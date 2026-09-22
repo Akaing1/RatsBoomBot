@@ -652,6 +652,54 @@ async def test_ad_status_reports_running_and_offline_states():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("action,length", [("run-90", 90), ("run-180", 180)])
+async def test_dashboard_ad_action_starts_commercial_for_connected_channel(monkeypatch, action, length):
+    broadcaster = SimpleNamespace(id="channel-1", is_live=True)
+    twitch_channel = SimpleNamespace(start_commercial=AsyncMock(return_value=SimpleNamespace(length=length, message="")))
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster})),
+        create_partialuser=lambda _: twitch_channel
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/ads/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_ad_action(request, action, "csrf")
+
+    assert response.status_code == 200
+    assert json.loads(response.body)["status"]["state"] == "running"
+    twitch_channel.start_commercial.assert_awaited_once_with(length=length)
+
+
+@pytest.mark.asyncio
+async def test_dashboard_ad_action_snoozes_next_ad(monkeypatch):
+    next_ad_at = datetime.now(UTC) + timedelta(minutes=15)
+    broadcaster = SimpleNamespace(id="channel-1", is_live=True)
+    twitch_channel = SimpleNamespace(snooze_next_ad=AsyncMock(return_value=SimpleNamespace(
+        next_ad_at=next_ad_at, snooze_count=2
+    )))
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster})),
+        create_partialuser=lambda _: twitch_channel
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/ads/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_ad_action(request, "snooze", "csrf")
+
+    assert response.status_code == 200
+    assert json.loads(response.body)["status"]["next_ad_at"] == next_ad_at.isoformat()
+    twitch_channel.snooze_next_ad.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_dashboard_can_send_to_twitch_and_youtube(monkeypatch):
     broadcaster = SimpleNamespace(id="channel-1")
     twitch_channel = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True)))
@@ -739,6 +787,48 @@ async def test_dashboard_viewer_queue_actions_send_their_chat_response(monkeypat
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("next_count", [1, 4, 10])
+async def test_dashboard_viewer_queue_next_uses_selected_count(monkeypatch, next_count):
+    queue = SimpleNamespace(
+        next_viewers=AsyncMock(return_value=(True, ["alice"], "Selected alice.")),
+        list_queue=lambda _: [], list_queue_members=lambda _: [], is_queue_open=lambda _: True
+    )
+    services = SimpleNamespace(
+        viewer_queue=queue,
+        chat_identity=SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=False)))
+    )
+    runtime_bot = SimpleNamespace(services=services, create_partialuser=lambda _: SimpleNamespace(id="channel-1"))
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/viewer-queue/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_viewer_queue_action(request, "next", "csrf", 0, 0, next_count)
+
+    assert response.status_code == 200
+    queue.next_viewers.assert_awaited_once_with("channel-1", next_count)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("next_count", [0, 11])
+async def test_dashboard_viewer_queue_next_rejects_out_of_range_count(monkeypatch, next_count):
+    queue = SimpleNamespace(next_viewers=AsyncMock())
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=SimpleNamespace(viewer_queue=queue)))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/viewer-queue/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_viewer_queue_action(request, "next", "csrf", 0, 0, next_count)
+
+    assert response.status_code == 400
+    queue.next_viewers.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("field", "value", "expected_update", "expected_announcement", "expected_value"),
     [
@@ -795,6 +885,27 @@ async def test_dashboard_metadata_chat_failure_does_not_undo_successful_twitch_e
     assert response.status_code == 200
     assert json.loads(response.body) == {"field": "title", "value": "New title", "announcement_sent": False}
     twitch_channel.modify_channel.assert_awaited_once_with(title="New title")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_rejects_title_over_140_characters(monkeypatch):
+    twitch_channel = SimpleNamespace(id="channel-1", modify_channel=AsyncMock())
+    runtime_bot = SimpleNamespace(
+        services=SimpleNamespace(),
+        create_partialuser=lambda _: twitch_channel
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: runtime_bot)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/channel-metadata", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.update_twitch_channel_metadata(request, "title", "x" * 141, "csrf")
+
+    assert response.status_code == 400
+    assert json.loads(response.body) == {"detail": "Titles must contain 1 to 140 characters."}
+    twitch_channel.modify_channel.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -1207,6 +1318,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     composer_script = open("web/static/js/dashboard-chat-send.js", encoding="utf-8").read()
     sidebar_script = open("web/static/js/channel-sidebar.js", encoding="utf-8").read()
     header_stats_script = open("web/static/js/dashboard-header-stats.js", encoding="utf-8").read()
+    stream_player_script = open("web/static/js/dashboard-stream-player.js", encoding="utf-8").read()
     ad_status_script = open("web/static/js/dashboard-ad-status.js", encoding="utf-8").read()
     metadata_script = open("web/static/js/dashboard-channel-metadata.js", encoding="utf-8").read()
     queue_script = open("web/static/js/dashboard-viewer-queue.js", encoding="utf-8").read()
@@ -1223,12 +1335,16 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '<p>Chat commands will appear here.</p>' in dashboard
     assert 'data-activity-tab="mod-actions"' in dashboard
     assert 'data-activity-tab="automod"' in dashboard
-    assert '.dashboard-activity-panel, .viewer-queue-column > .panel { container-type: inline-size; }' in dashboard_styles
-    assert '.dashboard-tabs.activity-tabs .dashboard-tab { min-width: 0; min-height: 34px; flex: 1 1 0;' in dashboard_styles
+    assert '.dashboard-tabs.activity-tabs { flex-wrap: nowrap;' in dashboard_styles
+    assert '.dashboard-tabs.activity-tabs .dashboard-tab { min-width: max-content; min-height: 34px; flex: 1 0 auto;' in dashboard_styles
     assert '.queue-toolbar button, .queue-toolbar a { display: inline-flex; width: 100%;' in dashboard_styles
-    assert '.dashboard-tabs.activity-tabs { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); overflow: visible; }' in dashboard_styles
-    assert '.dashboard-tabs.activity-tabs .dashboard-tab:nth-child(4):nth-last-child(2)' in dashboard_styles
-    assert '.queue-toolbar { grid-template-columns: repeat(2,minmax(0,1fr)); }' in dashboard_styles
+    assert '@container (max-width: 500px)' not in dashboard_styles
+    assert dashboard.count('data-activity-group>') == 2
+    assert 'selectActivity(group, selected)' in dashboard
+    assert 'tab.closest("[data-activity-group]")' in dashboard
+    assert '.queue-toolbar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr));' in dashboard_styles
+    assert '.queue-toolbar .queue-next-control > button { min-width: 0; flex: 1; width: auto; gap: 4px;' in dashboard_styles
+    assert '.queue-next-picker select' in dashboard_styles
     assert dashboard.index('data-activity-tab="raid"') < dashboard.index('include "channel/raid_summary.html"')
     assert 'data-chat-composer' in dashboard
     assert 'data-channel-id="{{ broadcaster.id }}"' in dashboard
@@ -1241,8 +1357,26 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "data-emote-toggle" in dashboard
     assert "data-dashboard-header-stats" in dashboard
     assert "data-dashboard-stat-value" in dashboard
+    assert '{% if stat.key != "points_lost" %}' in dashboard
+    assert '{% if stat.key == "points_lost" %}' in dashboard
+    assert 'class="dashboard-points-stat" data-dashboard-points-lost' in dashboard
+    assert 'class="dashboard-header-stat dashboard-points-stat"' not in dashboard
+    assert '.dashboard-header-stats > .dashboard-header-stat { flex: 1 0 auto; justify-content: center; }' in dashboard_styles
+    assert '.dashboard-points-stat { display: inline-flex; max-width: 65%; min-width: 0; min-height: 30px; align-items: center; gap: 6px; margin-left: auto; padding: 5px 9px; border: 0;' in dashboard_styles
+    assert 'dashboard.querySelectorAll("[data-dashboard-stat]")' in header_stats_script
+    assert 'dashboard.querySelector("[data-dashboard-points-lost]")' in header_stats_script
     assert "data-stream-status" in dashboard
-    assert 'class="dashboard-header-stat dashboard-ad-stat' in dashboard
+    assert 'class="dashboard-ad-stat state-{{ ad_status.state }}"' in dashboard
+    assert 'class="dashboard-header-stat dashboard-ad-stat' not in dashboard
+    assert 'data-ad-panel' in dashboard
+    assert dashboard.index('<h3>Ads</h3>') < dashboard.index('data-ad-status') < dashboard.index('data-ad-action="run-90"')
+    assert '.channel-dashboard-layout .panel { margin-bottom: 0; padding: 16px; }' in dashboard_styles
+    assert '.channel-page-overview .streamer-main-content { padding: 16px; }' in dashboard_styles
+    assert 'align-items: stretch; gap: 12px; margin-bottom: 16px;' in dashboard_styles
+    assert 'padding: 5px 9px; border: 0;' in dashboard_styles
+    assert 'data-ad-action="run-90"' in dashboard
+    assert 'data-ad-action="run-180"' in dashboard
+    assert 'data-ad-action="snooze"' in dashboard
     assert "stream-status-card" not in dashboard
     assert "Twitch ID:" not in dashboard
     assert 'data-user-id="{{ broadcaster.id }}"' in dashboard
@@ -1310,13 +1444,15 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert dashboard.count('spellcheck="false"') >= 2
     assert "dashboard-channel-metadata.js" in dashboard
     assert "dashboard-viewer-queue.js" in dashboard
-    assert 'data-queue-action="next4"' in dashboard
-    assert 'data-queue-action="next5"' in dashboard
+    assert 'data-queue-action="next"' in dashboard
+    assert 'data-queue-next-select' in dashboard
+    assert 'data-queue-next-count>4</span>' in dashboard
+    assert 'range(1, 11)' in dashboard
     assert 'data-queue-action="clear"' in dashboard
     assert 'href="/channel/viewer-queue/blacklist"' in dashboard
     assert 'data-queue-count' in dashboard
-    assert '.queue-heading-row small { padding: 3px 7px;' in dashboard_styles
-    assert 'color: var(--text); font-size: 12px; font-weight: 700;' in dashboard_styles
+    assert '.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-inline: auto; padding: 5px 9px; border: 0;' in dashboard_styles
+    assert 'color: var(--text); font-size: 13px; font-weight: 800;' in dashboard_styles
     assert 'item.draggable = true' in queue_script
     assert 'runAction("reorder", draggingPosition, position)' in queue_script
     assert 'moveIcon("top")' in queue_script
@@ -1355,9 +1491,16 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'source.onopen = () => showConnectionStatus(true)' in chat_script
     assert 'source.onerror = () => showConnectionStatus(false)' in chat_script
     assert 'window.setTimeout(() => connectionStatus.classList.add("is-fading"), 3000)' in chat_script
-    assert "<span>Category</span>" in dashboard
-    assert '.twitch-channel-field [data-channel-field="game"] { color: color-mix(in srgb, var(--text) 70%, var(--muted)); font-size: 16px; font-weight: 600;' in dashboard_styles
+    assert "<h3>Category</h3>" in dashboard
+    assert '.twitch-channel-field [data-channel-field="title"], .twitch-channel-field [data-channel-field="game"] { color: var(--text); font-size: 17px; font-weight: 700;' in dashboard_styles
     assert 'data-channel-field="title"' in dashboard
+    assert 'aria-label="Stream title (140 characters maximum)"' in dashboard
+    assert 'titleField.addEventListener("beforeinput"' in metadata_script
+    assert 'titleField.addEventListener("paste"' in metadata_script
+    assert 'titleField.addEventListener("input"' in metadata_script
+    assert 'selection.setBaseAndExtent(field, 0, field, field.childNodes.length);' in metadata_script
+    assert 'field.scrollLeft = field.scrollWidth;' in metadata_script
+    assert 'Array.from(titleField.textContent).slice(0, 140).join("")' in metadata_script
     assert 'window.setInterval(() => refreshPinned(feed), 2000)' in chat_script
     assert 'dashboard-activity-unread' in dashboard
     assert 'dashboard-activity-unread' in chat_script
@@ -1416,11 +1559,42 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "resize: none;" in dashboard_styles
     assert 'status.dataset.connectionState === "disconnected"' in composer_script
     assert 'status.classList.add("is-fading")' in composer_script
-    assert 'grid-template-areas: "header header chat" "channel channel chat" "queue activity chat"' in dashboard_styles
-    assert "grid-template-rows: max-content max-content minmax(540px,1fr)" in dashboard_styles
-    assert ".channel-dashboard-layout > .page-header { grid-area: header;" in dashboard_styles
-    assert 'grid-template-areas: "header" "channel" "chat" "activity" "queue"' in dashboard_styles
-    assert dashboard.index('<div class="channel-dashboard-layout">') < dashboard.index('<header class="page-header">')
+    assert 'grid-template-areas: "player queue chat" "activities activities chat"' in dashboard_styles
+    assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
+    assert '.channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }' in dashboard_styles
+    assert 'grid-template-areas: "player" "queue" "activities" "chat"' in dashboard_styles
+    assert 'grid-template-areas: "player queue" "activities activities" "chat chat"' in dashboard_styles
+    assert '.dashboard-activity-grid { display: grid; grid-area: activities;' in dashboard_styles
+    assert '<header class="page-header dashboard-channel-profile" hidden>' in dashboard
+    assert dashboard.index('class="panel dashboard-video-card"') < dashboard.index('class="panel live-chat-panel"')
+    assert dashboard.index('class="panel live-chat-panel"') < dashboard.index('class="dashboard-header-side"')
+    assert 'class="panel-header dashboard-video-header"' in dashboard
+    assert '.dashboard-video-header { display: grid; min-width: 0; grid-template-columns: minmax(0,2fr) minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header [data-channel-field="title"]:is(:focus, .editing) { position: relative; z-index: 10; }' in dashboard_styles
+    assert 'const maxWidth = Math.max(0, cardBounds.right - rightPadding - fieldBounds.left);' in metadata_script
+    assert 'Math.max(fieldBounds.width, titleField.scrollWidth + 2)' in metadata_script
+    assert 'titleField.style.removeProperty("width")' in metadata_script
+    assert '[data-channel-field].metadata-truncated:not(:focus):not(.editing)::after' in dashboard_styles
+    assert '[titleField, gameField].filter(Boolean).forEach(field => {' in metadata_script
+    assert 'new MutationObserver(updateFieldPencil)' in metadata_script
+    assert 'new ResizeObserver(updateFieldPencil)' in metadata_script
+    assert 'if (document.activeElement !== gameField) gameField.scrollLeft = 0;' in metadata_script
+    assert '<h3>Title</h3>' in dashboard
+    assert '<h3>Category</h3>' in dashboard
+    assert '<h3>Twitch stream</h3>' not in dashboard
+    assert '<h3>Stream preview</h3>' not in dashboard
+    assert '.dashboard-header-stats { display: flex; width: 100%; min-width: 0; flex-wrap: wrap; justify-content: flex-start; gap: 6px; }' in dashboard_styles
+    assert 'dashboard-header-stat-break' not in dashboard
+    assert 'data-stream-player' in dashboard
+    assert 'dashboard-stream-player.js' in dashboard
+    assert 'url.searchParams.set("parent", window.location.hostname)' in stream_player_script
+    assert 'url.searchParams.set("autoplay", "false")' in stream_player_script
+    assert 'url.searchParams.set("muted", "true")' in stream_player_script
+    assert '.dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }' in dashboard_styles
+    assert '.dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9;' in dashboard_styles
+    assert 'aspect-ratio: 16 / 9;' in dashboard_styles
+    assert 'grid-template-columns: minmax(0,1.3fr) minmax(0,1fr)' in dashboard_styles
+    assert dashboard.index('<div class="channel-dashboard-layout">') < dashboard.index('<header class="page-header dashboard-channel-profile" hidden>')
     assert 'body class="dashboard-page channel-page channel-page-{{ active_page }}"' in channel_layout
     assert "data-sidebar-toggle" in channel_layout
     assert "channel-sidebar.js" in channel_layout

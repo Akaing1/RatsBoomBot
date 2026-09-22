@@ -8,10 +8,31 @@
     const stateButton = panel.querySelector("[data-queue-toggle]");
     const count = panel.querySelector("[data-queue-count]");
     const status = panel.querySelector("[data-queue-action-status]");
+    const nextCountSelect = panel.querySelector("[data-queue-next-select]");
+    const nextCountLabel = panel.querySelector("[data-queue-next-count]");
+    const nextCountStorageKey = `ratsboombot-queue-next-count:${panel.dataset.channelId}`;
+    let nextCount = 4;
     let requestInProgress = false;
     let draggingPosition = 0;
     let lastSignature = null;
     let statusFadeTimer = null;
+
+    function chooseNextCount(value) {
+        const parsed = Number(value);
+        nextCount = Number.isInteger(parsed) && parsed >= 1 && parsed <= 10 ? parsed : 4;
+        nextCountSelect.value = String(nextCount);
+        nextCountLabel.textContent = String(nextCount);
+    }
+
+    try {
+        chooseNextCount(window.localStorage.getItem(nextCountStorageKey));
+    } catch (error) {
+        chooseNextCount(4);
+    }
+    nextCountSelect.addEventListener("change", () => {
+        chooseNextCount(nextCountSelect.value);
+        try { window.localStorage.setItem(nextCountStorageKey, String(nextCount)); } catch (error) { /* Storage is optional. */ }
+    });
 
     function showStatus(message, tone = "") {
         window.clearTimeout(statusFadeTimer);
@@ -143,6 +164,7 @@
         data.set("action", action);
         data.set("position", String(position));
         data.set("new_position", String(newPosition));
+        if (action === "next") data.set("count", String(nextCount));
         try {
             const response = await fetch(actionUrl, {method: "POST", body: data});
             const result = await response.json();
