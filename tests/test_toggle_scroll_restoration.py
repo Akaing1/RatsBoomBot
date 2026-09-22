@@ -4,6 +4,14 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_admin_overview_uses_available_width_in_both_sidebar_states() -> None:
+    layout = (PROJECT_ROOT / "web/templates/admin/layout.html").read_text(encoding="utf-8")
+    css = (PROJECT_ROOT / "web/static/css/style.css").read_text(encoding="utf-8")
+    assert "{% if channel_section == 'overview' %} admin-channel-overview" in layout
+    assert ".dashboard-page.admin-channel-overview .app-shell .admin-main-content," in css
+    assert ".dashboard-page.admin-channel-overview .app-shell.sidebar-collapsed .admin-main-content { position: static; left: auto; width: 100%; max-width: none;" in css
+
+
 def test_admin_channel_toggles_preserve_scroll_position() -> None:
     template = (PROJECT_ROOT / "web/templates/admin/channel_details.html").read_text(encoding="utf-8")
 

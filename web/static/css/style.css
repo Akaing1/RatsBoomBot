@@ -287,6 +287,22 @@ button, input { font: inherit; }
 .dashboard-command-feed { min-height: 390px; max-height: 455px; }
 
 @media (min-width: 901px) {
+    /* Match channel Overview sizing in both sidebar states; keep Raid scrollable below. */
+    .dashboard-page.admin-channel-overview .app-shell .admin-main-content,
+    .dashboard-page.admin-channel-overview .app-shell.sidebar-collapsed .admin-main-content { position: static; left: auto; width: 100%; max-width: none; min-width: 0; margin: 0; padding: 24px 28px; }
+    .admin-channel-overview .admin-channel-dashboard-layout { min-width: 0; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(320px,1.25fr); grid-template-rows: max-content max-content minmax(360px,1fr); }
+    .admin-channel-overview .admin-channel-header { flex-wrap: wrap; gap: 16px; }
+    .admin-channel-overview .channel-heading-image,
+    .admin-channel-overview .channel-heading-placeholder { width: 50px; height: 50px; flex-basis: 50px; }
+    .admin-channel-overview .page-header h2 { font-size: 28px; overflow-wrap: anywhere; }
+    .admin-channel-overview .page-description { margin-top: 5px; line-height: 1.35; }
+    .admin-channel-overview .status-card { min-width: 0; padding: 16px; }
+    .admin-channel-overview .admin-viewer-queue-column,
+    .admin-channel-overview .admin-viewer-queue-column > .panel,
+    .admin-channel-overview .admin-activity-panel,
+    .admin-channel-overview .admin-readonly-chat-panel { min-height: 0; }
+    .admin-channel-overview .admin-viewer-queue-column > .panel { height: 100%; }
+    .admin-channel-overview .panel-header { margin-bottom: 12px; }
     .channel-page-overview { height: 100dvh; overflow: hidden; }
     .channel-page-overview .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
     .channel-page-overview .sidebar { height: 100dvh; min-height: 0; overflow: visible; }
