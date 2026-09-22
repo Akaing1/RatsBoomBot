@@ -17,6 +17,13 @@ from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.shared.common import templates
 from web.shared.live_chat import stream_chat_events
+from web.shared.protected_users import (
+    ProtectedUserError,
+    add_protected_user,
+    get_protected_user_rows,
+    lookup_protected_user,
+    remove_protected_user
+)
 from web.state import get_bot
 
 router = APIRouter()
@@ -30,37 +37,6 @@ def protected_users_redirect(result: str, message: str) -> RedirectResponse:
         url=f"/channel/customization?protected_result={result}&protected_message={quote_plus(message)}&command_tab=protected#protected-users",
         status_code=303
     )
-
-
-async def get_protected_user_rows(runtime_bot, broadcaster_id: str) -> list[dict[str, object]]:
-    services = runtime_bot.services
-    profile_settings = services.profile_settings
-    default_ids = set(profile_settings.get_default_protected_user_ids(broadcaster_id))
-    added_users = {user.user_id: user for user in profile_settings.get_added_protected_users(broadcaster_id)}
-    resolved_defaults = {}
-
-    if default_ids:
-        try:
-            resolved_defaults = {str(user.id): user for user in await runtime_bot.fetch_users(ids=sorted(default_ids))}
-        except Exception:
-            LOGGER.exception("[Profiles] Failed to resolve default protected users for broadcaster %s.", broadcaster_id)
-
-    rows = []
-
-    for user_id in sorted(default_ids | set(added_users)):
-        added = added_users.get(user_id)
-        resolved = resolved_defaults.get(user_id)
-        login = added.login if added is not None else str(getattr(resolved, "name", "") or "")
-        display_name = added.display_name if added is not None else str(getattr(resolved, "display_name", "") or login or "Unknown user")
-        rows.append({
-            "user_id": user_id,
-            "login": login,
-            "display_name": display_name,
-            "is_default": user_id in default_ids,
-            "removable": user_id not in default_ids
-        })
-
-    return sorted(rows, key=lambda user: (str(user["display_name"]).casefold(), str(user["user_id"])))
 
 
 async def execute_twitch_slash_command(runtime_bot, broadcaster_id: str, message: str) -> str | None:
@@ -1227,39 +1203,17 @@ async def search_channel_protected_user(request: Request, query: str = ""):
     if not broadcaster_id:
         return JSONResponse({"detail": "Connect your Twitch channel first."}, status_code=401)
 
-    normalized_login = query.strip().lstrip("@").casefold()
-
-    if not re.fullmatch(r"[a-z0-9_]{3,25}", normalized_login):
-        return JSONResponse({"detail": "Enter a valid Twitch username."}, status_code=400)
-
     runtime_bot = get_bot()
 
     if runtime_bot is None or runtime_bot.services is None:
         return JSONResponse({"detail": "The bot runtime is unavailable."}, status_code=503)
 
     try:
-        user = await runtime_bot.fetch_user(login=normalized_login)
-    except Exception:
-        LOGGER.exception("[Profiles] Twitch user lookup failed for %s.", normalized_login)
-        return JSONResponse({"detail": "Twitch could not verify that user. Please try again."}, status_code=502)
+        user = await lookup_protected_user(runtime_bot, str(broadcaster_id), query)
+    except ProtectedUserError as error:
+        return JSONResponse({"detail": str(error)}, status_code=error.status_code)
 
-    if user is None:
-        return JSONResponse({"detail": f"Twitch user @{normalized_login} was not found."}, status_code=404)
-
-    user_id = str(user.id)
-    profile = get_active_profile(str(broadcaster_id))
-    automatically_protected = user_id in {str(broadcaster_id), str(runtime_bot.bot_id)}
-    already_protected = automatically_protected or (profile is not None and profile.is_user_protected(user_id))
-
-    return JSONResponse({
-        "user": {
-            "id": user_id,
-            "login": str(user.name),
-            "display_name": str(getattr(user, "display_name", None) or user.name),
-            "already_protected": already_protected,
-            "automatic": automatically_protected
-        }
-    })
+    return JSONResponse({"user": user})
 
 
 @router.post("/channel/protected-users/add")
@@ -1275,42 +1229,12 @@ async def add_channel_protected_user(request: Request, user_id: str = Form(...),
     if runtime_bot is None or runtime_bot.services is None:
         return protected_users_redirect("error", "The bot runtime is unavailable.")
 
-    if not user_id.isdigit():
-        return protected_users_redirect("error", "Twitch returned an invalid user ID.")
-
     try:
-        users = await runtime_bot.fetch_users(ids=[user_id])
-    except Exception:
-        LOGGER.exception("[Profiles] Twitch user validation failed for %s.", user_id)
-        return protected_users_redirect("error", "Twitch could not verify that user. Please try again.")
+        message = await add_protected_user(runtime_bot, str(broadcaster_id), user_id)
+    except ProtectedUserError as error:
+        return protected_users_redirect("error", str(error))
 
-    user = users[0] if users else None
-
-    if user is None:
-        return protected_users_redirect("error", "That Twitch user no longer exists.")
-
-    resolved_user_id = str(user.id)
-
-    if resolved_user_id in {str(broadcaster_id), str(runtime_bot.bot_id)}:
-        return protected_users_redirect("error", "The broadcaster and bot account are already protected automatically.")
-
-    profile = get_active_profile(str(broadcaster_id))
-
-    if profile is not None and profile.is_user_protected(resolved_user_id):
-        return protected_users_redirect("success", f"{getattr(user, 'display_name', None) or user.name} is already protected.")
-
-    try:
-        await runtime_bot.services.profile_settings.add_protected_user(
-            str(broadcaster_id),
-            resolved_user_id,
-            str(user.name),
-            str(getattr(user, "display_name", None) or user.name)
-        )
-    except Exception:
-        LOGGER.exception("[Profiles] Failed to add protected user %s for broadcaster %s.", resolved_user_id, broadcaster_id)
-        return protected_users_redirect("error", "The protected user could not be saved. Please try again.")
-
-    return protected_users_redirect("success", f"{getattr(user, 'display_name', None) or user.name} was added to protected users.")
+    return protected_users_redirect("success", message)
 
 
 @router.post("/channel/protected-users/remove")
@@ -1327,17 +1251,11 @@ async def remove_channel_protected_user(request: Request, user_id: str = Form(..
         return protected_users_redirect("error", "The bot runtime is unavailable.")
 
     try:
-        removed = await runtime_bot.services.profile_settings.remove_protected_user(str(broadcaster_id), user_id)
-    except ValueError as error:
+        message = await remove_protected_user(runtime_bot, str(broadcaster_id), user_id)
+    except ProtectedUserError as error:
         return protected_users_redirect("error", str(error))
-    except Exception:
-        LOGGER.exception("[Profiles] Failed to remove protected user %s for broadcaster %s.", user_id, broadcaster_id)
-        return protected_users_redirect("error", "The protected user could not be removed. Please try again.")
 
-    if not removed:
-        return protected_users_redirect("error", "That user is not in the protected-user list.")
-
-    return protected_users_redirect("success", "The user was removed from protected users.")
+    return protected_users_redirect("success", message)
 
 
 @router.post("/channel/features/toggles")

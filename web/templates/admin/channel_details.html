@@ -73,8 +73,10 @@
 {% block title %}{{ broadcaster.name or "Channel" }} | RatsBoomBot{% endblock %}
 
 {% block content %}
-<header class="page-header">
-    <div class="channel-heading">
+<header class="page-header admin-channel-header">
+    <div class="channel-heading dashboard-channel-heading">
+        <p class="eyebrow">Channel management</p>
+        <div class="dashboard-channel-identity">
         {% if broadcaster.profile_image_url %}
             <img
                 class="channel-heading-image"
@@ -87,8 +89,7 @@
             </div>
         {% endif %}
 
-        <div>
-            <p class="eyebrow">Channel management</p>
+        <div class="dashboard-channel-copy">
             <h2>{{ broadcaster.name or "Unknown channel" }}</h2>
 
             <p class="page-description">
@@ -99,39 +100,25 @@
                 Twitch ID: {{ broadcaster.id }}
             </p>
         </div>
+        </div>
     </div>
 
-    {% set customization_active = false %}
-    {% include "admin/channel_page_switch.html" %}
+    <div class="admin-channel-header-side">
+        <div class="dashboard-header-stats" aria-label="Channel status">
+            <div class="dashboard-header-stat dashboard-stream-stat {% if broadcaster.is_live %}state-live{% else %}state-offline{% endif %}">
+                <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span><span>Stream</span><strong>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
+            </div>
+            <div class="dashboard-header-stat">
+                <span id="queue-status-indicator" class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"></span>
+                <span>Queue</span><strong id="queue-status-label">{% if queue_open %}Open{% else %}Closed{% endif %}</strong>
+                <span id="queue-size-label" class="admin-header-queue-size">{{ queue_size }} waiting</span>
+            </div>
+            <div class="dashboard-header-stat"><span>Points lost</span><strong>{{ gambling_loss_total }}</strong></div>
+        </div>
+        {% set customization_active = false %}
+        {% include "admin/channel_page_switch.html" %}
+    </div>
 </header>
-
-<section class="status-grid channel-status-grid">
-    <article class="status-card">
-        <p class="card-label">Stream status</p>
-
-        <div class="status-row">
-            <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
-            <strong>{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</strong>
-        </div>
-
-        <p class="card-detail">Current Twitch broadcast status.</p>
-    </article>
-
-    <article class="status-card">
-        <p class="card-label">Viewer queue</p>
-
-        <div class="status-row">
-            <span id="queue-status-indicator" class="status-indicator {% if queue_open %}online{% else %}offline{% endif %}"></span>
-            <strong id="queue-status-label">{% if queue_open %}Open{% else %}Closed{% endif %}</strong>
-        </div>
-
-        <p id="queue-size-label" class="card-detail">
-            {{ queue_size }} viewer{% if queue_size != 1 %}s{% endif %} currently waiting.
-        </p>
-    </article>
-
-    <article class="status-card"><p class="card-label">Lost to RatsBoomBot</p><div class="metric">{{ gambling_loss_total }}</div><p class="card-detail">Points lost to gambling in this channel.</p></article>
-</section>
 
 {% if toggle_message %}
     <div class="toggle-feedback {% if toggle_result == 'success' %}success{% else %}error{% endif %}" role="status">
@@ -176,57 +163,8 @@
     </section>
 {% endif %}
 
-<div class="channel-dashboard-grid">
-    <div class="redemption-panel-grid">
-        <section class="panel activity-panel">
-            <div class="panel-header">
-                <div><p class="eyebrow">Account activity</p><h3>Check-ins</h3></div>
-                <span class="channel-state">Account</span>
-            </div>
-
-            <div id="checkin-activity-content" class="activity-scroll">
-                {% if redemption_activity.checkins %}
-                    <ul class="activity-list">
-                        {% for checkin in redemption_activity.checkins %}
-                            <li class="activity-list-item">
-                                <div class="activity-main"><strong>@{{ checkin.username }}</strong><span>{{ checkin.redeemed_at }}</span></div>
-                                <span class="activity-badge {% if checkin.type in ('first', 'second') %}{{ checkin.type }}{% endif %}">{% if checkin.type == "first" %}FIRST{% elif checkin.type == "second" %}SECOND{% else %}Check-in{% endif %}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <div class="compact-empty-state"><h4>No check-ins yet</h4><p>Daily, FIRST, and SECOND claims will appear here.</p></div>
-                {% endif %}
-            </div>
-        </section>
-
-        <section class="panel activity-panel">
-            <div class="panel-header">
-                <div><p class="eyebrow">Account activity</p><h3>Redeems</h3></div>
-                <span class="channel-state">Account</span>
-            </div>
-
-            <div id="redemption-activity-content" class="activity-scroll">
-                {% if redemption_activity.redemptions %}
-                    <ul class="activity-list">
-                        {% for redemption in redemption_activity.redemptions %}
-                            <li class="activity-list-item redemption-activity-item">
-                                <div class="activity-main">
-                                    <strong>{{ redemption.reward_title }}</strong>
-                                    <span>@{{ redemption.username }} &middot; {{ redemption.redeemed_at }}</span>
-                                    {% if redemption.user_input %}<p>{{ redemption.user_input }}</p>{% endif %}
-                                </div>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <div class="compact-empty-state"><h4>No other redeems yet</h4><p>Other channel point rewards will appear here.</p></div>
-                {% endif %}
-            </div>
-        </section>
-    </div>
-
-    <div class="channel-dashboard-side">
+<div class="admin-channel-live-grid">
+    <div class="channel-dashboard-side admin-viewer-queue-column">
         <section class="panel">
             <div class="panel-header">
                 <div><p class="eyebrow">Viewer games</p><h3>Viewer queue</h3></div>
@@ -260,9 +198,70 @@
                 {% endif %}
             </div>
         </section>
-
-
     </div>
+
+    <section class="panel activity-panel admin-activity-panel">
+        <div class="panel-header">
+            <div><p class="eyebrow">Account activity</p><h3>Activity</h3></div>
+            <span class="channel-state">Account</span>
+        </div>
+
+        <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Account activity feed">
+            <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-admin-activity-tab="redeems">Redeems</button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-admin-activity-tab="checkins">Check-ins</button>
+        </div>
+
+        <div data-admin-activity-panel="redeems">
+            <div id="redemption-activity-content" class="activity-scroll">
+                {% if redemption_activity.redemptions %}
+                    <ul class="activity-list">
+                        {% for redemption in redemption_activity.redemptions %}
+                            <li class="activity-list-item redemption-activity-item">
+                                <div class="activity-main">
+                                    <strong>{{ redemption.reward_title }}</strong>
+                                    <span>@{{ redemption.username }} &middot; {{ redemption.redeemed_at }}</span>
+                                    {% if redemption.user_input %}<p>{{ redemption.user_input }}</p>{% endif %}
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="compact-empty-state"><h4>No other redeems yet</h4><p>Other channel point rewards will appear here.</p></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div data-admin-activity-panel="checkins" hidden>
+            <div id="checkin-activity-content" class="activity-scroll">
+                {% if redemption_activity.checkins %}
+                    <ul class="activity-list">
+                        {% for checkin in redemption_activity.checkins %}
+                            <li class="activity-list-item">
+                                <div class="activity-main"><strong>@{{ checkin.username }}</strong><span>{{ checkin.redeemed_at }}</span></div>
+                                <span class="activity-badge {% if checkin.type in ('first', 'second') %}{{ checkin.type }}{% endif %}">{% if checkin.type == "first" %}FIRST{% elif checkin.type == "second" %}SECOND{% else %}Check-in{% endif %}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="compact-empty-state"><h4>No check-ins yet</h4><p>Daily, FIRST, and SECOND claims will appear here.</p></div>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section class="panel live-chat-panel admin-readonly-chat-panel">
+        <div class="panel-header">
+            <div><p class="eyebrow">Twitch + YouTube</p><h3>Combined Chat</h3></div>
+            <span class="channel-state">Read only</span>
+        </div>
+        <p class="panel-description admin-readonly-chat-description">Monitor this channel's combined chat without sending messages.</p>
+        <div
+            class="live-chat-feed dashboard-chat-feed"
+            data-live-chat-feed
+            data-stream-url="/admin/channels/{{ broadcaster.id }}/api/chat/stream?view=both"
+            data-max-messages="150"
+        ></div>
+    </section>
 </div>
 
 <section class="panel toggle-management-panel">
@@ -586,11 +585,27 @@
         const queueContent = document.getElementById("viewer-queue-content");
         const checkinContent = document.getElementById("checkin-activity-content");
         const redemptionContent = document.getElementById("redemption-activity-content");
+        const activityTabs = document.querySelectorAll("[data-admin-activity-tab]");
+        const activityPanels = document.querySelectorAll("[data-admin-activity-panel]");
         const raidStatus = document.getElementById("raid-monitor-status");
         const raidEmpty = document.getElementById("raid-monitor-empty");
         const raidDetails = document.getElementById("raid-monitor-details");
         let requestInProgress = false;
         let lastSignature = null;
+
+        activityTabs.forEach(tab => {
+            tab.addEventListener("click", () => {
+                const selected = tab.dataset.adminActivityTab;
+                activityTabs.forEach(candidate => {
+                    const active = candidate === tab;
+                    candidate.classList.toggle("active", active);
+                    candidate.setAttribute("aria-selected", String(active));
+                });
+                activityPanels.forEach(panel => {
+                    panel.hidden = panel.dataset.adminActivityPanel !== selected;
+                });
+            });
+        });
 
         function formatTime(value) {
             if (!value) return "";
@@ -789,6 +804,7 @@
 {% endblock %}
 
 {% block page_scripts %}
+<script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
 <script>
     (() => {
         const scrollKey = `ratsboombot-toggle-scroll:${window.location.pathname}`;

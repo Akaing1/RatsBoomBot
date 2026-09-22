@@ -5,3 +5,7 @@
 {% include "shared/profile_inputs.html" %}
 {% include "shared/timer_editor.html" %}
 {% endblock %}
+
+{% block page_scripts %}
+    <script src="{{ url_for('static', path='/js/protected-users.js') }}?v={{ deployment_stamp() }}" defer></script>
+{% endblock %}

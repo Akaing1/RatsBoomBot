@@ -1,9 +1,9 @@
 (() => {
-    const shell = document.querySelector("[data-channel-shell]");
+    const shell = document.querySelector("[data-dashboard-shell]");
     const toggle = document.querySelector("[data-sidebar-toggle]");
     if (!shell || !toggle) return;
 
-    const storageKey = "ratsboombot-channel-sidebar-collapsed";
+    const storageKey = shell.dataset.sidebarStorageKey || "ratsboombot-dashboard-sidebar-collapsed";
 
     function applyState(collapsed) {
         shell.classList.toggle("sidebar-collapsed", collapsed);

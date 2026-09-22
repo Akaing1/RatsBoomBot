@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from config.settings import settings
 from web.app import app, create_app
+from web.shared.common import templates
 
 
 def test_root_is_the_public_landing_page() -> None:
@@ -45,6 +46,20 @@ def test_admin_dashboard_uses_admin_prefix() -> None:
     assert response.headers["location"] == "/admin/login"
     assert login.status_code == 200
     assert legacy_login.status_code == 404
+
+
+def test_admin_layout_uses_standard_dashboard_navigation() -> None:
+    layout = templates.env.get_template("admin/layout.html").render(
+        active_page="dashboard", administrator=None, csrf_token="test",
+        url_for=lambda *args, **kwargs: kwargs.get("path", "/static/resource"),
+        deployment_stamp=lambda: "test"
+    )
+
+    assert 'class="dashboard-page admin-page admin-page-dashboard"' in layout
+    assert "data-dashboard-shell" in layout
+    assert 'data-sidebar-storage-key="ratsboombot-admin-sidebar-collapsed"' in layout
+    assert "data-sidebar-toggle" in layout
+    assert "channel-sidebar.js" in layout
 
 
 def test_channel_oauth_session_cookie_is_persistent() -> None:
