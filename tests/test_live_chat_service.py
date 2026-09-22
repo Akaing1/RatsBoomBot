@@ -1421,11 +1421,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert ".channel-dashboard-layout > .page-header { grid-area: header;" in dashboard_styles
     assert 'grid-template-areas: "header" "channel" "chat" "activity" "queue"' in dashboard_styles
     assert dashboard.index('<div class="channel-dashboard-layout">') < dashboard.index('<header class="page-header">')
-    assert 'body class="channel-page channel-page-{{ active_page }}"' in channel_layout
+    assert 'body class="dashboard-page channel-page channel-page-{{ active_page }}"' in channel_layout
     assert "data-sidebar-toggle" in channel_layout
     assert "channel-sidebar.js" in channel_layout
     assert 'localStorage.setItem(storageKey, String(collapsed))' in sidebar_script
-    assert ".channel-page:not(.channel-page-overview) .streamer-main-content" in dashboard_styles
+    assert ".dashboard-page:not(.channel-page-overview) .main-content" in dashboard_styles
     assert "left: -36px; width: min(1250px,calc(100vw - 144px));" in dashboard_styles
     assert "justify-content: space-evenly; gap: 0;" in dashboard_styles
     assert ".navigation .nav-link { flex: 0 0 auto; justify-content: center; }" in dashboard_styles

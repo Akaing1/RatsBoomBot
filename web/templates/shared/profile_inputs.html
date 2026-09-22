@@ -202,7 +202,7 @@
                         </div>
                     </div>
 
-                    <form class="protected-user-search" data-protected-user-search data-search-url="/channel/protected-users/search">
+                    <form class="protected-user-search" data-protected-user-search data-search-url="{{ protected_search_url | default('/channel/protected-users/search') }}">
                         <label for="protected-user-query">Twitch username</label>
                         <div class="protected-user-search-controls">
                             <input id="protected-user-query" class="profile-setting-input" type="text" name="query" placeholder="Enter username" maxlength="25" autocomplete="off" required>
@@ -211,7 +211,7 @@
                         <p class="protected-user-search-message" data-protected-search-message aria-live="polite"></p>
                     </form>
 
-                    <form class="protected-user-result" method="post" action="/channel/protected-users/add" data-protected-user-result hidden>
+                    <form class="protected-user-result" method="post" action="{{ protected_add_url | default('/channel/protected-users/add') }}" data-protected-user-result hidden>
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="user_id" data-protected-result-id>
                         <div>
@@ -232,7 +232,7 @@
                             {% if user.is_default %}
                                 <span class="toggle-status">Channel default</span>
                             {% elif user.removable %}
-                                <form method="post" action="/channel/protected-users/remove" onsubmit="return confirm('Remove {{ user.display_name }} from protected users?');">
+                                <form method="post" action="{{ protected_remove_url | default('/channel/protected-users/remove') }}" onsubmit="return confirm('Remove {{ user.display_name }} from protected users?');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <input type="hidden" name="user_id" value="{{ user.user_id }}">
                                     <button class="button danger" type="submit">Remove</button>

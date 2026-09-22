@@ -7,13 +7,12 @@
 {% block content %}
 <header class="page-header">
     <div>
-        <p class="eyebrow">Local administration</p>
+        <p class="eyebrow">RatsBoomBot administration</p>
 
         <h2>Admin Dashboard</h2>
 
         <p class="page-description">
-            Manage the local RatsBoomBot runtime, bot account,
-            and connected Twitch channels.
+            Monitor the runtime and move between connected channels from one workspace.
         </p>
     </div>
 
@@ -34,7 +33,7 @@
     </div>
 </header>
 
-<section class="status-grid">
+<section class="status-grid admin-runtime-grid">
     <article class="status-card">
         <p class="card-label">Bot runtime</p>
 
@@ -113,29 +112,25 @@
     </div>
 
     {% if broadcasters %}
-        <div class="channel-list">
+        <div class="channel-card-grid admin-channel-card-grid">
             {% for broadcaster in broadcasters %}
-                <article class="channel-row">
-                    <div class="channel-avatar">
-                        {{ (broadcaster.name or broadcaster.id)[0] | upper }}
+                <article class="channel-card admin-channel-card">
+                    <div class="channel-card-header">
+                        {% if broadcaster.profile_image_url %}
+                            <img class="channel-profile-image" src="{{ broadcaster.profile_image_url }}" alt="{{ broadcaster.name or broadcaster.id }}">
+                        {% else %}
+                            <div class="channel-profile-placeholder">{{ (broadcaster.name or broadcaster.id)[0] | upper }}</div>
+                        {% endif %}
+                        <div class="channel-card-identity">
+                            <h4>{{ broadcaster.name or "Channel" }}</h4>
+                            <p>{% if broadcaster.login %}@{{ broadcaster.login }} · {% endif %}{{ broadcaster.id }}</p>
+                        </div>
+                        <span class="channel-state {% if broadcaster.is_live %}live{% endif %}">{% if broadcaster.is_live %}Live{% else %}Offline{% endif %}</span>
                     </div>
-
-                    <div class="channel-details">
-                        <strong>
-                            {{ broadcaster.name or "Channel" }}
-                        </strong>
-
-                        <span>
-                            ID: {{ broadcaster.id }}
-                        </span>
+                    <div class="channel-card-actions">
+                        <a class="button secondary" href="/admin/channels/{{ broadcaster.id }}/customization">Customize</a>
+                        <a class="button primary" href="/admin/channels/{{ broadcaster.id }}">Manage</a>
                     </div>
-
-                    <a
-                        class="button secondary"
-                        href="/admin/channels/{{ broadcaster.id }}"
-                    >
-                        Manage
-                    </a>
                 </article>
             {% endfor %}
         </div>

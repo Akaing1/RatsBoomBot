@@ -1,13 +1,21 @@
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName
 from config.settings import settings
 from storage.database import delete_token
 from web.admin.auth import require_admin, require_owner, validate_csrf_token
 from web.shared.common import build_admin_context, render_error, templates
+from web.shared.live_chat import stream_chat_events
+from web.shared.protected_users import (
+    ProtectedUserError,
+    add_protected_user,
+    get_protected_user_rows,
+    lookup_protected_user,
+    remove_protected_user
+)
 from web.state import get_bot, get_db
 
 router = APIRouter(prefix="/channels")
@@ -33,7 +41,14 @@ async def admin_channel_customization(request: Request, broadcaster_id: str):
             channel_settings=await services.broadcaster_settings.get_settings(broadcaster_id),
             setting_groups=services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)}),
             setting_result=request.query_params.get("setting_result"),
-            setting_message=request.query_params.get("setting_message")
+            setting_message=request.query_params.get("setting_message"),
+            command_tab=request.query_params.get("command_tab", "responses"),
+            protected_users=await get_protected_user_rows(runtime_bot, str(broadcaster_id)),
+            protected_result=request.query_params.get("protected_result"),
+            protected_message=request.query_params.get("protected_message"),
+            protected_search_url=f"/admin/channels/{broadcaster_id}/protected-users/search",
+            protected_add_url=f"/admin/channels/{broadcaster_id}/protected-users/add",
+            protected_remove_url=f"/admin/channels/{broadcaster_id}/protected-users/remove"
         )
     )
 
@@ -73,6 +88,89 @@ async def save_admin_channel_customization(request: Request, broadcaster_id: str
         result, message = "error", str(error)
     query = urlencode({"setting_result": result, "setting_message": message})
     return RedirectResponse(url=f"/admin/channels/{broadcaster_id}/customization?{query}", status_code=303)
+
+
+def admin_protected_users_redirect(broadcaster_id: str, result: str, message: str) -> RedirectResponse:
+    query = urlencode({
+        "protected_result": result,
+        "protected_message": message,
+        "command_tab": "protected"
+    })
+    return RedirectResponse(
+        url=f"/admin/channels/{broadcaster_id}/customization?{query}#protected-users",
+        status_code=303
+    )
+
+
+@router.get("/{broadcaster_id}/protected-users/search", response_class=JSONResponse)
+async def search_admin_protected_user(request: Request, broadcaster_id: str, query: str = ""):
+    admin_redirect = await require_admin(request)
+
+    if admin_redirect:
+        return JSONResponse({"detail": "Administrator authentication required."}, status_code=401)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "The bot runtime is unavailable."}, status_code=503)
+
+    if get_broadcaster(runtime_bot, broadcaster_id) is None:
+        return JSONResponse({"detail": "That Twitch channel is not connected."}, status_code=404)
+
+    try:
+        user = await lookup_protected_user(runtime_bot, broadcaster_id, query)
+    except ProtectedUserError as error:
+        return JSONResponse({"detail": str(error)}, status_code=error.status_code)
+
+    return JSONResponse({"user": user})
+
+
+@router.post("/{broadcaster_id}/protected-users/add")
+async def add_admin_protected_user(request: Request, broadcaster_id: str, user_id: str = Form(...), csrf_token: str = Form(...)):
+    admin_redirect = await require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
+    validate_csrf_token(request, csrf_token)
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return admin_protected_users_redirect(broadcaster_id, "error", "The bot runtime is unavailable.")
+
+    if get_broadcaster(runtime_bot, broadcaster_id) is None:
+        return await get_channel_error(request)
+
+    try:
+        message = await add_protected_user(runtime_bot, broadcaster_id, user_id)
+    except ProtectedUserError as error:
+        return admin_protected_users_redirect(broadcaster_id, "error", str(error))
+
+    return admin_protected_users_redirect(broadcaster_id, "success", message)
+
+
+@router.post("/{broadcaster_id}/protected-users/remove")
+async def remove_admin_protected_user(request: Request, broadcaster_id: str, user_id: str = Form(...), csrf_token: str = Form(...)):
+    admin_redirect = await require_admin(request)
+
+    if admin_redirect:
+        return admin_redirect
+
+    validate_csrf_token(request, csrf_token)
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return admin_protected_users_redirect(broadcaster_id, "error", "The bot runtime is unavailable.")
+
+    if get_broadcaster(runtime_bot, broadcaster_id) is None:
+        return await get_channel_error(request)
+
+    try:
+        message = await remove_protected_user(runtime_bot, broadcaster_id, user_id)
+    except ProtectedUserError as error:
+        return admin_protected_users_redirect(broadcaster_id, "error", str(error))
+
+    return admin_protected_users_redirect(broadcaster_id, "success", message)
 
 
 async def get_runtime_error(request: Request):
@@ -288,6 +386,33 @@ async def channel_activity_state(request: Request, broadcaster_id: str):
         "redemptions": await get_redemption_dashboard_data(services, broadcaster_id),
         "raid": await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_configured else None
     })
+
+
+@router.get("/{broadcaster_id}/api/chat/stream")
+async def admin_channel_chat_stream(request: Request, broadcaster_id: str, view: str = "both"):
+    admin_redirect = await require_admin(request)
+
+    if admin_redirect:
+        return JSONResponse({"detail": "Administrator authentication required."}, status_code=401)
+
+    runtime_bot = get_bot()
+
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+
+    if get_broadcaster(runtime_bot, broadcaster_id) is None:
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    return StreamingResponse(
+        stream_chat_events(
+            request,
+            runtime_bot.services.live_chat,
+            broadcaster_id,
+            view
+        ),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
 
 
 @router.post("/{broadcaster_id}/toggles")

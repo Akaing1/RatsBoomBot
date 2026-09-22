@@ -41,6 +41,16 @@ def test_admin_feature_page_lists_unique_profile_integrations() -> None:
     assert "/admin/channels/{{ broadcaster.id }}/custom-bot/connect" not in template
 
 
+def test_admin_channel_chat_is_read_only() -> None:
+    template = (PROJECT_ROOT / "web/templates/admin/channel_details.html").read_text(encoding="utf-8")
+
+    assert 'data-stream-url="/admin/channels/{{ broadcaster.id }}/api/chat/stream?view=both"' in template
+    assert "live-chat-feed.js" in template
+    assert "data-chat-composer" not in template
+    assert "data-moderation-url" not in template
+    assert "data-pinned-url" not in template
+
+
 def test_streamer_dashboard_has_profile_customization_page() -> None:
     layout = (PROJECT_ROOT / "web/templates/channel/layout.html").read_text(encoding="utf-8")
     template = (PROJECT_ROOT / "web/templates/channel/customization.html").read_text(encoding="utf-8")

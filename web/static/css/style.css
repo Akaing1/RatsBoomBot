@@ -43,9 +43,9 @@ button, input { font: inherit; }
 }
 .main-content { width: 100%; max-width: 1250px; padding: 48px; }
 
-.channel-page .app-shell { transition: grid-template-columns .2s ease; }
-.channel-page:not(.channel-page-overview) .streamer-main-content { margin-right: auto; margin-left: auto; }
-.channel-page .brand { min-width: 0; padding-right: 28px; overflow: hidden; white-space: nowrap; }
+.dashboard-page .app-shell { transition: grid-template-columns .2s ease; }
+.dashboard-page:not(.channel-page-overview) .main-content { margin-right: auto; margin-left: auto; }
+.dashboard-page .brand { min-width: 0; padding-right: 28px; overflow: hidden; white-space: nowrap; }
 .sidebar-toggle { position: absolute; z-index: 2; top: 18px; right: 10px; display: grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
 .sidebar-toggle:hover, .sidebar-toggle:focus-visible { border-color: var(--accent); color: var(--text); }
 .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 38px; }
@@ -75,18 +75,18 @@ button, input { font: inherit; }
 }
 .nav-link-icon { display: grid; width: 20px; flex: 0 0 20px; place-items: center; font-size: 15px; }
 .brand-copy, .nav-link-label, .sidebar-button-label { opacity: 1; transition: opacity .14s ease, transform .18s ease; }
-.channel-page .sidebar-logout .button { gap: 10px; white-space: nowrap; }
-.channel-page .app-shell.sidebar-collapsed { grid-template-columns: 72px minmax(0,1fr); }
-.channel-page:not(.channel-page-overview) .app-shell.sidebar-collapsed .streamer-main-content { position: relative; left: -36px; width: min(1250px,calc(100vw - 144px)); max-width: none; }
-.channel-page .app-shell.sidebar-collapsed .sidebar { width: 72px; padding-right: 14px; padding-left: 14px; }
-.channel-page .app-shell.sidebar-collapsed .sidebar:hover { width: var(--sidebar-width); padding-right: 20px; padding-left: 20px; box-shadow: 18px 0 38px rgba(0,0,0,.38); }
-.channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand-copy,
-.channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link-label,
-.channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-button-label { width: 0; opacity: 0; transform: translateX(-8px); pointer-events: none; }
-.channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand { padding-right: 0; }
-.channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-toggle { top: 35px; right: -14px; }
-.channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link,
-.channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-logout .button { gap: 0; justify-content: center; padding-right: 10px; padding-left: 10px; }
+.dashboard-page .sidebar-logout .button { gap: 10px; white-space: nowrap; }
+.dashboard-page .app-shell.sidebar-collapsed { grid-template-columns: 72px minmax(0,1fr); }
+.dashboard-page:not(.channel-page-overview) .app-shell.sidebar-collapsed .main-content { position: relative; left: -36px; width: min(1250px,calc(100vw - 144px)); max-width: none; }
+.dashboard-page .app-shell.sidebar-collapsed .sidebar { width: 72px; padding-right: 14px; padding-left: 14px; }
+.dashboard-page .app-shell.sidebar-collapsed .sidebar:hover { width: var(--sidebar-width); padding-right: 20px; padding-left: 20px; box-shadow: 18px 0 38px rgba(0,0,0,.38); }
+.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand-copy,
+.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link-label,
+.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-button-label { width: 0; opacity: 0; transform: translateX(-8px); pointer-events: none; }
+.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand { padding-right: 0; }
+.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-toggle { top: 35px; right: -14px; }
+.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link,
+.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-logout .button { gap: 0; justify-content: center; padding-right: 10px; padding-left: 10px; }
 .nav-link:hover, .nav-link.active { background: var(--surface-raised); color: var(--text); }
 .nav-link.disabled { opacity: .45; pointer-events: none; }
 
@@ -173,6 +173,16 @@ button, input { font: inherit; }
 .channel-metadata span { color: var(--muted); font-size: 11px; text-transform: uppercase; }
 .channel-metadata strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; }
 .channel-card-actions { display: flex; justify-content: flex-end; gap: 9px; }
+.admin-main-content { width: min(100%, 1440px); max-width: 1440px; }
+.admin-runtime-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.admin-channel-card-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.admin-channel-card { min-height: 150px; }
+.admin-channel-card .channel-card-actions { margin-top: auto; padding-top: 18px; }
+.admin-channel-header { align-items: center; }
+.admin-channel-header-side { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: 12px; }
+.admin-channel-header-side .channel-page-controls { gap: 8px; }
+.admin-channel-header-side .header-actions { gap: 8px; }
+.admin-header-queue-size { font-size: 9px; }
 
 .channel-heading { display: flex; align-items: center; gap: 18px; }
 .channel-heading-image, .channel-heading-placeholder { width: 68px; height: 68px; flex: 0 0 68px; border-radius: 50%; }
@@ -236,6 +246,15 @@ button, input { font: inherit; }
 .channel-status-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .channel-detail-grid {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));align-items: start; gap: 24px; }
 .channel-dashboard-grid { display: grid; grid-template-columns: minmax(0,3fr) minmax(0,3fr) minmax(0,4fr); align-items: start; gap: 24px; }
+.admin-channel-live-grid { display: grid; grid-template-columns: minmax(240px,.85fr) minmax(270px,.95fr) minmax(360px,1.3fr); align-items: stretch; gap: 18px; margin-bottom: 24px; }
+.admin-channel-live-grid .panel { margin-bottom: 0; }
+.admin-viewer-queue-column, .admin-viewer-queue-column > .panel, .admin-activity-panel, .admin-readonly-chat-panel { min-width: 0; min-height: 540px; }
+.admin-viewer-queue-column > .panel, .admin-activity-panel, .admin-readonly-chat-panel { display: flex; flex-direction: column; }
+.admin-activity-panel > [data-admin-activity-panel]:not([hidden]) { display: flex; min-height: 0; flex: 1; flex-direction: column; }
+.admin-channel-live-grid .activity-scroll, .admin-channel-live-grid #viewer-queue-content { min-height: 0; max-height: 680px; overflow-y: auto; }
+.admin-readonly-chat-panel { grid-area: auto; }
+.admin-readonly-chat-description { margin-top: -4px; margin-bottom: 14px; }
+.admin-readonly-chat-panel .dashboard-chat-feed { min-height: 430px; max-height: 680px; }
 .channel-dashboard-layout { display: grid; grid-template-columns: minmax(250px,.8fr) minmax(270px,.9fr) minmax(360px,1.25fr); grid-template-rows: max-content max-content minmax(540px,1fr); grid-template-areas: "header header chat" "channel channel chat" "queue activity chat"; align-items: stretch; gap: 18px; margin-bottom: 24px; }
 .channel-dashboard-layout > .channel-status-grid, .channel-dashboard-layout > .channel-live-layout { display: contents; }
 .channel-dashboard-layout > .page-header { grid-area: header; min-width: 0; margin-bottom: 0; }
@@ -698,23 +717,24 @@ body.landing-page {
 @media (max-width: 900px) {
     .app-shell { display: block; }
     .sidebar { width: 100%; min-height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
-    .channel-page .app-shell.sidebar-collapsed .sidebar,
-    .channel-page .app-shell.sidebar-collapsed .sidebar:hover { width: 100%; padding: 28px 20px; box-shadow: none; }
-    .channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand { margin-top: 0; padding-right: 28px; }
-    .channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand-copy,
-    .channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link-label,
-    .channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-button-label { width: auto; opacity: 1; transform: none; pointer-events: auto; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar,
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:hover { width: 100%; padding: 28px 20px; box-shadow: none; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand { margin-top: 0; padding-right: 28px; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand-copy,
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link-label,
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-button-label { width: auto; opacity: 1; transform: none; pointer-events: auto; }
     .sidebar-toggle { display: none; }
     .navigation { width: 100%; flex-direction: row; justify-content: space-evenly; gap: 0; overflow-x: auto; }
     .navigation .nav-link { flex: 0 0 auto; justify-content: center; }
-    .channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link { gap: 11px; justify-content: center; padding: 11px 13px; }
-    .channel-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 17px; padding-left: 17px; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link { gap: 11px; justify-content: center; padding: 11px 13px; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 17px; padding-left: 17px; }
     .sidebar-logout { margin-top: 18px; }
     .main-content { padding: 28px 20px; }
-    .channel-page:not(.channel-page-overview) .streamer-main-content,
-    .channel-page:not(.channel-page-overview) .app-shell.sidebar-collapsed .streamer-main-content { position: static; left: auto; width: 100%; max-width: none; margin-right: 0; margin-left: 0; }
+    .dashboard-page:not(.channel-page-overview) .main-content,
+    .dashboard-page:not(.channel-page-overview) .app-shell.sidebar-collapsed .main-content { position: static; left: auto; width: 100%; max-width: none; margin-right: 0; margin-left: 0; }
     .page-header { flex-direction: column; }
-    .status-grid, .channel-summary, .channel-card-grid, .channel-status-grid, .channel-detail-grid, .channel-dashboard-grid, .channel-live-layout, .redemption-panel-grid, .performance-grid, .raid-metric-grid { grid-template-columns: 1fr; }
+    .status-grid, .channel-summary, .channel-card-grid, .channel-status-grid, .channel-detail-grid, .channel-dashboard-grid, .channel-live-layout, .redemption-panel-grid, .admin-channel-live-grid, .performance-grid, .raid-metric-grid { grid-template-columns: 1fr; }
+    .admin-viewer-queue-column, .admin-viewer-queue-column > .panel, .admin-activity-panel, .admin-readonly-chat-panel { min-height: 460px; }
     .channel-dashboard-layout { grid-template-columns: 1fr; grid-template-rows: none; grid-template-areas: "header" "channel" "chat" "activity" "queue"; }
     .dashboard-activity-panel, .viewer-queue-column > .panel { min-height: 460px; }
     .dashboard-chat-feed { min-height: 460px; }
