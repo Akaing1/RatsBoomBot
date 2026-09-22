@@ -3,6 +3,9 @@ import logging
 from twitchio.ext import commands
 
 from bot.profiles import GlobalCommandGroup
+from bot.services.channels.stream_metadata import (
+    StreamCategoryLookupError, StreamCategoryNotFoundError, update_stream_game, update_stream_title
+)
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -146,27 +149,21 @@ class SettingsCommands(commands.Component):
             return
 
         try:
-            game = await self.bot.fetch_game(name=game_name)
-        except Exception:
+            update = await update_stream_game(self.bot, broadcaster_id, game_name)
+        except StreamCategoryLookupError:
             LOGGER.exception("[Settings] Failed to find game %s for broadcaster %s.", game_name, broadcaster_id)
             await ctx.reply("Twitch could not look up that game right now. Please try again later.")
             return
-
-        if game is None:
+        except StreamCategoryNotFoundError:
             await ctx.reply(f'I could not find a Twitch category named "{game_name}".')
             return
-
-        try:
-            broadcaster = self.bot.create_partialuser(broadcaster_id)
-            await broadcaster.modify_channel(game_id=str(game.id))
         except Exception as error:
             LOGGER.exception("[Settings] Failed to update the game for broadcaster %s.", broadcaster_id)
             await self._send_update_error(ctx, error, "game")
             return
 
-        resolved_name = getattr(game, "name", game_name)
-        LOGGER.info("[Settings] User %s changed broadcaster %s's game to %s (%s).", username, broadcaster_id, resolved_name, game.id, extra={"broadcaster_id": broadcaster_id})
-        await ctx.reply(f'Stream game updated to "{resolved_name}".')
+        LOGGER.info("[Settings] User %s changed broadcaster %s's game to %s (%s).", username, broadcaster_id, update.value, update.game_id, extra={"broadcaster_id": broadcaster_id})
+        await ctx.reply(update.announcement)
 
     @set_channel.command(name="title")
     async def set_title(self, ctx: commands.Context, *, title: str | None = None) -> None:
@@ -188,15 +185,14 @@ class SettingsCommands(commands.Component):
             return
 
         try:
-            broadcaster = self.bot.create_partialuser(broadcaster_id)
-            await broadcaster.modify_channel(title=title)
+            update = await update_stream_title(self.bot, broadcaster_id, title)
         except Exception as error:
             LOGGER.exception("[Settings] Failed to update the title for broadcaster %s.", broadcaster_id)
             await self._send_update_error(ctx, error, "title")
             return
 
         LOGGER.info("[Settings] User %s changed broadcaster %s's stream title to %s.", username, broadcaster_id, title, extra={"broadcaster_id": broadcaster_id})
-        await ctx.reply(f'Stream title updated to "{title}".')
+        await ctx.reply(update.announcement)
 
     @staticmethod
     async def _send_update_error(ctx: commands.Context, error: Exception, field_name: str) -> None:
