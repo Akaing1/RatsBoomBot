@@ -208,7 +208,9 @@ def redirect_to_channel(broadcaster_id: str, **query_values) -> RedirectResponse
 
 
 async def get_redemption_dashboard_data(services, broadcaster_id: str) -> dict[str, object]:
-    return await services.redeems.get_dashboard_activity(broadcaster_id=broadcaster_id)
+    activity = await services.redeems.get_dashboard_activity(broadcaster_id=broadcaster_id)
+    activity.update(services.live_chat.get_moderation_activity(broadcaster_id))
+    return activity
 
 
 @router.get("", response_class=HTMLResponse)
