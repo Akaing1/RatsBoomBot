@@ -26,6 +26,9 @@ def test_root_is_the_public_landing_page() -> None:
     assert "Make the dashboard yours" in response.text
     assert "Connect and go live" in response.text
     assert "Core onboarding is self-service." in response.text
+    assert "Twitch stream" in response.text
+    assert "Combined Chat" in response.text
+    assert "Viewer queue" in response.text
     assert "Help keep RatsBoomBot growing." in response.text
     assert 'href="https://ko-fi.com/ninjakaing"' in response.text
     assert "Support never affects features, points, achievements, or raid odds." in response.text

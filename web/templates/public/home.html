@@ -63,39 +63,56 @@
                         <p>Channel overview</p>
                     </div>
 
-                    <div class="preview-profile">
-                        <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="">
-
-                        <div>
-                            <small>RAT'S BOOM BOT</small>
-                            <strong>Your community dashboard</strong>
-                            <p>Live chat, ad status, viewer activities, and commands.</p>
+                    <div class="preview-dashboard">
+                        <div class="preview-dashboard-header">
+                            <div class="preview-dashboard-identity">
+                                <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="">
+                                <div>
+                                    <small>RAT'S BOOM BOT</small>
+                                    <strong>Your channel</strong>
+                                    <p>@yourchannel</p>
+                                </div>
+                            </div>
+                            <div class="preview-dashboard-stats">
+                                <span><i class="preview-dot online"></i> Stream <strong>Live</strong></span>
+                                <span>Ads <strong>Not running</strong></span>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="preview-stat-grid">
-                        <article>
-                            <span class="preview-dot online"></span>
-                            <small>Stream tools</small>
-                            <strong>Connected</strong>
-                        </article>
+                        <div class="preview-dashboard-grid">
+                            <article class="preview-dashboard-card preview-stream-card">
+                                <h3>Twitch stream</h3>
+                                <p><span>Title</span><strong>Community game night</strong></p>
+                                <p><span>Category</span><strong>Just Chatting</strong></p>
+                            </article>
 
-                        <article>
-                            <span class="preview-dot accent"></span>
-                            <small>Community</small>
-                            <strong>Interactive</strong>
-                        </article>
+                            <article class="preview-dashboard-card preview-chat-card">
+                                <header>
+                                    <h3>Combined Chat</h3>
+                                    <div><span>Twitch</span><span>YouTube</span></div>
+                                </header>
+                                <div class="preview-chat-message twitch">
+                                    <strong>ViewerOne</strong><p>This dashboard looks great!</p>
+                                </div>
+                                <div class="preview-chat-message youtube">
+                                    <strong>ViewerTwo</strong><p>Ready for the stream 👋</p>
+                                </div>
+                                <div class="preview-chat-compose">
+                                    <span>Send a message to chat...</span><strong>Send</strong>
+                                </div>
+                            </article>
 
-                        <article>
-                            <span class="preview-dot success"></span>
-                            <small>Dashboard</small>
-                            <strong>Live updates</strong>
-                        </article>
-                    </div>
+                            <article class="preview-dashboard-card preview-queue-card">
+                                <header><h3>Viewer queue</h3><span>Open</span></header>
+                                <ol><li><span>1</span>ViewerOne</li><li><span>2</span>ViewerThree</li></ol>
+                            </article>
 
-                    <div class="preview-command">
-                        <code>!register PlayerName#TAG</code>
-                        <p>Join the channel's League community ladder.</p>
+                            <article class="preview-dashboard-card preview-activity-card">
+                                <h3>Activity</h3>
+                                <div class="preview-activity-tabs"><strong>Redeems</strong><span>Commands</span></div>
+                                <p><strong>Hydrate</strong><span>ViewerTwo · now</span></p>
+                            </article>
+                        </div>
                     </div>
                 </div>
             </div>
