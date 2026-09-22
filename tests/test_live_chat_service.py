@@ -1568,7 +1568,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
     assert '.channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }' in dashboard_styles
     assert 'grid-template-areas: "player" "queue" "activities" "chat"' in dashboard_styles
-    assert 'grid-template-areas: "player queue" "activities activities" "chat chat"' in dashboard_styles
+    assert 'grid-template-areas: "player queue" "activities activities" "chat chat"' not in dashboard_styles
+    assert '(min-width: 901px) and (max-height: 780px)' not in dashboard_styles
+    assert 'grid-template-columns: minmax(0,1.35fr) minmax(0,.65fr) minmax(0,.8fr)' in dashboard_styles
+    assert 'grid-template-rows: minmax(0,3fr) minmax(0,2fr)' in dashboard_styles
+    assert 'width: min(100%, calc(100cqh * 16 / 9))' in dashboard_styles
     assert '.dashboard-activity-grid { display: grid; grid-area: activities;' in dashboard_styles
     assert '<header class="page-header dashboard-channel-profile" hidden>' in dashboard
     assert dashboard.index('class="panel dashboard-video-card"') < dashboard.index('class="panel live-chat-panel"')
@@ -1660,8 +1664,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert ".channel-page-overview .dashboard-chat-column { grid-row: 1 / -1; }" in dashboard_styles
     assert 'grid-template-areas: "player queue chat" "activities activities chat";' in dashboard_styles
     assert '.dashboard-chat-column > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }' in dashboard_styles
-    assert 'grid-template-rows: max-content max-content minmax(540px,auto)' in dashboard_styles
-    assert '.channel-page-overview .dashboard-chat-column { height: auto; grid-row: auto; overflow: visible; }' in dashboard_styles
+    assert 'grid-template-rows: max-content max-content minmax(540px,auto)' not in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column { overflow-y: auto; }' in dashboard_styles
     assert ".dashboard-chat-column { display: flex; grid-area: chat;" in dashboard_styles
     assert 'showTimer && streamStatus.dataset.startedAt ? ` · ${formatUptime(streamStatus.dataset.startedAt)}`' in header_stats_script
     assert 'container.querySelector("[data-stream-status]")?.addEventListener("click", () => {' in header_stats_script
