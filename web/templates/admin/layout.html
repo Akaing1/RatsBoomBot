@@ -20,7 +20,7 @@
     >
 </head>
 
-<body class="dashboard-page admin-page admin-page-{{ active_page }}">
+<body class="dashboard-page admin-page admin-page-{{ active_page }}{% if channel_section == 'overview' %} admin-channel-overview{% endif %}">
     <div class="app-shell" data-dashboard-shell data-sidebar-storage-key="ratsboombot-admin-sidebar-collapsed">
         <aside class="sidebar">
             <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-expanded="true" aria-label="Collapse navigation" title="Collapse navigation"><span aria-hidden="true">‹</span></button>
