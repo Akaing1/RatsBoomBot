@@ -6,6 +6,14 @@
     const storageKey = `ratsboombot:dashboard-stat-visibility:${container.dataset.channelId || "channel"}`;
     const refreshUrl = container.dataset.refreshUrl;
     const refreshInterval = 60000;
+    const streamStatus = container.querySelector("[data-stream-status]");
+    const viewerValue = container.querySelector('[data-dashboard-stat="viewers"] [data-dashboard-stat-value]');
+    let actualViewerCount = viewerValue?.textContent || "—";
+    let actualStreamStatus = {
+        isLive: streamStatus?.classList.contains("state-live") || false,
+        startedAt: streamStatus?.dataset.startedAt || ""
+    };
+    let previewActive = false;
     let hiddenStats = new Set();
     let refreshInProgress = false;
     let lastRefreshAt = Date.now();
@@ -37,13 +45,61 @@
     }
 
     function renderStreamStatus() {
-        const streamStatus = container.querySelector("[data-stream-status]");
         const text = streamStatus?.querySelector("[data-stream-status-text]");
         if (!streamStatus || !text) return;
-        text.textContent = streamStatus.classList.contains("state-live") && streamStatus.dataset.startedAt
-            ? `Live · ${formatUptime(streamStatus.dataset.startedAt)}`
+        const isLive = streamStatus.classList.contains("state-live");
+        const showTimer = !hiddenStats.has("stream_timer");
+        text.textContent = isLive
+            ? `Online${showTimer && streamStatus.dataset.startedAt ? ` · ${formatUptime(streamStatus.dataset.startedAt)}` : ""}`
             : "Offline";
+        streamStatus.setAttribute("aria-pressed", String(showTimer));
+        streamStatus.setAttribute("aria-label", `${showTimer ? "Hide" : "Show"} online timer`);
+        streamStatus.title = `${showTimer ? "Hide" : "Show"} online timer`;
     }
+
+    function applyStreamStatus(isLive, startedAt) {
+        if (!streamStatus) return;
+        streamStatus.classList.toggle("state-live", isLive);
+        streamStatus.classList.toggle("state-offline", !isLive);
+        streamStatus.querySelector(".status-indicator")?.classList.toggle("online", isLive);
+        streamStatus.querySelector(".status-indicator")?.classList.toggle("offline", !isLive);
+        streamStatus.dataset.startedAt = startedAt;
+        renderStreamStatus();
+    }
+
+    // Browser-console preview only: no Twitch or server state is changed.
+    window.dashboardLiveTest = {
+        start(minutes = 0) {
+            const elapsedMinutes = Number(minutes);
+            if (!Number.isFinite(elapsedMinutes) || elapsedMinutes < 0) {
+                throw new RangeError("Minutes must be a non-negative number.");
+            }
+            previewActive = true;
+            applyStreamStatus(true, new Date(Date.now() - elapsedMinutes * 60000).toISOString());
+            if (viewerValue) viewerValue.textContent = (Math.floor(Math.random() * 500) + 1).toLocaleString();
+        },
+        stop() {
+            previewActive = false;
+            applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);
+            if (viewerValue) viewerValue.textContent = actualViewerCount;
+            void refreshStats();
+        }
+    };
+
+    function saveVisibility() {
+        try {
+            window.localStorage.setItem(storageKey, JSON.stringify(Array.from(hiddenStats)));
+        } catch (_error) {
+            // Keep the current choice for this page when storage is unavailable.
+        }
+    }
+
+    container.querySelector("[data-stream-status]")?.addEventListener("click", () => {
+        if (hiddenStats.has("stream_timer")) hiddenStats.delete("stream_timer");
+        else hiddenStats.add("stream_timer");
+        renderStreamStatus();
+        saveVisibility();
+    });
 
     dashboard.querySelectorAll("[data-dashboard-stat]").forEach(button => {
         const key = button.dataset.dashboardStat;
@@ -52,11 +108,7 @@
             if (hiddenStats.has(key)) hiddenStats.delete(key);
             else hiddenStats.add(key);
             applyVisibility(button, hiddenStats.has(key));
-            try {
-                window.localStorage.setItem(storageKey, JSON.stringify(Array.from(hiddenStats)));
-            } catch (_error) {
-                // Keep the current choice for this page when storage is unavailable.
-            }
+            saveVisibility();
         });
     });
 
@@ -72,17 +124,13 @@
                     ? dashboard.querySelector("[data-dashboard-points-lost]")
                     : dashboard.querySelector(`[data-dashboard-stat="${CSS.escape(String(stat.key || ""))}"]`);
                 const value = statContainer?.querySelector("[data-dashboard-stat-value]");
-                if (value) value.textContent = String(stat.display_value ?? "—");
+                const displayValue = String(stat.display_value ?? "—");
+                if (stat.key === "viewers") actualViewerCount = displayValue;
+                if (value && !(previewActive && stat.key === "viewers")) value.textContent = displayValue;
             });
-            const streamStatus = container.querySelector("[data-stream-status]");
-            const streamStatusText = streamStatus?.querySelector("[data-stream-status-text]");
-            if (streamStatus && streamStatusText && typeof payload.is_live === "boolean") {
-                streamStatus.classList.toggle("state-live", payload.is_live);
-                streamStatus.classList.toggle("state-offline", !payload.is_live);
-                streamStatus.querySelector(".status-indicator")?.classList.toggle("online", payload.is_live);
-                streamStatus.querySelector(".status-indicator")?.classList.toggle("offline", !payload.is_live);
-                streamStatus.dataset.startedAt = payload.started_at || "";
-                renderStreamStatus();
+            if (streamStatus && typeof payload.is_live === "boolean") {
+                actualStreamStatus = {isLive: payload.is_live, startedAt: payload.started_at || ""};
+                if (!previewActive) applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);
             }
             lastRefreshAt = Date.now();
         } catch (_error) {

@@ -317,7 +317,7 @@ async def get_ad_status(broadcaster, twitch_user=None) -> dict[str, object]:
     ends_at = last_ad_at + timedelta(seconds=schedule.duration) if last_ad_at is not None else None
 
     if ends_at is not None and last_ad_at <= now < ends_at:
-        return {"state": "running", "label": "Ad running", "next_ad_at": None, "ends_at": ends_at.isoformat(), "snoozes_available": snoozes_available}
+        return {"state": "running", "label": "Ad running", "next_ad_at": None, "started_at": last_ad_at.isoformat(), "ends_at": ends_at.isoformat(), "snoozes_available": snoozes_available}
 
     if schedule.next_ad_at is not None:
         return {"state": "scheduled", "label": "Next ad", "next_ad_at": schedule.next_ad_at.isoformat(), "ends_at": None, "snoozes_available": snoozes_available}
@@ -896,11 +896,13 @@ async def channel_ad_action(request: Request, action: str = Form(...), csrf_toke
         if result.message:
             return JSONResponse({"detail": result.message}, status_code=409)
         actual_duration = result.length or duration
+        started_at = datetime.now(UTC)
         return JSONResponse({
             "message": f"{actual_duration}-second ad started.",
             "status": {
                 "state": "running", "label": "Ad running", "next_ad_at": None,
-                "ends_at": (datetime.now(UTC) + timedelta(seconds=actual_duration)).isoformat(),
+                "started_at": started_at.isoformat(),
+                "ends_at": (started_at + timedelta(seconds=actual_duration)).isoformat(),
                 "snoozes_available": None
             }
         })

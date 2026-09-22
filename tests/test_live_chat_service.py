@@ -647,6 +647,7 @@ async def test_ad_status_reports_running_and_offline_states():
     offline_status = await get_ad_status(offline)
 
     assert running["state"] == "running"
+    assert running["started_at"] == (now - timedelta(seconds=10)).isoformat()
     assert running["ends_at"] is not None
     assert offline_status["state"] == "offline"
 
@@ -670,7 +671,9 @@ async def test_dashboard_ad_action_starts_commercial_for_connected_channel(monke
     response = await dashboard_router.channel_ad_action(request, action, "csrf")
 
     assert response.status_code == 200
-    assert json.loads(response.body)["status"]["state"] == "running"
+    status = json.loads(response.body)["status"]
+    assert status["state"] == "running"
+    assert (datetime.fromisoformat(status["ends_at"]) - datetime.fromisoformat(status["started_at"])) == timedelta(seconds=length)
     twitch_channel.start_commercial.assert_awaited_once_with(length=length)
 
 
@@ -1369,7 +1372,9 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'class="dashboard-ad-stat state-{{ ad_status.state }}"' in dashboard
     assert 'class="dashboard-header-stat dashboard-ad-stat' not in dashboard
     assert 'data-ad-panel' in dashboard
-    assert dashboard.index('<h3>Ads</h3>') < dashboard.index('data-ad-status') < dashboard.index('data-ad-action="run-90"')
+    assert 'data-started-at="{{ ad_status.started_at or \'\' }}"' in dashboard
+    assert 'data-ad-progress-ring' in dashboard
+    assert dashboard.index('<h3>Ads</h3>') < dashboard.index('data-ad-status data-state=') < dashboard.index('data-ad-action="run-90"')
     assert '.channel-dashboard-layout .panel { margin-bottom: 0; padding: 16px; }' in dashboard_styles
     assert '.channel-page-overview .streamer-main-content { padding: 16px; }' in dashboard_styles
     assert 'align-items: stretch; gap: 12px; margin-bottom: 16px;' in dashboard_styles
@@ -1567,7 +1572,10 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.dashboard-activity-grid { display: grid; grid-area: activities;' in dashboard_styles
     assert '<header class="page-header dashboard-channel-profile" hidden>' in dashboard
     assert dashboard.index('class="panel dashboard-video-card"') < dashboard.index('class="panel live-chat-panel"')
-    assert dashboard.index('class="panel live-chat-panel"') < dashboard.index('class="dashboard-header-side"')
+    assert dashboard.index('class="panel dashboard-video-card"') < dashboard.index('class="dashboard-chat-column"') < dashboard.index('class="dashboard-header-side"') < dashboard.index('class="panel live-chat-panel"')
+    assert '<span>Stream</span>' not in dashboard
+    assert '{% if broadcaster.is_live %}Online{% else %}Offline{% endif %}' in dashboard
+    assert 'data-stream-status' in dashboard and 'aria-pressed="true"' in dashboard
     assert 'class="panel-header dashboard-video-header"' in dashboard
     assert '.dashboard-video-header { display: grid; min-width: 0; grid-template-columns: minmax(0,2fr) minmax(0,1fr);' in dashboard_styles
     assert '.dashboard-video-header [data-channel-field="title"]:is(:focus, .editing) { position: relative; z-index: 10; }' in dashboard_styles
@@ -1610,18 +1618,36 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "const refreshInterval = 60000" in header_stats_script
     assert "window.setInterval(refreshStats, refreshInterval)" in header_stats_script
     assert 'fetch(refreshUrl, {headers: {Accept: "application/json"}, cache: "no-store"})' in header_stats_script
-    assert 'streamStatus.dataset.startedAt = payload.started_at || ""' in header_stats_script
+    assert 'actualStreamStatus = {isLive: payload.is_live, startedAt: payload.started_at || ""};' in header_stats_script
     assert "window.setInterval(renderStreamStatus, 1000)" in header_stats_script
-    assert 'label.textContent = remaining > 0 ? `Ends in ${formatDuration(remaining)}`' in ad_status_script
+    assert 'label.textContent = `Ends in ${formatDuration(remaining)}`' in ad_status_script
     assert 'label.textContent = remaining > 0 ? `Starts in ${formatDuration(remaining)}`' in ad_status_script
     assert 'remaining < 60' in ad_status_script
     assert 'setAppearance("ad-warning")' in ad_status_script
     assert 'setAppearance("ad-running")' in ad_status_script
+    assert 'setAppearance("ad-scheduled")' in ad_status_script
+    assert 'progressRing.style.strokeDashoffset = String(ringCircumference * (1 - fraction))' in ad_status_script
+    assert 'if (progressRing && !ringIntroActive && !ringCountdownActive)' in ad_status_script
+    assert 'if (enteringRunning && container.dataset.state === "running") beginRingIntro();' in ad_status_script
+    assert '@keyframes dashboard-ad-ring-fill { from { stroke-dashoffset: 56.55; } to { stroke-dashoffset: 0; } }' in dashboard_styles
+    assert 'animation: dashboard-ad-ring-countdown var(--ad-ring-duration) linear forwards;' in dashboard_styles
+    assert 'progressRing.style.setProperty("--ad-ring-duration", `${remainingMs}ms`);' in ad_status_script
+    assert 'window.dashboardAdTest = {' in ad_status_script
+    assert 'schedule(secondsUntilStart = 5, durationSeconds = 15)' in ad_status_script
+    assert 'if (simulationActive) startSimulatedAd(duration);' in ad_status_script
+    assert 'scheduledRefreshAt = container.dataset.nextAdAt;' in ad_status_script
+    assert 'displayStatus({state: "complete", label: "Ads finished"});' in ad_status_script
+    assert 'window.getComputedStyle(completionCheck).animationDuration' in ad_status_script
+    assert '}, 5000 + animationSeconds * 1000);' in ad_status_script
+    assert '.dashboard-ad-stat.ad-complete .dashboard-ad-progress-check' in dashboard_styles
     assert 'setAppearance("ad-idle")' in ad_status_script
     assert 'container.dataset.state === "offline"' in ad_status_script
     assert 'setAppearance("ad-neutral")' in ad_status_script
     assert '.dashboard-ad-stat.ad-idle' in dashboard_styles
     assert '.dashboard-ad-stat.ad-running' in dashboard_styles
+    assert '.dashboard-ads-panel .dashboard-ad-stat.ad-scheduled { background: rgba(139,92,246,.12); }' in dashboard_styles
+    assert '.dashboard-ads-panel .dashboard-ad-stat.ad-running { background: rgba(139,92,246,.2); }' in dashboard_styles
+    assert '.dashboard-ad-progress-ring { stroke: #c7b7ff;' in dashboard_styles
     assert 'animation: dashboard-ad-warning 1s ease-in-out 5' in dashboard_styles
     assert "transition-delay: 1s,1s;" in dashboard_styles
     assert ".dashboard-channel-heading { flex-direction: column; align-items: flex-start; gap: 10px; }" in dashboard_styles
@@ -1631,7 +1657,23 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "width: 50px; height: 50px; flex-basis: 50px;" in dashboard_styles
     assert ".dashboard-channel-copy .page-description { margin-top: 1px; line-height: 1.15; }" in dashboard_styles
     assert ".channel-page-overview { height: 100dvh; overflow: hidden; }" in dashboard_styles
-    assert ".channel-page-overview .live-chat-panel { grid-row: 1 / -1; }" in dashboard_styles
+    assert ".channel-page-overview .dashboard-chat-column { grid-row: 1 / -1; }" in dashboard_styles
+    assert 'grid-template-areas: "player queue chat" "activities activities chat";' in dashboard_styles
+    assert '.dashboard-chat-column > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }' in dashboard_styles
+    assert 'grid-template-rows: max-content max-content minmax(540px,auto)' in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column { height: auto; grid-row: auto; overflow: visible; }' in dashboard_styles
+    assert ".dashboard-chat-column { display: flex; grid-area: chat;" in dashboard_styles
+    assert 'showTimer && streamStatus.dataset.startedAt ? ` · ${formatUptime(streamStatus.dataset.startedAt)}`' in header_stats_script
+    assert 'container.querySelector("[data-stream-status]")?.addEventListener("click", () => {' in header_stats_script
+    assert 'hiddenStats.has("stream_timer")' in header_stats_script
+    assert 'window.dashboardLiveTest = {' in header_stats_script
+    assert 'applyStreamStatus(true, new Date(Date.now() - elapsedMinutes * 60000).toISOString());' in header_stats_script
+    assert 'viewerValue.textContent = (Math.floor(Math.random() * 500) + 1).toLocaleString();' in header_stats_script
+    assert 'viewerValue.textContent = actualViewerCount;' in header_stats_script
+    assert 'if (value && !(previewActive && stat.key === "viewers")) value.textContent = displayValue;' in header_stats_script
+    assert 'if (!previewActive) applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
+    assert 'applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
+    assert ".dashboard-stream-stat.state-live .status-indicator { animation: dashboard-live-pulse" in dashboard_styles
     assert ".sidebar:not(:hover) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
 
 
