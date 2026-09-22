@@ -53,14 +53,27 @@ def test_admin_channel_chat_is_read_only() -> None:
 
 def test_admin_activity_matches_channel_dashboard_feeds() -> None:
     template = (PROJECT_ROOT / "web/templates/admin/channel_details.html").read_text(encoding="utf-8")
-    stylesheet = (PROJECT_ROOT / "web/static/css/style.css").read_text(encoding="utf-8")
 
-    for activity in ("redeems", "checkins", "commands", "mod-actions", "automod", "raid"):
+    for activity in ("redeems", "checkins", "commands", "mod-actions", "automod"):
         assert f'data-admin-activity-tab="{activity}"' in template
         assert f'data-admin-activity-panel="{activity}"' in template
 
     assert "api/chat/stream?view=commands" in template
-    assert ".admin-channel-live-grid > .admin-readonly-chat-panel { grid-area: auto; }" in stylesheet
+    assert 'class="channel-dashboard-layout admin-channel-dashboard-layout"' in template
+    assert 'class="channel-live-layout"' in template
+    assert 'class="panel raid-monitor-panel admin-overview-raid-panel"' in template
+    assert template.index('class="channel-live-layout"') < template.index("admin-overview-raid-panel")
+
+
+def test_admin_channel_navigation_has_three_sections() -> None:
+    navigation = (PROJECT_ROOT / "web/templates/admin/channel_page_switch.html").read_text(encoding="utf-8")
+
+    assert ">Overview</a>" in navigation
+    assert "/features" in navigation
+    assert ">Features</a>" in navigation
+    assert "/customization" in navigation
+    assert ">Customization</a>" in navigation
+    assert "channel-page-switch" not in navigation
 
 
 def test_streamer_dashboard_has_profile_customization_page() -> None:
