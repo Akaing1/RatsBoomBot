@@ -51,6 +51,18 @@ def test_admin_channel_chat_is_read_only() -> None:
     assert "data-pinned-url" not in template
 
 
+def test_admin_activity_matches_channel_dashboard_feeds() -> None:
+    template = (PROJECT_ROOT / "web/templates/admin/channel_details.html").read_text(encoding="utf-8")
+    stylesheet = (PROJECT_ROOT / "web/static/css/style.css").read_text(encoding="utf-8")
+
+    for activity in ("redeems", "checkins", "commands", "mod-actions", "automod", "raid"):
+        assert f'data-admin-activity-tab="{activity}"' in template
+        assert f'data-admin-activity-panel="{activity}"' in template
+
+    assert "api/chat/stream?view=commands" in template
+    assert ".admin-channel-live-grid > .admin-readonly-chat-panel { grid-area: auto; }" in stylesheet
+
+
 def test_streamer_dashboard_has_profile_customization_page() -> None:
     layout = (PROJECT_ROOT / "web/templates/channel/layout.html").read_text(encoding="utf-8")
     template = (PROJECT_ROOT / "web/templates/channel/customization.html").read_text(encoding="utf-8")

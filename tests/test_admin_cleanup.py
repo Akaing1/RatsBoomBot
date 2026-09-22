@@ -164,3 +164,21 @@ async def test_admin_chat_stream_uses_selected_channel_history(monkeypatch):
     assert response.headers["cache-control"] == "no-cache"
     assert response.headers["x-accel-buffering"] == "no"
     stream.assert_called_once_with(request, live_chat, "123", "both")
+
+
+@pytest.mark.asyncio
+async def test_admin_activity_includes_moderation_feeds():
+    moderation = {
+        "mod_actions": [{"action": "timeout", "target": "viewer"}],
+        "automod": [{"id": "held-1", "message": "review me"}]
+    }
+    services = SimpleNamespace(
+        redeems=SimpleNamespace(get_dashboard_activity=AsyncMock(return_value={"checkins": [], "redemptions": []})),
+        live_chat=SimpleNamespace(get_moderation_activity=Mock(return_value=moderation))
+    )
+
+    activity = await channels.get_redemption_dashboard_data(services, "123")
+
+    assert activity["mod_actions"] == moderation["mod_actions"]
+    assert activity["automod"] == moderation["automod"]
+    services.live_chat.get_moderation_activity.assert_called_once_with("123")

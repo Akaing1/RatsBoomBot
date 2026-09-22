@@ -130,39 +130,6 @@
     </div>
 {% endif %}
 
-{% if raid_configured %}
-    <section class="panel raid-monitor-panel">
-        <div class="panel-header">
-            <div><p class="eyebrow">Raid activity</p><h3>Raid encounter monitor</h3></div>
-            <span id="raid-monitor-status" class="channel-state {% if raid_metrics and raid_metrics.status == 'active' %}live{% endif %}">{% if raid_metrics %}{{ raid_metrics.status | title }}{% else %}Waiting{% endif %}</span>
-        </div>
-
-        <div id="raid-monitor-empty" class="compact-empty-state" {% if raid_metrics %}hidden{% endif %}>
-            <h4>No raid encounter recorded</h4><p>Spawn a mini or main boss to begin tracking raid activity.</p>
-        </div>
-
-        <div id="raid-monitor-details" {% if not raid_metrics %}hidden{% endif %}>
-            <div class="raid-monitor-heading">
-                <div><strong id="raid-boss-name">{% if raid_metrics %}{{ raid_metrics.boss_name }}{% endif %}</strong><p id="raid-boss-meta">{% if raid_metrics %}{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; {% if raid_metrics.boss_tier == 'tutorial' %}Active until defeated &middot; Stream {{ raid_metrics.streams_used }}{% else %}{{ raid_metrics.streams_used }}/{{ raid_metrics.stream_limit }} streams{% endif %}{% endif %}</p></div>
-                <strong id="raid-hp-label">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.current_hp) }}/{{ "{:,}".format(raid_metrics.max_hp) }} HP{% endif %}</strong>
-            </div>
-
-            <div class="progress-track raid-hp-track"><span id="raid-hp-progress" style="width: {% if raid_metrics %}{{ raid_metrics.hp_percent }}{% else %}0{% endif %}%"></span></div>
-
-            <div class="raid-metric-grid">
-                <article><span>Unique attackers</span><strong id="raid-unique-attackers">{% if raid_metrics %}{{ raid_metrics.unique_attackers }}{% else %}0{% endif %}</strong></article>
-                <article><span>Total attacks</span><strong id="raid-total-attacks">{% if raid_metrics %}{{ raid_metrics.total_attacks }}{% else %}0{% endif %}</strong></article>
-                <article><span>Average damage</span><strong id="raid-average-damage">{% if raid_metrics %}{{ raid_metrics.average_damage }}{% else %}0{% endif %}</strong></article>
-                <article><span>Total damage</span><strong id="raid-total-damage">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.total_damage) }}{% else %}0{% endif %}</strong></article>
-                <article><span>Weapon attacks</span><strong id="raid-weapon-attacks">{% if raid_metrics %}{{ raid_metrics.weapon_attacks }}{% else %}0{% endif %}</strong></article>
-                <article><span>Potion attacks</span><strong id="raid-potion-attacks">{% if raid_metrics %}{{ raid_metrics.potion_attacks }}{% else %}0{% endif %}</strong></article>
-                <article><span>Critical hits</span><strong id="raid-critical-hits">{% if raid_metrics %}{{ raid_metrics.critical_hits }}{% else %}0{% endif %}</strong></article>
-                <article><span>Base reward</span><strong id="raid-reward-pool">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.max_hp) }}{% else %}0{% endif %}</strong></article>
-            </div>
-        </div>
-    </section>
-{% endif %}
-
 <div class="admin-channel-live-grid">
     <div class="channel-dashboard-side admin-viewer-queue-column">
         <section class="panel">
@@ -209,6 +176,12 @@
         <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Account activity feed">
             <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-admin-activity-tab="redeems">Redeems</button>
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-admin-activity-tab="checkins">Check-ins</button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-admin-activity-tab="commands">Commands</button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-admin-activity-tab="mod-actions">Mod actions</button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-admin-activity-tab="automod">AutoMod</button>
+            {% if raid_configured %}
+                <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-admin-activity-tab="raid">Raid</button>
+            {% endif %}
         </div>
 
         <div data-admin-activity-panel="redeems">
@@ -247,6 +220,64 @@
                 {% endif %}
             </div>
         </div>
+
+        <div data-admin-activity-panel="commands" hidden>
+            <div
+                class="live-chat-feed dashboard-command-feed"
+                data-live-chat-feed
+                data-stream-url="/admin/channels/{{ broadcaster.id }}/api/chat/stream?view=commands"
+                data-max-messages="100"
+            >
+                <div class="compact-empty-state"><h4>No commands yet</h4><p>Registered chat commands will appear here.</p></div>
+            </div>
+        </div>
+
+        <div data-admin-activity-panel="mod-actions" hidden>
+            <div id="mod-action-activity-content" class="activity-scroll">
+                <div class="compact-empty-state"><h4>No moderation actions yet</h4><p>Moderator actions will appear here.</p></div>
+            </div>
+        </div>
+
+        <div data-admin-activity-panel="automod" hidden>
+            <div id="automod-activity-content" class="activity-scroll">
+                <div class="compact-empty-state"><h4>AutoMod queue is clear</h4><p>Held messages will appear here for review.</p></div>
+            </div>
+        </div>
+
+        {% if raid_configured %}
+            <div class="admin-dashboard-raid-tab" data-admin-activity-panel="raid" hidden>
+                <div class="raid-monitor-panel">
+                    <div class="panel-header">
+                        <div><p class="eyebrow">Raid activity</p><h3>Raid encounter monitor</h3></div>
+                        <span id="raid-monitor-status" class="channel-state {% if raid_metrics and raid_metrics.status == 'active' %}live{% endif %}">{% if raid_metrics %}{{ raid_metrics.status | title }}{% else %}Waiting{% endif %}</span>
+                    </div>
+
+                    <div id="raid-monitor-empty" class="compact-empty-state" {% if raid_metrics %}hidden{% endif %}>
+                        <h4>No raid encounter recorded</h4><p>Spawn a mini or main boss to begin tracking raid activity.</p>
+                    </div>
+
+                    <div id="raid-monitor-details" {% if not raid_metrics %}hidden{% endif %}>
+                        <div class="raid-monitor-heading">
+                            <div><strong id="raid-boss-name">{% if raid_metrics %}{{ raid_metrics.boss_name }}{% endif %}</strong><p id="raid-boss-meta">{% if raid_metrics %}{{ raid_metrics.boss_tier | title }} Boss &middot; {{ raid_metrics.boss_type | title }} &middot; {% if raid_metrics.boss_tier == 'tutorial' %}Active until defeated &middot; Stream {{ raid_metrics.streams_used }}{% else %}{{ raid_metrics.streams_used }}/{{ raid_metrics.stream_limit }} streams{% endif %}{% endif %}</p></div>
+                            <strong id="raid-hp-label">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.current_hp) }}/{{ "{:,}".format(raid_metrics.max_hp) }} HP{% endif %}</strong>
+                        </div>
+
+                        <div class="progress-track raid-hp-track"><span id="raid-hp-progress" style="width: {% if raid_metrics %}{{ raid_metrics.hp_percent }}{% else %}0{% endif %}%"></span></div>
+
+                        <div class="raid-metric-grid">
+                            <article><span>Unique attackers</span><strong id="raid-unique-attackers">{% if raid_metrics %}{{ raid_metrics.unique_attackers }}{% else %}0{% endif %}</strong></article>
+                            <article><span>Total attacks</span><strong id="raid-total-attacks">{% if raid_metrics %}{{ raid_metrics.total_attacks }}{% else %}0{% endif %}</strong></article>
+                            <article><span>Average damage</span><strong id="raid-average-damage">{% if raid_metrics %}{{ raid_metrics.average_damage }}{% else %}0{% endif %}</strong></article>
+                            <article><span>Total damage</span><strong id="raid-total-damage">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.total_damage) }}{% else %}0{% endif %}</strong></article>
+                            <article><span>Weapon attacks</span><strong id="raid-weapon-attacks">{% if raid_metrics %}{{ raid_metrics.weapon_attacks }}{% else %}0{% endif %}</strong></article>
+                            <article><span>Potion attacks</span><strong id="raid-potion-attacks">{% if raid_metrics %}{{ raid_metrics.potion_attacks }}{% else %}0{% endif %}</strong></article>
+                            <article><span>Critical hits</span><strong id="raid-critical-hits">{% if raid_metrics %}{{ raid_metrics.critical_hits }}{% else %}0{% endif %}</strong></article>
+                            <article><span>Base reward</span><strong id="raid-reward-pool">{% if raid_metrics %}{{ "{:,}".format(raid_metrics.max_hp) }}{% else %}0{% endif %}</strong></article>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
     </section>
 
     <section class="panel live-chat-panel admin-readonly-chat-panel">
@@ -585,6 +616,8 @@
         const queueContent = document.getElementById("viewer-queue-content");
         const checkinContent = document.getElementById("checkin-activity-content");
         const redemptionContent = document.getElementById("redemption-activity-content");
+        const modActionContent = document.getElementById("mod-action-activity-content");
+        const automodContent = document.getElementById("automod-activity-content");
         const activityTabs = document.querySelectorAll("[data-admin-activity-tab]");
         const activityPanels = document.querySelectorAll("[data-admin-activity-panel]");
         const raidStatus = document.getElementById("raid-monitor-status");
@@ -744,6 +777,77 @@
             redemptionContent.appendChild(list);
         }
 
+        function renderModActions(actions) {
+            if (!modActionContent) return;
+            modActionContent.replaceChildren();
+            if (!actions.length) {
+                modActionContent.appendChild(emptyState("No moderation actions yet", "Moderator actions will appear here."));
+                return;
+            }
+            const list = document.createElement("ul");
+            list.className = "activity-list";
+            actions.forEach(action => {
+                const item = document.createElement("li");
+                item.className = "activity-list-item";
+                const main = document.createElement("div");
+                main.className = "activity-main";
+                const heading = document.createElement("strong");
+                heading.textContent = `${action.action}${action.target ? ` · ${action.target}` : ""}`;
+                const detail = document.createElement("span");
+                detail.textContent = `Performed by ${action.moderator}${action.timestamp ? ` · ${formatTime(action.timestamp)}` : ""}`;
+                main.append(heading, detail);
+
+                const addDetail = (label, value) => {
+                    if (value === null || value === undefined || value === "") return;
+                    const line = document.createElement("p");
+                    line.textContent = `${label}: ${value}`;
+                    main.appendChild(line);
+                };
+                addDetail("Reason", action.reason);
+                addDetail("Timeout ends", action.expires_at ? formatTime(action.expires_at) : "");
+                addDetail("Deleted message", action.message ? `“${action.message}”` : "");
+                addDetail("Moderator note", action.note);
+                addDetail("Followers-only requirement", action.follow_duration !== null && action.follow_duration !== undefined ? `${action.follow_duration} minute${action.follow_duration === 1 ? "" : "s"}` : "");
+                addDetail("Slow-mode delay", action.wait_time !== null && action.wait_time !== undefined ? `${action.wait_time} second${action.wait_time === 1 ? "" : "s"}` : "");
+                addDetail("Raid viewers", action.viewer_count);
+                addDetail("Terms", Array.isArray(action.terms) && action.terms.length ? `${action.term_list || "list"}: ${action.terms.join(", ")}${action.from_automod ? " · From AutoMod" : ""}` : "");
+                addDetail("Chat rules", Array.isArray(action.chat_rules) ? action.chat_rules.join(", ") : "");
+                addDetail("Source channel", action.source_channel);
+                item.appendChild(main);
+                list.appendChild(item);
+            });
+            modActionContent.appendChild(list);
+        }
+
+        function renderAutomod(messages) {
+            if (!automodContent) return;
+            automodContent.replaceChildren();
+            if (!messages.length) {
+                automodContent.appendChild(emptyState("AutoMod queue is clear", "Held messages will appear here for review."));
+                return;
+            }
+            const list = document.createElement("ul");
+            list.className = "activity-list automod-list";
+            messages.forEach(message => {
+                const item = document.createElement("li");
+                item.className = "activity-list-item automod-item";
+                const main = document.createElement("div");
+                main.className = "activity-main";
+                const user = document.createElement("strong");
+                user.textContent = message.display_name !== message.username
+                    ? `${message.display_name} (${message.username})`
+                    : message.username;
+                const text = document.createElement("p");
+                text.textContent = message.message;
+                const reason = document.createElement("span");
+                reason.textContent = `${message.reason}${message.level ? ` · Level ${message.level}` : ""}`;
+                main.append(user, text, reason);
+                item.appendChild(main);
+                list.appendChild(item);
+            });
+            automodContent.appendChild(list);
+        }
+
         function renderRaid(raid) {
             if (!raidStatus || !raidEmpty || !raidDetails) return;
             const hasRaid = Boolean(raid);
@@ -776,6 +880,8 @@
             renderQueue(data.queue || {});
             renderCheckins(Array.isArray(redemptions.checkins) ? redemptions.checkins : []);
             renderRedemptions(Array.isArray(redemptions.redemptions) ? redemptions.redemptions : []);
+            renderModActions(Array.isArray(redemptions.mod_actions) ? redemptions.mod_actions : []);
+            renderAutomod(Array.isArray(redemptions.automod) ? redemptions.automod : []);
             renderRaid(data.raid || null);
         }
 
