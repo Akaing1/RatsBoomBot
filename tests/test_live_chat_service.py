@@ -1310,6 +1310,20 @@ def test_live_chat_tracks_mod_actions_and_automod_queue():
     assert service.get_moderation_activity("channel-1")["automod"] == []
 
 
+def test_dashboard_carousel_keeps_stream_player_mounted_across_breakpoints():
+    dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    carousel = open("web/static/js/dashboard-carousel.js", encoding="utf-8").read()
+
+    assert dashboard.index("dashboard-carousel.js") < dashboard.index("dashboard-stream-player.js")
+    assert ".dashboard-carousel-deck, .dashboard-carousel-slide { display: contents; }" in styles
+    assert "playerSlide.append(player);" in carousel
+    assert "slides = [playerSlide];" in carousel
+    assert "index === 0 ? card.elements.slice(1) : card.elements" in carousel
+    assert "slides.slice(1).forEach(slide => slide.remove());" in carousel
+    assert "deck.replaceChildren()" not in carousel
+
+
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
     features = open("web/templates/channel/features.html", encoding="utf-8").read()
@@ -1374,7 +1388,14 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'data-ad-panel' in dashboard
     assert 'data-started-at="{{ ad_status.started_at or \'\' }}"' in dashboard
     assert 'data-ad-progress-ring' in dashboard
-    assert dashboard.index('<h3>Ads</h3>') < dashboard.index('data-ad-status data-state=') < dashboard.index('data-ad-action="run-90"')
+    assert 'data-ad-progress-mirror-ring' in dashboard
+    assert dashboard.index('data-ad-status-mirror') < dashboard.index('<h3>Ads</h3>') < dashboard.index('data-ad-status data-state=') < dashboard.index('data-ad-action="run-90"')
+    assert 'stickyMirror.querySelector("[data-ad-status-mirror-text]").textContent = label.textContent;' in ad_status_script
+    assert 'stickyProgressRing.style.setProperty("--ad-ring-duration", `${remainingMs}ms`);' in ad_status_script
+    assert 'stickyProgressRing.style.strokeDashoffset = progressRing.style.strokeDashoffset;' in ad_status_script
+    assert '...["ad-ring-intro", "ad-ring-countdown"].filter(name => container.classList.contains(name))' in ad_status_script
+    assert 'stickyMedia.matches && window.scrollY > 32' in ad_status_script
+    assert '.dashboard-header-stats > .dashboard-ad-sticky.is-visible' in dashboard_styles
     assert '.channel-dashboard-layout .panel { margin-bottom: 0; padding: 16px; }' in dashboard_styles
     assert '.channel-page-overview .streamer-main-content { padding: 16px; }' in dashboard_styles
     assert 'align-items: stretch; gap: 12px; margin-bottom: 16px;' in dashboard_styles
@@ -1567,12 +1588,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'grid-template-areas: "player queue chat" "activities activities chat"' in dashboard_styles
     assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
     assert '.channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }' in dashboard_styles
-    assert 'grid-template-areas: "player" "queue" "activities" "chat"' in dashboard_styles
-    assert 'grid-template-areas: "player queue" "activities activities" "chat chat"' not in dashboard_styles
-    assert '(min-width: 901px) and (max-height: 780px)' not in dashboard_styles
-    assert 'grid-template-columns: minmax(0,1.35fr) minmax(0,.65fr) minmax(0,.8fr)' in dashboard_styles
-    assert 'grid-template-rows: minmax(0,3fr) minmax(0,2fr)' in dashboard_styles
-    assert 'width: min(100%, calc(100cqh * 16 / 9))' in dashboard_styles
+    assert 'grid-template-areas: "stats" "player" "queue" "activities" "chat"' in dashboard_styles
+    assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' in dashboard_styles
     assert '.dashboard-activity-grid { display: grid; grid-area: activities;' in dashboard_styles
     assert '<header class="page-header dashboard-channel-profile" hidden>' in dashboard
     assert dashboard.index('class="panel dashboard-video-card"') < dashboard.index('class="panel live-chat-panel"')
@@ -1606,16 +1623,25 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9;' in dashboard_styles
     assert 'aspect-ratio: 16 / 9;' in dashboard_styles
     assert 'grid-template-columns: minmax(0,1.3fr) minmax(0,1fr)' in dashboard_styles
-    assert dashboard.index('<div class="channel-dashboard-layout">') < dashboard.index('<header class="page-header dashboard-channel-profile" hidden>')
+    assert dashboard.index('<div class="channel-dashboard-layout" data-dashboard-carousel>') < dashboard.index('<header class="page-header dashboard-channel-profile" hidden>')
     assert 'body class="dashboard-page channel-page channel-page-{{ active_page }}"' in channel_layout
     assert "data-sidebar-toggle" in channel_layout
     assert "channel-sidebar.js" in channel_layout
-    assert 'localStorage.setItem(storageKey, String(collapsed))' in sidebar_script
+    assert 'localStorage.setItem(storageKey, String(desktopCollapsed))' in sidebar_script
     assert ".dashboard-page:not(.channel-page-overview) .main-content" in dashboard_styles
     assert "left: -36px; width: min(1250px,calc(100vw - 144px));" in dashboard_styles
-    assert "justify-content: space-evenly; gap: 0;" in dashboard_styles
-    assert ".navigation .nav-link { flex: 0 0 auto; justify-content: center; }" in dashboard_styles
-    assert ".sidebar:not(:hover) .nav-link { gap: 11px; justify-content: center; padding: 11px 13px; }" in dashboard_styles
+    assert 'window.matchMedia("(max-width: 1100px)")' in sidebar_script
+    assert 'mobile ? (collapsed ? "☰" : "×")' in sidebar_script
+    assert 'position: sticky;' in dashboard_styles
+    assert '.navigation { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; gap: 7px; overflow-x: hidden; overflow-y: auto; }' in dashboard_styles
+    assert '.channel-page-overview .sidebar { position: fixed; z-index: 50; top: 0; right: 0; left: 0; width: 100%; height: 100dvh;' in dashboard_styles
+    assert '.sidebar:hover { width: 100%; height: 74px; min-height: 0;' in dashboard_styles
+    assert '.navigation { width: 100%; min-height: 0; flex-direction: column; justify-content: flex-start; gap: 7px; overflow-x: hidden; overflow-y: auto; }' in dashboard_styles
+    assert '.sidebar-toggle span { display: block; transition: transform .24s ease, opacity .18s ease; }' in dashboard_styles
+    assert 'transition: opacity .2s ease .08s, transform .24s ease .08s, visibility 0s linear 0s;' in dashboard_styles
+    assert 'visibility: hidden; opacity: 0; transform: translateY(-10px); pointer-events: none;' in dashboard_styles
+    assert '.navigation .nav-link { width: 100%; flex: 0 0 auto; justify-content: flex-start; }' in dashboard_styles
+    assert '.sidebar .navigation,' in dashboard_styles
     assert ".sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 17px; padding-left: 17px; }" in dashboard_styles
     assert "window.localStorage.setItem(storageKey" in header_stats_script
     assert "dashboard-stat-visibility" in header_stats_script
@@ -1664,8 +1690,20 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert ".channel-page-overview .dashboard-chat-column { grid-row: 1 / -1; }" in dashboard_styles
     assert 'grid-template-areas: "player queue chat" "activities activities chat";' in dashboard_styles
     assert '.dashboard-chat-column > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }' in dashboard_styles
+    assert 'grid-template-rows: max-content max-content minmax(0,1fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 16px)' in dashboard_styles
+    assert '.channel-page-overview .dashboard-video-frame { flex: 0 0 auto; aspect-ratio: 16 / 9; container-type: normal; }' in dashboard_styles
+    assert '.channel-page-overview .dashboard-video-unavailable { width: 100%; height: 100%; aspect-ratio: auto; }' in dashboard_styles
+    assert '--dashboard-video-height' not in dashboard_styles
+    assert 'height: calc(200dvh - var(--dashboard-stats-height, 36px) - 20px)' in dashboard_styles
+    assert 'observer.observe(statsRow)' in header_stats_script
+    assert 'observer.observe(videoCard)' not in header_stats_script
+    assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 0; display: flex; grid-area: stats; min-width: 0; margin-bottom: -12px; padding-block: 12px; background: var(--background); }' in dashboard_styles
+    assert '.channel-page-overview .dashboard-header-stats > .dashboard-header-stat { min-width: 0; flex: 1 1 0; }' in dashboard_styles
+    assert '.channel-page-overview .dashboard-header-stats > .dashboard-ad-sticky.is-visible { max-width: 100%; flex-grow: 1; padding: 4px 9px; border: 1px solid var(--border);' in dashboard_styles
+    assert 'classes.some(name => !stickyMirror.classList.contains(name))' in ad_status_script
+    assert '.channel-page-overview .dashboard-ad-sticky:not(.is-visible) { background: transparent; box-shadow: none; }' in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column { display: contents; }' in dashboard_styles
     assert 'grid-template-rows: max-content max-content minmax(540px,auto)' not in dashboard_styles
-    assert '.channel-page-overview .dashboard-chat-column { overflow-y: auto; }' in dashboard_styles
     assert ".dashboard-chat-column { display: flex; grid-area: chat;" in dashboard_styles
     assert 'showTimer && streamStatus.dataset.startedAt ? ` · ${formatUptime(streamStatus.dataset.startedAt)}`' in header_stats_script
     assert 'container.querySelector("[data-stream-status]")?.addEventListener("click", () => {' in header_stats_script

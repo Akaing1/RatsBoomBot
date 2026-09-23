@@ -5,7 +5,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="channel-dashboard-layout">
+<div class="channel-dashboard-layout" data-dashboard-carousel>
 <header class="page-header dashboard-channel-profile" hidden>
     <div class="channel-heading dashboard-channel-heading">
         <p class="eyebrow">Rat's Boom Bot</p>
@@ -124,6 +124,14 @@
                 </button>
                 {% endif %}
             {% endfor %}
+            <div class="dashboard-ad-stat dashboard-ad-sticky" data-ad-status-mirror aria-hidden="true">
+                <svg class="dashboard-ad-progress" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle class="dashboard-ad-progress-track" cx="12" cy="12" r="9"></circle>
+                    <circle class="dashboard-ad-progress-ring" cx="12" cy="12" r="9" data-ad-progress-mirror-ring></circle>
+                    <path class="dashboard-ad-progress-check" d="M6.5 12.5 10.5 16.5 18 8.5"></path>
+                </svg>
+                <strong data-ad-status-mirror-text>{{ ad_status.label }}</strong>
+            </div>
         </div>
     </div>
     <section class="panel live-chat-panel">
@@ -423,6 +431,11 @@
         </section>
 
     </div>
+</div>
+<div class="dashboard-carousel-deck" data-dashboard-carousel-deck aria-label="Dashboard cards"></div>
+<div class="dashboard-carousel-controls" aria-label="Dashboard cards">
+    <button class="dashboard-carousel-peek" type="button" data-dashboard-carousel-prev aria-label="Previous card"></button>
+    <button class="dashboard-carousel-peek" type="button" data-dashboard-carousel-next aria-label="Next card"></button>
 </div>
 </div>
 
@@ -910,6 +923,7 @@
 
 {% block page_scripts %}
     <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-carousel.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-stream-player.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-channel-metadata.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-viewer-queue.js') }}?v={{ deployment_stamp() }}" defer></script>

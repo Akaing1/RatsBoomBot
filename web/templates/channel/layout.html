@@ -42,9 +42,12 @@
 
                 <div class="brand-copy">
                     <h1>RatsBoomBot</h1>
-                    <p>Streamer Control</p>
+                    <p class="sidebar-brand-subtitle">Streamer Control</p>
                 </div>
             </div>
+            {% if active_page == 'overview' %}
+            <span class="dashboard-carousel-navbar-label" data-dashboard-carousel-position role="status" aria-live="polite"><span class="dashboard-carousel-navbar-count" data-dashboard-carousel-count>1 / 4 ·</span><span class="dashboard-carousel-navbar-name" data-dashboard-carousel-name>Stream and Ads</span></span>
+            {% endif %}
 
             <nav class="navigation">
                 <a
