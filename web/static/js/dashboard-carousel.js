@@ -21,6 +21,16 @@
     }));
     if (cards.some(card => card.elements.some(element => !element))) return;
 
+    // Place the iframe in its permanent slide before dashboard-stream-player.js sets src.
+    // Reparenting a loaded iframe at a breakpoint would restart the Twitch player.
+    const player = cards[0].elements[0];
+    const playerSlide = document.createElement("section");
+    playerSlide.className = "dashboard-carousel-slide";
+    playerSlide.setAttribute("aria-label", cards[0].name);
+    playerSlide.dataset.dashboardCarouselSlide = "0";
+    playerSlide.append(player);
+    deck.append(playerSlide);
+
     let slides = [];
     let originals = [];
     let activeIndex = 0;
@@ -44,19 +54,24 @@
 
     function enableCarousel() {
         if (slides.length) return;
-        originals = cards.flatMap(card => card.elements).map(element => {
+        originals = cards.flatMap((card, index) => index === 0 ? card.elements.slice(1) : card.elements).map(element => {
             const marker = document.createComment("dashboard carousel position");
             element.before(marker);
             return {element, marker};
         });
-        slides = cards.map((card, index) => {
+        slides = [playerSlide];
+        cards.forEach((card, index) => {
+            if (index === 0) {
+                card.elements.slice(1).forEach(element => playerSlide.append(element));
+                return;
+            }
             const slide = document.createElement("section");
             slide.className = "dashboard-carousel-slide";
             slide.setAttribute("aria-label", card.name);
             slide.dataset.dashboardCarouselSlide = String(index);
             card.elements.forEach(element => slide.append(element));
             deck.append(slide);
-            return slide;
+            slides.push(slide);
         });
         showCard(activeIndex);
         layout.classList.add("has-carousel");
@@ -69,7 +84,10 @@
             element.inert = false;
             marker.replaceWith(element);
         });
-        deck.replaceChildren();
+        slides.slice(1).forEach(slide => slide.remove());
+        playerSlide.classList.remove("is-active", "is-before", "is-after", "is-neighbor");
+        playerSlide.inert = false;
+        playerSlide.removeAttribute("aria-hidden");
         slides = [];
         originals = [];
     }

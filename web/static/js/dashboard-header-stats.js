@@ -3,18 +3,15 @@
     if (!container) return;
     const dashboard = container.closest(".channel-dashboard-layout") || document;
     const statsRow = container.closest(".dashboard-header-side");
-    const videoCard = dashboard.querySelector(".dashboard-video-card");
 
-    function updateDashboardHeights() {
+    function updateDashboardStatsHeight() {
         if (statsRow) dashboard.style.setProperty("--dashboard-stats-height", `${statsRow.getBoundingClientRect().height}px`);
-        if (videoCard) dashboard.style.setProperty("--dashboard-video-height", `${videoCard.getBoundingClientRect().height}px`);
     }
-    updateDashboardHeights();
+    updateDashboardStatsHeight();
     if ("ResizeObserver" in window) {
-        const observer = new ResizeObserver(updateDashboardHeights);
+        const observer = new ResizeObserver(updateDashboardStatsHeight);
         if (statsRow) observer.observe(statsRow);
-        if (videoCard) observer.observe(videoCard);
-    } else window.addEventListener("resize", updateDashboardHeights);
+    } else window.addEventListener("resize", updateDashboardStatsHeight);
 
     const storageKey = `ratsboombot:dashboard-stat-visibility:${container.dataset.channelId || "channel"}`;
     const refreshUrl = container.dataset.refreshUrl;

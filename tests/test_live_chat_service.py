@@ -1310,6 +1310,20 @@ def test_live_chat_tracks_mod_actions_and_automod_queue():
     assert service.get_moderation_activity("channel-1")["automod"] == []
 
 
+def test_dashboard_carousel_keeps_stream_player_mounted_across_breakpoints():
+    dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    carousel = open("web/static/js/dashboard-carousel.js", encoding="utf-8").read()
+
+    assert dashboard.index("dashboard-carousel.js") < dashboard.index("dashboard-stream-player.js")
+    assert ".dashboard-carousel-deck, .dashboard-carousel-slide { display: contents; }" in styles
+    assert "playerSlide.append(player);" in carousel
+    assert "slides = [playerSlide];" in carousel
+    assert "index === 0 ? card.elements.slice(1) : card.elements" in carousel
+    assert "slides.slice(1).forEach(slide => slide.remove());" in carousel
+    assert "deck.replaceChildren()" not in carousel
+
+
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
     features = open("web/templates/channel/features.html", encoding="utf-8").read()
@@ -1676,10 +1690,13 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert ".channel-page-overview .dashboard-chat-column { grid-row: 1 / -1; }" in dashboard_styles
     assert 'grid-template-areas: "player queue chat" "activities activities chat";' in dashboard_styles
     assert '.dashboard-chat-column > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }' in dashboard_styles
-    assert 'grid-template-rows: max-content var(--dashboard-video-height, 400px) minmax(0,1fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 16px)' in dashboard_styles
+    assert 'grid-template-rows: max-content max-content minmax(0,1fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 16px)' in dashboard_styles
+    assert '.channel-page-overview .dashboard-video-frame { flex: 0 0 auto; aspect-ratio: 16 / 9; container-type: normal; }' in dashboard_styles
+    assert '.channel-page-overview .dashboard-video-unavailable { width: 100%; height: 100%; aspect-ratio: auto; }' in dashboard_styles
+    assert '--dashboard-video-height' not in dashboard_styles
     assert 'height: calc(200dvh - var(--dashboard-stats-height, 36px) - 20px)' in dashboard_styles
     assert 'observer.observe(statsRow)' in header_stats_script
-    assert 'observer.observe(videoCard)' in header_stats_script
+    assert 'observer.observe(videoCard)' not in header_stats_script
     assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 0; display: flex; grid-area: stats; min-width: 0; margin-bottom: -12px; padding-block: 12px; background: var(--background); }' in dashboard_styles
     assert '.channel-page-overview .dashboard-header-stats > .dashboard-header-stat { min-width: 0; flex: 1 1 0; }' in dashboard_styles
     assert '.channel-page-overview .dashboard-header-stats > .dashboard-ad-sticky.is-visible { max-width: 100%; flex-grow: 1; padding: 4px 9px; border: 1px solid var(--border);' in dashboard_styles

@@ -283,7 +283,8 @@ button, input { font: inherit; }
 .channel-dashboard-layout { display: grid; grid-template-columns: minmax(600px,1.35fr) minmax(260px,.65fr) minmax(340px,.8fr); grid-template-rows: max-content minmax(540px,1fr); grid-template-areas: "player queue chat" "activities activities chat"; align-items: stretch; gap: 12px; margin-bottom: 16px; }
 .channel-dashboard-layout > .channel-live-layout { display: contents; }
 .channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }
-.dashboard-carousel-deck, .dashboard-carousel-controls { display: none; }
+.dashboard-carousel-deck, .dashboard-carousel-slide { display: contents; }
+.dashboard-carousel-controls { display: none; }
 .dashboard-activity-grid { display: grid; grid-area: activities; min-width: 0; min-height: 0; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .dashboard-video-card { position: relative; display: flex; grid-area: player; min-width: 0; align-self: start; flex-direction: column; }
 .dashboard-video-card .channel-metadata-status { right: 16px; bottom: 2px; }
@@ -415,11 +416,17 @@ button, input { font: inherit; }
     .channel-page-overview #viewer-queue-content,
     .channel-page-overview .dashboard-command-feed { min-height: 0; max-height: none; flex: 1; overflow-y: auto; }
 }
+@media (max-width: 1600px) {
+    .channel-page-overview .dashboard-video-frame { flex: 0 0 auto; aspect-ratio: 16 / 9; container-type: normal; }
+    .channel-page-overview .dashboard-video-player,
+    .channel-page-overview .dashboard-video-unavailable { width: 100%; height: 100%; aspect-ratio: auto; }
+}
 @media (min-width: 1101px) and (max-width: 1600px) {
     .channel-page-overview, .channel-page-overview .app-shell { height: auto; min-height: 100dvh; overflow: visible; }
     .channel-page-overview .sidebar { height: 100dvh; min-height: 0; }
     .channel-page-overview .streamer-main-content { height: auto; min-height: 100dvh; overflow: visible; padding-top: 0; }
-    .channel-page-overview .channel-dashboard-layout { height: calc(200dvh - var(--dashboard-stats-height, 36px) - 20px); flex: none; grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr); grid-template-rows: max-content var(--dashboard-video-height, 400px) minmax(0,1fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 16px); grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"; overflow: visible; }
+    .channel-page-overview .channel-dashboard-layout { height: calc(200dvh - var(--dashboard-stats-height, 36px) - 20px); flex: none; grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr); grid-template-rows: max-content max-content minmax(0,1fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 16px); grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"; overflow: visible; }
+    .channel-page-overview .dashboard-video-card { align-self: start; }
     .channel-page-overview .dashboard-chat-column { display: contents; }
     .channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 0; display: flex; grid-area: stats; min-width: 0; margin-bottom: -12px; padding-block: 12px; background: var(--background); }
     .channel-page-overview .live-chat-panel { height: 100%; min-height: 0; overflow: hidden; }
