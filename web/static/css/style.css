@@ -66,7 +66,7 @@ button, input { font: inherit; }
 .brand h1 { margin: 0; font-size: 17px; }
 .brand p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
 .dashboard-carousel-navbar-label { display: none; }
-.navigation { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 7px; overflow-y: auto; }
+.navigation { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; gap: 7px; overflow-x: hidden; overflow-y: auto; }
 .nav-link {
     display: flex;
     align-items: center;
@@ -91,6 +91,10 @@ button, input { font: inherit; }
 .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-toggle { top: 35px; right: -14px; }
 .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link,
 .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-logout .button { gap: 0; justify-content: center; padding-right: 10px; padding-left: 10px; }
+@media (min-width: 1101px) {
+    .dashboard-page .app-shell.sidebar-collapsed:has(> .sidebar:hover) { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
+    .dashboard-page:not(.channel-page-overview):not(.admin-channel-overview) .app-shell.sidebar-collapsed:has(> .sidebar:hover) .main-content { position: static; left: auto; width: 100%; max-width: 1250px; }
+}
 .nav-link:hover, .nav-link.active { background: var(--surface-raised); color: var(--text); }
 .nav-link.disabled { opacity: .45; pointer-events: none; }
 

@@ -1619,7 +1619,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'window.matchMedia("(max-width: 1100px)")' in sidebar_script
     assert 'mobile ? (collapsed ? "☰" : "×")' in sidebar_script
     assert 'position: sticky;' in dashboard_styles
-    assert '.navigation { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 7px; overflow-y: auto; }' in dashboard_styles
+    assert '.navigation { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; gap: 7px; overflow-x: hidden; overflow-y: auto; }' in dashboard_styles
     assert '.channel-page-overview .sidebar { position: fixed; z-index: 50; top: 0; right: 0; left: 0; width: 100%; height: 100dvh;' in dashboard_styles
     assert '.sidebar:hover { width: 100%; height: 74px; min-height: 0;' in dashboard_styles
     assert '.navigation { width: 100%; min-height: 0; flex-direction: column; justify-content: flex-start; gap: 7px; overflow-x: hidden; overflow-y: auto; }' in dashboard_styles
