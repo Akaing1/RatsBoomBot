@@ -5,6 +5,10 @@
     const label = container.querySelector("[data-ad-status-text]");
     const progressRing = container.querySelector("[data-ad-progress-ring]");
     const completionCheck = container.querySelector(".dashboard-ad-progress-check");
+    const stickyMirror = document.querySelector("[data-ad-status-mirror]");
+    const stickyProgressRing = stickyMirror?.querySelector("[data-ad-progress-mirror-ring]");
+    const stickyMedia = window.matchMedia("(min-width: 1101px) and (max-width: 1600px) and (min-height: 781px)");
+    const mobileMedia = window.matchMedia("(max-width: 1100px)");
     const panel = document.querySelector("[data-ad-panel]");
     const actionStatus = panel?.querySelector("[data-ad-action-status]");
     const actionButtons = Array.from(panel?.querySelectorAll("[data-ad-action]") || []);
@@ -44,16 +48,41 @@
         container.classList.add(appearance);
     }
 
+    function syncStickyStatus() {
+        if (!stickyMirror) return;
+        const visible = stickyMirror.classList.contains("is-visible");
+        const classes = [
+            "dashboard-ad-stat", "dashboard-ad-sticky",
+            ...(visible ? ["is-visible"] : []),
+            ...appearanceClasses.filter(name => container.classList.contains(name)),
+            ...["ad-ring-intro", "ad-ring-countdown"].filter(name => container.classList.contains(name)),
+            ...Array.from(container.classList).filter(name => name.startsWith("state-"))
+        ];
+        if (stickyMirror.classList.length !== classes.length || classes.some(name => !stickyMirror.classList.contains(name))) {
+            stickyMirror.className = classes.join(" ");
+        }
+        stickyMirror.querySelector("[data-ad-status-mirror-text]").textContent = label.textContent;
+    }
+
+    function updateStickyVisibility() {
+        if (!stickyMirror) return;
+        const visible = mobileMedia.matches || (stickyMedia.matches && window.scrollY > 32);
+        stickyMirror.classList.toggle("is-visible", visible);
+        stickyMirror.setAttribute("aria-hidden", String(!visible));
+    }
+
     function clearRingIntro() {
         if (ringIntroTimer !== null) window.clearTimeout(ringIntroTimer);
         ringIntroTimer = null;
         ringIntroActive = false;
         container.classList.remove("ad-ring-intro");
+        stickyMirror?.classList.remove("ad-ring-intro");
     }
 
     function clearRingCountdown() {
         ringCountdownActive = false;
         container.classList.remove("ad-ring-countdown");
+        stickyMirror?.classList.remove("ad-ring-countdown");
     }
 
     function beginRingCountdown(fromFull = true) {
@@ -73,9 +102,16 @@
         progressRing.style.strokeDashoffset = String(fromOffset);
         progressRing.style.setProperty("--ad-ring-from", String(fromOffset));
         progressRing.style.setProperty("--ad-ring-duration", `${remainingMs}ms`);
+        if (stickyProgressRing) {
+            stickyProgressRing.style.strokeDashoffset = String(fromOffset);
+            stickyProgressRing.style.setProperty("--ad-ring-from", String(fromOffset));
+            stickyProgressRing.style.setProperty("--ad-ring-duration", `${remainingMs}ms`);
+        }
         void progressRing.getBoundingClientRect();
+        if (stickyProgressRing) void stickyProgressRing.getBoundingClientRect();
         ringCountdownActive = true;
         container.classList.add("ad-ring-countdown");
+        syncStickyStatus();
     }
 
     function beginRingIntro() {
@@ -84,7 +120,9 @@
         clearRingCountdown();
         ringIntroActive = true;
         progressRing.style.strokeDashoffset = String(ringCircumference);
+        if (stickyProgressRing) stickyProgressRing.style.strokeDashoffset = String(ringCircumference);
         container.classList.add("ad-ring-intro");
+        syncStickyStatus();
         const animationSeconds = parseFloat(window.getComputedStyle(progressRing).animationDuration) || 0;
         if (animationSeconds <= 0) {
             clearRingIntro();
@@ -130,6 +168,7 @@
             const fraction = duration > 0 ? Math.min(1, Math.max(0, (endsAt - now) / duration)) : 0;
             if (progressRing && !ringIntroActive && !ringCountdownActive) {
                 progressRing.style.strokeDashoffset = String(ringCircumference * (1 - fraction));
+                if (stickyProgressRing) stickyProgressRing.style.strokeDashoffset = progressRing.style.strokeDashoffset;
             }
             setAppearance("ad-running");
         } else if (container.dataset.state === "scheduled" && container.dataset.nextAdAt) {
@@ -161,6 +200,7 @@
                     (state !== "scheduled" || (snoozes !== "" && Number(snoozes) <= 0))) ||
                 (button.dataset.adAction !== "snooze" && state === "running");
         });
+        syncStickyStatus();
     }
 
     function displayStatus(data) {
@@ -290,6 +330,10 @@
 
     render();
     if (container.dataset.state === "running") beginRingIntro();
+    updateStickyVisibility();
+    window.addEventListener("scroll", updateStickyVisibility, {passive: true});
+    stickyMedia.addEventListener("change", updateStickyVisibility);
+    mobileMedia.addEventListener("change", updateStickyVisibility);
     actionButtons.forEach(button => button.addEventListener("click", () => runAction(button.dataset.adAction)));
     window.setInterval(render, 1000);
     window.setInterval(refresh, 30000);
