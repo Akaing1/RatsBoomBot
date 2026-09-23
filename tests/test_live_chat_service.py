@@ -1686,6 +1686,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'classes.some(name => !stickyMirror.classList.contains(name))' in ad_status_script
     assert '.channel-page-overview .dashboard-ad-sticky:not(.is-visible) { background: transparent; box-shadow: none; }' in dashboard_styles
     assert '.channel-page-overview .dashboard-chat-column { display: contents; }' in dashboard_styles
+    assert 'grid-template-rows: max-content max-content minmax(540px,auto)' not in dashboard_styles
     assert ".dashboard-chat-column { display: flex; grid-area: chat;" in dashboard_styles
     assert 'showTimer && streamStatus.dataset.startedAt ? ` · ${formatUptime(streamStatus.dataset.startedAt)}`' in header_stats_script
     assert 'container.querySelector("[data-stream-status]")?.addEventListener("click", () => {' in header_stats_script
