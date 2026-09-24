@@ -1589,7 +1589,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
     assert '.channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }' in dashboard_styles
     assert 'grid-template-areas: "stats" "player" "queue" "activities" "chat"' in dashboard_styles
-    assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' in dashboard_styles
+    assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' not in dashboard_styles
     assert '.dashboard-activity-grid { display: grid; grid-area: activities;' in dashboard_styles
     assert '<header class="page-header dashboard-channel-profile" hidden>' in dashboard
     assert dashboard.index('class="panel dashboard-video-card"') < dashboard.index('class="panel live-chat-panel"')
@@ -1690,14 +1690,14 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert ".channel-page-overview .dashboard-chat-column { grid-row: 1 / -1; }" in dashboard_styles
     assert 'grid-template-areas: "player queue chat" "activities activities chat";' in dashboard_styles
     assert '.dashboard-chat-column > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }' in dashboard_styles
-    assert 'grid-template-rows: max-content max-content minmax(0,1fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 16px)' in dashboard_styles
+    assert 'grid-template-rows: max-content max-content minmax(0,1fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 16px)' not in dashboard_styles
     assert '.channel-page-overview .dashboard-video-frame { flex: 0 0 auto; aspect-ratio: 16 / 9; container-type: normal; }' in dashboard_styles
     assert '.channel-page-overview .dashboard-video-unavailable { width: 100%; height: 100%; aspect-ratio: auto; }' in dashboard_styles
     assert '--dashboard-video-height' not in dashboard_styles
-    assert 'height: calc(200dvh - var(--dashboard-stats-height, 36px) - 20px)' in dashboard_styles
+    assert 'height: calc(200dvh - var(--dashboard-stats-height, 36px) - 20px)' not in dashboard_styles
     assert 'observer.observe(statsRow)' in header_stats_script
     assert 'observer.observe(videoCard)' not in header_stats_script
-    assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 0; display: flex; grid-area: stats; min-width: 0; margin-bottom: -12px; padding-block: 12px; background: var(--background); }' in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 0; display: flex; grid-area: stats; min-width: 0; margin-bottom: -12px; padding-block: 12px; background: var(--background); }' not in dashboard_styles
     assert '.channel-page-overview .dashboard-header-stats > .dashboard-header-stat { min-width: 0; flex: 1 1 0; }' in dashboard_styles
     assert '.channel-page-overview .dashboard-header-stats > .dashboard-ad-sticky.is-visible { max-width: 100%; flex-grow: 1; padding: 4px 9px; border: 1px solid var(--border);' in dashboard_styles
     assert 'classes.some(name => !stickyMirror.classList.contains(name))' in ad_status_script
@@ -1705,6 +1705,9 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.channel-page-overview .dashboard-chat-column { display: contents; }' in dashboard_styles
     assert 'grid-template-rows: max-content max-content minmax(540px,auto)' not in dashboard_styles
     assert ".dashboard-chat-column { display: flex; grid-area: chat;" in dashboard_styles
+    assert "(max-height: 780px)" not in dashboard_styles
+    assert "grid-template-columns: minmax(0,1.35fr) minmax(0,.65fr) minmax(0,.8fr)" in dashboard_styles
+    assert "width: min(100%, calc(100cqh * 16 / 9))" in dashboard_styles
     assert 'showTimer && streamStatus.dataset.startedAt ? ` · ${formatUptime(streamStatus.dataset.startedAt)}`' in header_stats_script
     assert 'container.querySelector("[data-stream-status]")?.addEventListener("click", () => {' in header_stats_script
     assert 'hiddenStats.has("stream_timer")' in header_stats_script
