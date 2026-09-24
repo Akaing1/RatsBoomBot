@@ -137,12 +137,9 @@
     <section class="panel live-chat-panel">
         <div class="panel-header">
             <div>
-                <h3>Combined Chat</h3>
+                <h3 class="chat-heading">Combined Chat <span class="chat-platform-dot twitch active" title="Twitch connected" aria-label="Twitch connected"></span><span class="chat-platform-dot youtube {% if youtube_chat.connected %}active{% endif %}" title="YouTube {% if youtube_chat.connected %}connected{% else %}off{% endif %}" aria-label="YouTube {% if youtube_chat.connected %}connected{% else %}off{% endif %}"></span></h3>
             </div>
-            <div class="chat-platform-states" aria-label="Connected chat platforms">
-                <span class="channel-state live">Twitch</span>
-                <span class="channel-state {% if youtube_chat.connected %}live{% endif %}">YouTube{% if not youtube_chat.connected %} off{% endif %}</span>
-            </div>
+            <button type="button" class="channel-state live chat-command-toggle" data-chat-command-toggle aria-pressed="true">Commands on</button>
         </div>
 
         <div
