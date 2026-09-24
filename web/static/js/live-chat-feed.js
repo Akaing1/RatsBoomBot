@@ -193,6 +193,7 @@
         feed.element.querySelector(".compact-empty-state")?.remove();
 
         const row = makeElement("article", `live-chat-message platform-${message.platform} kind-${message.kind}`);
+        row.hidden = message.kind === "command" && feed.hideCommands;
         if (message.deleted) row.classList.add("is-deleted");
         if (message.mentioned) row.classList.add("is-mentioned");
         if (message.is_bot) row.classList.add("is-bot");
@@ -371,6 +372,17 @@
                 connectionStatus._connectionFadeTimer = connectionFadeTimer;
             }
         }
+        const commandToggle = element.closest(".live-chat-panel")?.querySelector("[data-chat-command-toggle]");
+        feed.hideCommands = false;
+        commandToggle?.addEventListener("click", () => {
+            const followNewest = distanceFromBottom(element) <= 24;
+            feed.hideCommands = !feed.hideCommands;
+            commandToggle.textContent = feed.hideCommands ? "Commands off" : "Commands on";
+            commandToggle.setAttribute("aria-pressed", String(!feed.hideCommands));
+            commandToggle.classList.toggle("live", !feed.hideCommands);
+            element.querySelectorAll(".kind-command").forEach(row => { row.hidden = feed.hideCommands; });
+            if (followNewest) scrollToBottom(feed);
+        });
         feed.jumpButton.type = "button";
         feed.jumpButton.hidden = true;
         feed.jumpButton.addEventListener("click", () => {

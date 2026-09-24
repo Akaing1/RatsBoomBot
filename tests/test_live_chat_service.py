@@ -1411,7 +1411,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'aria-label="Open {{ broadcaster.name or broadcaster.login }} on Twitch"' in dashboard
     assert "Open Twitch" not in dashboard
     assert "Twitch + YouTube" not in dashboard
-    assert "<h3>Combined Chat</h3>" in dashboard
+    assert '<h3 class="chat-heading">Combined Chat' in dashboard
+    assert 'data-chat-command-toggle aria-pressed="true"' in dashboard
     assert 'data-activity-link="commands"' not in dashboard
     assert "Stream activity" not in dashboard
     assert "Viewer games" not in dashboard
