@@ -297,6 +297,10 @@ button, input { font: inherit; }
 .dashboard-chat-column > .live-chat-panel { grid-area: chat; min-height: 0; flex: 1 1 auto; }
 .dashboard-activity-grid > .dashboard-activity-panel { min-width: 0; }
 .admin-channel-dashboard-layout .admin-activity-panel { grid-area: activity; }
+.admin-channel-dashboard-layout { grid-template-areas: "header header chat" "stream stream chat" "queue activity chat"; }
+.admin-channel-dashboard-layout > .admin-channel-header { grid-area: header; min-width: 0; margin-bottom: 0; }
+.admin-channel-dashboard-layout > .channel-status-grid { grid-area: stream; min-width: 0; grid-template-columns: minmax(0,1fr); margin-bottom: 0; }
+.admin-channel-dashboard-layout .admin-readonly-chat-panel { grid-area: chat; }
 .viewer-queue-column { grid-area: queue; }
 .channel-dashboard-layout .viewer-queue-column { gap: 12px; }
 .channel-dashboard-layout .panel { margin-bottom: 0; padding: 16px; }
@@ -895,6 +899,7 @@ body.landing-page {
 }
 
 @media (max-width: 900px) {
+    .channel-dashboard-layout.admin-channel-dashboard-layout { grid-template-areas: "header" "stream" "queue" "activity" "chat"; }
     .main-content { padding: 28px 20px; }
     .channel-page-overview .streamer-main-content { padding: 16px; }
     .page-header { flex-direction: column; }
@@ -1669,7 +1674,7 @@ body.landing-page {
 .chat-platform-dot { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; background: #687080; }
 .chat-platform-dot.twitch.active { background: #9146ff; }
 .chat-platform-dot.youtube.active { background: #ff0033; }
-.chat-command-toggle { cursor: pointer; font: inherit; font-size: 12px; color: #ff8784; border-color: rgba(239,68,68,.5); }
+.chat-command-toggle { cursor: pointer; font: inherit; font-size: 12px; background: var(--surface); color: #ff8784; border-color: rgba(239,68,68,.5); }
 .chat-command-toggle.live { color: #22c55e; border-color: rgba(34,197,94,.5); }
 .live-chat-message[hidden] { display: none; }
 
