@@ -2,6 +2,16 @@
     const container = document.querySelector("[data-dashboard-header-stats]");
     if (!container) return;
     const dashboard = container.closest(".channel-dashboard-layout") || document;
+    const statsRow = container.closest(".dashboard-header-side");
+
+    function updateDashboardStatsHeight() {
+        if (statsRow) dashboard.style.setProperty("--dashboard-stats-height", `${statsRow.getBoundingClientRect().height}px`);
+    }
+    updateDashboardStatsHeight();
+    if ("ResizeObserver" in window) {
+        const observer = new ResizeObserver(updateDashboardStatsHeight);
+        if (statsRow) observer.observe(statsRow);
+    } else window.addEventListener("resize", updateDashboardStatsHeight);
 
     const storageKey = `ratsboombot:dashboard-stat-visibility:${container.dataset.channelId || "channel"}`;
     const refreshUrl = container.dataset.refreshUrl;
