@@ -177,3 +177,36 @@ def test_sign_in_from_public_profile_keeps_account_available(monkeypatch) -> Non
             assert signed_in.status_code == 200
             assert "My account" in signed_in.text
             assert "Sign in with Twitch" not in signed_in.text
+            assert "Sign out" in signed_in.text
+            assert signed_in.headers["cache-control"] == "no-store"
+        assert "My chatter profile" in client.get("/chatters/alice").text
+        assert "Your activity in" in client.get("/chatters/alice/channels/testchannel").text
+
+
+def test_another_chatter_profile_stays_public_after_sign_in(monkeypatch) -> None:
+    from web.shared.oauth import TwitchTokenResponse, TwitchUser
+
+    async def exchange(*, code, redirect_uri):
+        return TwitchTokenResponse("token", "refresh", 3600, [], "bearer")
+
+    async def fetch(token):
+        return TwitchUser("someone-else", "bob", "Bob")
+
+    monkeypatch.setattr("web.viewer.routers.exchange_code_for_token", exchange)
+    monkeypatch.setattr("web.viewer.routers.fetch_twitch_user", fetch)
+    monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=SimpleNamespace(chatter_stats=FakeChatterStats())))
+
+    with TestClient(app) as client:
+        start = client.get("/me/connect", follow_redirects=False)
+        state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+        client.get(f"/oauth/viewer/connect?code=valid&state={state}", follow_redirects=False)
+
+        global_profile = client.get("/chatters/alice")
+        channel_profile = client.get("/chatters/alice/channels/testchannel")
+
+    assert "Public chatter profile" in global_profile.text
+    assert "My chatter profile" not in global_profile.text
+    assert "Sign out" not in global_profile.text
+    assert "@alice in" in channel_profile.text
+    assert "Your activity in" not in channel_profile.text
+    assert "Sign out" not in channel_profile.text
