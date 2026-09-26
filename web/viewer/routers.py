@@ -145,27 +145,14 @@ async def shop_context(request: Request, channel_name: str):
     return runtime_db, services, profile, channel_profile.raid_bosses, token
 
 
-@router.get("/me/channels/{channel_name}/shop", response_class=HTMLResponse)
-async def viewer_raid_shop(request: Request, channel_name: str, result: str = ""):
+@router.get("/me/channels/{channel_name}/shop")
+async def viewer_raid_shop(request: Request, channel_name: str):
     context = await shop_context(request, channel_name)
     if isinstance(context, RedirectResponse):
         return context
 
-    _, _, profile, config, _ = context
-    return templates.TemplateResponse(
-        request=request,
-        name="viewer/raid_shop.html",
-        context={
-            "profile": profile,
-            "config": config,
-            "weapons": [(item, config.weapon_names.display(item), config.overclocked_weapon_cost if item in OVERCLOCKED_WEAPON_TYPES else config.weapon_cost) for item in SHOP_WEAPONS],
-            "recipes": [(item, config.weapon_names.display(item), config.weapon_names.display(ingredient), config.masterwork_crafting_cost if item.startswith(("masterwork_", "archmage_")) else config.refined_crafting_cost) for item, ingredient in CRAFTING_RECIPES.items()],
-            "sellable": [item for item in profile["inventory"] if item["item_id"] in SELLABLE_WEAPON_TYPES],
-            "message": SHOP_RESULTS.get(result),
-            "csrf_token": get_csrf_token(request),
-        },
-        headers=PRIVATE_HEADERS,
-    )
+    _, _, profile, _, _ = context
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=shop", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.post("/me/channels/{channel_name}/shop/{action}")
@@ -198,7 +185,7 @@ async def viewer_raid_action(request: Request, channel_name: str, action: str, i
 
     if result not in SHOP_RESULTS:
         result = "invalid"
-    return RedirectResponse(f"/me/channels/{channel_name}/shop?result={result}", status_code=303, headers=PRIVATE_HEADERS)
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=shop&result={result}", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.post("/me/logout")

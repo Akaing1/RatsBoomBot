@@ -23,20 +23,30 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
         features=FeatureDefaults(raid_bosses=True),
         raid_bosses=RaidBossConfig(enabled=True, weapon_cost=100, refined_crafting_cost=25),
     ))
+    activate_profile("channel-2", ChannelProfile(
+        channel_name="OtherChannel",
+        features=FeatureDefaults(raid_bosses=True),
+        raid_bosses=RaidBossConfig(enabled=True, weapon_cost=300),
+    ))
 
     async with asqlite.create_pool(str(tmp_path / "shop.db")) as db:
         await run_migrations(db)
         async with db.acquire() as connection:
             await connection.execute("INSERT INTO viewers (broadcaster_id,user_id,username,points,messages) VALUES ('channel-1','user-1','alice',1000,0)")
+            await connection.execute("INSERT INTO viewers (broadcaster_id,user_id,username,points,messages) VALUES ('channel-2','user-1','alice',500,0)")
 
         class Stats:
             async def get_channel_profile(self, user_id, channel_name):
-                if user_id != "user-1" or channel_name != "testchannel":
+                if user_id not in ("user-1", "alice") or channel_name not in ("testchannel", "otherchannel"):
                     return None
+                user_id = "user-1"
+                broadcaster_id = "channel-1" if channel_name == "testchannel" else "channel-2"
                 async with db.acquire() as connection:
-                    balance = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id='channel-1' AND user_id=?", (user_id,))
-                    items = await connection.fetchall("SELECT item_id,quantity FROM raid_boss_inventory WHERE broadcaster_id='channel-1' AND user_id=? AND quantity>0", (user_id,))
-                return {"identity": {"user_id": user_id, "login": "alice"}, "channel": {"id": "channel-1", "login": channel_name, "display_name": "TestChannel"}, "current_points": balance["points"], "currency_name": "Points", "inventory": [{"item_id": row["item_id"], "quantity": row["quantity"], "display_name": row["item_id"], "equipped": False} for row in items]}
+                    balance = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id=? AND user_id=?", (broadcaster_id, user_id))
+                    items = await connection.fetchall("SELECT item_id,quantity FROM raid_boss_inventory WHERE broadcaster_id=? AND user_id=? AND quantity>0", (broadcaster_id, user_id))
+                profile = {"identity": {"user_id": user_id, "login": "alice", "display_name": "Alice"}, "channel": {"id": broadcaster_id, "login": channel_name, "display_name": "TestChannel" if broadcaster_id == "channel-1" else "OtherChannel", "profile_image_url": None}, "current_points": balance["points"], "currency_name": "Points" if broadcaster_id == "channel-1" else "Crumbs", "inventory": [{"item_id": row["item_id"], "quantity": row["quantity"], "display_name": row["item_id"], "durability": 10, "equipped": False} for row in items], "consumables": [], "recent_raids": [], "achievements": []}
+                profile.update({key: 0 for key in ("messages_sent", "lifetime_points_earned", "daily_check_ins", "firsts", "damage_dealt", "highest_contribution", "raid_reward_points", "top_contributor_finishes", "bosses_attacked", "bosses_defeated", "final_hits", "raids_rewarded")})
+                return profile
 
         async def exchange(*, code, redirect_uri):
             return TwitchTokenResponse("user-token", "refresh-token", 3600, [], "bearer")
@@ -47,6 +57,8 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
         services = SimpleNamespace(chatter_stats=Stats(), features=SimpleNamespace(is_enabled=lambda *args: True), raid_bosses=RaidBossService(None, db))
         monkeypatch.setattr("web.viewer.routers.get_bot", lambda: SimpleNamespace(services=services))
         monkeypatch.setattr("web.viewer.routers.get_db", lambda: db)
+        monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=services))
+        monkeypatch.setattr("web.public.routers.get_db", lambda: db)
         monkeypatch.setattr("web.viewer.routers.exchange_code_for_token", exchange)
         monkeypatch.setattr("web.viewer.routers.fetch_twitch_user", fetch)
 
@@ -58,8 +70,11 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
                 state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
                 assert (await client.get(f"/oauth/viewer/connect?code=ok&state={state}", follow_redirects=False)).headers["location"] == shop_url
 
-                page = await client.get(shop_url)
+                page = await client.get(shop_url, follow_redirects=True)
                 assert page.status_code == 200
+                assert page.url.path == "/chatters/alice/channels/testchannel"
+                assert 'data-chatter-panel="shop"' in page.text
+                assert 'data-chatter-tab="shop"' in page.text
                 assert "1,000 Points" in page.text
                 csrf = re.search(r'name="csrf_token" value="([^"]+)"', page.text).group(1)
                 action = f"{shop_url}/buy"
@@ -67,6 +82,7 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
                 assert (await client.post(action, data={"csrf_token": csrf, "item_id": "blessing"})).status_code == 400
 
                 first = await client.post(action, data={"csrf_token": csrf, "item_id": "basic_sword"}, follow_redirects=False)
+                assert first.headers["location"].startswith("/chatters/alice/channels/testchannel?tab=shop")
                 assert first.headers["location"].endswith("result=bought")
                 assert (await client.post(action, data={"csrf_token": csrf, "item_id": "basic_sword"})).status_code == 429
                 now[0] += 3
@@ -85,6 +101,20 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
                 assert balance["points"] == 1000 - 200 - 25 + 112 + rewards["points"]
                 assert rewards["points"] > 0  # Buying and crafting can unlock channel achievements.
                 assert inventory["quantity"] == 0
+
+                other_shop = "/chatters/alice/channels/otherchannel?tab=shop"
+                other_page = await client.get(other_shop)
+                assert "500 Crumbs" in other_page.text
+                assert 'data-chatter-tab="shop"' in other_page.text
+                now[0] += 3
+                other_purchase = await client.post("/me/channels/otherchannel/shop/buy", data={"csrf_token": csrf, "item_id": "basic_bow"}, follow_redirects=False)
+                assert other_purchase.headers["location"].startswith(other_shop)
+                async with db.acquire() as connection:
+                    other_balance = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id='channel-2' AND user_id='user-1'")
+                    other_rewards = await connection.fetchone("SELECT COALESCE(SUM(points),0) AS points FROM channel_achievement_rewards WHERE broadcaster_id='channel-2' AND user_id='user-1'")
+                    original_balance = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id='channel-1' AND user_id='user-1'")
+                assert other_balance["points"] == 500 - 300 + other_rewards["points"]
+                assert original_balance["points"] == balance["points"]
 
                 assert (await client.post("/me/logout", data={"csrf_token": csrf}, follow_redirects=False)).status_code == 303
                 assert (await client.get(shop_url, follow_redirects=False)).headers["location"].startswith("/me/connect")
