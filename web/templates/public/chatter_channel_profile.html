@@ -10,14 +10,17 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
 </head>
 <body class="chatter-profile-page">
-    <header class="public-command-navigation">
+    <header class="public-command-navigation chatter-channel-navigation">
         <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
             <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
             <span><strong>RatsBoomBot</strong><small>Chatter profiles</small></span>
         </a>
-        <a class="button secondary" href="/chatters/{{ profile.identity.login }}">Back to global profile</a>
-        <a class="button secondary" href="{{ '/me' if viewer_user_id else '/me/connect?next=' ~ ('/chatters/' ~ profile.identity.login ~ '/channels/' ~ profile.channel.login)|urlencode }}">{{ 'My account' if viewer_user_id else 'Sign in with Twitch' }}</a>
-        {% if owner_mode %}<form method="post" action="/me/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>{% endif %}
+        <a class="button secondary chatter-channel-back" href="/chatters/{{ profile.identity.login }}">Back to global profile</a>
+        {% if owner_mode %}
+            <form method="post" action="/me/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>
+        {% elif not viewer_user_id %}
+            <a class="button secondary chatter-channel-auth" href="/me/connect?next={{ ('/chatters/' ~ profile.identity.login ~ '/channels/' ~ profile.channel.login)|urlencode }}">Sign in with Twitch</a>
+        {% endif %}
     </header>
 
     <main class="chatter-profile-content">
