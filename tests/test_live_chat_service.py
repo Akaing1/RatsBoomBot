@@ -7,11 +7,13 @@ from urllib.parse import parse_qs, urlparse
 
 import asqlite
 import httpx
+import grpc
 import pytest
 from starlette.requests import Request
 
 import web.channel.routers.dashboard as dashboard_router
 from bot.services.channels.live_chat import ChatBadge, ChatSegment, LiveChatService, UnifiedChatMessage, message_matches_view, normalize_chat_view
+from bot.services.channels import youtube_live_chat_pb2
 from storage.migration_runner import run_migrations
 from web.channel.routers.dashboard import get_ad_status
 from web.admin.auth import CSRF_SESSION_KEY
@@ -467,6 +469,82 @@ async def test_deleted_chat_messages_remain_in_history_as_deleted_updates():
     assert history[0]["deleted"] is True
     assert update.id == message.id
     assert update.deleted is True
+
+
+@pytest.mark.asyncio
+async def test_youtube_stream_publishes_immediately_and_uses_existing_token(monkeypatch):
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace(access_token="access")
+    service._ensure_access_token = AsyncMock(return_value=service.connections["channel-1"])
+    service._poll_live_chat = AsyncMock()
+    requests = []
+
+    class FakeChannel:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def unary_stream(self, method, **kwargs):
+            assert method == "/youtube.api.v3.V3DataLiveChatMessageService/StreamList"
+
+            def call(request, *, metadata):
+                requests.append((request, metadata))
+
+                async def events():
+                    item = youtube_live_chat_pb2.LiveChatMessage(id="message-1")
+                    item.snippet.display_message = "Hello from YouTube"
+                    item.snippet.has_display_content = True
+                    item.snippet.published_at = "2026-09-26T01:00:00Z"
+                    item.author_details.channel_id = "author-1"
+                    item.author_details.display_name = "Viewer"
+                    yield youtube_live_chat_pb2.LiveChatMessageListResponse(
+                        next_page_token="token-2", items=[item], offline_at="2026-09-26T01:01:00Z"
+                    )
+
+                return events()
+
+            return call
+
+    monkeypatch.setattr("bot.services.channels.live_chat.grpc.aio.secure_channel", lambda *args: FakeChannel())
+    await service._stream_live_chat("channel-1", "live-chat-1")
+
+    assert requests[0][0].live_chat_id == "live-chat-1"
+    assert requests[0][1] == (("authorization", "Bearer access"),)
+    assert service.history("channel-1")[0]["message"] == "Hello from YouTube"
+    service._poll_live_chat.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_youtube_stream_falls_back_to_polling_after_disconnect(monkeypatch):
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace(access_token="access")
+    service._ensure_access_token = AsyncMock(return_value=service.connections["channel-1"])
+    service._poll_live_chat = AsyncMock()
+
+    class FakeChannel:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def unary_stream(self, method, **kwargs):
+            def call(request, *, metadata):
+                async def events():
+                    yield youtube_live_chat_pb2.LiveChatMessageListResponse(next_page_token="last-token")
+                    raise grpc.aio.AioRpcError(grpc.StatusCode.UNAVAILABLE)
+
+                return events()
+
+            return call
+
+    monkeypatch.setattr("bot.services.channels.live_chat.grpc.aio.secure_channel", lambda *args: FakeChannel())
+    await service._stream_live_chat("channel-1", "live-chat-1")
+    service._poll_live_chat.assert_awaited_once_with("channel-1", "live-chat-1", page_token="last-token")
 
 
 def test_youtube_messages_are_normalized_and_deduplicated():
