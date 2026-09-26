@@ -28,9 +28,8 @@
             <a href="#features">Features</a>
             <a href="#how-it-works">How it works</a>
             <a href="#support">Support</a>
-            <a href="/me">My account</a>
-            <a class="button secondary" href="{{ dashboard_url }}">
-                {% if is_authenticated %}Open Dashboard{% else %}Sign in with Twitch{% endif %}
+            <a class="button secondary" href="{{ viewer_url }}">
+                {% if viewer_authenticated %}My chatter profile{% else %}Sign in with Twitch{% endif %}
             </a>
         </nav>
     </header>
@@ -49,12 +48,11 @@
                 </p>
 
                 <div class="hero-actions">
-                    <a class="button primary landing-primary-action" href="{{ dashboard_url }}">
-                        {% if is_authenticated %}Open Your Dashboard{% else %}Sign in with Twitch{% endif %}
+                    <a class="button primary landing-primary-action" href="{{ viewer_url }}">
+                        {% if viewer_authenticated %}Open Your Chatter Profile{% else %}Sign in to Your Chatter Profile{% endif %}
                     </a>
 
                     <a class="button secondary" href="#features">Explore Features</a>
-                    <a class="button secondary" href="/me">View your chatter profile</a>
                 </div>
             </div>
 
@@ -312,13 +310,13 @@
 
         <section class="landing-cta">
             <div>
-                <p class="eyebrow">Ready when you are</p>
-                <h2>{% if is_authenticated %}Your dashboard is waiting.{% else %}Bring your community into the fun.{% endif %}</h2>
-                <p>Manage chat, viewer activities, loyalty tools, and stream controls from one place.</p>
+                <p class="eyebrow">Streamer setup</p>
+                <h2>{% if is_authenticated %}Your streamer dashboard is ready.{% else %}Set up RatsBoomBot for your channel.{% endif %}</h2>
+                <p>For broadcasters: connect your channel to manage chat, loyalty tools, and stream controls.</p>
             </div>
 
             <a class="button primary landing-primary-action" href="{{ dashboard_url }}">
-                {% if is_authenticated %}Open Dashboard{% else %}Continue with Twitch{% endif %}
+                {% if is_authenticated %}Open Streamer Dashboard{% else %}Set Up the Bot{% endif %}
             </a>
         </section>
 

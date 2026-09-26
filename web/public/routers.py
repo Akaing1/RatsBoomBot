@@ -176,6 +176,7 @@ async def landing_page(request: Request):
     is_authenticated = bool(request.session.get(CHANNEL_USER_ID_KEY))
     destination = "/channel" if is_authenticated else "/connect/twitch"
     dashboard_url = f"{settings.DASHBOARD_BASE_URL.rstrip('/')}{destination}"
+    viewer_authenticated = viewer_user_id(request) is not None
 
     return templates.TemplateResponse(
         request=request,
@@ -183,6 +184,8 @@ async def landing_page(request: Request):
         context={
             "dashboard_url": dashboard_url,
             "is_authenticated": is_authenticated,
+            "viewer_url": "/me" if viewer_authenticated else "/me/connect",
+            "viewer_authenticated": viewer_authenticated,
             "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
             "release_highlights": HOME_RELEASE_HIGHLIGHTS,
             "release_history_url": PUBLIC_RELEASE_HISTORY_URL

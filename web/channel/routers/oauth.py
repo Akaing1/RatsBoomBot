@@ -171,7 +171,7 @@ async def public_channel_callback(request: Request, code: str | None = None, sta
         return await render_error(request, title="Channel authorization failed", message="The Twitch authorization request could not be verified.", status_code=400)
 
     if error:
-        return await render_error(request, title="Channel authorization failed", message=error, status_code=400)
+        return RedirectResponse(url="/", status_code=303)
 
     if not code:
         return await render_error(request, title="Channel authorization failed", message="No authorization code was provided.", status_code=400)

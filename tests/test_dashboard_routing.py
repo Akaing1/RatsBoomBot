@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from urllib.parse import parse_qs, urlparse
 
 from config.settings import settings
 from web.app import app, create_app
@@ -33,7 +34,22 @@ def test_root_is_the_public_landing_page() -> None:
     assert "Help keep RatsBoomBot growing." in response.text
     assert 'href="https://ko-fi.com/ninjakaing"' in response.text
     assert "Support never affects features, points, achievements, or raid odds." in response.text
-    assert f'{settings.DASHBOARD_BASE_URL}/connect/twitch' in response.text
+    assert response.text.count('href="/me/connect"') == 2
+    assert "Sign in to Your Chatter Profile" in response.text
+    assert "Streamer setup" in response.text
+    assert "Set Up the Bot" in response.text
+    assert response.text.count(f'href="{settings.DASHBOARD_BASE_URL}/connect/twitch"') == 1
+    assert response.text.index('href="/me/connect"') < response.text.index(f'href="{settings.DASHBOARD_BASE_URL}/connect/twitch"')
+
+
+def test_canceling_broadcaster_setup_returns_home() -> None:
+    with TestClient(app) as client:
+        start = client.get("/connect/twitch", follow_redirects=False)
+        state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+        canceled = client.get(f"/oauth/channel/connect?error=access_denied&state={state}", follow_redirects=False)
+
+    assert canceled.status_code == 303
+    assert canceled.headers["location"] == "/"
 
 
 def test_admin_dashboard_uses_admin_prefix() -> None:
