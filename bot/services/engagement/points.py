@@ -26,10 +26,11 @@ class PointsService:
     LEGACY_BROADCASTER_ID = "shared"
     BOT_USERNAME = "RatsBoomBot"
 
-    def __init__(self, bot, db, chatter_stats=None):
+    def __init__(self, bot, db, chatter_stats=None, pets=None):
         self.bot = bot
         self.db = db
         self.chatter_stats = chatter_stats
+        self.pets = pets
         self.cooldowns: dict[str, float] = {}
         self.message_locks: dict[str, asyncio.Lock] = {}
         self.pending_duels: dict[str, PendingDuel] = {}
@@ -223,19 +224,18 @@ class PointsService:
                 messages = messages + 1
             """
 
-            values = (
-                broadcaster_id,
-                user_id,
-                username,
-                points_config.points_per_message
-            )
-
             try:
                 async with self.db.acquire() as connection:
+                    awarded_points = await self.apply_earned_bonus(
+                        user_id,
+                        points_config.points_per_message,
+                        connection
+                    )
+                    values = (broadcaster_id, user_id, username, awarded_points)
                     await connection.execute(query, values)
 
                     if self.chatter_stats is not None:
-                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, points_config.points_per_message, connection)
+                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, awarded_points, connection)
             except Exception:
                 LOGGER.exception(
                     "[Points] Failed to award message points to %s for broadcaster %s.",
@@ -248,10 +248,19 @@ class PointsService:
 
         LOGGER.debug(
             "[Points] Awarded %d message points to %s for broadcaster %s.",
-            points_config.points_per_message,
+            awarded_points,
             username,
             broadcaster_id
         )
+
+    async def apply_earned_bonus(self, user_id: str, base_amount: int, connection=None) -> int:
+        base_amount = int(base_amount)
+
+        if base_amount <= 0 or self.pets is None:
+            return base_amount
+
+        bonus = await self.pets.loyalty_bonus(str(user_id), base_amount, connection)
+        return base_amount + bonus
 
     async def get_points(self, broadcaster_id: str, user_id: str) -> int:
         broadcaster_id = str(broadcaster_id)
@@ -304,14 +313,14 @@ class PointsService:
             points = points + excluded.points
         """
 
-        values = (broadcaster_id, user_id, username, amount)
-
         try:
             async with self.db.acquire() as connection:
+                awarded_amount = await self.apply_earned_bonus(user_id, amount, connection) if earned else amount
+                values = (broadcaster_id, user_id, username, awarded_amount)
                 await connection.execute(query, values)
 
                 if earned and self.chatter_stats is not None:
-                    await self.chatter_stats.record_points_earned(broadcaster_id, user_id, amount, connection)
+                    await self.chatter_stats.record_points_earned(broadcaster_id, user_id, awarded_amount, connection)
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to add %d points to %s for broadcaster %s.",
@@ -323,7 +332,7 @@ class PointsService:
 
         LOGGER.info(
             "[Points] Added %d points to %s for broadcaster %s.",
-            amount,
+            awarded_amount,
             username,
             broadcaster_id
         )
@@ -341,6 +350,7 @@ class PointsService:
                 await connection.execute("BEGIN")
 
                 try:
+                    awarded_amount = await self.apply_earned_bonus(user_id, amount, connection) if earned else amount
                     await connection.execute(
                         """
                         INSERT OR IGNORE INTO point_reward_events (
@@ -352,7 +362,7 @@ class PointsService:
                         )
                         VALUES (?, ?, ?, ?, ?)
                         """,
-                        (broadcaster_id, source, event_id, user_id, amount)
+                        (broadcaster_id, source, event_id, user_id, awarded_amount)
                     )
                     changed = await connection.fetchone("SELECT changes() AS count")
 
@@ -368,11 +378,11 @@ class PointsService:
                             username = excluded.username,
                             points = points + excluded.points
                         """,
-                        (broadcaster_id, user_id, username, amount)
+                        (broadcaster_id, user_id, username, awarded_amount)
                     )
 
                     if earned and self.chatter_stats is not None:
-                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, amount, connection)
+                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, awarded_amount, connection)
 
                     await connection.commit()
                 except Exception:
@@ -391,7 +401,7 @@ class PointsService:
         LOGGER.info(
             "[Points] Added a one-time %s reward of %d points to %s for broadcaster %s.",
             source,
-            amount,
+            awarded_amount,
             username,
             broadcaster_id
         )

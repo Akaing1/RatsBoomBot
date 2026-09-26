@@ -66,6 +66,19 @@ class FakeChatterStats:
         }
 
 
+class FakePets:
+
+    async def get_equipped_pet(self, user_id: str):
+        assert user_id == "user-1"
+        return SimpleNamespace(
+            display_name="Dungeon Bat",
+            level=1,
+            passive_percent_label="10",
+            sprite_path="/static/img/dungeon-bat.png",
+            frame_count=4
+        )
+
+
 def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=SimpleNamespace(chatter_stats=FakeChatterStats())))
 
@@ -87,6 +100,20 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert "750 / 2,500 XP" in response.text
     assert 'src="https://example.com/alice.png"' in response.text
     assert "View on Twitch" not in response.text
+
+
+def test_public_global_chatter_profile_renders_equipped_pet(monkeypatch) -> None:
+    services = SimpleNamespace(chatter_stats=FakeChatterStats(), pets=FakePets())
+    monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=services))
+
+    with TestClient(app) as client:
+        response = client.get("/chatters/alice")
+
+    assert response.status_code == 200
+    assert "Dungeon Bat" in response.text
+    assert "+10% loyalty points" in response.text
+    assert "/static/img/dungeon-bat.png" in response.text
+    assert "--pet-frames: 4" in response.text
 
 
 def test_public_channel_chatter_profile_renders(monkeypatch) -> None:

@@ -145,10 +145,11 @@ class RaidBossService:
     REPEAT_REMINDER_SECONDS = 60 * 60
     REQUIRED_REMINDER_MESSAGES = 20
 
-    def __init__(self, bot, db, chatter_stats=None):
+    def __init__(self, bot, db, chatter_stats=None, points=None):
         self.bot = bot
         self.db = db
         self.chatter_stats = chatter_stats
+        self.points = points
         self._shared_inventory_lock = asyncio.Lock()
         self.spawn_tasks: dict[str, asyncio.Task] = {}
         self.reminder_tasks: dict[str, asyncio.Task] = {}
@@ -1720,17 +1721,23 @@ class RaidBossService:
         if amount <= 0:
             return
 
+        awarded_amount = (
+            await self.points.apply_earned_bonus(user_id, amount, connection)
+            if self.points is not None
+            else amount
+        )
+
         await connection.execute(
             """
             INSERT INTO viewers (broadcaster_id, user_id, username, points, messages)
             VALUES (?, ?, ?, ?, 0)
             ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET username = excluded.username, points = points + excluded.points
             """,
-            (str(broadcaster_id), str(user_id), username, amount)
+            (str(broadcaster_id), str(user_id), username, awarded_amount)
         )
 
         if self.chatter_stats is not None:
-            await self.chatter_stats.record_points_earned(broadcaster_id, user_id, amount, connection)
+            await self.chatter_stats.record_points_earned(broadcaster_id, user_id, awarded_amount, connection)
 
     @staticmethod
     def _event_from_row(row) -> RaidBossEvent:
