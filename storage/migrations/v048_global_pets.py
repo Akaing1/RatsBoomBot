@@ -43,6 +43,6 @@ async def migrate(connection) -> None:
         INSERT INTO pet_definitions (
             id, display_name, rarity, sprite_path, frame_count, max_level
         )
-        VALUES ('dungeon_bat', 'Dungeon Bat', 'common', '/static/img/dungeon-bat.png', 4, 50)
+        VALUES ('dungeon_bat', 'Dungeon Bat', 'common', '/assets/dungeon-bat.png', 4, 50)
         """
     )

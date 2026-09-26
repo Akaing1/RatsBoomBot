@@ -74,7 +74,7 @@ class FakePets:
             display_name="Dungeon Bat",
             level=1,
             passive_percent_label="10",
-            sprite_path="/static/img/dungeon-bat.png",
+            sprite_path="/assets/dungeon-bat.png",
             frame_count=4
         )
 
@@ -112,7 +112,7 @@ def test_public_global_chatter_profile_renders_equipped_pet(monkeypatch) -> None
     assert response.status_code == 200
     assert "Dungeon Bat" in response.text
     assert "+10% loyalty points" in response.text
-    assert "/static/img/dungeon-bat.png" in response.text
+    assert "/assets/dungeon-bat.png" in response.text
     assert "--pet-frames: 4" in response.text
 
 
