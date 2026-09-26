@@ -32,7 +32,7 @@
         <header class="chatter-profile-hero">
             {% if profile.identity.profile_image_url %}<img class="chatter-profile-avatar" src="{{ profile.identity.profile_image_url }}" alt="{{ profile.identity.display_name }} Twitch profile picture">{% else %}<div class="chatter-profile-avatar">{{ profile.identity.display_name[0] | upper }}</div>{% endif %}
             <div>
-                <p class="eyebrow">Public chatter profile</p>
+                <p class="eyebrow">{{ 'My chatter profile' if account_mode else 'Public chatter profile' }}</p>
                 <h1>{{ profile.identity.display_name }}</h1>
                 <p>@{{ profile.identity.login }} &middot; Seen in {{ profile.channels_interacted }} RatsBoomBot {{ "channel" if profile.channels_interacted == 1 else "channels" }}</p>
             </div>

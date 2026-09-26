@@ -17,13 +17,14 @@
         </a>
         <a class="button secondary" href="/chatters/{{ profile.identity.login }}">Back to global profile</a>
         <a class="button secondary" href="{{ '/me' if viewer_user_id else '/me/connect?next=' ~ ('/chatters/' ~ profile.identity.login ~ '/channels/' ~ profile.channel.login)|urlencode }}">{{ 'My account' if viewer_user_id else 'Sign in with Twitch' }}</a>
+        {% if owner_mode %}<form method="post" action="/me/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>{% endif %}
     </header>
 
     <main class="chatter-profile-content">
         <header class="chatter-profile-hero channel-profile-hero">
             {% if profile.channel.profile_image_url %}<img src="{{ profile.channel.profile_image_url }}" alt="{{ profile.channel.display_name }}">{% else %}<div class="chatter-profile-avatar">{{ profile.channel.display_name[0] | upper }}</div>{% endif %}
             <div>
-                <p class="eyebrow">@{{ profile.identity.login }} in</p>
+                <p class="eyebrow">{{ 'Your activity in' if owner_mode else '@' ~ profile.identity.login ~ ' in' }}</p>
                 <h1>{{ profile.channel.display_name }}</h1>
                 <p>Channel-specific activity, loyalty progress, redeems, and raid equipment.</p>
             </div>

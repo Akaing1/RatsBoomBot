@@ -6,6 +6,7 @@ from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels.live_chat import normalize_chat_view
 from config.settings import settings
 from storage.patch_notes_repository import get_note, list_notes
+from web.admin.auth import get_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY
 from web.shared.common import templates
 from web.shared.live_chat import stream_chat_events
@@ -126,7 +127,20 @@ async def public_chatter_profile(request: Request, chatter_name: str):
 
     pets = getattr(runtime_bot.services, "pets", None)
     profile["pet"] = await pets.get_equipped_pet(profile["identity"]["user_id"]) if pets is not None else None
-    return templates.TemplateResponse(request=request, name="public/chatter_profile.html", context={"profile": profile, "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"), "viewer_user_id": viewer_user_id(request)})
+    signed_in_user_id = viewer_user_id(request)
+    is_owner = signed_in_user_id == str(profile["identity"]["user_id"])
+    return templates.TemplateResponse(
+        request=request,
+        name="public/chatter_profile.html",
+        context={
+            "profile": profile,
+            "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
+            "viewer_user_id": signed_in_user_id,
+            "account_mode": is_owner,
+            "csrf_token": get_csrf_token(request) if is_owner else None,
+        },
+        headers={"Cache-Control": "no-store"} if is_owner else None,
+    )
 
 
 @router.get("/chatters/{chatter_name}/channels/{channel_name}", response_class=HTMLResponse)
@@ -141,7 +155,20 @@ async def public_chatter_channel_profile(request: Request, chatter_name: str, ch
     if profile is None:
         return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": chatter_name, "channel_name": channel_name}, status_code=404)
 
-    return templates.TemplateResponse(request=request, name="public/chatter_channel_profile.html", context={"profile": profile, "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"), "viewer_user_id": viewer_user_id(request)})
+    signed_in_user_id = viewer_user_id(request)
+    is_owner = signed_in_user_id == str(profile["identity"]["user_id"])
+    return templates.TemplateResponse(
+        request=request,
+        name="public/chatter_channel_profile.html",
+        context={
+            "profile": profile,
+            "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
+            "viewer_user_id": signed_in_user_id,
+            "owner_mode": is_owner,
+            "csrf_token": get_csrf_token(request) if is_owner else None,
+        },
+        headers={"Cache-Control": "no-store"} if is_owner else None,
+    )
 
 
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
