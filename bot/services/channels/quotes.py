@@ -47,9 +47,26 @@ class QuoteService:
 
     async def remove(self, broadcaster_id: str, number: int) -> bool:
         async with self.db.acquire() as connection:
-            row = await connection.fetchone(
-                "DELETE FROM channel_quotes WHERE broadcaster_id = ? AND number = ? RETURNING number",
-                (broadcaster_id, number),
-            )
-            await connection.commit()
-        return row is not None
+            async with immediate_transaction(connection):
+                row = await connection.fetchone(
+                    "DELETE FROM channel_quotes WHERE broadcaster_id = ? AND number = ? RETURNING number",
+                    (broadcaster_id, number),
+                )
+                if row is None:
+                    return False
+
+                # Move affected numbers into a temporary negative range so the
+                # channel's (broadcaster_id, number) primary key never collides.
+                await connection.execute(
+                    "UPDATE channel_quotes SET number = -number WHERE broadcaster_id = ? AND number > ?",
+                    (broadcaster_id, number),
+                )
+                await connection.execute(
+                    "UPDATE channel_quotes SET number = -number - 1 WHERE broadcaster_id = ? AND number < 0",
+                    (broadcaster_id,),
+                )
+                await connection.execute(
+                    "UPDATE channel_quote_sequences SET last_number = last_number - 1 WHERE broadcaster_id = ?",
+                    (broadcaster_id,),
+                )
+                return True
