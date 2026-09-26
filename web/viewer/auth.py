@@ -12,7 +12,7 @@ VIEWER_USER_DISPLAY_NAME_KEY = "viewer_user_display_name"
 VIEWER_SERVER_TOKEN_KEY = "viewer_server_token"
 
 
-PROFILE_PATH = re.compile(r"(?:/chatters/[a-zA-Z0-9_]+(?:/channels/[a-zA-Z0-9_]+)?|/me/channels/[a-zA-Z0-9_]+/shop)\Z")
+PROFILE_PATH = re.compile(r"(?:/chatters/[a-zA-Z0-9_]+(?:/channels/[a-zA-Z0-9_]+)?|/me/channels/[a-zA-Z0-9_]+/(?:shop|gamble))\Z")
 
 
 def start_viewer_oauth(request: Request, next_path: str = "") -> str:

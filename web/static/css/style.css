@@ -1909,6 +1909,10 @@ body.landing-page {
 .chatter-shop-card h3, .chatter-shop-card p { margin: 0; }
 .chatter-shop-card p { color: var(--muted); }
 .chatter-shop-card form { margin-top: auto; }
+.chatter-gamble-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; padding: 22px; }
+.chatter-gamble-form form { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.chatter-gamble-form label { font-weight: 700; }
+.chatter-gamble-form input[name="amount"] { min-width: 160px; max-width: 230px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
 .chatter-profile-content { width: min(100% - 40px, 1120px); margin: 0 auto; padding: 34px 0 70px; }
 .chatter-search { display: flex; align-items: center; gap: 9px; }
 .chatter-search.centered { max-width: 440px; margin: 24px auto 0; }

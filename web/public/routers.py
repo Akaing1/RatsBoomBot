@@ -15,7 +15,7 @@ from web.shared.live_chat import stream_chat_events
 from web.shared.markdown import render_markdown
 from web.state import get_bot, get_db
 from web.viewer.auth import VIEWER_SERVER_TOKEN_KEY, viewer_user_id
-from web.viewer.routers import SHOP_RESULTS, SHOP_WEAPONS
+from web.viewer.routers import GAMBLE_RESULT_KEY, SHOP_RESULTS, SHOP_WEAPONS
 
 router = APIRouter()
 
@@ -163,15 +163,22 @@ async def public_chatter_channel_profile(request: Request, chatter_name: str, ch
     broadcaster_id = str(profile["channel"]["id"])
     channel_profile = get_active_profile(broadcaster_id)
     features = getattr(runtime_bot.services, "features", None)
-    shop_available = bool(
-        is_owner and channel_profile is not None and channel_profile.raid_bosses.enabled
-        and features is not None and features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
+    gamble_available = bool(
+        is_owner and channel_profile is not None and features is not None
         and features.is_enabled(broadcaster_id, FeatureName.POINTS)
     )
-    shop_signed_in = bool(
-        shop_available and (runtime_db := get_db()) is not None
+    shop_available = bool(gamble_available and channel_profile.raid_bosses.enabled
+                          and features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES))
+    actions_signed_in = bool(
+        gamble_available and (runtime_db := get_db()) is not None
         and await valid_viewer_session(runtime_db, signed_in_user_id, request.session.get(VIEWER_SERVER_TOKEN_KEY))
     )
+    shop_signed_in = shop_available and actions_signed_in
+    gamble_result = request.session.get(GAMBLE_RESULT_KEY) if actions_signed_in and request.query_params.get("tab") == "gamble" else None
+    if gamble_result is not None and gamble_result.get("channel_id") == broadcaster_id:
+        request.session.pop(GAMBLE_RESULT_KEY, None)
+    else:
+        gamble_result = None
     raid_config = channel_profile.raid_bosses if shop_available else None
     return templates.TemplateResponse(
         request=request,
@@ -182,6 +189,10 @@ async def public_chatter_channel_profile(request: Request, chatter_name: str, ch
             "viewer_user_id": signed_in_user_id,
             "owner_mode": is_owner,
             "shop_available": shop_available,
+            "gamble_available": gamble_available,
+            "gamble_signed_in": actions_signed_in,
+            "gamble_chance": channel_profile.points.gamble_win_chance if gamble_available else None,
+            "gamble_result": gamble_result,
             "shop_signed_in": shop_signed_in,
             "shop_weapons": [(item, raid_config.weapon_names.display(item), raid_config.overclocked_weapon_cost if item in OVERCLOCKED_WEAPON_TYPES else raid_config.weapon_cost) for item in SHOP_WEAPONS] if shop_signed_in else [],
             "shop_recipes": [(item, raid_config.weapon_names.display(item), raid_config.weapon_names.display(ingredient), raid_config.masterwork_crafting_cost if item.startswith(("masterwork_", "archmage_")) else raid_config.refined_crafting_cost) for item, ingredient in CRAFTING_RECIPES.items()] if shop_signed_in else [],
