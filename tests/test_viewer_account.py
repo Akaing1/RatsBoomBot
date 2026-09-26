@@ -52,6 +52,9 @@ def test_viewer_oauth_uses_identity_scope_and_never_onboards_broadcaster(monkeyp
         assert account.status_code == 200
         assert "Welcome, Alice" in account.text
         assert account.headers["cache-control"] == "no-store"
+        signed_in_home = client.get("/")
+        assert signed_in_home.text.count('href="/me"') == 2
+        assert "Open Your Chatter Profile" in signed_in_home.text
 
         cookie = client.cookies.get("ratsboombot_session")
         session = json.loads(base64.b64decode(cookie.split(".")[0]))
@@ -62,6 +65,13 @@ def test_viewer_oauth_uses_identity_scope_and_never_onboards_broadcaster(monkeyp
         csrf = re.search(r'name="csrf_token" value="([^"]+)"', account.text).group(1)
         assert client.post("/me/logout", data={"csrf_token": csrf}, follow_redirects=False).status_code == 303
         assert client.get("/me", follow_redirects=False).headers["location"] == "/me/connect"
+        home = client.get("/")
+        assert 'href="/me/connect"' in home.text
+        start = client.get("/me/connect", follow_redirects=False)
+        state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+        canceled = client.get(f"/oauth/viewer/connect?error=access_denied&state={state}", follow_redirects=False)
+        assert canceled.headers["location"] == "/"
+        assert 'href="/me/connect"' in client.get("/").text
 
 
 def test_viewer_account_requires_matching_twitch_id(monkeypatch):
