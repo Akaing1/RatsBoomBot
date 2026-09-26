@@ -51,6 +51,7 @@ from storage.migrations.v046_channel_quotes import migrate as migrate_channel_qu
 from storage.migrations.v047_compact_channel_quotes import migrate as migrate_compact_channel_quotes
 from storage.migrations.v048_global_pets import migrate as migrate_global_pets
 from storage.migrations.v049_pet_asset_path import migrate as migrate_pet_asset_path
+from storage.migrations.v050_viewer_sessions import migrate as migrate_viewer_sessions
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -112,4 +113,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=47, name="compact_channel_quotes", run=migrate_compact_channel_quotes)
     , Migration(version=48, name="global_pets", run=migrate_global_pets)
     , Migration(version=49, name="pet_asset_path", run=migrate_pet_asset_path)
+    , Migration(version=50, name="viewer_sessions", run=migrate_viewer_sessions)
 )

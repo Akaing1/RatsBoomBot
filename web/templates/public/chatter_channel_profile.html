@@ -37,6 +37,7 @@
         <nav class="chatter-tabs" aria-label="Channel profile sections">
             <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
             <button type="button" data-chatter-tab="raids" aria-selected="false">Raids</button>
+            {% if shop_available %}<button type="button" data-chatter-tab="shop" aria-selected="false">Shop &amp; Craft</button>{% endif %}
             {% if profile.achievements %}<button type="button" data-chatter-tab="achievements" aria-selected="false">Achievements</button>{% endif %}
         </nav>
 
@@ -109,6 +110,32 @@
                 {% endif %}
             </section>
         </section>
+
+        {% if shop_available %}
+        <section class="chatter-shop" data-chatter-panel="shop" hidden>
+            {% if shop_signed_in %}
+                <div class="panel chatter-account-intro"><h2>{{ profile.channel.display_name }} raid shop</h2><p>Balance: <strong>{{ '{:,}'.format(profile.current_points) }} {{ profile.currency_name }}</strong>. Purchases, crafting, and sales use this channel's balance and inventory.</p></div>
+                {% if shop_message %}<div class="panel chatter-shop-result" role="status">{{ shop_message }}</div>{% endif %}
+                <section class="chatter-section"><div class="chatter-section-heading"><div><p class="eyebrow">Shop</p><h2>Weapons</h2></div><p>Buy weapons with channel loyalty points, even when the stream is offline.</p></div>
+                    <div class="chatter-shop-grid">{% for item_id, name, price in shop_weapons %}
+                        <article class="panel chatter-shop-card"><h3>{{ name }}</h3><p>{{ '{:,}'.format(price) }} {{ profile.currency_name }}</p><form method="post" action="/me/channels/{{ profile.channel.login }}/shop/buy"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item_id }}"><button class="button primary" type="submit">Buy</button></form></article>
+                    {% endfor %}</div>
+                </section>
+                <section class="chatter-section"><div class="chatter-section-heading"><div><p class="eyebrow">Crafting</p><h2>Upgrade weapons</h2></div><p>Each recipe consumes two copies of its ingredient and a crafting fee.</p></div>
+                    <div class="chatter-shop-grid">{% for item_id, name, ingredient, price in shop_recipes %}
+                        <article class="panel chatter-shop-card"><h3>{{ name }}</h3><p>2 &times; {{ ingredient }} + {{ '{:,}'.format(price) }} {{ profile.currency_name }}</p><form method="post" action="/me/channels/{{ profile.channel.login }}/shop/craft"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item_id }}"><button class="button secondary" type="submit">Craft</button></form></article>
+                    {% endfor %}</div>
+                </section>
+                <section class="chatter-section"><div class="chatter-section-heading"><div><p class="eyebrow">Inventory</p><h2>Sell weapons</h2></div><p>Sell one eligible copy at a time. Your final equipped copy cannot be sold.</p></div>
+                    {% if shop_sellable %}<div class="chatter-shop-grid">{% for item in shop_sellable %}
+                        <article class="panel chatter-shop-card"><h3>{{ item.display_name }}</h3><p>Owned: {{ item.quantity }}{% if item.equipped %} &middot; Equipped{% endif %}</p><form method="post" action="/me/channels/{{ profile.channel.login }}/shop/sell"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item.item_id }}"><button class="button secondary" type="submit">Sell one</button></form></article>
+                    {% endfor %}</div>{% else %}<div class="panel compact-empty-state"><p>No sellable weapons in this channel yet.</p></div>{% endif %}
+                </section>
+            {% else %}
+                <div class="panel chatter-account-intro"><h2>Sign in to use the {{ profile.channel.display_name }} raid shop</h2><p>Verify your Twitch account to buy, craft, and sell with this channel's loyalty points.</p><a class="button primary" href="/me/connect?next={{ ('/me/channels/' ~ profile.channel.login ~ '/shop')|urlencode }}">Sign in with Twitch</a></div>
+            {% endif %}
+        </section>
+        {% endif %}
 
         {% if profile.achievements %}{% include 'public/achievements.html' %}{% endif %}
 

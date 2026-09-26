@@ -4,15 +4,18 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 from bot.command_registry import build_enabled_command_help_groups
 from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels.live_chat import normalize_chat_view
+from bot.services.engagement.raid_boss import CRAFTING_RECIPES, OVERCLOCKED_WEAPON_TYPES, SELLABLE_WEAPON_TYPES
 from config.settings import settings
 from storage.patch_notes_repository import get_note, list_notes
+from storage.viewer_sessions import valid_viewer_session
 from web.admin.auth import get_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY
 from web.shared.common import templates
 from web.shared.live_chat import stream_chat_events
 from web.shared.markdown import render_markdown
 from web.state import get_bot, get_db
-from web.viewer.auth import viewer_user_id
+from web.viewer.auth import VIEWER_SERVER_TOKEN_KEY, viewer_user_id
+from web.viewer.routers import SHOP_RESULTS, SHOP_WEAPONS
 
 router = APIRouter()
 
@@ -157,6 +160,19 @@ async def public_chatter_channel_profile(request: Request, chatter_name: str, ch
 
     signed_in_user_id = viewer_user_id(request)
     is_owner = signed_in_user_id == str(profile["identity"]["user_id"])
+    broadcaster_id = str(profile["channel"]["id"])
+    channel_profile = get_active_profile(broadcaster_id)
+    features = getattr(runtime_bot.services, "features", None)
+    shop_available = bool(
+        is_owner and channel_profile is not None and channel_profile.raid_bosses.enabled
+        and features is not None and features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
+        and features.is_enabled(broadcaster_id, FeatureName.POINTS)
+    )
+    shop_signed_in = bool(
+        shop_available and (runtime_db := get_db()) is not None
+        and await valid_viewer_session(runtime_db, signed_in_user_id, request.session.get(VIEWER_SERVER_TOKEN_KEY))
+    )
+    raid_config = channel_profile.raid_bosses if shop_available else None
     return templates.TemplateResponse(
         request=request,
         name="public/chatter_channel_profile.html",
@@ -165,6 +181,12 @@ async def public_chatter_channel_profile(request: Request, chatter_name: str, ch
             "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
             "viewer_user_id": signed_in_user_id,
             "owner_mode": is_owner,
+            "shop_available": shop_available,
+            "shop_signed_in": shop_signed_in,
+            "shop_weapons": [(item, raid_config.weapon_names.display(item), raid_config.overclocked_weapon_cost if item in OVERCLOCKED_WEAPON_TYPES else raid_config.weapon_cost) for item in SHOP_WEAPONS] if shop_signed_in else [],
+            "shop_recipes": [(item, raid_config.weapon_names.display(item), raid_config.weapon_names.display(ingredient), raid_config.masterwork_crafting_cost if item.startswith(("masterwork_", "archmage_")) else raid_config.refined_crafting_cost) for item, ingredient in CRAFTING_RECIPES.items()] if shop_signed_in else [],
+            "shop_sellable": [item for item in profile["inventory"] if item["item_id"] in SELLABLE_WEAPON_TYPES] if shop_signed_in else [],
+            "shop_message": SHOP_RESULTS.get(request.query_params.get("result")) if shop_signed_in else None,
             "csrf_token": get_csrf_token(request) if is_owner else None,
         },
         headers={"Cache-Control": "no-store"} if is_owner else None,
