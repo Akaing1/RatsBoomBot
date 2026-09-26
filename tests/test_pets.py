@@ -4,6 +4,7 @@ import pytest
 from bot.services.engagement.pets import LOYALTY_GAIN_PASSIVE, PetService
 from bot.services.engagement.points import PointsService
 from storage.migration_runner import run_migrations
+from storage.migrations.v049_pet_asset_path import migrate as migrate_pet_asset_path
 
 
 @pytest.mark.asyncio
@@ -71,3 +72,21 @@ async def test_transfers_and_gambling_payouts_do_not_receive_pet_bonus(tmp_path)
 
         assert balance == 130
 
+
+@pytest.mark.asyncio
+async def test_pet_asset_migration_updates_existing_bat_path(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "pets.db")) as database:
+        await run_migrations(database)
+
+        async with database.acquire() as connection:
+            await connection.execute(
+                "UPDATE pet_definitions SET sprite_path = ? WHERE id = ?",
+                ("/static/img/dungeon-bat.png", "dungeon_bat")
+            )
+            await migrate_pet_asset_path(connection)
+            row = await connection.fetchone(
+                "SELECT sprite_path FROM pet_definitions WHERE id = ?",
+                ("dungeon_bat",)
+            )
+
+        assert row["sprite_path"] == "/assets/bat.png"
