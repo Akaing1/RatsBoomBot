@@ -38,6 +38,7 @@
             <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
             <button type="button" data-chatter-tab="raids" aria-selected="false">Raids</button>
             {% if shop_available %}<button type="button" data-chatter-tab="shop" aria-selected="false">Shop &amp; Craft</button>{% endif %}
+            {% if gamble_available %}<button type="button" data-chatter-tab="gamble" aria-selected="false">Gamble</button>{% endif %}
             {% if profile.achievements %}<button type="button" data-chatter-tab="achievements" aria-selected="false">Achievements</button>{% endif %}
         </nav>
 
@@ -133,6 +134,34 @@
                 </section>
             {% else %}
                 <div class="panel chatter-account-intro"><h2>Sign in to use the {{ profile.channel.display_name }} raid shop</h2><p>Verify your Twitch account to buy, craft, and sell with this channel's loyalty points.</p><a class="button primary" href="/me/connect?next={{ ('/me/channels/' ~ profile.channel.login ~ '/shop')|urlencode }}">Sign in with Twitch</a></div>
+            {% endif %}
+        </section>
+        {% endif %}
+
+        {% if gamble_available %}
+        <section class="chatter-shop" data-chatter-panel="gamble" hidden>
+            {% if gamble_signed_in %}
+                <div class="panel chatter-account-intro"><h2>Gamble in {{ profile.channel.display_name }}</h2><p>Current balance: <strong>{{ '{:,}'.format(profile.current_points) }} {{ profile.currency_name }}</strong>. Each bet has a {{ (gamble_chance * 100)|round(1) }}% chance to double, using this channel's balance only.</p></div>
+                {% if gamble_result %}<div class="panel chatter-shop-result" role="status">
+                    {% if gamble_result.message %}{{ gamble_result.message }}
+                    {% elif gamble_result.won %}You won {{ '{:,}'.format(gamble_result.bet) }} {{ profile.currency_name }}! New balance: {{ '{:,}'.format(gamble_result.balance) }}.
+                    {% else %}You lost {{ '{:,}'.format(gamble_result.bet) }} {{ profile.currency_name }}. New balance: {{ '{:,}'.format(gamble_result.balance) }}.{% endif %}
+                </div>{% endif %}
+                <div class="panel chatter-gamble-form">
+                    <form action="/me/channels/{{ profile.channel.login }}/gamble" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label for="gamble-amount">Bet amount</label>
+                        <input id="gamble-amount" name="amount" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="18" autocomplete="off" required placeholder="Enter {{ profile.currency_name }}">
+                        <button class="button primary" type="submit">Place bet</button>
+                    </form>
+                    <form action="/me/channels/{{ profile.channel.login }}/gamble" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="amount" value="all">
+                        <button class="button secondary" type="submit">Bet all</button>
+                    </form>
+                </div>
+            {% else %}
+                <div class="panel chatter-account-intro"><h2>Sign in to gamble in {{ profile.channel.display_name }}</h2><p>Verify your Twitch account to bet with this channel's loyalty points.</p><a class="button primary" href="/me/connect?next={{ ('/me/channels/' ~ profile.channel.login ~ '/gamble')|urlencode }}">Sign in with Twitch</a></div>
             {% endif %}
         </section>
         {% endif %}

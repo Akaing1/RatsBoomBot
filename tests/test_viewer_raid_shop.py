@@ -6,8 +6,9 @@ import asqlite
 import httpx
 import pytest
 
-from bot.profiles import ChannelProfile, FeatureDefaults, RaidBossConfig, activate_profile, clear_profiles
+from bot.profiles import ChannelProfile, FeatureDefaults, FeatureName, RaidBossConfig, activate_profile, clear_profiles
 from bot.services.engagement.raid_boss import RaidBossService
+from bot.services.engagement.points import PointsService
 from storage.migration_runner import run_migrations
 from storage.viewer_sessions import claim_viewer_action, create_viewer_session, revoke_viewer_session, valid_viewer_session
 from web.app import app
@@ -54,7 +55,9 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
         async def fetch(token):
             return TwitchUser("user-1", "alice", "Alice")
 
-        services = SimpleNamespace(chatter_stats=Stats(), features=SimpleNamespace(is_enabled=lambda *args: True), raid_bosses=RaidBossService(None, db))
+        points = PointsService(None, db)
+        await points.setup()
+        services = SimpleNamespace(chatter_stats=Stats(), features=SimpleNamespace(is_enabled=lambda *args: True), raid_bosses=RaidBossService(None, db), points=points)
         monkeypatch.setattr("web.viewer.routers.get_bot", lambda: SimpleNamespace(services=services))
         monkeypatch.setattr("web.viewer.routers.get_db", lambda: db)
         monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=services))
@@ -115,6 +118,45 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
                     original_balance = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id='channel-1' AND user_id='user-1'")
                 assert other_balance["points"] == 500 - 300 + other_rewards["points"]
                 assert original_balance["points"] == balance["points"]
+
+                gamble_url = "/me/channels/otherchannel/gamble"
+                gamble_page = await client.get(gamble_url, follow_redirects=True)
+                assert gamble_page.url.path == "/chatters/alice/channels/otherchannel"
+                assert 'data-chatter-tab="gamble"' in gamble_page.text
+                assert "Crumbs" in gamble_page.text
+                assert (await client.post(gamble_url, data={"csrf_token": "invalid", "amount": "50"})).status_code == 403
+                assert (await client.post(gamble_url, data={"csrf_token": csrf, "amount": "5oops"})).status_code == 400
+                now[0] += 6
+                monkeypatch.setattr("web.viewer.routers.random.random", lambda: 0.0)
+                win = await client.post(gamble_url, data={"csrf_token": csrf, "amount": "50"}, follow_redirects=False)
+                assert win.headers["location"] == "/chatters/alice/channels/otherchannel?tab=gamble"
+                assert (await client.post(gamble_url, data={"csrf_token": csrf, "amount": "50"})).status_code == 429
+                result = await client.get(win.headers["location"])
+                assert "You won 50 Crumbs" in result.text
+                assert "You won 50 Crumbs" not in (await client.get(win.headers["location"])).text
+                now[0] += 6
+                monkeypatch.setattr("web.viewer.routers.random.random", lambda: 1.0)
+                loss = await client.post(gamble_url, data={"csrf_token": csrf, "amount": "all"}, follow_redirects=False)
+                assert "You lost" in (await client.get(loss.headers["location"])).text
+                assert await points.get_points("channel-2", "user-1") == 0
+                assert await points.get_points("channel-1", "user-1") == original_balance["points"]
+                async with db.acquire() as connection:
+                    streak = await connection.fetchone("SELECT outcome,length,channel_name FROM gamble_streaks WHERE broadcaster_id='channel-2' AND user_id='user-1'")
+                    other_totals = await connection.fetchone("SELECT winnings,losses FROM viewer_gambling_totals WHERE broadcaster_id='channel-2' AND user_id='user-1'")
+                    original_totals = await connection.fetchone("SELECT 1 FROM viewer_gambling_totals WHERE broadcaster_id='channel-1' AND user_id='user-1'")
+                assert (streak["outcome"], streak["length"], streak["channel_name"]) == ("loss", 1, "otherchannel")
+                assert other_totals["winnings"] == 50
+                assert other_totals["losses"] > 0
+                assert original_totals is None
+                now[0] += 6
+                empty_bet = await client.post(gamble_url, data={"csrf_token": csrf, "amount": "all"}, follow_redirects=True)
+                assert "You have no points to gamble" in empty_bet.text
+                assert await points.get_points("channel-2", "user-1") == 0
+
+                monkeypatch.setattr(services.features, "is_enabled", lambda broadcaster, feature: feature == FeatureName.POINTS if broadcaster == "channel-2" else True)
+                points_only = await client.get("/chatters/alice/channels/otherchannel")
+                assert 'data-chatter-tab="gamble"' in points_only.text
+                assert 'data-chatter-tab="shop"' not in points_only.text
 
                 assert (await client.post("/me/logout", data={"csrf_token": csrf}, follow_redirects=False)).status_code == 303
                 assert (await client.get(shop_url, follow_redirects=False)).headers["location"].startswith("/me/connect")

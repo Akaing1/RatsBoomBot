@@ -1,3 +1,5 @@
+import random
+
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -23,6 +25,7 @@ from web.viewer.auth import (
 
 router = APIRouter()
 PRIVATE_HEADERS = {"Cache-Control": "no-store"}
+GAMBLE_RESULT_KEY = "viewer_gamble_result"
 SHOP_WEAPONS = (*BASIC_WEAPON_TYPES, *OVERCLOCKED_WEAPON_TYPES)
 SHOP_RESULTS = {
     "bought": "Weapon purchased. Your inventory and balance are updated.",
@@ -114,21 +117,21 @@ async def my_account(request: Request):
     )
 
 
-async def shop_context(request: Request, channel_name: str):
+async def viewer_channel_context(request: Request, channel_name: str, destination: str):
     user_id = viewer_user_id(request)
     if user_id is None:
-        return RedirectResponse(f"/me/connect?next=/me/channels/{channel_name}/shop", status_code=303, headers=PRIVATE_HEADERS)
+        return RedirectResponse(f"/me/connect?next=/me/channels/{channel_name}/{destination}", status_code=303, headers=PRIVATE_HEADERS)
 
     runtime_db = get_db()
     token = request.session.get(VIEWER_SERVER_TOKEN_KEY)
     if runtime_db is None:
-        raise HTTPException(503, "Chatter shop is temporarily unavailable.")
+        raise HTTPException(503, "Chatter actions are temporarily unavailable.")
     if not await valid_viewer_session(runtime_db, user_id, token):
-        return RedirectResponse(f"/me/connect?next=/me/channels/{channel_name}/shop", status_code=303, headers=PRIVATE_HEADERS)
+        return RedirectResponse(f"/me/connect?next=/me/channels/{channel_name}/{destination}", status_code=303, headers=PRIVATE_HEADERS)
 
     runtime_bot = get_bot()
     if runtime_bot is None or runtime_bot.services is None:
-        raise HTTPException(503, "Chatter shop is temporarily unavailable.")
+        raise HTTPException(503, "Chatter actions are temporarily unavailable.")
 
     services = runtime_bot.services
     profile = await services.chatter_stats.get_channel_profile(user_id, channel_name)
@@ -137,12 +140,33 @@ async def shop_context(request: Request, channel_name: str):
 
     broadcaster_id = str(profile["channel"]["id"])
     channel_profile = get_active_profile(broadcaster_id)
+    return runtime_db, services, profile, channel_profile, token
+
+
+async def shop_context(request: Request, channel_name: str):
+    context = await viewer_channel_context(request, channel_name, "shop")
+    if isinstance(context, RedirectResponse):
+        return context
+
+    runtime_db, services, profile, channel_profile, token = context
+    broadcaster_id = str(profile["channel"]["id"])
     if (channel_profile is None or not channel_profile.raid_bosses.enabled
             or not services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
             or not services.features.is_enabled(broadcaster_id, FeatureName.POINTS)):
         raise HTTPException(404, "Raid shop is unavailable for this channel.")
 
     return runtime_db, services, profile, channel_profile.raid_bosses, token
+
+
+async def gamble_context(request: Request, channel_name: str):
+    context = await viewer_channel_context(request, channel_name, "gamble")
+    if isinstance(context, RedirectResponse):
+        return context
+
+    runtime_db, services, profile, channel_profile, token = context
+    if channel_profile is None or not services.features.is_enabled(str(profile["channel"]["id"]), FeatureName.POINTS):
+        raise HTTPException(404, "Gambling is unavailable for this channel.")
+    return runtime_db, services, profile, channel_profile.points, token
 
 
 @router.get("/me/channels/{channel_name}/shop")
@@ -186,6 +210,51 @@ async def viewer_raid_action(request: Request, channel_name: str, action: str, i
     if result not in SHOP_RESULTS:
         result = "invalid"
     return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=shop&result={result}", status_code=303, headers=PRIVATE_HEADERS)
+
+
+@router.get("/me/channels/{channel_name}/gamble")
+async def viewer_gamble_page(request: Request, channel_name: str):
+    context = await gamble_context(request, channel_name)
+    if isinstance(context, RedirectResponse):
+        return context
+    _, _, profile, _, _ = context
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=gamble", status_code=303, headers=PRIVATE_HEADERS)
+
+
+@router.post("/me/channels/{channel_name}/gamble")
+async def viewer_gamble(request: Request, channel_name: str, amount: str = Form(...), csrf_token: str = Form(...)):
+    validate_csrf_token(request, csrf_token)
+    context = await gamble_context(request, channel_name)
+    if isinstance(context, RedirectResponse):
+        return context
+
+    runtime_db, services, profile, config, token = context
+    broadcaster_id = str(profile["channel"]["id"])
+    user_id = str(profile["identity"]["user_id"])
+    amount = amount.strip()
+    if amount != "all" and (not amount.isascii() or not amount.isdecimal() or len(amount) > 18):
+        raise HTTPException(400, "Enter a positive whole number or all.")
+
+    if not await claim_viewer_action(runtime_db, user_id, token, interval=5):
+        raise HTTPException(429, "Please wait before gambling again.")
+
+    balance = await services.points.get_points(broadcaster_id, user_id)
+    bet = balance if amount == "all" else int(amount)
+    if bet <= 0 or bet > balance:
+        message = "You have no points to gamble." if balance <= 0 else "Enter a bet within your current balance."
+        request.session[GAMBLE_RESULT_KEY] = {"channel_id": broadcaster_id, "message": message}
+    else:
+        won = random.random() < config.gamble_win_chance
+        new_balance = await services.points.settle_wager(
+            broadcaster_id, user_id, str(profile["identity"]["login"]), bet,
+            bet * 2 if won else 0, game="gamble", channel_name=str(profile["channel"]["login"]),
+        )
+        request.session[GAMBLE_RESULT_KEY] = (
+            {"channel_id": broadcaster_id, "message": "Your balance changed before the bet was placed. Please try again."}
+            if new_balance is None else {"channel_id": broadcaster_id, "won": won, "bet": bet, "balance": new_balance}
+        )
+
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=gamble", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.post("/me/logout")
