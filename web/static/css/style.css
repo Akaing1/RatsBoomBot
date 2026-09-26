@@ -1916,6 +1916,7 @@ img.chatter-profile-avatar { display: block; }
 .chatter-stat-grid article { padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
 .chatter-stat-grid span { display: block; margin-bottom: 10px; color: var(--muted); font-size: 12px; }
 .chatter-stat-grid strong { font-size: 25px; }
+.chatter-stat-grid small { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; }
 .chatter-tabs { display: flex; gap: 8px; margin-bottom: 18px; padding: 5px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); width: fit-content; }
 .chatter-tabs button { padding: 10px 18px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-weight: 700; }
 .chatter-tabs button:hover { color: var(--text); }
