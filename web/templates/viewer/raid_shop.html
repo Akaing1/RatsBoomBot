@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Raid shop in {{ profile.channel.display_name }} | RatsBoomBot</title>
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
+</head>
+<body class="chatter-profile-page">
+    <header class="public-command-navigation chatter-channel-navigation">
+        <a class="landing-brand" href="/" aria-label="RatsBoomBot home"><img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt=""><span><strong>RatsBoomBot</strong><small>Chatter accounts</small></span></a>
+        <a class="button secondary chatter-channel-back" href="/chatters/{{ profile.identity.login }}/channels/{{ profile.channel.login }}">Back to channel profile</a>
+        <form action="/me/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>
+    </header>
+    <main class="chatter-profile-content chatter-shop">
+        <header class="panel chatter-account-intro">
+            <p class="eyebrow">{{ profile.channel.display_name }} &middot; Your raid shop</p>
+            <h1>Prepare for the next raid</h1>
+            <p>Balance: <strong>{{ '{:,}'.format(profile.current_points) }} {{ profile.currency_name }}</strong>. Purchases, crafting, and sales use your channel balance and inventory in chat too.</p>
+        </header>
+        {% if message %}<div class="panel chatter-shop-result" role="status">{{ message }}</div>{% endif %}
+
+        <section class="chatter-section">
+            <div class="chatter-section-heading"><div><p class="eyebrow">Shop</p><h2>Weapons</h2></div><p>Buy weapons with channel loyalty points, even when the stream is offline.</p></div>
+            <div class="chatter-shop-grid">
+                {% for item_id, name, price in weapons %}
+                    <article class="panel chatter-shop-card"><h3>{{ name }}</h3><p>{{ '{:,}'.format(price) }} {{ profile.currency_name }}</p>
+                        <form method="post" action="/me/channels/{{ profile.channel.login }}/shop/buy"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item_id }}"><button class="button primary" type="submit">Buy</button></form>
+                    </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="chatter-section">
+            <div class="chatter-section-heading"><div><p class="eyebrow">Crafting</p><h2>Upgrade weapons</h2></div><p>Each recipe consumes two copies of its ingredient and a crafting fee.</p></div>
+            <div class="chatter-shop-grid">
+                {% for item_id, name, ingredient, price in recipes %}
+                    <article class="panel chatter-shop-card"><h3>{{ name }}</h3><p>2 &times; {{ ingredient }} + {{ '{:,}'.format(price) }} {{ profile.currency_name }}</p>
+                        <form method="post" action="/me/channels/{{ profile.channel.login }}/shop/craft"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item_id }}"><button class="button secondary" type="submit">Craft</button></form>
+                    </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="chatter-section">
+            <div class="chatter-section-heading"><div><p class="eyebrow">Inventory</p><h2>Sell weapons</h2></div><p>Sell one eligible copy at a time. Your final equipped copy cannot be sold.</p></div>
+            {% if sellable %}<div class="chatter-shop-grid">
+                {% for item in sellable %}
+                    <article class="panel chatter-shop-card"><h3>{{ item.display_name }}</h3><p>Owned: {{ item.quantity }}{% if item.equipped %} &middot; Equipped{% endif %}</p>
+                        <form method="post" action="/me/channels/{{ profile.channel.login }}/shop/sell"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item.item_id }}"><button class="button secondary" type="submit">Sell one</button></form>
+                    </article>
+                {% endfor %}
+            </div>{% else %}<div class="panel compact-empty-state"><p>No sellable weapons in this channel yet.</p></div>{% endif %}
+        </section>
+    </main>
+</body>
+</html>

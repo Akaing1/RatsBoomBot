@@ -34,6 +34,8 @@
             <a class="button primary" href="https://twitch.tv/{{ profile.channel.login }}">Watch channel</a>
         </header>
 
+        {% if shop_available %}<div class="chatter-shop-entry"><a class="button primary" href="/me/channels/{{ profile.channel.login }}/shop">Shop, craft and sell</a></div>{% endif %}
+
         <nav class="chatter-tabs" aria-label="Channel profile sections">
             <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
             <button type="button" data-chatter-tab="raids" aria-selected="false">Raids</button>

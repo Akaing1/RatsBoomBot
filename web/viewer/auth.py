@@ -9,9 +9,10 @@ VIEWER_OAUTH_NEXT_KEY = "viewer_oauth_next"
 VIEWER_USER_ID_KEY = "viewer_user_id"
 VIEWER_USER_LOGIN_KEY = "viewer_user_login"
 VIEWER_USER_DISPLAY_NAME_KEY = "viewer_user_display_name"
+VIEWER_SERVER_TOKEN_KEY = "viewer_server_token"
 
 
-PROFILE_PATH = re.compile(r"/chatters/[a-zA-Z0-9_]+(?:/channels/[a-zA-Z0-9_]+)?\Z")
+PROFILE_PATH = re.compile(r"(?:/chatters/[a-zA-Z0-9_]+(?:/channels/[a-zA-Z0-9_]+)?|/me/channels/[a-zA-Z0-9_]+/shop)\Z")
 
 
 def start_viewer_oauth(request: Request, next_path: str = "") -> str:
@@ -32,5 +33,5 @@ def viewer_user_id(request: Request) -> str | None:
 
 
 def logout_viewer(request: Request) -> None:
-    for key in (VIEWER_USER_ID_KEY, VIEWER_USER_LOGIN_KEY, VIEWER_USER_DISPLAY_NAME_KEY, VIEWER_OAUTH_STATE_KEY, VIEWER_OAUTH_NEXT_KEY):
+    for key in (VIEWER_USER_ID_KEY, VIEWER_USER_LOGIN_KEY, VIEWER_USER_DISPLAY_NAME_KEY, VIEWER_SERVER_TOKEN_KEY, VIEWER_OAUTH_STATE_KEY, VIEWER_OAUTH_NEXT_KEY):
         request.session.pop(key, None)

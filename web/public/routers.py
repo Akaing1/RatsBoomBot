@@ -157,6 +157,14 @@ async def public_chatter_channel_profile(request: Request, chatter_name: str, ch
 
     signed_in_user_id = viewer_user_id(request)
     is_owner = signed_in_user_id == str(profile["identity"]["user_id"])
+    broadcaster_id = str(profile["channel"]["id"])
+    channel_profile = get_active_profile(broadcaster_id)
+    features = getattr(runtime_bot.services, "features", None)
+    shop_available = bool(
+        is_owner and channel_profile is not None and channel_profile.raid_bosses.enabled
+        and features is not None and features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
+        and features.is_enabled(broadcaster_id, FeatureName.POINTS)
+    )
     return templates.TemplateResponse(
         request=request,
         name="public/chatter_channel_profile.html",
@@ -165,6 +173,7 @@ async def public_chatter_channel_profile(request: Request, chatter_name: str, ch
             "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
             "viewer_user_id": signed_in_user_id,
             "owner_mode": is_owner,
+            "shop_available": shop_available,
             "csrf_token": get_csrf_token(request) if is_owner else None,
         },
         headers={"Cache-Control": "no-store"} if is_owner else None,

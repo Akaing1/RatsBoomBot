@@ -1903,6 +1903,13 @@ body.landing-page {
 .chatter-account-intro { margin-bottom: 24px; padding: 24px; }
 .chatter-account-intro h1, .chatter-account-intro h2 { margin: 0 0 8px; }
 .chatter-account-intro p:last-child { margin-bottom: 0; color: var(--muted); }
+.chatter-shop-entry { margin: -6px 0 24px; }
+.chatter-shop-result { padding: 16px 20px; border-color: rgba(139,92,246,.45); }
+.chatter-shop-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 14px; }
+.chatter-shop-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 20px; }
+.chatter-shop-card h3, .chatter-shop-card p { margin: 0; }
+.chatter-shop-card p { color: var(--muted); }
+.chatter-shop-card form { margin-top: auto; }
 .chatter-profile-content { width: min(100% - 40px, 1120px); margin: 0 auto; padding: 34px 0 70px; }
 .chatter-search { display: flex; align-items: center; gap: 9px; }
 .chatter-search.centered { max-width: 440px; margin: 24px auto 0; }

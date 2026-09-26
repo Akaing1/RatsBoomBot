@@ -2,8 +2,22 @@ from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
+import pytest
 
 from web.app import app
+
+
+@pytest.fixture(autouse=True)
+def mock_viewer_session_store(monkeypatch):
+    async def create(db, user_id):
+        return "test-server-session"
+
+    async def revoke(db, token):
+        pass
+
+    monkeypatch.setattr("web.viewer.routers.get_db", lambda: object())
+    monkeypatch.setattr("web.viewer.routers.create_viewer_session", create)
+    monkeypatch.setattr("web.viewer.routers.revoke_viewer_session", revoke)
 
 
 class FakeChatterStats:
