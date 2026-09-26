@@ -10,8 +10,10 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
 
 import httpx
+import grpc
 
 from bot.profiles import get_active_profile
+from bot.services.channels import youtube_live_chat_pb2
 from config.settings import settings
 from web.shared.youtube_oauth import YOUTUBE_API_URL, YOUTUBE_TOKEN_URL, YouTubeChannel, YouTubeTokenResponse
 
@@ -1173,7 +1175,7 @@ class LiveChatService:
                     self.active_youtube_chat_ids[broadcaster_id] = live_chat_id
                     self.youtube_statuses[broadcaster_id] = ("live", "Receiving YouTube live-chat messages.")
                     try:
-                        await self._poll_live_chat(broadcaster_id, live_chat_id)
+                        await self._stream_live_chat(broadcaster_id, live_chat_id)
                     finally:
                         self.active_youtube_chat_ids.pop(broadcaster_id, None)
                 except asyncio.CancelledError:
@@ -1225,8 +1227,70 @@ class LiveChatService:
 
         return None
 
-    async def _poll_live_chat(self, broadcaster_id: str, live_chat_id: str) -> None:
+    async def _stream_live_chat(self, broadcaster_id: str, live_chat_id: str) -> None:
+        """Receive new messages as YouTube publishes them, with REST polling as a fallback."""
         page_token = None
+
+        try:
+            async with grpc.aio.secure_channel("youtube.googleapis.com:443", grpc.ssl_channel_credentials()) as channel:
+                stream_list = channel.unary_stream(
+                    "/youtube.api.v3.V3DataLiveChatMessageService/StreamList",
+                    request_serializer=youtube_live_chat_pb2.LiveChatMessageListRequest.SerializeToString,
+                    response_deserializer=youtube_live_chat_pb2.LiveChatMessageListResponse.FromString,
+                )
+
+                while self.started and broadcaster_id in self.connections:
+                    connection = await self._ensure_access_token(broadcaster_id)
+                    request = youtube_live_chat_pb2.LiveChatMessageListRequest(
+                        live_chat_id=live_chat_id,
+                        part=["id", "snippet", "authorDetails"],
+                        page_token=page_token,
+                    )
+                    stream = stream_list(request, metadata=(("authorization", f"Bearer {connection.access_token}"),))
+
+                    async for response in stream:
+                        self._publish_youtube_items(broadcaster_id, [self._stream_message_item(item) for item in response.items])
+                        if response.next_page_token:
+                            page_token = response.next_page_token
+                        if response.offline_at:
+                            return
+
+                    # YouTube may close an otherwise healthy stream. Resume at its last token.
+                    await asyncio.sleep(1)
+        except grpc.aio.AioRpcError as error:
+            if error.code() in {grpc.StatusCode.NOT_FOUND, grpc.StatusCode.FAILED_PRECONDITION}:
+                return
+            LOGGER.warning(
+                "[Live Chat] YouTube streaming failed for broadcaster %s (%s); falling back to polling.",
+                broadcaster_id, error.code().name,
+            )
+            if error.code() == grpc.StatusCode.UNAUTHENTICATED:
+                self.connections[broadcaster_id].expires_at = datetime.now(UTC).isoformat()
+            await self._poll_live_chat(broadcaster_id, live_chat_id, page_token=page_token)
+
+    @staticmethod
+    def _stream_message_item(item) -> dict:
+        snippet = item.snippet
+        author = item.author_details
+        message = snippet.display_message
+        return {
+            "id": item.id,
+            "snippet": {
+                "displayMessage": message,
+                "hasDisplayContent": snippet.has_display_content if snippet.HasField("has_display_content") else bool(message),
+                "publishedAt": snippet.published_at,
+            },
+            "authorDetails": {
+                "channelId": author.channel_id,
+                "displayName": author.display_name,
+                "isVerified": author.is_verified,
+                "isChatOwner": author.is_chat_owner,
+                "isChatSponsor": author.is_chat_sponsor,
+                "isChatModerator": author.is_chat_moderator,
+            },
+        }
+
+    async def _poll_live_chat(self, broadcaster_id: str, live_chat_id: str, *, page_token: str | None = None) -> None:
 
         while self.started and broadcaster_id in self.connections:
             params = {"part": "id,snippet,authorDetails", "liveChatId": live_chat_id, "maxResults": 200}
