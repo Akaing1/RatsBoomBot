@@ -23,7 +23,7 @@
         {% if account_mode %}
             <form method="post" action="/me/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>
         {% else %}
-            <a class="button secondary" href="{{ '/me' if viewer_user_id else '/me/connect' }}">{{ 'My account' if viewer_user_id else 'Sign in with Twitch' }}</a>
+            <a class="button secondary" href="{{ '/me' if viewer_user_id else '/me/connect?next=' ~ ('/chatters/' ~ profile.identity.login)|urlencode }}">{{ 'My account' if viewer_user_id else 'Sign in with Twitch' }}</a>
         {% endif %}
     </header>
 

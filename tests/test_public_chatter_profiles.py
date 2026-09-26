@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
 
@@ -96,6 +97,7 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert 'data-chatter-tab="raids"' in response.text
     assert 'data-chatter-panel="raids" hidden' in response.text
     assert "/chatters/alice/channels/testchannel" in response.text
+    assert "/me/connect?next=/chatters/alice" in response.text
     assert "Level 3" in response.text
     assert "750 / 2,500 XP" in response.text
     assert 'src="https://example.com/alice.png"' in response.text
@@ -134,6 +136,7 @@ def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
     assert "#2 of 12" in response.text
     assert "Top Contributor finishes" in response.text
     assert "Recent raid history" in response.text
+    assert "/me/connect?next=/chatters/alice/channels/testchannel" in response.text
     assert 'data-chatter-tab="overview"' in response.text
     assert 'data-chatter-tab="raids"' in response.text
     assert 'data-chatter-panel="raids" hidden' in response.text
@@ -147,3 +150,30 @@ def test_public_chatter_search_redirects_to_canonical_profile(monkeypatch) -> No
 
     assert response.status_code == 303
     assert response.headers["location"] == "/chatters/alice"
+
+
+def test_sign_in_from_public_profile_keeps_account_available(monkeypatch) -> None:
+    from web.shared.oauth import TwitchTokenResponse, TwitchUser
+
+    async def exchange(*, code, redirect_uri):
+        return TwitchTokenResponse("token", "refresh", 3600, [], "bearer")
+
+    async def fetch(token):
+        return TwitchUser("user-1", "alice", "Alice")
+
+    monkeypatch.setattr("web.viewer.routers.exchange_code_for_token", exchange)
+    monkeypatch.setattr("web.viewer.routers.fetch_twitch_user", fetch)
+    monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=SimpleNamespace(chatter_stats=FakeChatterStats())))
+
+    with TestClient(app) as client:
+        profile = client.get("/chatters/alice")
+        assert "/me/connect?next=/chatters/alice" in profile.text
+        start = client.get("/me/connect?next=/chatters/alice", follow_redirects=False)
+        state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+        callback = client.get(f"/oauth/viewer/connect?code=valid&state={state}", follow_redirects=False)
+        assert callback.headers["location"] == "/chatters/alice"
+        for path in ("/chatters/alice", "/chatters/alice/channels/testchannel"):
+            signed_in = client.get(path)
+            assert signed_in.status_code == 200
+            assert "My account" in signed_in.text
+            assert "Sign in with Twitch" not in signed_in.text

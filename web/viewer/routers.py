@@ -8,6 +8,7 @@ from web.shared.oauth import build_viewer_oauth_url, exchange_code_for_token, fe
 from web.state import get_bot
 from web.viewer.auth import (
     VIEWER_USER_DISPLAY_NAME_KEY,
+    VIEWER_OAUTH_NEXT_KEY,
     VIEWER_USER_ID_KEY,
     VIEWER_USER_LOGIN_KEY,
     consume_viewer_oauth_state,
@@ -21,8 +22,8 @@ PRIVATE_HEADERS = {"Cache-Control": "no-store"}
 
 
 @router.get("/me/connect")
-async def connect_viewer(request: Request):
-    state = start_viewer_oauth(request)
+async def connect_viewer(request: Request, next: str = ""):
+    state = start_viewer_oauth(request, next)
     return RedirectResponse(build_viewer_oauth_url(state), headers=PRIVATE_HEADERS)
 
 
@@ -31,6 +32,7 @@ async def viewer_oauth_callback(request: Request, code: str | None = None, state
     if not consume_viewer_oauth_state(request, state):
         return HTMLResponse("Viewer sign-in could not be verified. Please try again.", status_code=400, headers=PRIVATE_HEADERS)
 
+    destination = request.session.pop(VIEWER_OAUTH_NEXT_KEY, "/me")
     if error or not code:
         return RedirectResponse("/", status_code=303, headers=PRIVATE_HEADERS)
 
@@ -45,7 +47,7 @@ async def viewer_oauth_callback(request: Request, code: str | None = None, state
     request.session[VIEWER_USER_ID_KEY] = user.user_id
     request.session[VIEWER_USER_LOGIN_KEY] = user.login
     request.session[VIEWER_USER_DISPLAY_NAME_KEY] = user.display_name
-    return RedirectResponse("/me", status_code=303, headers=PRIVATE_HEADERS)
+    return RedirectResponse(destination, status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.get("/me", response_class=HTMLResponse)

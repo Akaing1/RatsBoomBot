@@ -311,7 +311,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 | Group | Commands |
 | --- | --- |
-| Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats [username]` |
+| Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats`, `!me` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube` |
 | Settings | `!set discord <url>`, `!set youtube <url>`, `!set game <game name>`, `!set title <stream title>`, `!timers`, `!timers on`, `!timers off` |

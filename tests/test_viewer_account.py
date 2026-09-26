@@ -88,3 +88,25 @@ def test_viewer_account_requires_matching_twitch_id(monkeypatch):
         account = client.get("/me")
         assert account.status_code == 200
         assert "Welcome, Alice" in account.text
+
+
+def test_profile_sign_in_returns_to_profile_and_rejects_external_destinations(monkeypatch):
+    async def exchange(*, code, redirect_uri):
+        return TwitchTokenResponse("token", "refresh", 3600, [], "bearer")
+
+    async def fetch(token):
+        return TwitchUser("42", "alice", "Alice")
+
+    monkeypatch.setattr("web.viewer.routers.exchange_code_for_token", exchange)
+    monkeypatch.setattr("web.viewer.routers.fetch_twitch_user", fetch)
+
+    with TestClient(app) as client:
+        start = client.get("/me/connect?next=/chatters/alice/channels/testchannel", follow_redirects=False)
+        state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+        callback = client.get(f"/oauth/viewer/connect?code=valid&state={state}", follow_redirects=False)
+        assert callback.headers["location"] == "/chatters/alice/channels/testchannel"
+
+        start = client.get("/me/connect?next=//example.com/steal", follow_redirects=False)
+        state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+        callback = client.get(f"/oauth/viewer/connect?code=valid&state={state}", follow_redirects=False)
+        assert callback.headers["location"] == "/me"
