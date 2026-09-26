@@ -193,15 +193,17 @@ async def test_global_profile_refreshes_and_caches_twitch_profile_image(tmp_path
 
 
 @pytest.mark.asyncio
-async def test_stats_command_links_to_public_profile(monkeypatch) -> None:
+async def test_stats_and_me_link_to_channel_and_global_profiles(monkeypatch) -> None:
     replies = []
     identity = {"login": "alice", "display_name": "Alice"}
     services = SimpleNamespace(
         features=SimpleNamespace(is_global_command_enabled=lambda broadcaster_id, command: True),
-        chatter_stats=SimpleNamespace(resolve_identity=lambda value: None)
+        chatter_stats=SimpleNamespace(resolve_identity=lambda value: None),
+        broadcasters=FakeBroadcasters(),
     )
 
     async def resolve_identity(value: str):
+        assert value == "user-1"
         return identity
 
     services.chatter_stats.resolve_identity = resolve_identity
@@ -215,9 +217,13 @@ async def test_stats_command_links_to_public_profile(monkeypatch) -> None:
     monkeypatch.setattr("bot.shared.commands.stats.settings.PUBLIC_BASE_URL", "https://ratsboombot.com")
     component = StatsCommands(bot)
 
-    await component.stats.callback(component, context, "")
+    await component.stats.callback(component, context)
+    await component.me.callback(component, context)
 
-    assert replies == ["View Alice's RatsBoomBot profile: https://ratsboombot.com/chatters/alice"]
+    assert replies == [
+        "Your stats in TestChannel: https://ratsboombot.com/chatters/alice/channels/testchannel",
+        "Your RatsBoomBot profile: https://ratsboombot.com/chatters/alice",
+    ]
 
 
 def test_chatter_profile_templates_compile() -> None:

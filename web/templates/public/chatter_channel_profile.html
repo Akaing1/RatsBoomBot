@@ -16,6 +16,7 @@
             <span><strong>RatsBoomBot</strong><small>Chatter profiles</small></span>
         </a>
         <a class="button secondary" href="/chatters/{{ profile.identity.login }}">Back to global profile</a>
+        <a class="button secondary" href="{{ '/me' if viewer_user_id else '/me/connect?next=' ~ ('/chatters/' ~ profile.identity.login ~ '/channels/' ~ profile.channel.login)|urlencode }}">{{ 'My account' if viewer_user_id else 'Sign in with Twitch' }}</a>
     </header>
 
     <main class="chatter-profile-content">
