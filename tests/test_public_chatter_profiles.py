@@ -137,6 +137,8 @@ def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
     assert "Top Contributor finishes" in response.text
     assert "Recent raid history" in response.text
     assert "/me/connect?next=/chatters/alice/channels/testchannel" in response.text
+    assert 'class="public-command-navigation chatter-channel-navigation"' in response.text
+    assert 'class="button secondary chatter-channel-back"' in response.text
     assert 'data-chatter-tab="overview"' in response.text
     assert 'data-chatter-tab="raids"' in response.text
     assert 'data-chatter-panel="raids" hidden' in response.text
@@ -175,7 +177,11 @@ def test_sign_in_from_public_profile_keeps_account_available(monkeypatch) -> Non
         for path in ("/chatters/alice", "/chatters/alice/channels/testchannel"):
             signed_in = client.get(path)
             assert signed_in.status_code == 200
-            assert "My account" in signed_in.text
+            if path.endswith("/testchannel"):
+                assert "My account" not in signed_in.text
+                assert "Back to global profile" in signed_in.text
+            else:
+                assert "My account" in signed_in.text
             assert "Sign in with Twitch" not in signed_in.text
             assert "Sign out" in signed_in.text
             assert signed_in.headers["cache-control"] == "no-store"
@@ -210,3 +216,4 @@ def test_another_chatter_profile_stays_public_after_sign_in(monkeypatch) -> None
     assert "@alice in" in channel_profile.text
     assert "Your activity in" not in channel_profile.text
     assert "Sign out" not in channel_profile.text
+    assert "My account" not in channel_profile.text
