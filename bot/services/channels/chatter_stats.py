@@ -115,6 +115,13 @@ class ChatterStatsService:
                 """,
                 (user_id, user_id)
             )
+            gamble = await connection.fetchone(
+                """
+                SELECT COALESCE(SUM(wins), 0) AS wins, COALESCE(SUM(losses), 0) AS losses
+                FROM viewer_gamble_outcomes WHERE user_id = ?
+                """,
+                (user_id,)
+            )
             raid = await connection.fetchone(
                 """
                 SELECT COALESCE(SUM(attacks.damage), 0) AS damage_dealt,
@@ -207,6 +214,9 @@ class ChatterStatsService:
             "lifetime_points_earned": int(totals["lifetime_points_earned"]),
             "channels_interacted": int(totals["channels_interacted"]),
             "daily_check_ins": int(claims["daily_check_ins"]),
+            "gamble_wins": int(gamble["wins"]),
+            "gamble_total": int(gamble["wins"]) + int(gamble["losses"]),
+            "gamble_win_rate": self._gamble_win_rate(gamble),
             "favorite_channel": favorite_channel,
             "damage_dealt": int(raid["damage_dealt"]),
             "highest_contribution": int(highest["highest_contribution"]),
@@ -263,6 +273,12 @@ class ChatterStatsService:
 
         return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
+    @staticmethod
+    def _gamble_win_rate(gamble) -> float | None:
+        wins = int(gamble["wins"])
+        total = wins + int(gamble["losses"])
+        return 100 * wins / total if total else None
+
     async def get_channel_profile(self, chatter_value: str, channel_value: str) -> dict[str, Any] | None:
         identity = await self.resolve_identity(chatter_value)
         broadcaster = self._resolve_broadcaster(channel_value)
@@ -293,6 +309,15 @@ class ChatterStatsService:
                 """,
                 (broadcaster_id, user_id)
             )
+            gamble = await connection.fetchone(
+                """
+                SELECT COALESCE(wins, 0) AS wins, COALESCE(losses, 0) AS losses
+                FROM viewer_gamble_outcomes
+                WHERE broadcaster_id = ? AND user_id = ?
+                """,
+                (broadcaster_id, user_id)
+            )
+            gamble = gamble or {"wins": 0, "losses": 0}
             raid = await connection.fetchone(
                 """
                 SELECT COALESCE(SUM(attacks.damage), 0) AS damage_dealt,
@@ -392,6 +417,9 @@ class ChatterStatsService:
             "messages_sent": int(summary["messages_sent"]),
             "lifetime_points_earned": int(summary["lifetime_points_earned"]),
             "current_points": int(summary["current_points"]),
+            "gamble_wins": int(gamble["wins"]),
+            "gamble_total": int(gamble["wins"]) + int(gamble["losses"]),
+            "gamble_win_rate": self._gamble_win_rate(gamble),
             "currency_name": currency_name,
             "achievements": achievements,
             "damage_dealt": int(raid["damage_dealt"]),

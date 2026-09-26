@@ -51,6 +51,7 @@
                 <article><span>Points earned</span><strong>{{ "{:,}".format(profile.lifetime_points_earned) }}</strong></article>
                 <article><span>Total daily check-ins</span><strong>{{ "{:,}".format(profile.daily_check_ins) }}</strong></article>
                 <article><span>Favorite channel</span><strong>{{ profile.favorite_channel.display_name if profile.favorite_channel else "Not enough activity" }}</strong></article>
+                <article><span>Gamble win rate</span><strong>{{ "%.1f%%" | format(profile.gamble_win_rate) if profile.gamble_win_rate is not none else "—" }}</strong><small>{{ profile.gamble_wins }} wins / {{ profile.gamble_total }} gambles since tracking began</small></article>
             </div>
 
             <section class="chatter-section">
