@@ -1,0 +1,30 @@
+import secrets
+
+from fastapi import Request
+
+
+VIEWER_OAUTH_STATE_KEY = "viewer_oauth_state"
+VIEWER_USER_ID_KEY = "viewer_user_id"
+VIEWER_USER_LOGIN_KEY = "viewer_user_login"
+VIEWER_USER_DISPLAY_NAME_KEY = "viewer_user_display_name"
+
+
+def start_viewer_oauth(request: Request) -> str:
+    state = secrets.token_urlsafe(32)
+    request.session[VIEWER_OAUTH_STATE_KEY] = state
+    return state
+
+
+def consume_viewer_oauth_state(request: Request, submitted_state: str | None) -> bool:
+    expected = request.session.pop(VIEWER_OAUTH_STATE_KEY, None)
+    return bool(expected and submitted_state and secrets.compare_digest(expected, submitted_state))
+
+
+def viewer_user_id(request: Request) -> str | None:
+    value = request.session.get(VIEWER_USER_ID_KEY)
+    return value if isinstance(value, str) and value else None
+
+
+def logout_viewer(request: Request) -> None:
+    for key in (VIEWER_USER_ID_KEY, VIEWER_USER_LOGIN_KEY, VIEWER_USER_DISPLAY_NAME_KEY, VIEWER_OAUTH_STATE_KEY):
+        request.session.pop(key, None)

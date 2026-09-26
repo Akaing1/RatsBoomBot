@@ -53,6 +53,16 @@ def build_public_channel_oauth_url(force_verify: bool = True, state: str | None 
     )
 
 
+def build_viewer_oauth_url(state: str) -> str:
+    # Identity only: viewers must never grant the broadcaster's management scopes.
+    return _build_oauth_url(
+        redirect_uri=settings.VIEWER_REDIRECT_URI,
+        scopes="",
+        force_verify=False,
+        state=state
+    )
+
+
 def build_public_custom_bot_oauth_url(force_verify: bool = True, state: str | None = None) -> str:
     return _build_oauth_url(redirect_uri=settings.PUBLIC_CHANNEL_REDIRECT_URI, scopes=settings.BOT_SCOPES, force_verify=force_verify, state=state)
 
@@ -62,7 +72,7 @@ def _build_oauth_url(*, redirect_uri: str, scopes: str, force_verify: bool, stat
         "client_id": settings.CLIENT_ID,
         "redirect_uri": redirect_uri,
         "response_type": "code",
-        "scope": scopes
+        "scope": scopes,
     }
 
     if force_verify:

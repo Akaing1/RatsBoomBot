@@ -66,6 +66,7 @@ class Settings:
     BOT_REDIRECT_URI = os.getenv("BOT_REDIRECT_URI", f"{ADMIN_BASE_URL}/admin/oauth/bot")
     CHANNEL_REDIRECT_URI = os.getenv("CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/admin/oauth/channel")
     PUBLIC_CHANNEL_REDIRECT_URI = os.getenv("PUBLIC_CHANNEL_REDIRECT_URI", f"{ADMIN_BASE_URL}/oauth/channel/connect")
+    VIEWER_REDIRECT_URI = os.getenv("VIEWER_REDIRECT_URI", f"{PUBLIC_BASE_URL.rstrip('/')}/oauth/viewer/connect")
     YOUTUBE_CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID")
     YOUTUBE_CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET")
     YOUTUBE_REDIRECT_URI = os.getenv("YOUTUBE_REDIRECT_URI", f"{DASHBOARD_BASE_URL}/oauth/youtube/connect")
