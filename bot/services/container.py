@@ -2,7 +2,7 @@ import logging
 
 from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatIdentityService, ChatterIdentityService, ChatterStatsService, FeatureToggleService, LiveChatService, ProfileSettingsService
-from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PassivePointsService, PointsService, RaidBossService, RedeemService, ViewerQueueService
+from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PassivePointsService, PetService, PointsService, RaidBossService, RedeemService, ViewerQueueService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
 from config.settings import settings
@@ -35,9 +35,10 @@ class ServiceContainer:
         self.stream_logs = StreamLogService(bot, self.broadcasters, settings.STREAM_LOGS_PATH)
         self.help = HelpService(bot)
         self.timers = TimerService(bot, self.broadcasters, self.broadcaster_settings)
-        self.points = PointsService(bot, db, self.chatter_stats)
+        self.pets = PetService(db)
+        self.points = PointsService(bot, db, self.chatter_stats, self.pets)
         self.passive_points = PassivePointsService(bot, db, self.points, self.chat_identity, self.features)
-        self.raid_bosses = RaidBossService(bot, db, self.chatter_stats)
+        self.raid_bosses = RaidBossService(bot, db, self.chatter_stats, self.points)
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
         self.viewer_queue = ViewerQueueService(bot, db)
@@ -64,6 +65,7 @@ class ServiceContainer:
             ("ProfileSettingsService", self.profile_settings),
             ("FeatureToggleService", self.features),
             ("LiveChatService", self.live_chat),
+            ("PetService", self.pets),
             ("PointsService", self.points),
             ("PassivePointsService", self.passive_points),
             ("RaidBossService", self.raid_bosses),

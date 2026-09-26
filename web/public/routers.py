@@ -123,6 +123,8 @@ async def public_chatter_profile(request: Request, chatter_name: str):
     if profile is None:
         return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": chatter_name}, status_code=404)
 
+    pets = getattr(runtime_bot.services, "pets", None)
+    profile["pet"] = await pets.get_equipped_pet(profile["identity"]["user_id"]) if pets is not None else None
     return templates.TemplateResponse(request=request, name="public/chatter_profile.html", context={"profile": profile, "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")})
 
 

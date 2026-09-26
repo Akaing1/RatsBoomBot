@@ -49,6 +49,7 @@ from storage.migrations.v044_channel_protected_users import migrate as migrate_c
 from storage.migrations.v045_unpublish_test_patch_note import migrate as migrate_unpublish_test_patch_note
 from storage.migrations.v046_channel_quotes import migrate as migrate_channel_quotes
 from storage.migrations.v047_compact_channel_quotes import migrate as migrate_compact_channel_quotes
+from storage.migrations.v048_global_pets import migrate as migrate_global_pets
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -108,4 +109,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=45, name="unpublish_test_patch_note", run=migrate_unpublish_test_patch_note)
     , Migration(version=46, name="channel_quotes", run=migrate_channel_quotes)
     , Migration(version=47, name="compact_channel_quotes", run=migrate_compact_channel_quotes)
+    , Migration(version=48, name="global_pets", run=migrate_global_pets)
 )
