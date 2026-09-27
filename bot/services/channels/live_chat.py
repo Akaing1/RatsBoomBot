@@ -1163,10 +1163,12 @@ class LiveChatService:
 
     async def _watch_youtube(self, broadcaster_id: str) -> None:
         connection_failed = False
+        known_chat_id: str | None = None
         try:
             while self.started and broadcaster_id in self.connections:
+                phase = "discovery"
                 try:
-                    live_chat_id = await self._find_active_live_chat(broadcaster_id)
+                    live_chat_id = known_chat_id or await self._find_active_live_chat(broadcaster_id)
                     connection_failed = False
 
                     if live_chat_id is None:
@@ -1175,6 +1177,8 @@ class LiveChatService:
                         await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
                         continue
 
+                    known_chat_id = live_chat_id
+                    phase = "chat"
                     self.active_youtube_chat_ids[broadcaster_id] = live_chat_id
                     self.youtube_statuses[broadcaster_id] = ("live", "Receiving YouTube live-chat messages.")
                     LOGGER.info(
@@ -1184,6 +1188,7 @@ class LiveChatService:
                     connection_failed = False
                     try:
                         await self._stream_live_chat(broadcaster_id, live_chat_id)
+                        known_chat_id = None
                     finally:
                         self.active_youtube_chat_ids.pop(broadcaster_id, None)
                         LOGGER.info(
@@ -1207,7 +1212,8 @@ class LiveChatService:
 
                     if self.youtube_statuses.get(broadcaster_id) != status:
                         LOGGER.warning(
-                            "[Live Chat] YouTube discovery unavailable for broadcaster %s (%s): %s",
+                            "[Live Chat] YouTube %s unavailable for broadcaster %s (%s): %s",
+                            phase,
                             broadcaster_id,
                             reason or "forbidden",
                             api_message or "The YouTube API returned HTTP 403.",

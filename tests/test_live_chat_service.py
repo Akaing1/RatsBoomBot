@@ -672,6 +672,33 @@ async def test_youtube_polling_quota_error_reaches_watcher():
         await service._poll_live_chat("channel-1", "chat-1")
 
 
+@pytest.mark.asyncio
+async def test_youtube_watcher_reuses_known_chat_after_temporary_failure(monkeypatch, caplog):
+    request = httpx.Request("GET", "https://www.googleapis.com/youtube/v3/liveChat/messages")
+    response = httpx.Response(403, request=request, json={
+        "error": {"errors": [{"reason": "quotaExceeded"}]}
+    })
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._find_active_live_chat = AsyncMock(return_value="chat-1")
+    service._stream_live_chat = AsyncMock(side_effect=[
+        httpx.HTTPStatusError("Quota exceeded", request=request, response=response),
+        asyncio.CancelledError(),
+    ])
+    service._seconds_until_youtube_quota_reset = lambda: 10.0
+    sleep = AsyncMock()
+    monkeypatch.setattr("bot.services.channels.live_chat.asyncio.sleep", sleep)
+
+    with caplog.at_level("WARNING", logger="RatBoomBot"), pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube("channel-1")
+
+    service._find_active_live_chat.assert_awaited_once_with("channel-1")
+    assert service._stream_live_chat.await_count == 2
+    sleep.assert_awaited_once_with(10.0)
+    assert any("YouTube chat unavailable" in record.message for record in caplog.records)
+
+
 def test_chat_view_normalization_and_matching():
     chat = UnifiedChatMessage("1", "twitch", "chat", "viewer", "Viewer", "hello", datetime.now(UTC).isoformat())
     command = UnifiedChatMessage("2", "youtube", "command", "viewer", "Viewer", "!hello", datetime.now(UTC).isoformat())
