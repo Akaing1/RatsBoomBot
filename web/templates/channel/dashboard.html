@@ -235,7 +235,6 @@
 
         <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Activity feed">
             <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-activity-tab="redeems">Redeems</button>
-            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="checkins">Check-ins</button>
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="commands">Commands</button>
             {% if raid_enabled %}
                 <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="raid">Raid</button>
@@ -243,52 +242,38 @@
         </div>
 
         <div data-activity-panel="redeems">
-            <div id="redemption-activity-content" class="activity-scroll">
-                {% if redemption_activity.redemptions %}
+            <div id="community-activity-content" class="activity-scroll">
+                {% if redemption_activity.feed %}
                     <ul class="activity-list">
-                        {% for redemption in redemption_activity.redemptions %}
+                        {% for entry in redemption_activity.feed %}
+                            {% if entry.kind == "checkin" %}
+                            <li class="activity-list-item">
+                                <div class="activity-main">
+                                    <strong>{{ entry.user_label }}</strong>
+                                    <span>{{ entry.redeemed_at }}</span>
+                                </div>
+                                <span class="activity-badge {% if entry.type in ('first', 'second') %}{{ entry.type }}{% endif %}">
+                                    {% if entry.type == "first" %}FIRST{% elif entry.type == "second" %}SECOND{% else %}Check-in{% endif %}
+                                </span>
+                            </li>
+                            {% else %}
                             <li class="activity-list-item redemption-activity-item">
                                 <div class="activity-main">
-                                    <strong>{{ redemption.reward_title }}</strong>
-                                    <span>{{ redemption.user_label }} &middot; {{ redemption.redeemed_at }}</span>
+                                    <strong>{{ entry.reward_title }}</strong>
+                                    <span>{{ entry.user_label }} &middot; {{ entry.redeemed_at }}</span>
 
-                                    {% if redemption.user_input %}
-                                        <p>{{ redemption.user_input }}</p>
+                                    {% if entry.user_input %}
+                                        <p>{{ entry.user_input }}</p>
                                     {% endif %}
                                 </div>
                             </li>
+                            {% endif %}
                         {% endfor %}
                     </ul>
                 {% else %}
                     <div class="compact-empty-state">
-                        <h4>No other redeems yet</h4>
-                        <p>Other channel point rewards will appear here.</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <div data-activity-panel="checkins" hidden>
-            <div id="checkin-activity-content" class="activity-scroll">
-                {% if redemption_activity.checkins %}
-                    <ul class="activity-list">
-                        {% for checkin in redemption_activity.checkins %}
-                            <li class="activity-list-item">
-                                <div class="activity-main">
-                                    <strong>{{ checkin.user_label }}</strong>
-                                    <span>{{ checkin.redeemed_at }}</span>
-                                </div>
-
-                                <span class="activity-badge {% if checkin.type in ('first', 'second') %}{{ checkin.type }}{% endif %}">
-                                    {% if checkin.type == "first" %}FIRST{% elif checkin.type == "second" %}SECOND{% else %}Check-in{% endif %}
-                                </span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <div class="compact-empty-state">
-                        <h4>No check-ins yet</h4>
-                        <p>Daily, FIRST, and SECOND claims will appear here.</p>
+                        <h4>No activity yet</h4>
+                        <p>Check-ins and channel point rewards will appear here.</p>
                     </div>
                 {% endif %}
             </div>
@@ -300,6 +285,7 @@
                 data-live-chat-feed
                 data-stream-url="/channel/api/chat/stream?view=commands"
                 data-activity-notify="commands"
+                data-newest-first="true"
                 data-max-messages="100"
             >
                 <div class="compact-empty-state">
@@ -391,24 +377,27 @@
                         <li class="queue-list-item" data-username="{{ member.username }}">
                             <span class="queue-position">{{ loop.index }}</span>
                             <strong class="queue-username">{{ member.label }}</strong>
+                            <span class="queue-grab-indicator" aria-hidden="true"></span>
 
-                            <form
-                                method="post"
-                                action="/channel/viewer-queue/remove"
-                                onsubmit="return confirm('Remove {{ member.username }} from the viewer queue?');"
-                            >
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <input type="hidden" name="position" value="{{ loop.index }}">
-
-                                <button
-                                    class="queue-remove-button"
-                                    type="submit"
-                                    aria-label="Remove {{ member.username }} from the queue"
-                                    title="Remove {{ member.username }}"
+                            <div class="queue-item-actions">
+                                <form
+                                    method="post"
+                                    action="/channel/viewer-queue/remove"
+                                    onsubmit="return confirm('Remove {{ member.username }} from the viewer queue?');"
                                 >
-                                    &times;
-                                </button>
-                            </form>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <input type="hidden" name="position" value="{{ loop.index }}">
+
+                                    <button
+                                        class="queue-remove-button"
+                                        type="submit"
+                                        aria-label="Remove {{ member.username }} from the queue"
+                                        title="Remove {{ member.username }}"
+                                    >
+                                        &times;
+                                    </button>
+                                </form>
+                            </div>
                         </li>
                     {% endfor %}
                     </ul>
@@ -608,19 +597,73 @@
     })();
 
     (() => {
-        const endpoint = "/channel/api/redemptions";
-        const checkinContent = document.getElementById("checkin-activity-content");
-        const redemptionContent = document.getElementById("redemption-activity-content");
+        const activityEndpoint = "/channel/api/redemptions";
+        const feedContent = document.getElementById("community-activity-content");
         const modActionContent = document.getElementById("mod-action-activity-content");
         const automodContent = document.getElementById("automod-activity-content");
         const automodActionUrl = "/channel/api/automod/action";
         const csrfToken = {{ csrf_token | tojson }};
-        let requestInProgress = false;
-        let lastActivitySignature = null;
-        let lastRedemptionSignature = null;
-        let lastCheckinSignature = null;
+        let activityRequestInProgress = false;
+        let lastFeedSignature = null;
         let lastModActionSignature = null;
         let lastAutomodSignature = null;
+
+        function createTopScroller(element) {
+            const shell = document.createElement("div");
+            shell.className = "activity-feed-shell";
+            element.before(shell);
+            shell.appendChild(element);
+            const jumpButton = document.createElement("button");
+            jumpButton.type = "button";
+            jumpButton.className = "live-chat-jump";
+            jumpButton.textContent = "↑ Jump to present";
+            jumpButton.hidden = true;
+            shell.appendChild(jumpButton);
+            const scroller = {element, jumpButton, hasUnseen: false};
+            const update = () => {
+                const atTop = element.scrollTop <= 24;
+                if (atTop) scroller.hasUnseen = false;
+                jumpButton.hidden = atTop;
+                jumpButton.classList.toggle("has-unseen", scroller.hasUnseen && !atTop);
+            };
+            scroller.update = update;
+            element.addEventListener("scroll", update, {passive: true});
+            jumpButton.addEventListener("click", () => {
+                scroller.hasUnseen = false;
+                element.scrollTo({top: 0, behavior: "smooth"});
+                update();
+            });
+            return scroller;
+        }
+
+        function renderTopScroller(scroller, render, hasNewActivity) {
+            const {element} = scroller;
+            const atTop = element.scrollTop <= 24;
+            const previousTop = element.scrollTop;
+            const previousHeight = element.scrollHeight;
+            const viewportTop = element.getBoundingClientRect().top;
+            const anchor = atTop ? null : [...element.querySelectorAll("[data-activity-key]")]
+                .find(item => item.getBoundingClientRect().bottom > viewportTop);
+            const anchorKey = anchor?.dataset.activityKey;
+            const anchorTop = anchor?.getBoundingClientRect().top;
+            render();
+            if (atTop) {
+                element.scrollTop = 0;
+            } else {
+                element.scrollTop = previousTop;
+                const replacement = [...element.querySelectorAll("[data-activity-key]")]
+                    .find(item => item.dataset.activityKey === anchorKey);
+                element.scrollTop += replacement
+                    ? replacement.getBoundingClientRect().top - anchorTop
+                    : element.scrollHeight - previousHeight;
+            }
+            if (hasNewActivity && !atTop) scroller.hasUnseen = true;
+            scroller.update();
+        }
+
+        const feedScroller = createTopScroller(feedContent);
+        const modActionScroller = createTopScroller(modActionContent);
+        const automodScroller = createTopScroller(automodContent);
 
         function formatActivityTime(value) {
             if (!value) {
@@ -654,89 +697,53 @@
             container.appendChild(emptyState);
         }
 
-        function renderCheckins(checkins) {
-            checkinContent.replaceChildren();
+        function renderFeed(feed) {
+            feedContent.replaceChildren();
 
-            if (checkins.length === 0) {
-                renderEmptyState(
-                    checkinContent,
-                    "No check-ins yet",
-                    "Daily, FIRST, and SECOND claims will appear here."
-                );
+            if (feed.length === 0) {
+                renderEmptyState(feedContent, "No activity yet", "Check-ins and channel point rewards will appear here.");
                 return;
             }
 
             const list = document.createElement("ul");
             list.className = "activity-list";
 
-            checkins.forEach(checkin => {
+            feed.forEach(entry => {
                 const item = document.createElement("li");
-                item.className = "activity-list-item";
+                item.className = `activity-list-item${entry.kind === "checkin" ? "" : " redemption-activity-item"}`;
+                item.dataset.activityKey = entry.kind === "checkin"
+                    ? JSON.stringify(["checkin", entry.username, entry.redeemed_at, entry.type])
+                    : JSON.stringify(["redemption", entry.id || entry.username, entry.redeemed_at, entry.reward_title]);
 
                 const main = document.createElement("div");
                 main.className = "activity-main";
 
-                const username = document.createElement("strong");
-                username.textContent = checkin.user_label || checkin.username;
-                main.appendChild(username);
-
-                const time = document.createElement("span");
-                time.textContent = formatActivityTime(checkin.redeemed_at);
-                main.appendChild(time);
-                item.appendChild(main);
-
-                const badge = document.createElement("span");
-                badge.className = `activity-badge${["first", "second"].includes(checkin.type) ? ` ${checkin.type}` : ""}`;
-                badge.textContent = checkin.type === "first" ? "FIRST" : checkin.type === "second" ? "SECOND" : "Check-in";
-                item.appendChild(badge);
-                list.appendChild(item);
-            });
-
-            checkinContent.appendChild(list);
-        }
-
-        function renderRedemptions(redemptions) {
-            redemptionContent.replaceChildren();
-
-            if (redemptions.length === 0) {
-                renderEmptyState(
-                    redemptionContent,
-                    "No other redeems yet",
-                    "Other channel point rewards will appear here."
-                );
-                return;
-            }
-
-            const list = document.createElement("ul");
-            list.className = "activity-list";
-
-            redemptions.forEach(redemption => {
-                const item = document.createElement("li");
-                item.className = "activity-list-item redemption-activity-item";
-
-                const main = document.createElement("div");
-                main.className = "activity-main";
-
-                const rewardTitle = document.createElement("strong");
-                rewardTitle.textContent = redemption.reward_title;
-                main.appendChild(rewardTitle);
-
+                const heading = document.createElement("strong");
+                heading.textContent = entry.kind === "checkin" ? entry.user_label || entry.username : entry.reward_title;
+                main.appendChild(heading);
                 const metadata = document.createElement("span");
-                const time = formatActivityTime(redemption.redeemed_at);
-                metadata.textContent = `${redemption.user_label || redemption.username}${time ? ` · ${time}` : ""}`;
+                const time = formatActivityTime(entry.redeemed_at);
+                metadata.textContent = entry.kind === "checkin"
+                    ? time
+                    : `${entry.user_label || entry.username}${time ? ` · ${time}` : ""}`;
                 main.appendChild(metadata);
 
-                if (redemption.user_input) {
+                if (entry.kind === "checkin") {
+                    const badge = document.createElement("span");
+                    badge.className = `activity-badge${["first", "second"].includes(entry.type) ? ` ${entry.type}` : ""}`;
+                    badge.textContent = entry.type === "first" ? "FIRST" : entry.type === "second" ? "SECOND" : "Check-in";
+                    item.append(main, badge);
+                } else if (entry.user_input) {
                     const userInput = document.createElement("p");
-                    userInput.textContent = redemption.user_input;
+                    userInput.textContent = entry.user_input;
                     main.appendChild(userInput);
                 }
 
-                item.appendChild(main);
+                if (entry.kind !== "checkin") item.appendChild(main);
                 list.appendChild(item);
             });
 
-            redemptionContent.appendChild(list);
+            feedContent.appendChild(list);
         }
 
         function renderModActions(actions) {
@@ -750,6 +757,7 @@
             actions.forEach(action => {
                 const item = document.createElement("li");
                 item.className = "activity-list-item";
+                item.dataset.activityKey = String(action.id || JSON.stringify([action.action, action.target, action.timestamp]));
                 const main = document.createElement("div");
                 main.className = "activity-main";
                 const heading = document.createElement("strong");
@@ -804,6 +812,7 @@
                 const item = document.createElement("li");
                 item.className = "activity-list-item automod-item";
                 item.dataset.automodMessage = message.id;
+                item.dataset.activityKey = String(message.id);
                 const main = document.createElement("div");
                 main.className = "activity-main";
                 const user = document.createElement("strong");
@@ -835,75 +844,61 @@
             automodContent.appendChild(list);
         }
 
-        function renderActivity(data) {
-            const checkins = Array.isArray(data.checkins) ? data.checkins : [];
-            const redemptions = Array.isArray(data.redemptions) ? data.redemptions : [];
-            const modActions = Array.isArray(data.mod_actions) ? data.mod_actions : [];
-            const automod = Array.isArray(data.automod) ? data.automod : [];
-            const redemptionSignature = JSON.stringify(redemptions);
-            const checkinSignature = JSON.stringify(checkins);
-            const modActionSignature = JSON.stringify(modActions);
-            const automodSignature = JSON.stringify(automod);
-            const signature = JSON.stringify([
-                checkins,
-                redemptions,
-                modActions,
-                automod
-            ]);
-
-            if (signature === lastActivitySignature) {
-                return;
-            }
-
-            if (lastRedemptionSignature !== null && redemptionSignature !== lastRedemptionSignature) {
+        function renderRedemptions(data) {
+            const feed = Array.isArray(data.feed) ? data.feed : [];
+            const feedSignature = JSON.stringify(feed);
+            if (feedSignature === lastFeedSignature) return;
+            if (lastFeedSignature !== null) {
                 document.dispatchEvent(new CustomEvent("dashboard-activity-unread", {detail: {activity: "redeems"}}));
             }
-            if (lastCheckinSignature !== null && checkinSignature !== lastCheckinSignature) {
-                document.dispatchEvent(new CustomEvent("dashboard-activity-unread", {detail: {activity: "checkins"}}));
-            }
+            renderTopScroller(feedScroller, () => renderFeed(feed), lastFeedSignature !== null);
+            lastFeedSignature = feedSignature;
+        }
+
+        function renderModeration(data) {
+            const modActions = Array.isArray(data.mod_actions) ? data.mod_actions : [];
+            const automod = Array.isArray(data.automod) ? data.automod : [];
+            const modActionSignature = JSON.stringify(modActions);
+            const automodSignature = JSON.stringify(automod);
             if (lastModActionSignature !== null && modActionSignature !== lastModActionSignature) {
                 document.dispatchEvent(new CustomEvent("dashboard-activity-unread", {detail: {activity: "mod-actions"}}));
             }
             if (lastAutomodSignature !== null && automodSignature !== lastAutomodSignature) {
                 document.dispatchEvent(new CustomEvent("dashboard-activity-unread", {detail: {activity: "automod"}}));
             }
-            lastRedemptionSignature = redemptionSignature;
-            lastCheckinSignature = checkinSignature;
+            if (modActionSignature !== lastModActionSignature) {
+                renderTopScroller(modActionScroller, () => renderModActions(modActions), lastModActionSignature !== null);
+            }
+            if (automodSignature !== lastAutomodSignature) {
+                renderTopScroller(automodScroller, () => renderAutomod(automod), lastAutomodSignature !== null);
+            }
             lastModActionSignature = modActionSignature;
             lastAutomodSignature = automodSignature;
-            lastActivitySignature = signature;
-            renderCheckins(checkins);
-            renderRedemptions(redemptions);
-            renderModActions(modActions);
-            renderAutomod(automod);
+        }
+
+        async function fetchActivity() {
+            const response = await fetch(activityEndpoint, {
+                headers: {Accept: "application/json"},
+                cache: "no-store"
+            });
+            if (response.status === 401) {
+                window.location.assign("/connect");
+            } else if (response.ok) {
+                const data = await response.json();
+                renderRedemptions(data);
+                renderModeration(data);
+            }
         }
 
         async function refreshActivity() {
-            if (requestInProgress || document.hidden) {
-                return;
-            }
-
-            requestInProgress = true;
+            if (activityRequestInProgress || document.hidden) return;
+            activityRequestInProgress = true;
             try {
-                const response = await fetch(endpoint, {
-                    headers: { "Accept": "application/json" },
-                    cache: "no-store"
-                });
-
-                if (response.status === 401) {
-                    window.location.assign("/connect");
-                    return;
-                }
-
-                if (!response.ok) {
-                    return;
-                }
-
-                renderActivity(await response.json());
+                await fetchActivity();
             } catch (error) {
-                // Keep the most recently rendered activity during transient network errors.
+                // Keep the last activity during a transient network error.
             } finally {
-                requestInProgress = false;
+                activityRequestInProgress = false;
             }
         }
 

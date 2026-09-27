@@ -10,6 +10,7 @@ from starlette.requests import Request
 
 from bot.services.stream.stream_logs import StreamLogService
 from web.admin.routers import channels
+from web.channel.routers import dashboard
 from web.shared.common import templates
 
 
@@ -182,3 +183,26 @@ async def test_admin_activity_includes_moderation_feeds():
     assert activity["mod_actions"] == moderation["mod_actions"]
     assert activity["automod"] == moderation["automod"]
     services.live_chat.get_moderation_activity.assert_called_once_with("123")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_activity_combines_checkins_and_redemptions_by_time():
+    services = SimpleNamespace(
+        redeems=SimpleNamespace(get_dashboard_activity=AsyncMock(return_value={
+            "checkins": [
+                {"username": "latest", "type": "first", "redeemed_at": "2026-09-27 12:10:00"},
+                {"username": "earliest", "type": "daily", "redeemed_at": "2026-09-27 12:00:00"}
+            ],
+            "redemptions": [
+                {"username": "middle", "reward_title": "Reward", "redeemed_at": "2026-09-27T12:05:00+00:00"}
+            ]
+        })),
+        live_chat=SimpleNamespace(get_moderation_activity=Mock(return_value={"mod_actions": [], "automod": []}))
+    )
+
+    activity = await dashboard.get_redemption_dashboard_data(services, "123")
+
+    assert [(entry["kind"], entry["username"]) for entry in activity["feed"]] == [
+        ("checkin", "latest"), ("redemption", "middle"), ("checkin", "earliest")
+    ]
+    assert activity["feed"][0]["user_label"] == "latest"

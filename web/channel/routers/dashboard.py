@@ -266,11 +266,27 @@ def get_queue_members(services, broadcaster_id: str) -> list[dict[str, str]]:
     return members
 
 
+def dashboard_activity_time(value: object) -> datetime:
+    try:
+        timestamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=UTC)
+    return timestamp.replace(tzinfo=UTC) if timestamp.tzinfo is None else timestamp.astimezone(UTC)
+
+
 async def get_redemption_dashboard_data(services, broadcaster_id: str) -> dict[str, object]:
     activity = await services.redeems.get_dashboard_activity(broadcaster_id=broadcaster_id)
     for collection in (activity.get("checkins", []), activity.get("redemptions", [])):
         for entry in collection:
             entry["user_label"] = format_dashboard_username(services, broadcaster_id, entry.get("username", ""))
+    activity["feed"] = sorted(
+        [{**entry, "kind": kind} for kind, entries in (
+            ("checkin", activity.get("checkins", [])),
+            ("redemption", activity.get("redemptions", []))
+        ) for entry in entries],
+        key=lambda entry: dashboard_activity_time(entry.get("redeemed_at")),
+        reverse=True
+    )
     activity.update(services.live_chat.get_moderation_activity(broadcaster_id))
 
     return activity

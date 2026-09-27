@@ -23,6 +23,7 @@
     let dragPreview = null;
     let dragScrollFrame = null;
     let queueAnimating = false;
+    let previewLineGeneration = 0;
     const shiftAnimations = new WeakMap();
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let simulationActive = false;
@@ -91,6 +92,7 @@
         const button = document.createElement("button");
         button.type = "button";
         button.className = `queue-item-action${dangerous ? " danger" : ""}`;
+        button.dataset.queueItemAction = action;
         if (iconClass) button.classList.add(iconClass);
         if (typeof symbol === "string") button.textContent = symbol;
         else button.appendChild(symbol);
@@ -117,6 +119,13 @@
         return svg;
     }
 
+    function grabIndicator() {
+        const indicator = document.createElement("span");
+        indicator.className = "queue-grab-indicator";
+        indicator.setAttribute("aria-hidden", "true");
+        return indicator;
+    }
+
     function updateState(data) {
         const isOpen = Boolean(data.open);
         const users = Array.isArray(data.users) ? data.users : [];
@@ -129,21 +138,26 @@
     }
 
     function trackPreviewLine(list, rows, duration) {
+        const generation = ++previewLineGeneration;
         const until = window.performance.now() + duration;
         const followLine = () => {
-            if (!list.isConnected) return;
+            if (!list.isConnected || generation !== previewLineGeneration || rows.some(row => row.parentElement !== list)) return;
             updatePreviewLine(list, rows);
             if (window.performance.now() < until) window.requestAnimationFrame(followLine);
         };
         window.requestAnimationFrame(followLine);
     }
 
-    function renderQueue(data, afterExit = false) {
+    function renderQueue(data, afterExit = false, movePosition = 0) {
         if (queueAnimating) return;
         const users = updateState(data);
         const signature = JSON.stringify([Boolean(data.open), users]);
         if ((!afterExit && signature === lastSignature) || draggingPosition || touchDrag || mouseDrag) return;
         const previousRows = [...queueContent.querySelectorAll(".queue-list-item")];
+        const movedUsername = previousRows[movePosition - 1]?.dataset.username;
+        const previousTops = movedUsername && !reduceMotion.matches
+            ? new Map(previousRows.map(item => [item.dataset.username, item.getBoundingClientRect().top]))
+            : null;
         const previousNames = new Set(previousRows.map(item => item.dataset.username));
         const currentNames = new Set(users.map(member => typeof member === "string" ? member : member.username));
         const removedRows = previousRows.filter(item => !currentNames.has(item.dataset.username));
@@ -165,9 +179,11 @@
             return;
         }
         lastSignature = signature;
-        queueContent.replaceChildren();
+        previewLineGeneration++;
+        const list = queueContent.querySelector(".queue-list");
 
         if (!users.length) {
+            queueContent.replaceChildren();
             const empty = document.createElement("div");
             empty.className = "compact-empty-state";
             const heading = document.createElement("h4");
@@ -179,8 +195,9 @@
             return;
         }
 
-        const list = document.createElement("ul");
-        list.className = "queue-list";
+        const nextList = list || document.createElement("ul");
+        nextList.className = "queue-list";
+        nextList.replaceChildren();
         const addedRows = [];
         users.forEach((member, index) => {
             const username = typeof member === "string" ? member : member.username;
@@ -200,19 +217,33 @@
             usernameLabel.textContent = label;
             const actions = document.createElement("div");
             actions.className = "queue-item-actions";
-            actions.append(
-                actionButton(moveIcon("top"), `Move ${username} to top`, "top", position),
-                actionButton(moveIcon("bottom"), `Move ${username} to bottom`, "bottom", position),
-                actionButton("🗑", `Remove ${username}`, "remove", position, true)
-            );
-            item.append(positionLabel, usernameLabel, actions);
-            list.appendChild(item);
+            if (index > 0) actions.appendChild(actionButton(moveIcon("top"), `Move ${username} to top`, "top", position));
+            if (index < users.length - 1) actions.appendChild(actionButton(moveIcon("bottom"), `Move ${username} to bottom`, "bottom", position));
+            actions.appendChild(actionButton("🗑", `Remove ${username}`, "remove", position, true));
+            item.append(positionLabel, usernameLabel, grabIndicator(), actions);
+            nextList.appendChild(item);
             if (!previousNames.has(username)) addedRows.push(item);
         });
-        queueContent.appendChild(list);
+        if (!list) queueContent.replaceChildren(nextList);
         highlightNext();
+        if (previousTops) {
+            nextList.querySelectorAll(".queue-list-item").forEach(item => {
+                const previousTop = previousTops.get(item.dataset.username);
+                if (previousTop === undefined || typeof item.animate !== "function") return;
+                const shift = previousTop - item.getBoundingClientRect().top;
+                if (Math.abs(shift) < 1) return;
+                if (item.dataset.username === movedUsername) item.classList.add("is-moving");
+                const animation = item.animate(
+                    [{transform: `translateY(${shift}px)`}, {transform: "translateY(0)"}],
+                    {duration: 320, easing: "cubic-bezier(.2,.8,.2,1)"}
+                );
+                const finish = () => item.classList.remove("is-moving");
+                animation.addEventListener("finish", finish, {once: true});
+                animation.addEventListener("cancel", finish, {once: true});
+            });
+        }
         if (!reduceMotion.matches) {
-            if (addedRows.length) list.classList.add("is-entering");
+            if (addedRows.length) nextList.classList.add("is-entering");
             addedRows.forEach((item, index) => {
                 item.style.setProperty("--queue-row-height", `${item.getBoundingClientRect().height}px`);
                 item.style.setProperty("--queue-enter-delay", `${Math.min(index * 45, 600)}ms`);
@@ -221,8 +252,8 @@
             });
             if (addedRows.length) {
                 const enterDuration = Math.min((addedRows.length - 1) * 45, 600) + 360;
-                trackPreviewLine(list, [...list.querySelectorAll(".queue-list-item")], enterDuration);
-                window.setTimeout(() => list.classList.remove("is-entering"), enterDuration);
+                trackPreviewLine(nextList, [...nextList.querySelectorAll(".queue-list-item")], enterDuration);
+                window.setTimeout(() => nextList.classList.remove("is-entering"), enterDuration);
             }
         }
     }
@@ -248,7 +279,7 @@
                 if (member) users.splice(action === "top" ? 0 : action === "bottom" ? users.length : newPosition - 1, 0, member);
             }
             draggingPosition = 0;
-            renderQueue(simulatedState);
+            renderQueue(simulatedState, false, action === "top" || action === "bottom" ? position : 0);
             showStatus("Test queue updated; no Twitch action was sent.", "success");
             return;
         }
@@ -272,7 +303,7 @@
             actualState = result;
             draggingPosition = 0;
             lastSignature = null;
-            if (!simulationActive) renderQueue(result);
+            if (!simulationActive) renderQueue(result, false, action === "top" || action === "bottom" ? position : 0);
             showStatus(result.message || "Queue updated.", "success");
         } catch (error) {
             showStatus(error.message, "error");

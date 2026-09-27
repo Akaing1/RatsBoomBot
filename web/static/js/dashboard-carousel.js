@@ -132,16 +132,14 @@
     });
     deck.addEventListener("touchstart", event => {
         touchStart = null;
-        if (event.touches.length !== 1 || event.target.closest(".dashboard-tabs, .chat-emote-picker, .twitch-game-suggestions, .queue-list")) return;
+        if (!media.matches || event.touches.length !== 1) return;
+        if (event.target.closest(".chat-emote-picker, .twitch-game-suggestions")) return;
+        if (event.target.closest(".queue-list") && !event.target.closest("button")) return;
         const touch = event.changedTouches[0];
-        touchStart = {x: touch.clientX, y: touch.clientY, startedAt: performance.now(), horizontal: false};
+        touchStart = {x: touch.clientX, y: touch.clientY, horizontal: false};
     }, {passive: true});
     deck.addEventListener("touchmove", event => {
         if (!touchStart || event.touches.length !== 1) return;
-        if (performance.now() - touchStart.startedAt > 500 && !touchStart.horizontal) {
-            touchStart = null;
-            return;
-        }
         const touch = event.changedTouches[0];
         const deltaX = touch.clientX - touchStart.x;
         const deltaY = touch.clientY - touchStart.y;
@@ -159,9 +157,9 @@
         const deltaY = touch.clientY - touchStart.y;
         touchStart = null;
         if (Math.abs(deltaX) < 60 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+        suppressClickUntil = performance.now() + 350;
         const destination = activeIndex + (deltaX < 0 ? 1 : -1);
         if (destination < 0 || destination >= slides.length) return;
-        suppressClickUntil = performance.now() + 350;
         showCard(destination);
     }, {passive: true});
     deck.addEventListener("touchcancel", () => { touchStart = null; }, {passive: true});
