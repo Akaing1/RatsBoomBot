@@ -615,6 +615,31 @@ async def test_youtube_watcher_squelches_forbidden_discovery_traceback(monkeypat
     )
 
 
+@pytest.mark.asyncio
+async def test_youtube_watcher_waits_for_quota_reset(monkeypatch):
+    request = httpx.Request("GET", "https://www.googleapis.com/youtube/v3/liveBroadcasts")
+    response = httpx.Response(403, request=request, json={
+        "error": {"message": "Daily quota exceeded", "errors": [{"reason": "quotaExceeded"}]}
+    })
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._find_active_live_chat = AsyncMock(side_effect=httpx.HTTPStatusError(
+        "Forbidden", request=request, response=response
+    ))
+    service._seconds_until_youtube_quota_reset = lambda: 9876.0
+    sleep = AsyncMock(side_effect=asyncio.CancelledError)
+    monkeypatch.setattr("bot.services.channels.live_chat.asyncio.sleep", sleep)
+
+    with pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube("channel-1")
+
+    sleep.assert_awaited_once_with(9876.0)
+    assert service.youtube_statuses["channel-1"] == (
+        "unavailable", "YouTube API quota is exhausted. Chat discovery will resume after the daily reset."
+    )
+
+
 def test_chat_view_normalization_and_matching():
     chat = UnifiedChatMessage("1", "twitch", "chat", "viewer", "Viewer", "hello", datetime.now(UTC).isoformat())
     command = UnifiedChatMessage("2", "youtube", "command", "viewer", "Viewer", "!hello", datetime.now(UTC).isoformat())

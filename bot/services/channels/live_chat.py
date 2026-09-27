@@ -8,6 +8,7 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import httpx
 import grpc
@@ -1161,10 +1162,12 @@ class LiveChatService:
         self.tasks[str(broadcaster_id)] = task
 
     async def _watch_youtube(self, broadcaster_id: str) -> None:
+        connection_failed = False
         try:
             while self.started and broadcaster_id in self.connections:
                 try:
                     live_chat_id = await self._find_active_live_chat(broadcaster_id)
+                    connection_failed = False
 
                     if live_chat_id is None:
                         self.active_youtube_chat_ids.pop(broadcaster_id, None)
@@ -1174,6 +1177,7 @@ class LiveChatService:
 
                     self.active_youtube_chat_ids[broadcaster_id] = live_chat_id
                     self.youtube_statuses[broadcaster_id] = ("live", "Receiving YouTube live-chat messages.")
+                    connection_failed = False
                     try:
                         await self._stream_live_chat(broadcaster_id, live_chat_id)
                     finally:
@@ -1187,7 +1191,9 @@ class LiveChatService:
                     reason, api_message = self._youtube_error_details(error.response)
                     detail = {
                         "liveStreamingNotEnabled": "YouTube live streaming is not enabled for the connected channel.",
-                        "insufficientLivePermissions": "Reconnect YouTube to grant live-stream access."
+                        "insufficientLivePermissions": "Reconnect YouTube to grant live-stream access.",
+                        "quotaExceeded": "YouTube API quota is exhausted. Chat discovery will resume after the daily reset.",
+                        "dailyLimitExceeded": "YouTube API quota is exhausted. Chat discovery will resume after the daily reset."
                     }.get(reason, "YouTube live-chat discovery is unavailable; retrying automatically.")
                     status = ("unavailable", detail)
 
@@ -1201,6 +1207,13 @@ class LiveChatService:
 
                     self.active_youtube_chat_ids.pop(broadcaster_id, None)
                     self.youtube_statuses[broadcaster_id] = status
+                    delay = self._seconds_until_youtube_quota_reset() if reason in {"quotaExceeded", "dailyLimitExceeded"} else settings.YOUTUBE_CHAT_DISCOVERY_SECONDS
+                    await asyncio.sleep(delay)
+                except httpx.RequestError as error:
+                    self.youtube_statuses[broadcaster_id] = ("error", "YouTube connection is temporarily unavailable; retrying automatically.")
+                    if not connection_failed:
+                        LOGGER.warning("[Live Chat] YouTube connection failed for broadcaster %s: %s; retrying.", broadcaster_id, error)
+                    connection_failed = True
                     await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
                 except Exception:
                     self.youtube_statuses[broadcaster_id] = ("error", "YouTube chat is temporarily unavailable; retrying automatically.")
@@ -1211,6 +1224,12 @@ class LiveChatService:
 
             if current is asyncio.current_task():
                 self.tasks.pop(broadcaster_id, None)
+
+    @staticmethod
+    def _seconds_until_youtube_quota_reset() -> float:
+        pacific_now = datetime.now(ZoneInfo("America/Los_Angeles"))
+        next_reset = (pacific_now + timedelta(days=1)).replace(hour=0, minute=1, second=0, microsecond=0)
+        return max(60.0, (next_reset - pacific_now).total_seconds())
 
     async def _find_active_live_chat(self, broadcaster_id: str) -> str | None:
         response = await self._youtube_get(

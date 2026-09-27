@@ -1,8 +1,10 @@
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import asqlite
 import pytest
+from twitchio.exceptions import HTTPException
 
 import bot.services.engagement.passive_points as passive_module
 from bot.services.engagement.passive_points import PassivePointsService
@@ -34,6 +36,33 @@ class FakeBroadcaster:
     async def _iterate_chatters(self):
         for chatter in self.chatters:
             yield chatter
+
+
+@pytest.mark.asyncio
+async def test_missing_moderator_permission_pauses_passive_payout_retries(monkeypatch):
+    clock = [1000.0]
+    sleeps = 0
+
+    async def sleep(_seconds):
+        nonlocal sleeps
+        sleeps += 1
+        if sleeps == 3:
+            clock[0] += PassivePointsService.PERMISSION_RETRY_SECONDS
+        if sleeps == 4:
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(passive_module.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(passive_module.asyncio, "sleep", sleep)
+    service = PassivePointsService(None, None, None, FakeChatIdentity(), None)
+    service.award_interval = AsyncMock(side_effect=[
+        HTTPException(status=403, extra={"message": "Not a moderator"}), 1
+    ])
+
+    with pytest.raises(asyncio.CancelledError):
+        await service._run("channel-1", "stream-1")
+
+    assert service.award_interval.await_count == 2
+    assert "channel-1" not in service.permission_retry_at
 
 
 @pytest.mark.asyncio
