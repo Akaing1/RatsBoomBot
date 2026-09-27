@@ -85,7 +85,7 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert "Total daily check-ins" in response.text
     assert "Gamble win rate" in response.text
     assert "62.5%" in response.text
-    assert "5 wins / 8 gambles since tracking began" in response.text
+    assert "5 wins / 3 losses" in response.text
     assert "Recent raid history" in response.text
     assert "#2 of 12" in response.text
     assert 'data-chatter-tab="overview"' in response.text
@@ -109,7 +109,7 @@ def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
     assert "Daily check-ins" in response.text
     assert "Gamble win rate" in response.text
     assert "66.7%" in response.text
-    assert "2 wins / 3 gambles since tracking began" in response.text
+    assert "2 wins / 1 loss" in response.text
     assert "Sword" in response.text
     assert "Basic Bow" in response.text
     assert "Power Potion" in response.text
