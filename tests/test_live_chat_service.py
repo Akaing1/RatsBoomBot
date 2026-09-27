@@ -1541,7 +1541,19 @@ def test_dashboard_carousel_keeps_stream_player_mounted_across_breakpoints():
     assert 'deck.setAttribute("aria-roledescription", "carousel")' in carousel
     assert 'deck.addEventListener("keydown", event =>' in carousel
     assert 'deck.addEventListener("touchmove", event =>' in carousel
+    assert 'event.target.closest(".dashboard-tabs' not in carousel
+    assert 'event.target.closest(".queue-list") && !event.target.closest("button")' in carousel
+    assert 'if (!media.matches || event.touches.length !== 1) return;' in carousel
+    assert 'suppressClickUntil = performance.now() + 350;' in carousel
     assert 'event.preventDefault()' in carousel
+
+
+def test_dashboard_mobile_activity_panels_keep_tabs_above_scrollable_events():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+
+    assert '.channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel > .activity-tabs { flex: 0 0 auto; }' in styles
+    assert '.channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel > [data-activity-panel]:not([hidden]) { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow: hidden; }' in styles
+    assert '.channel-page-overview .dashboard-carousel-slide .activity-scroll,' in styles
 
 
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
@@ -1565,13 +1577,29 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert dashboard.count("data-connection-status-target") == 1
     assert "Waiting for chat messages" not in dashboard
     assert "Waiting for commands" not in dashboard
-    assert 'data-activity-tab="redeems"' in dashboard
-    assert 'data-activity-tab="checkins"' in dashboard
-    assert '<h4 class="activity-subheading">Check-ins</h4>' not in dashboard
+    assert 'data-activity-tab="redeems">Redeems</button>' in dashboard
+    assert 'data-activity-tab="checkins"' not in dashboard
+    assert 'data-activity-panel="checkins"' not in dashboard
+    assert 'id="community-activity-content"' in dashboard
+    assert '{% for entry in redemption_activity.feed %}' in dashboard
+    assert 'renderFeed(feed)' in dashboard
+    assert 'activity: "redeems"' in dashboard
     assert '<h4>No commands yet</h4>' in dashboard
     assert '<p>Chat commands will appear here.</p>' in dashboard
     assert 'data-activity-tab="mod-actions"' in dashboard
     assert 'data-activity-tab="automod"' in dashboard
+    assert 'data-newest-first="true"' in dashboard
+    assert dashboard.count('data-newest-first="true"') == 1
+    assert 'const feedScroller = createTopScroller(feedContent);' in dashboard
+    assert 'const modActionScroller = createTopScroller(modActionContent);' in dashboard
+    assert 'const automodScroller = createTopScroller(automodContent);' in dashboard
+    assert 'const activityEndpoint = "/channel/api/redemptions";' in dashboard
+    assert 'window.setInterval(refreshActivity, 2000);' in dashboard
+    assert 'renderModeration(data);' in dashboard
+    assert 'const anchor = atTop ? null : [...element.querySelectorAll("[data-activity-key]")]' in dashboard
+    assert 'element.scrollTop += replacement' in dashboard
+    assert 'renderTopScroller(feedScroller, () => renderFeed(feed), lastFeedSignature !== null);' in dashboard
+    assert '.activity-feed-shell { position: relative; display: flex; min-height: 0; flex: 1; flex-direction: column; }' in dashboard_styles
     assert '.dashboard-tabs.activity-tabs { flex-wrap: nowrap;' in dashboard_styles
     assert '.dashboard-tabs.activity-tabs .dashboard-tab { min-width: max-content; min-height: 34px; flex: 1 0 auto;' in dashboard_styles
     assert '.queue-toolbar button, .queue-toolbar a { display: inline-flex; width: 100%;' in dashboard_styles
@@ -1659,7 +1687,10 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '"live-chat-pinned-action live-chat-unpin"' in live_chat_script
     assert '["", "∞"]' in live_chat_script
     assert 'window.requestAnimationFrame(finishScroll)' in live_chat_script
-    assert 'if (feed.followNewest) scrollToBottom(feed)' in live_chat_script
+    assert 'if (feed.followNewest) scrollToNewest(feed)' in live_chat_script
+    assert 'return feed.newestFirst ? feed.element.scrollTop <= 24 : distanceFromBottom(feed.element) <= 24;' in live_chat_script
+    assert 'if (feed.newestFirst) feed.element.prepend(row);' in live_chat_script
+    assert 'const oldest = feed.newestFirst ? messages[messages.length - 1] : messages[0];' in live_chat_script
     assert 'const shouldFollowNewest = feed.followNewest && distanceFromBottom(feed.element) <= 24' in live_chat_script
     assert '["wheel", "touchmove"]' in live_chat_script
     assert 'feed.followRowObserver = new ResizeObserver' in live_chat_script
@@ -1697,6 +1728,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.queue-next-picker select:focus-visible' in dashboard_styles
     assert 'nextCountPicker.classList.add("is-selection-committed")' in queue_script
     assert 'data-queue-next-count>4</span>' in dashboard
+    assert '#viewer-queue-content { width: calc(100% + 8px); max-height: 430px; margin-right: -8px; padding-right: 8px;' in dashboard_styles
     assert 'range(1, 11)' in dashboard
     assert 'data-queue-action="clear"' in dashboard
     assert 'href="/channel/viewer-queue/blacklist"' in dashboard
@@ -1715,8 +1747,10 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'ghost.querySelector(".queue-position").textContent = String(newPosition + 1)' in queue_script
     assert 'item.classList.toggle("is-next-preview", index < nextCount)' in queue_script
     assert 'highlightNext();' in queue_script
+    assert 'const nextList = list || document.createElement("ul")' in queue_script
+    assert 'if (!list) queueContent.replaceChildren(nextList)' in queue_script
     assert '.queue-list-item.is-next-preview' in dashboard_styles
-    assert '#viewer-queue-content > .queue-list::before { position: absolute; z-index: 1; top: var(--queue-line-top, 0px); left: 14px; width: 3px; height: var(--queue-line-height, 0px);' in dashboard_styles
+    assert '#viewer-queue-content > .queue-list::before { position: absolute; z-index: 1; top: var(--queue-line-top, 0px); left: 22px; width: 3px; height: var(--queue-line-height, 0px);' in dashboard_styles
     assert 'list.style.setProperty("--queue-line-height", `${Math.max(0, center(last) - top)}px`)' in queue_script
     assert 'function updateDragPreviewOrder()' in queue_script
     assert 'const order = previewOrder(list, source, placeholder)' in queue_script
@@ -1728,6 +1762,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'item.classList.add("is-removing")' in queue_script
     assert 'item.classList.add("is-appearing")' in queue_script
     assert 'trackPreviewLine(list, previousRows, exitDuration)' in queue_script
+    assert 'generation !== previewLineGeneration || rows.some(row => row.parentElement !== list)' in queue_script
     assert '@keyframes queue-slide-away' in dashboard_styles
     assert '@keyframes queue-fold-in' in dashboard_styles
     assert 'window.dashboardQueueTest = {' in queue_script
@@ -1737,7 +1772,22 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'if (simulationActive) {' in queue_script
     assert 'moveIcon("top")' in queue_script
     assert 'moveIcon("bottom")' in queue_script
+    assert 'if (index > 0) actions.appendChild(actionButton(moveIcon("top")' in queue_script
+    assert 'if (index < users.length - 1) actions.appendChild(actionButton(moveIcon("bottom")' in queue_script
+    assert 'button.dataset.queueItemAction = action;' in queue_script
+    assert '.queue-item-actions { display: grid; grid-template-columns: repeat(3, 28px);' in dashboard_styles
+    assert '.queue-item-actions > [data-queue-item-action="top"] { grid-column: 1; }' in dashboard_styles
+    assert '.queue-item-actions > [data-queue-item-action="bottom"] { grid-column: 2; }' in dashboard_styles
+    assert 'const previousTops = movedUsername && !reduceMotion.matches' in queue_script
+    assert 'renderQueue(result, false, action === "top" || action === "bottom" ? position : 0)' in queue_script
+    assert '{duration: 320, easing: "cubic-bezier(.2,.8,.2,1)"}' in queue_script
+    assert '.queue-list-item.is-moving { z-index: 3; }' in dashboard_styles
     assert 'actionButton("🗑"' in queue_script
+    assert 'item.append(positionLabel, usernameLabel, grabIndicator(), actions);' in queue_script
+    assert 'class="queue-grab-indicator" aria-hidden="true"' in dashboard
+    assert '@media (hover: none) { .queue-item-actions { opacity: 1; pointer-events: auto; } .queue-grab-indicator { opacity: 1; } }' in dashboard_styles
+    assert '.queue-grab-indicator { position: absolute; z-index: 2; top: 50%; left: calc(50% + 8px);' in dashboard_styles
+    assert '.queue-grab-indicator::before, .queue-grab-indicator::after { width: 16px; height: 2px;' in dashboard_styles
     assert '.queue-item-action svg' in dashboard_styles
     assert 'fetch(endpoint' in metadata_script
     assert "searchGames" in metadata_script
@@ -1791,14 +1841,19 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "('both', 'Both'" in customization
     assert ".live-chat-feed::-webkit-scrollbar" in dashboard_styles
     assert "#viewer-queue-content::-webkit-scrollbar" in dashboard_styles
-    assert "#viewer-queue-content { max-height: 430px; overflow-y: auto;" in dashboard_styles
+    assert "padding-right: 8px; overflow-y: auto; scrollbar-gutter: stable;" in dashboard_styles
+    assert '.queue-list .queue-list-item, .queue-list .queue-drop-placeholder { padding-left: 8px; }' in dashboard_styles
+    assert '.queue-list-item.is-next-preview { border-top-color: transparent; background: rgba(139,92,246,.16); }' in dashboard_styles
+    assert '.channel-page-overview .dashboard-activity-panel .activity-scroll,' in dashboard_styles
+    assert '.channel-page-overview .dashboard-activity-panel .dashboard-command-feed,' in dashboard_styles
+    assert '.channel-page-overview .dashboard-activity-panel .dashboard-raid-tab #dashboard-raid { width: calc(100% + 8px); margin-right: -8px; padding-right: 8px; scrollbar-gutter: stable; }' in dashboard_styles
     assert "background: #0f1115" in widget_styles
     assert "background: transparent" not in widget_styles.split("body {", 1)[0]
     assert ".widget-chat-feed::-webkit-scrollbar" in widget_styles
     assert "overflow-y: auto" in widget_styles
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
-    assert '"live-chat-jump", "↓ Jump to present"' in chat_script
+    assert 'element.dataset.newestFirst === "true" ? "↑ Jump to present" : "↓ Jump to present"' in chat_script
     assert 'makeElement("div", "live-chat-feed-shell")' in chat_script
     assert 'element.addEventListener("scroll", () => {' in chat_script
     assert "updateJumpButton(feed);" in chat_script
@@ -1806,7 +1861,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "feed.hasUnseenMessages = true" in chat_script
     assert 'maxMessages: Number(element.dataset.maxMessages || 100)' in chat_script
     assert 'data-max-messages="150"' in dashboard
-    assert 'classList.toggle("has-unseen", feed.hasUnseenMessages && !atBottom)' in chat_script
+    assert 'classList.toggle("has-unseen", feed.hasUnseenMessages && !atPresent)' in chat_script
     assert "display: flex; flex: 0 0 auto;" in dashboard_styles
     assert "display: flex; min-width: 0; flex: 1; flex-wrap: wrap;" in dashboard_styles
     assert ".live-chat-time { position: absolute; top: 1px; right: 0;" in dashboard_styles
