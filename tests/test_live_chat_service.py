@@ -640,6 +640,38 @@ async def test_youtube_watcher_waits_for_quota_reset(monkeypatch):
     )
 
 
+@pytest.mark.asyncio
+async def test_youtube_watcher_logs_chat_attachment_for_stream_session(monkeypatch, caplog):
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._find_active_live_chat = AsyncMock(return_value="chat-1")
+    service._stream_live_chat = AsyncMock(side_effect=asyncio.CancelledError)
+
+    with caplog.at_level("INFO", logger="RatBoomBot"), pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube("channel-1")
+
+    attachment = next(record for record in caplog.records if "Attached to YouTube live chat" in record.message)
+    assert attachment.broadcaster_id == "channel-1"
+
+
+@pytest.mark.asyncio
+async def test_youtube_polling_quota_error_reaches_watcher():
+    request = httpx.Request("GET", "https://www.googleapis.com/youtube/v3/liveChat/messages")
+    response = httpx.Response(403, request=request, json={
+        "error": {"errors": [{"reason": "quotaExceeded"}]}
+    })
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._youtube_get = AsyncMock(side_effect=httpx.HTTPStatusError(
+        "Forbidden", request=request, response=response
+    ))
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await service._poll_live_chat("channel-1", "chat-1")
+
+
 def test_chat_view_normalization_and_matching():
     chat = UnifiedChatMessage("1", "twitch", "chat", "viewer", "Viewer", "hello", datetime.now(UTC).isoformat())
     command = UnifiedChatMessage("2", "youtube", "command", "viewer", "Viewer", "!hello", datetime.now(UTC).isoformat())

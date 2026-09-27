@@ -1177,11 +1177,19 @@ class LiveChatService:
 
                     self.active_youtube_chat_ids[broadcaster_id] = live_chat_id
                     self.youtube_statuses[broadcaster_id] = ("live", "Receiving YouTube live-chat messages.")
+                    LOGGER.info(
+                        "[Live Chat] Attached to YouTube live chat for broadcaster %s.", broadcaster_id,
+                        extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
+                    )
                     connection_failed = False
                     try:
                         await self._stream_live_chat(broadcaster_id, live_chat_id)
                     finally:
                         self.active_youtube_chat_ids.pop(broadcaster_id, None)
+                        LOGGER.info(
+                            "[Live Chat] YouTube message stream ended for broadcaster %s; resuming discovery.",
+                            broadcaster_id, extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
+                        )
                 except asyncio.CancelledError:
                     raise
                 except httpx.HTTPStatusError as error:
@@ -1202,7 +1210,8 @@ class LiveChatService:
                             "[Live Chat] YouTube discovery unavailable for broadcaster %s (%s): %s",
                             broadcaster_id,
                             reason or "forbidden",
-                            api_message or "The YouTube API returned HTTP 403."
+                            api_message or "The YouTube API returned HTTP 403.",
+                            extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
                         )
 
                     self.active_youtube_chat_ids.pop(broadcaster_id, None)
@@ -1212,12 +1221,18 @@ class LiveChatService:
                 except httpx.RequestError as error:
                     self.youtube_statuses[broadcaster_id] = ("error", "YouTube connection is temporarily unavailable; retrying automatically.")
                     if not connection_failed:
-                        LOGGER.warning("[Live Chat] YouTube connection failed for broadcaster %s: %s; retrying.", broadcaster_id, error)
+                        LOGGER.warning(
+                            "[Live Chat] YouTube connection failed for broadcaster %s: %s; retrying.",
+                            broadcaster_id, error, extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
+                        )
                     connection_failed = True
                     await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
                 except Exception:
                     self.youtube_statuses[broadcaster_id] = ("error", "YouTube chat is temporarily unavailable; retrying automatically.")
-                    LOGGER.exception("[Live Chat] YouTube watcher failed for broadcaster %s.", broadcaster_id)
+                    LOGGER.exception(
+                        "[Live Chat] YouTube watcher failed for broadcaster %s.", broadcaster_id,
+                        extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
+                    )
                     await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
         finally:
             current = self.tasks.get(broadcaster_id)
@@ -1278,10 +1293,16 @@ class LiveChatService:
                     await asyncio.sleep(1)
         except grpc.aio.AioRpcError as error:
             if error.code() in {grpc.StatusCode.NOT_FOUND, grpc.StatusCode.FAILED_PRECONDITION}:
+                LOGGER.info(
+                    "[Live Chat] YouTube message stream closed for broadcaster %s (%s).",
+                    broadcaster_id, error.code().name,
+                    extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
+                )
                 return
             LOGGER.warning(
                 "[Live Chat] YouTube streaming failed for broadcaster %s (%s); falling back to polling.",
                 broadcaster_id, error.code().name,
+                extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
             )
             if error.code() == grpc.StatusCode.UNAUTHENTICATED:
                 self.connections[broadcaster_id].expires_at = datetime.now(UTC).isoformat()
@@ -1321,6 +1342,14 @@ class LiveChatService:
                 payload = await self._youtube_get(broadcaster_id, "/liveChat/messages", params)
             except httpx.HTTPStatusError as error:
                 if error.response.status_code in {403, 404}:
+                    reason, _ = self._youtube_error_details(error.response)
+                    if reason in {"quotaExceeded", "dailyLimitExceeded"}:
+                        raise
+                    LOGGER.warning(
+                        "[Live Chat] YouTube chat polling stopped for broadcaster %s (HTTP %d, %s).",
+                        broadcaster_id, error.response.status_code, reason or "unknown",
+                        extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
+                    )
                     return
                 raise
 
