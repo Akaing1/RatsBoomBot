@@ -13,6 +13,8 @@
     let gameSearchController = null;
     let gameOptions = [];
     let selectedGame = 0;
+    let statusSpaceTimer = null;
+    let refreshGamePencil = () => {};
 
     function showStatus(message, tone = "") {
         window.clearTimeout(statusFadeTimer);
@@ -42,13 +44,51 @@
     [titleField, gameField].filter(Boolean).forEach(field => {
         function updateFieldPencil() {
             field.classList.remove("metadata-truncated");
-            field.classList.toggle("metadata-truncated", field.scrollWidth > field.clientWidth + 1);
+            const range = document.createRange();
+            range.selectNodeContents(field);
+            const textWidth = range.getBoundingClientRect().width;
+            const style = window.getComputedStyle(field);
+            const pencilStyle = window.getComputedStyle(field, "::after");
+            const availableWidth = field.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+            const pencilWidth = parseFloat(pencilStyle.fontSize) + parseFloat(pencilStyle.marginLeft);
+            field.classList.toggle("metadata-truncated", textWidth + pencilWidth > availableWidth + 1);
         }
+        if (field === gameField) refreshGamePencil = updateFieldPencil;
         new MutationObserver(updateFieldPencil).observe(field, {childList: true, characterData: true, subtree: true});
         new ResizeObserver(updateFieldPencil).observe(field, {box: "border-box"});
-        field.addEventListener("blur", () => window.requestAnimationFrame(updateFieldPencil));
+        field.addEventListener("blur", () => {
+            field.scrollLeft = 0;
+            window.requestAnimationFrame(() => {
+                if (document.activeElement === field) return;
+                field.scrollLeft = 0;
+                updateFieldPencil();
+            });
+        });
         window.requestAnimationFrame(updateFieldPencil);
     });
+
+    if (gameField) {
+        function setStatusSpace(width) {
+            gameField.style.setProperty("--metadata-status-padding", `${width ? width + 31 : 8}px`);
+            gameField.style.setProperty("--metadata-status-pencil-right", `${width ? width + 6 : 8}px`);
+            window.requestAnimationFrame(refreshGamePencil);
+        }
+        function updateStatusSpace() {
+            window.clearTimeout(statusSpaceTimer);
+            if (document.activeElement === gameField) {
+                setStatusSpace(0);
+            } else if (status.classList.contains("is-fading")) {
+                statusSpaceTimer = window.setTimeout(() => setStatusSpace(0), 450);
+            } else {
+                setStatusSpace(Math.ceil(status.getBoundingClientRect().width));
+            }
+        }
+        new MutationObserver(updateStatusSpace).observe(status, {attributes: true, attributeFilter: ["class"], childList: true, characterData: true, subtree: true});
+        new ResizeObserver(updateStatusSpace).observe(status);
+        gameField.addEventListener("focus", updateStatusSpace);
+        gameField.addEventListener("blur", () => window.requestAnimationFrame(updateStatusSpace));
+        updateStatusSpace();
+    }
 
     if (titleField) {
         const titleLength = text => Array.from(text).length;
@@ -93,20 +133,6 @@
             selection?.addRange(range);
             showStatus("Titles are limited to 140 characters.", "warning");
         });
-        function updateTitleEditingWidth() {
-            if (document.activeElement !== titleField) return;
-            titleField.style.removeProperty("width");
-            const fieldBounds = titleField.getBoundingClientRect();
-            const cardBounds = card.getBoundingClientRect();
-            const rightPadding = parseFloat(window.getComputedStyle(card).paddingRight) || 0;
-            const maxWidth = Math.max(0, cardBounds.right - rightPadding - fieldBounds.left);
-            const width = Math.min(maxWidth, Math.max(fieldBounds.width, titleField.scrollWidth + 2));
-            titleField.style.width = `${width}px`;
-        }
-        titleField.addEventListener("focus", updateTitleEditingWidth);
-        titleField.addEventListener("input", updateTitleEditingWidth);
-        titleField.addEventListener("blur", () => titleField.style.removeProperty("width"));
-        new ResizeObserver(updateTitleEditingWidth).observe(card, {box: "border-box"});
     }
 
     function renderGameOptions(games) {
@@ -233,9 +259,6 @@
                 window.clearTimeout(gameSearchTimer);
                 gameSearchController?.abort();
                 gameSuggestions.hidden = true;
-                window.requestAnimationFrame(() => {
-                    if (document.activeElement !== gameField) gameField.scrollLeft = 0;
-                });
             }
             if (field.dataset.cancelEdit) {
                 delete field.dataset.cancelEdit;

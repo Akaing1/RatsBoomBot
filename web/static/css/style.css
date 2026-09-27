@@ -246,12 +246,11 @@ button, input { font: inherit; }
 .dashboard-ad-stat.state-scheduled strong { color: #c7b7ff; }
 .dashboard-ad-stat.state-unavailable strong { color: var(--danger); }
 .channel-dashboard-layout .panel-header h3 { color: #c7b7ff; }
-.dashboard-video-header { display: grid; min-width: 0; grid-template-columns: minmax(0,2fr) minmax(0,1fr); align-items: center; gap: 10px; }
-.dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: auto minmax(0,1fr); column-gap: 7px; }
-.dashboard-video-header .twitch-channel-field > h3 { margin: 0; line-height: 1.2; white-space: nowrap; }
-.dashboard-video-header .twitch-channel-field strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-video-header { --metadata-label-width: 88px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr); align-items: center; gap: 4px; }
+.dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: var(--metadata-label-width) minmax(0,1fr); column-gap: 7px; }
+.dashboard-video-header .twitch-channel-field > h3 { margin: 0; line-height: 1.2; text-align: right; white-space: nowrap; }
+.dashboard-video-header .twitch-channel-field strong { box-sizing: border-box; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dashboard-video-header .twitch-channel-field strong:focus { overflow-x: auto; text-overflow: clip; }
-.dashboard-video-header [data-channel-field="title"]:is(:focus, .editing) { position: relative; z-index: 10; }
 .dashboard-video-header [data-channel-field].metadata-truncated:not(:focus):not(.editing) { position: relative; padding-right: 26px; }
 .dashboard-video-header [data-channel-field].metadata-truncated:not(:focus):not(.editing)::after { position: absolute; top: 50%; right: 8px; margin-left: 0; transform: translateY(-50%) scaleX(-1); }
 .twitch-channel-field { display: grid; min-width: 0; grid-template-columns: 56px minmax(0,1fr); align-items: center; column-gap: 14px; }
@@ -263,12 +262,16 @@ button, input { font: inherit; }
 .twitch-channel-field strong:hover { color: #ddd6fe; }
 .twitch-channel-field strong[data-has-draft="true"], .twitch-channel-field strong[data-has-draft="true"]:hover { color: #f5c451; }
 .twitch-channel-field strong:focus, .twitch-channel-field strong.editing { border-color: var(--accent); background: var(--background); box-shadow: 0 0 0 3px rgba(139,92,246,.12); }
-.twitch-game-field { position: relative; }
-.twitch-game-suggestions { position: absolute; z-index: 25; top: calc(100% + 4px); right: 0; left: 50px; max-height: 240px; overflow-y: auto; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); box-shadow: 0 12px 30px rgba(0,0,0,.38); }
+.dashboard-video-header .twitch-game-field { position: relative; }
+.dashboard-video-header .twitch-game-field [data-channel-field="game"]:not(:focus):not(.editing) { padding-right: var(--metadata-status-padding, 8px); }
+.dashboard-video-header .twitch-game-field [data-channel-field="game"].metadata-truncated:not(:focus):not(.editing) { padding-right: max(26px, var(--metadata-status-padding, 8px)); }
+.dashboard-video-header .twitch-game-field [data-channel-field="game"].metadata-truncated:not(:focus):not(.editing)::after { right: var(--metadata-status-pencil-right, 8px); }
+.twitch-game-suggestions { position: absolute; z-index: 25; top: calc(100% + 4px); right: 0; left: calc(var(--metadata-label-width) + 7px); max-height: 240px; overflow-y: auto; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); box-shadow: 0 12px 30px rgba(0,0,0,.38); }
 .twitch-game-suggestions[hidden] { display: none; }
 .twitch-game-option { display: block; width: 100%; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 11px; text-align: left; cursor: pointer; }
 .twitch-game-option:hover, .twitch-game-option.active { background: rgba(139,92,246,.18); }
-.channel-metadata-status { position: absolute; right: 15px; bottom: 11px; max-width: calc(100% - 30px); min-height: 14px; margin: 0; overflow: hidden; color: var(--muted); font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; opacity: .8; pointer-events: none; transition: opacity .45s ease; }
+.channel-metadata-status { position: absolute; z-index: 1; right: 0; bottom: 6px; max-width: min(60%,240px); min-height: 14px; margin: 0; padding-left: 8px; overflow: hidden; background: var(--surface); box-shadow: -6px 0 8px var(--surface); color: var(--muted); font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; opacity: .8; pointer-events: none; transition: opacity .45s ease; }
+.twitch-game-field:focus-within .channel-metadata-status { opacity: 0; }
 .channel-metadata-status.is-fading { opacity: 0; }
 .channel-metadata-status.success { color: var(--success); }
 .channel-metadata-status.warning { color: #f5c451; }
@@ -289,7 +292,6 @@ button, input { font: inherit; }
 .dashboard-carousel-controls { display: none; }
 .dashboard-activity-grid { display: grid; grid-area: activities; min-width: 0; min-height: 0; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .dashboard-video-card { position: relative; display: flex; grid-area: player; min-width: 0; align-self: start; flex-direction: column; }
-.dashboard-video-card .channel-metadata-status { right: 16px; bottom: 2px; }
 .dashboard-video-card > .panel-header { margin-bottom: 10px; }
 .dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }
 .dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; background: #0f1115; }
@@ -478,8 +480,7 @@ button, input { font: inherit; }
     .channel-page-overview #viewer-queue-content { max-height: none; flex: 1 1 auto; overflow-y: auto; }
 }
 @media (max-width: 600px) {
-    .dashboard-video-header { grid-template-columns: minmax(0,1fr); }
-    .dashboard-video-header .twitch-channel-field { grid-template-columns: 100px minmax(0,1fr); }
+    .dashboard-video-header { --metadata-label-width: 100px; }
     .dashboard-activity-grid { grid-template-columns: minmax(0,1fr); }
 }
 .live-chat-message { --chat-edge-color: #9147ff; position: relative; display: flex; flex: 0 0 auto; align-items: flex-start; gap: 9px; overflow: hidden; padding: 10px; border-left: 3px solid var(--chat-edge-color); border-radius: 9px; background: var(--surface-raised); }

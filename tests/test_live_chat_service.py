@@ -1691,16 +1691,28 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '{% if broadcaster.is_live %}Online{% else %}Offline{% endif %}' in dashboard
     assert 'data-stream-status' in dashboard and 'aria-pressed="true"' in dashboard
     assert 'class="panel-header dashboard-video-header"' in dashboard
-    assert '.dashboard-video-header { display: grid; min-width: 0; grid-template-columns: minmax(0,2fr) minmax(0,1fr);' in dashboard_styles
-    assert '.dashboard-video-header [data-channel-field="title"]:is(:focus, .editing) { position: relative; z-index: 10; }' in dashboard_styles
-    assert 'const maxWidth = Math.max(0, cardBounds.right - rightPadding - fieldBounds.left);' in metadata_script
-    assert 'Math.max(fieldBounds.width, titleField.scrollWidth + 2)' in metadata_script
-    assert 'titleField.style.removeProperty("width")' in metadata_script
-    assert '[data-channel-field].metadata-truncated:not(:focus):not(.editing)::after' in dashboard_styles
+    assert dashboard.index('data-channel-field="game"') < dashboard.index('data-channel-metadata-status') < dashboard.index('class="dashboard-video-frame"')
+    assert '.dashboard-video-header .twitch-game-field { position: relative; }' in dashboard_styles
+    assert '[data-channel-field="game"]:not(:focus):not(.editing) { padding-right: var(--metadata-status-padding, 8px); }' in dashboard_styles
+    assert '[data-channel-field="game"].metadata-truncated:not(:focus):not(.editing)::after { right: var(--metadata-status-pencil-right, 8px); }' in dashboard_styles
+    assert '.channel-metadata-status { position: absolute; z-index: 1; right: 0; bottom: 6px; max-width: min(60%,240px);' in dashboard_styles
+    assert '.twitch-game-field:focus-within .channel-metadata-status { opacity: 0; }' in dashboard_styles
+    assert 'setStatusSpace(Math.ceil(status.getBoundingClientRect().width))' in metadata_script
+    assert 'statusSpaceTimer = window.setTimeout(() => setStatusSpace(0), 450)' in metadata_script
+    assert '.dashboard-video-header { --metadata-label-width: 88px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: var(--metadata-label-width) minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field > h3 { margin: 0; line-height: 1.2; text-align: right;' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field strong { box-sizing: border-box; width: 100%;' in dashboard_styles
+    assert 'updateTitleEditingWidth' not in metadata_script
+    assert 'range.selectNodeContents(field)' in metadata_script
+    assert 'textWidth + pencilWidth > availableWidth + 1' in metadata_script
+    assert '[data-channel-field].metadata-truncated:not(:focus):not(.editing)::after { position: absolute; top: 50%; right: 8px;' in dashboard_styles
     assert '[titleField, gameField].filter(Boolean).forEach(field => {' in metadata_script
     assert 'new MutationObserver(updateFieldPencil)' in metadata_script
     assert 'new ResizeObserver(updateFieldPencil)' in metadata_script
-    assert 'if (document.activeElement !== gameField) gameField.scrollLeft = 0;' in metadata_script
+    assert 'field.addEventListener("blur", () => {' in metadata_script
+    assert 'field.scrollLeft = 0;' in metadata_script
+    assert 'if (document.activeElement === field) return;' in metadata_script
     assert '<h3>Title</h3>' in dashboard
     assert '<h3>Category</h3>' in dashboard
     assert '<h3>Twitch stream</h3>' not in dashboard
