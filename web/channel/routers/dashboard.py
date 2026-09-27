@@ -433,7 +433,8 @@ async def channel_viewer_queue_action(
     csrf_token: str = Form(...),
     position: int = Form(0),
     new_position: int = Form(0),
-    count: int = Form(4)
+    count: int = Form(4),
+    expected_users: str = Form("")
 ):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
     if not broadcaster_id:
@@ -452,6 +453,10 @@ async def channel_viewer_queue_action(
         next_count = count if action == "next" else (4 if action == "next4" else 5)
         if not 1 <= next_count <= 10:
             return JSONResponse({"detail": "Choose between 1 and 10 viewers."}, status_code=400)
+        if isinstance(expected_users, str) and expected_users:
+            highlighted = expected_users.split(",")
+            if queue.list_queue(broadcaster_id)[:next_count] != highlighted:
+                return JSONResponse({"detail": "The queue changed. Review the next viewers again."}, status_code=409)
         _, selected, message = await queue.next_viewers(broadcaster_id, next_count)
     elif action == "clear":
         message = await queue.clear(broadcaster_id)

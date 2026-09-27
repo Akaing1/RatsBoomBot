@@ -132,7 +132,7 @@
     });
     deck.addEventListener("touchstart", event => {
         touchStart = null;
-        if (event.touches.length !== 1 || event.target.closest(".dashboard-tabs, .chat-emote-picker, .twitch-game-suggestions")) return;
+        if (event.touches.length !== 1 || event.target.closest(".dashboard-tabs, .chat-emote-picker, .twitch-game-suggestions, .queue-list")) return;
         const touch = event.changedTouches[0];
         touchStart = {x: touch.clientX, y: touch.clientY, startedAt: performance.now(), horizontal: false};
     }, {passive: true});
