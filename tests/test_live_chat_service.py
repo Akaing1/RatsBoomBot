@@ -1518,6 +1518,11 @@ def test_dashboard_carousel_keeps_stream_player_mounted_across_breakpoints():
     assert "index === 0 ? card.elements.slice(1) : card.elements" in carousel
     assert "slides.slice(1).forEach(slide => slide.remove());" in carousel
     assert "deck.replaceChildren()" not in carousel
+    assert 'const media = window.matchMedia("(max-width: 768px)")' in carousel
+    assert 'deck.setAttribute("aria-roledescription", "carousel")' in carousel
+    assert 'deck.addEventListener("keydown", event =>' in carousel
+    assert 'deck.addEventListener("touchmove", event =>' in carousel
+    assert 'event.preventDefault()' in carousel
 
 
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
@@ -1674,7 +1679,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'data-queue-action="clear"' in dashboard
     assert 'href="/channel/viewer-queue/blacklist"' in dashboard
     assert 'data-queue-count' in dashboard
-    assert '.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-inline: auto; padding: 5px 9px; border: 0;' in dashboard_styles
+    assert '.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-left: auto; padding: 5px 9px; border: 0;' in dashboard_styles
     assert 'color: var(--text); font-size: 13px; font-weight: 800;' in dashboard_styles
     assert 'item.draggable = true' in queue_script
     assert 'runAction("reorder", draggingPosition, position)' in queue_script
@@ -1786,7 +1791,16 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
     assert '.channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }' in dashboard_styles
     assert 'grid-template-areas: "stats" "player" "queue" "activities" "chat"' in dashboard_styles
-    assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' not in dashboard_styles
+    assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' in dashboard_styles
+    assert '@media (min-width: 769px) and (max-width: 1100px)' in dashboard_styles
+    assert '@media (max-width: 600px) {\n    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-header-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }' in dashboard_styles
+    assert 'height: calc(200dvh - var(--dashboard-stats-height, 36px) - 52px)' in dashboard_styles
+    assert 'grid-template-rows: max-content minmax(0,3fr) minmax(0,2fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 32px)' in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 16px; display: flex; grid-area: stats; min-width: 0; margin-bottom: -6px; padding-bottom: 6px;' in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side { grid-area: stats; margin-bottom: 0;' not in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side::before { position: absolute; z-index: -1; top: -16px; right: -16px; bottom: -6px; left: -16px; background: var(--background);' in dashboard_styles
+    assert '.channel-page-overview .viewer-queue-column > [data-viewer-queue-panel] { height: auto; min-height: 0; flex: 1 1 0; overflow-y: auto; }' in dashboard_styles
+    assert '.channel-page-overview .live-chat-panel { height: 100%; min-height: 0; overflow: hidden; }' in dashboard_styles
     assert '.dashboard-activity-grid { display: grid; grid-area: activities;' in dashboard_styles
     assert '<header class="page-header dashboard-channel-profile" hidden>' in dashboard
     assert dashboard.index('class="panel dashboard-video-card"') < dashboard.index('class="panel live-chat-panel"')
@@ -1795,16 +1809,28 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '{% if broadcaster.is_live %}Online{% else %}Offline{% endif %}' in dashboard
     assert 'data-stream-status' in dashboard and 'aria-pressed="true"' in dashboard
     assert 'class="panel-header dashboard-video-header"' in dashboard
-    assert '.dashboard-video-header { display: grid; min-width: 0; grid-template-columns: minmax(0,2fr) minmax(0,1fr);' in dashboard_styles
-    assert '.dashboard-video-header [data-channel-field="title"]:is(:focus, .editing) { position: relative; z-index: 10; }' in dashboard_styles
-    assert 'const maxWidth = Math.max(0, cardBounds.right - rightPadding - fieldBounds.left);' in metadata_script
-    assert 'Math.max(fieldBounds.width, titleField.scrollWidth + 2)' in metadata_script
-    assert 'titleField.style.removeProperty("width")' in metadata_script
-    assert '[data-channel-field].metadata-truncated:not(:focus):not(.editing)::after' in dashboard_styles
+    assert dashboard.index('data-channel-field="game"') < dashboard.index('data-channel-metadata-status') < dashboard.index('class="dashboard-video-frame"')
+    assert '.dashboard-video-header .twitch-game-field { position: relative; }' in dashboard_styles
+    assert '[data-channel-field="game"]:not(:focus):not(.editing) { padding-right: var(--metadata-status-padding, 8px); }' in dashboard_styles
+    assert '[data-channel-field="game"].metadata-truncated:not(:focus):not(.editing)::after { right: var(--metadata-status-pencil-right, 8px); }' in dashboard_styles
+    assert '.channel-metadata-status { position: absolute; z-index: 1; right: 0; bottom: 6px; max-width: min(60%,240px);' in dashboard_styles
+    assert '.twitch-game-field:focus-within .channel-metadata-status { opacity: 0; }' in dashboard_styles
+    assert 'setStatusSpace(Math.ceil(status.getBoundingClientRect().width))' in metadata_script
+    assert 'statusSpaceTimer = window.setTimeout(() => setStatusSpace(0), 450)' in metadata_script
+    assert '.dashboard-video-header { --metadata-label-width: 88px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: var(--metadata-label-width) minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field > h3 { margin: 0; line-height: 1.2; text-align: right;' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field strong { box-sizing: border-box; width: 100%;' in dashboard_styles
+    assert 'updateTitleEditingWidth' not in metadata_script
+    assert 'range.selectNodeContents(field)' in metadata_script
+    assert 'textWidth + pencilWidth > availableWidth + 1' in metadata_script
+    assert '[data-channel-field].metadata-truncated:not(:focus):not(.editing)::after { position: absolute; top: 50%; right: 8px;' in dashboard_styles
     assert '[titleField, gameField].filter(Boolean).forEach(field => {' in metadata_script
     assert 'new MutationObserver(updateFieldPencil)' in metadata_script
     assert 'new ResizeObserver(updateFieldPencil)' in metadata_script
-    assert 'if (document.activeElement !== gameField) gameField.scrollLeft = 0;' in metadata_script
+    assert 'field.addEventListener("blur", () => {' in metadata_script
+    assert 'field.scrollLeft = 0;' in metadata_script
+    assert 'if (document.activeElement === field) return;' in metadata_script
     assert '<h3>Title</h3>' in dashboard
     assert '<h3>Category</h3>' in dashboard
     assert '<h3>Twitch stream</h3>' not in dashboard
@@ -1827,7 +1853,13 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'localStorage.setItem(storageKey, String(desktopCollapsed))' in sidebar_script
     assert ".dashboard-page:not(.channel-page-overview) .main-content" in dashboard_styles
     assert "left: -36px; width: min(1250px,calc(100vw - 144px));" in dashboard_styles
-    assert 'window.matchMedia("(max-width: 1100px)")' in sidebar_script
+    assert 'window.matchMedia("(max-width: 768px)")' in sidebar_script
+    assert 'window.matchMedia("(min-width: 769px) and (max-width: 1100px)")' in sidebar_script
+    assert 'compactMedia.matches ? !compactExpanded : desktopCollapsed' in sidebar_script
+    assert 'enableTransitionsAfterLayout()' in sidebar_script
+    assert 'sidebar-hover-locked' in sidebar_script
+    assert '@media (min-width: 769px) {\n    .dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked) .sidebar:hover' in dashboard_styles
+    assert dashboard_styles.index('.dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked):has(> .sidebar:hover) { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }') < dashboard_styles.index('@media (min-width: 901px)')
     assert 'mobile ? (collapsed ? "☰" : "×")' in sidebar_script
     assert 'position: sticky;' in dashboard_styles
     assert '.navigation { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; gap: 7px; overflow-x: hidden; overflow-y: auto; }' in dashboard_styles
@@ -1839,7 +1871,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'visibility: hidden; opacity: 0; transform: translateY(-10px); pointer-events: none;' in dashboard_styles
     assert '.navigation .nav-link { width: 100%; flex: 0 0 auto; justify-content: flex-start; }' in dashboard_styles
     assert '.sidebar .navigation,' in dashboard_styles
-    assert ".sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 17px; padding-left: 17px; }" in dashboard_styles
+    assert ".sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 11px; padding-left: 11px; }" in dashboard_styles
+    assert '.dashboard-page .sidebar-logout .button { justify-content: center; gap: 10px; overflow: hidden; padding-right: 11px; padding-left: 11px;' in dashboard_styles
+    assert '.dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-logout .button { gap: 0; justify-content: center; }' in dashboard_styles
+    assert '.dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked) .sidebar:hover { width: var(--sidebar-width); padding-right: 14px; padding-left: 14px;' in dashboard_styles
+    assert 'overflow: hidden;\n    padding: 11px 12px;\n    border-radius: 9px;' in dashboard_styles
     assert "window.localStorage.setItem(storageKey" in header_stats_script
     assert "dashboard-stat-visibility" in header_stats_script
     assert "const refreshInterval = 60000" in header_stats_script
@@ -1916,7 +1952,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'if (!previewActive) applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert 'applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert ".dashboard-stream-stat.state-live .status-indicator { animation: dashboard-live-pulse" in dashboard_styles
-    assert ".sidebar:not(:hover) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
+    assert ".sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
 
 
 @pytest.mark.asyncio

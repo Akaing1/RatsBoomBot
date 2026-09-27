@@ -39,14 +39,15 @@ button, input { font: inherit; }
     min-height: 0;
     align-self: start;
     flex-direction: column;
-    padding: 28px 20px;
+    padding: 28px 14px;
     border-right: 1px solid var(--border);
     background: var(--sidebar);
-    transition: width .2s ease, height .28s ease, max-height .28s ease, padding .2s ease, box-shadow .2s ease;
 }
 .main-content { width: 100%; max-width: 1250px; padding: 48px; }
 
-.dashboard-page .app-shell { transition: grid-template-columns .2s ease; }
+.dashboard-page .app-shell.sidebar-ready { transition: grid-template-columns .2s ease; }
+.dashboard-page .app-shell.sidebar-ready .sidebar { transition: width .2s ease, height .28s ease, max-height .28s ease, padding .2s ease, box-shadow .2s ease; }
+.dashboard-page .app-shell:not(.sidebar-ready) :is(.brand-copy, .nav-link-label, .sidebar-button-label, .sidebar-toggle span, .navigation, .sidebar-logout) { transition: none; }
 .dashboard-page:not(.channel-page-overview) .main-content { margin-right: auto; margin-left: auto; }
 .dashboard-page .brand { min-width: 0; padding-right: 28px; overflow: hidden; white-space: nowrap; }
 .sidebar-toggle { position: absolute; z-index: 2; top: 18px; right: 10px; display: grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
@@ -72,28 +73,29 @@ button, input { font: inherit; }
     align-items: center;
     gap: 11px;
     white-space: nowrap;
-    padding: 11px 13px;
+    overflow: hidden;
+    padding: 11px 12px;
     border-radius: 9px;
     color: var(--muted);
     font-size: 14px;
 }
 .nav-link-icon { display: grid; width: 20px; flex: 0 0 20px; place-items: center; font-size: 15px; }
 .brand-copy, .nav-link-label, .sidebar-button-label { opacity: 1; transition: opacity .14s ease, transform .18s ease; }
-.dashboard-page .sidebar-logout .button { gap: 10px; white-space: nowrap; }
+.dashboard-page .sidebar-logout .button { justify-content: center; gap: 10px; overflow: hidden; padding-right: 11px; padding-left: 11px; white-space: nowrap; }
 .dashboard-page .app-shell.sidebar-collapsed { grid-template-columns: 72px minmax(0,1fr); }
 .dashboard-page:not(.channel-page-overview) .app-shell.sidebar-collapsed .main-content { position: relative; left: -36px; width: min(1250px,calc(100vw - 144px)); max-width: none; }
 .dashboard-page .app-shell.sidebar-collapsed .sidebar { width: 72px; padding-right: 14px; padding-left: 14px; }
-.dashboard-page .app-shell.sidebar-collapsed .sidebar:hover { width: var(--sidebar-width); padding-right: 20px; padding-left: 20px; box-shadow: 18px 0 38px rgba(0,0,0,.38); }
-.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand-copy,
-.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link-label,
-.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-button-label { width: 0; opacity: 0; transform: translateX(-8px); pointer-events: none; }
-.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand { padding-right: 0; }
-.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-toggle { top: 35px; right: -14px; }
-.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link,
-.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-logout .button { gap: 0; justify-content: center; padding-right: 10px; padding-left: 10px; }
-@media (min-width: 1101px) {
-    .dashboard-page .app-shell.sidebar-collapsed:has(> .sidebar:hover) { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
-    .dashboard-page:not(.channel-page-overview):not(.admin-channel-overview) .app-shell.sidebar-collapsed:has(> .sidebar:hover) .main-content { position: static; left: auto; width: 100%; max-width: 1250px; }
+@media (min-width: 769px) {
+    .dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked) .sidebar:hover { width: var(--sidebar-width); padding-right: 14px; padding-left: 14px; box-shadow: 18px 0 38px rgba(0,0,0,.38); }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .brand-copy,
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .nav-link-label,
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-button-label { width: 0; opacity: 0; transform: translateX(-8px); pointer-events: none; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .brand { padding-right: 0; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-toggle { top: 35px; right: -14px; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .nav-link { gap: 0; justify-content: flex-start; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-logout .button { gap: 0; justify-content: center; }
+    .dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked):has(> .sidebar:hover) { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
+    .dashboard-page:not(.channel-page-overview):not(.admin-channel-overview) .app-shell.sidebar-collapsed:not(.sidebar-hover-locked):has(> .sidebar:hover) .main-content { position: static; left: auto; width: 100%; max-width: 1250px; }
 }
 .nav-link:hover, .nav-link.active { background: var(--surface-raised); color: var(--text); }
 .nav-link.disabled { opacity: .45; pointer-events: none; }
@@ -244,12 +246,11 @@ button, input { font: inherit; }
 .dashboard-ad-stat.state-scheduled strong { color: #c7b7ff; }
 .dashboard-ad-stat.state-unavailable strong { color: var(--danger); }
 .channel-dashboard-layout .panel-header h3 { color: #c7b7ff; }
-.dashboard-video-header { display: grid; min-width: 0; grid-template-columns: minmax(0,2fr) minmax(0,1fr); align-items: center; gap: 10px; }
-.dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: auto minmax(0,1fr); column-gap: 7px; }
-.dashboard-video-header .twitch-channel-field > h3 { margin: 0; line-height: 1.2; white-space: nowrap; }
-.dashboard-video-header .twitch-channel-field strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-video-header { --metadata-label-width: 88px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr); align-items: center; gap: 4px; }
+.dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: var(--metadata-label-width) minmax(0,1fr); column-gap: 7px; }
+.dashboard-video-header .twitch-channel-field > h3 { margin: 0; line-height: 1.2; text-align: right; white-space: nowrap; }
+.dashboard-video-header .twitch-channel-field strong { box-sizing: border-box; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dashboard-video-header .twitch-channel-field strong:focus { overflow-x: auto; text-overflow: clip; }
-.dashboard-video-header [data-channel-field="title"]:is(:focus, .editing) { position: relative; z-index: 10; }
 .dashboard-video-header [data-channel-field].metadata-truncated:not(:focus):not(.editing) { position: relative; padding-right: 26px; }
 .dashboard-video-header [data-channel-field].metadata-truncated:not(:focus):not(.editing)::after { position: absolute; top: 50%; right: 8px; margin-left: 0; transform: translateY(-50%) scaleX(-1); }
 .twitch-channel-field { display: grid; min-width: 0; grid-template-columns: 56px minmax(0,1fr); align-items: center; column-gap: 14px; }
@@ -261,12 +262,16 @@ button, input { font: inherit; }
 .twitch-channel-field strong:hover { color: #ddd6fe; }
 .twitch-channel-field strong[data-has-draft="true"], .twitch-channel-field strong[data-has-draft="true"]:hover { color: #f5c451; }
 .twitch-channel-field strong:focus, .twitch-channel-field strong.editing { border-color: var(--accent); background: var(--background); box-shadow: 0 0 0 3px rgba(139,92,246,.12); }
-.twitch-game-field { position: relative; }
-.twitch-game-suggestions { position: absolute; z-index: 25; top: calc(100% + 4px); right: 0; left: 50px; max-height: 240px; overflow-y: auto; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); box-shadow: 0 12px 30px rgba(0,0,0,.38); }
+.dashboard-video-header .twitch-game-field { position: relative; }
+.dashboard-video-header .twitch-game-field [data-channel-field="game"]:not(:focus):not(.editing) { padding-right: var(--metadata-status-padding, 8px); }
+.dashboard-video-header .twitch-game-field [data-channel-field="game"].metadata-truncated:not(:focus):not(.editing) { padding-right: max(26px, var(--metadata-status-padding, 8px)); }
+.dashboard-video-header .twitch-game-field [data-channel-field="game"].metadata-truncated:not(:focus):not(.editing)::after { right: var(--metadata-status-pencil-right, 8px); }
+.twitch-game-suggestions { position: absolute; z-index: 25; top: calc(100% + 4px); right: 0; left: calc(var(--metadata-label-width) + 7px); max-height: 240px; overflow-y: auto; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); box-shadow: 0 12px 30px rgba(0,0,0,.38); }
 .twitch-game-suggestions[hidden] { display: none; }
 .twitch-game-option { display: block; width: 100%; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 11px; text-align: left; cursor: pointer; }
 .twitch-game-option:hover, .twitch-game-option.active { background: rgba(139,92,246,.18); }
-.channel-metadata-status { position: absolute; right: 15px; bottom: 11px; max-width: calc(100% - 30px); min-height: 14px; margin: 0; overflow: hidden; color: var(--muted); font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; opacity: .8; pointer-events: none; transition: opacity .45s ease; }
+.channel-metadata-status { position: absolute; z-index: 1; right: 0; bottom: 6px; max-width: min(60%,240px); min-height: 14px; margin: 0; padding-left: 8px; overflow: hidden; background: var(--surface); box-shadow: -6px 0 8px var(--surface); color: var(--muted); font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; opacity: .8; pointer-events: none; transition: opacity .45s ease; }
+.twitch-game-field:focus-within .channel-metadata-status { opacity: 0; }
 .channel-metadata-status.is-fading { opacity: 0; }
 .channel-metadata-status.success { color: var(--success); }
 .channel-metadata-status.warning { color: #f5c451; }
@@ -287,7 +292,6 @@ button, input { font: inherit; }
 .dashboard-carousel-controls { display: none; }
 .dashboard-activity-grid { display: grid; grid-area: activities; min-width: 0; min-height: 0; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .dashboard-video-card { position: relative; display: flex; grid-area: player; min-width: 0; align-self: start; flex-direction: column; }
-.dashboard-video-card .channel-metadata-status { right: 16px; bottom: 2px; }
 .dashboard-video-card > .panel-header { margin-bottom: 10px; }
 .dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }
 .dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; background: #0f1115; }
@@ -399,6 +403,8 @@ button, input { font: inherit; }
     .admin-channel-overview .admin-readonly-chat-panel { min-height: 0; }
     .admin-channel-overview .admin-viewer-queue-column > .panel { height: 100%; }
     .admin-channel-overview .panel-header { margin-bottom: 12px; }
+}
+@media (min-width: 769px) {
     .channel-page-overview { height: 100dvh; overflow: hidden; }
     .channel-page-overview .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
     .channel-page-overview .sidebar { height: 100dvh; min-height: 0; overflow: visible; }
@@ -453,24 +459,28 @@ button, input { font: inherit; }
     .channel-page-overview .dashboard-ad-sticky:is(.ad-neutral, .state-offline) strong { color: var(--muted); }
     .channel-page-overview .dashboard-ad-sticky:not(.is-visible) { background: transparent; box-shadow: none; }
 }
-@media (min-width: 901px) and (max-width: 1100px) {
+@media (min-width: 769px) and (max-width: 1100px) {
     .channel-page-overview, .channel-page-overview .app-shell { height: auto; min-height: 100dvh; overflow: visible; }
     .channel-page-overview .sidebar { height: auto; min-height: 100dvh; }
     .channel-page-overview .streamer-main-content { height: auto; min-height: 100dvh; overflow: visible; padding-top: 16px; }
-    .channel-page-overview .channel-dashboard-layout { height: auto; min-height: 0; flex: none; grid-template-columns: minmax(0,1fr); grid-template-rows: none; grid-template-areas: "stats" "player" "queue" "activities" "chat"; overflow: visible; }
+    .channel-page-overview .channel-dashboard-layout { height: calc(200dvh - var(--dashboard-stats-height, 36px) - 52px); min-height: 0; flex: none; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); grid-template-rows: max-content minmax(0,3fr) minmax(0,2fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 32px); grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"; overflow: visible; }
     .channel-page-overview .dashboard-chat-column { display: contents; }
-    .channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 16px; display: flex; grid-area: stats; min-width: 0; margin-bottom: 0; padding-bottom: 6px; background: var(--background); }
-    .channel-page-overview .live-chat-panel { height: auto; min-height: 540px; overflow: visible; }
-    .channel-page-overview .dashboard-activity-grid { height: auto; overflow: visible; }
+    .channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 16px; display: flex; grid-area: stats; min-width: 0; margin-bottom: -6px; padding-bottom: 6px; isolation: isolate; background: var(--background); }
+    .channel-page-overview .dashboard-chat-column > .dashboard-header-side::before { position: absolute; z-index: -1; top: -16px; right: -16px; bottom: -6px; left: -16px; background: var(--background); content: ""; pointer-events: none; }
+    .channel-page-overview .dashboard-video-frame { min-height: 0; flex: 1 1 auto; aspect-ratio: auto; container-type: size; }
+    .channel-page-overview .dashboard-video-player,
+    .channel-page-overview .dashboard-video-unavailable { width: min(100%, calc(100cqh * 16 / 9)); height: auto; aspect-ratio: 16 / 9; }
+    .channel-page-overview .live-chat-panel { height: 100%; min-height: 0; overflow: hidden; }
+    .channel-page-overview .dashboard-activity-grid { height: 100%; min-height: 0; overflow: hidden; }
     .channel-page-overview .dashboard-activity-panel,
-    .channel-page-overview .viewer-queue-column,
-    .channel-page-overview .viewer-queue-column > [data-viewer-queue-panel] { height: auto; min-height: 460px; overflow: visible; }
+    .channel-page-overview .viewer-queue-column { height: 100%; min-height: 0; overflow: hidden; }
+    .channel-page-overview .dashboard-ads-panel { min-height: 0; flex: 0 1 auto; overflow-y: auto; }
+    .channel-page-overview .viewer-queue-column > [data-viewer-queue-panel] { height: auto; min-height: 0; flex: 1 1 0; overflow-y: auto; }
     .channel-page-overview .viewer-queue-column { max-height: none; }
-    .channel-page-overview #viewer-queue-content { max-height: 430px; flex: 0 1 auto; }
+    .channel-page-overview #viewer-queue-content { max-height: none; flex: 1 1 auto; overflow-y: auto; }
 }
 @media (max-width: 600px) {
-    .dashboard-video-header { grid-template-columns: minmax(0,1fr); }
-    .dashboard-video-header .twitch-channel-field { grid-template-columns: 100px minmax(0,1fr); }
+    .dashboard-video-header { --metadata-label-width: 100px; }
     .dashboard-activity-grid { grid-template-columns: minmax(0,1fr); }
 }
 .live-chat-message { --chat-edge-color: #9147ff; position: relative; display: flex; flex: 0 0 auto; align-items: flex-start; gap: 9px; overflow: hidden; padding: 10px; border-left: 3px solid var(--chat-edge-color); border-radius: 9px; background: var(--surface-raised); }
@@ -872,12 +882,9 @@ body.landing-page {
 .landing-footer .landing-brand img { width: 38px; height: 38px; border-radius: 11px; }
 .landing-footer p { max-width: 430px; margin: 0; color: #707989; font-size: 11px; text-align: right; }
 
-@media (max-width: 1100px) {
+@media (max-width: 768px) {
     .app-shell { display: block; padding-top: 74px; }
     .channel-page-overview .sidebar-brand-subtitle { display: none; }
-    .channel-page-overview .dashboard-carousel-navbar-label { position: absolute; top: 37px; right: 58px; left: 185px; display: flex; min-width: 0; justify-content: flex-end; gap: 4px; overflow: hidden; color: var(--muted); font-size: 12px; white-space: nowrap; transform: translateY(-50%); }
-    .channel-page-overview .dashboard-carousel-navbar-count { flex: 0 0 auto; }
-    .channel-page-overview .dashboard-carousel-navbar-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .sidebar,
     .channel-page-overview .sidebar { position: fixed; z-index: 50; top: 0; right: 0; left: 0; width: 100%; height: 100dvh; max-height: 100dvh; min-height: 0; padding: 16px 20px; overflow: hidden; border-right: 0; border-bottom: 1px solid var(--border); box-shadow: 0 18px 38px rgba(0,0,0,.4); }
     .dashboard-page .app-shell.sidebar-collapsed .sidebar,
@@ -897,15 +904,16 @@ body.landing-page {
     .dashboard-page .sidebar .sidebar-logout { visibility: visible; opacity: 1; transform: translateY(0); transition: opacity .2s ease .08s, transform .24s ease .08s, visibility 0s linear 0s; }
     .dashboard-page .app-shell.sidebar-collapsed .sidebar .navigation,
     .dashboard-page .app-shell.sidebar-collapsed .sidebar .sidebar-logout { visibility: hidden; opacity: 0; transform: translateY(-10px); pointer-events: none; transition-delay: 0s; }
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link { gap: 11px; justify-content: flex-start; padding: 11px 13px; }
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 17px; padding-left: 17px; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link { gap: 11px; justify-content: flex-start; padding: 11px 12px; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 11px; padding-left: 11px; }
     .sidebar-logout { margin-top: 12px; }
     .dashboard-page:not(.channel-page-overview) .main-content,
     .dashboard-page:not(.channel-page-overview) .app-shell.sidebar-collapsed .main-content { position: static; left: auto; width: 100%; max-width: none; margin-right: 0; margin-left: 0; }
 }
 
-@media (max-width: 1100px) and (prefers-reduced-motion: reduce) {
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
     .sidebar,
+    .dashboard-page .app-shell.sidebar-ready .sidebar,
     .sidebar-toggle span,
     .dashboard-page .sidebar .navigation,
     .dashboard-page .sidebar .sidebar-logout { transition: none; }
@@ -920,7 +928,7 @@ body.landing-page {
     .admin-viewer-queue-column, .admin-viewer-queue-column > .panel, .admin-activity-panel, .admin-readonly-chat-panel { min-height: 460px; }
     .channel-dashboard-layout { grid-template-columns: 1fr; grid-template-rows: none; grid-template-areas: "stats" "player" "queue" "activities" "chat"; }
     .channel-page-overview .dashboard-chat-column { display: contents; }
-    .channel-page-overview .dashboard-chat-column > .dashboard-header-side { grid-area: stats; margin-bottom: 0; padding-bottom: 6px; }
+    .channel-page-overview .dashboard-chat-column > .dashboard-header-side { grid-area: stats; padding-bottom: 6px; }
     .dashboard-activity-panel, .viewer-queue-column > [data-viewer-queue-panel] { min-height: 460px; }
     .dashboard-chat-feed { min-height: 460px; }
     .channel-heading { align-items: flex-start; }
@@ -947,7 +955,10 @@ body.landing-page {
     .landing-footer p { text-align: left; }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 768px) {
+    .channel-page-overview .dashboard-carousel-navbar-label { position: absolute; top: 37px; right: 58px; left: 185px; display: flex; min-width: 0; justify-content: flex-end; gap: 4px; overflow: hidden; color: var(--muted); font-size: 12px; white-space: nowrap; transform: translateY(-50%); }
+    .channel-page-overview .dashboard-carousel-navbar-count { flex: 0 0 auto; }
+    .channel-page-overview .dashboard-carousel-navbar-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .channel-page-overview,
     .channel-page-overview .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
     .channel-page-overview .streamer-main-content { height: calc(100dvh - 74px); min-height: 0; padding: 12px; overflow: hidden; }
@@ -966,6 +977,8 @@ body.landing-page {
     .channel-page-overview .dashboard-carousel-slide.is-active { opacity: 1; visibility: visible; pointer-events: auto; transform: translateX(0); transition: transform .3s ease, opacity .3s ease, visibility 0s; }
     .channel-page-overview .dashboard-carousel-slide.is-neighbor { opacity: .65; visibility: visible; transition: transform .3s ease, opacity .3s ease, visibility 0s; }
     .channel-page-overview .dashboard-carousel-slide.is-before { transform: translateX(calc(-100% - 14px)); }
+    .channel-page-overview .dashboard-carousel-slide:focus-visible,
+    .channel-page-overview .dashboard-carousel-deck:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .channel-page-overview .dashboard-carousel-slide > .panel { width: 100%; min-width: 0; min-height: 0; max-height: none; margin: 0; }
     .channel-page-overview .dashboard-carousel-slide > .dashboard-video-card { flex: 0 0 auto; }
     .channel-page-overview .dashboard-carousel-slide > .dashboard-ads-panel { flex: 1 0 auto; }
@@ -987,13 +1000,13 @@ body.landing-page {
     .dashboard-carousel-peek[data-dashboard-carousel-next] { right: 0; }
 }
 
-@media (max-width: 699px) {
+@media (max-width: 600px) {
     .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-header-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }
     .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-header-stats > :nth-child(-n+3) { grid-column: span 2; }
     .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-header-stats > :nth-child(n+4) { grid-column: span 3; }
 }
 
-@media (max-width: 1100px) and (prefers-reduced-motion: reduce) {
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
     .channel-page-overview .dashboard-carousel-slide { transition: none; }
 }
 
@@ -1217,7 +1230,7 @@ body.landing-page {
 }
 .queue-panel-header { gap: 8px; }
 .queue-panel-header h3 { min-width: 0; }
-.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-inline: auto; padding: 5px 9px; border: 0; border-radius: 7px; background: var(--surface-raised); color: var(--text); font-size: 13px; font-weight: 800; line-height: 1.3; white-space: nowrap; }
+.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-left: auto; padding: 5px 9px; border: 0; border-radius: 7px; background: var(--surface-raised); color: var(--text); font-size: 13px; font-weight: 800; line-height: 1.3; white-space: nowrap; }
 .queue-state-toggle { position: relative; min-width: 70px; height: 34px; overflow: hidden; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-raised); color: var(--muted); font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; transition: border-color .32s ease, background-color .32s ease, color .32s ease; }
 .queue-state-toggle:not(.live):hover, .queue-state-toggle:not(.live):focus-visible { border-color: rgba(139,92,246,.7); background: rgba(139,92,246,.18); color: #ddd6fe; }
 .queue-state-toggle.live { border-color: rgba(53,196,106,.4); background: rgba(53,196,106,.1); color: var(--success); }

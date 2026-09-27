@@ -65,6 +65,7 @@
         <div class="twitch-channel-field twitch-game-field">
             <h3>Category</h3>
             <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" data-channel-field="game">{{ twitch_channel_metadata.game }}</strong>
+            <p class="channel-metadata-status" data-channel-metadata-status aria-live="polite">Click the title or game to edit.</p>
             <div class="twitch-game-suggestions" data-game-suggestions role="listbox" hidden></div>
         </div>
     </div>
@@ -86,7 +87,6 @@
             <p class="dashboard-video-unavailable">A Twitch channel login is needed to show the stream preview.</p>
         {% endif %}
     </div>
-    <p class="channel-metadata-status" data-channel-metadata-status aria-live="polite">Click the title or game to edit.</p>
 </section>
 
 <div class="channel-live-layout">
@@ -429,10 +429,10 @@
 
     </div>
 </div>
-<div class="dashboard-carousel-deck" data-dashboard-carousel-deck aria-label="Dashboard cards"></div>
+<div id="dashboard-carousel-deck" class="dashboard-carousel-deck" data-dashboard-carousel-deck aria-label="Dashboard cards"></div>
 <div class="dashboard-carousel-controls" aria-label="Dashboard cards">
-    <button class="dashboard-carousel-peek" type="button" data-dashboard-carousel-prev aria-label="Previous card"></button>
-    <button class="dashboard-carousel-peek" type="button" data-dashboard-carousel-next aria-label="Next card"></button>
+    <button class="dashboard-carousel-peek" type="button" data-dashboard-carousel-prev aria-controls="dashboard-carousel-deck" aria-label="Previous card"></button>
+    <button class="dashboard-carousel-peek" type="button" data-dashboard-carousel-next aria-controls="dashboard-carousel-deck" aria-label="Next card"></button>
 </div>
 </div>
 
