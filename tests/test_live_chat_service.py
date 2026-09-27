@@ -699,6 +699,40 @@ async def test_youtube_watcher_reuses_known_chat_after_temporary_failure(monkeyp
     assert any("YouTube chat unavailable" in record.message for record in caplog.records)
 
 
+@pytest.mark.asyncio
+async def test_youtube_watchers_only_run_during_twitch_stream(monkeypatch):
+    monkeypatch.setattr("bot.services.channels.live_chat.settings.YOUTUBE_CLIENT_ID", "client")
+    monkeypatch.setattr("bot.services.channels.live_chat.settings.YOUTUBE_CLIENT_SECRET", "secret")
+    monkeypatch.setattr("bot.services.channels.live_chat.httpx.AsyncClient", lambda **kwargs: SimpleNamespace(aclose=AsyncMock()))
+    live = set()
+    stream_logs = SimpleNamespace(get_active_session=lambda channel: object() if channel in live else None)
+    broadcasters = SimpleNamespace(get_broadcasters=lambda: {})
+    bot = SimpleNamespace(services=SimpleNamespace(stream_logs=stream_logs, broadcasters=broadcasters))
+    service = LiveChatService(None, bot=bot)
+    service.connections["channel-1"] = SimpleNamespace(channel_id="youtube-1", channel_title="Channel")
+    service._refresh_seventv_global_loop = AsyncMock()
+    service._start_watcher = Mock()
+
+    await service.start()
+    service._start_watcher.assert_not_called()
+    assert service.get_youtube_state("channel-1").detail == "Waiting for the Twitch stream to go live."
+
+    live.add("channel-1")
+    service.start_youtube_for_twitch_stream("channel-1")
+    service._start_watcher.assert_called_once_with("channel-1")
+
+    live.clear()
+    await service.stop_youtube_for_twitch_stream("channel-1")
+    assert service.get_youtube_state("channel-1").detail == "Waiting for the Twitch stream to go live."
+    await service.stop()
+
+    service._start_watcher.reset_mock()
+    live.add("channel-1")
+    await service.start()
+    service._start_watcher.assert_called_once_with("channel-1")
+    await service.stop()
+
+
 def test_chat_view_normalization_and_matching():
     chat = UnifiedChatMessage("1", "twitch", "chat", "viewer", "Viewer", "hello", datetime.now(UTC).isoformat())
     command = UnifiedChatMessage("2", "youtube", "command", "viewer", "Viewer", "!hello", datetime.now(UTC).isoformat())

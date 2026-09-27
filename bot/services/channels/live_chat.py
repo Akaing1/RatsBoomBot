@@ -180,6 +180,8 @@ class LiveChatService:
             return
 
         for broadcaster_id in self.connections:
+            if not self._twitch_stream_is_live(broadcaster_id):
+                continue
             self._start_watcher(broadcaster_id)
 
     async def stop(self) -> None:
@@ -1091,9 +1093,13 @@ class LiveChatService:
     def get_youtube_state(self, broadcaster_id: str) -> YouTubeChatState:
         broadcaster_id = str(broadcaster_id)
         connection = self.connections.get(broadcaster_id)
+        waiting = (
+            "Waiting for an active YouTube livestream." if self._twitch_stream_is_live(broadcaster_id)
+            else "Waiting for the Twitch stream to go live."
+        )
         status, detail = self.youtube_statuses.get(
             broadcaster_id,
-            ("waiting", "Waiting for an active YouTube livestream.") if connection else ("disconnected", "Connect a YouTube channel to include its live chat.")
+            ("waiting", waiting) if connection else ("disconnected", "Connect a YouTube channel to include its live chat.")
         )
         return YouTubeChatState(
             configured=settings.YOUTUBE_CONFIGURED,
@@ -1128,9 +1134,12 @@ class LiveChatService:
             )
 
         self.connections[broadcaster_id] = connection
-        self.youtube_statuses[broadcaster_id] = ("waiting", "Waiting for an active YouTube livestream.")
+        self.youtube_statuses[broadcaster_id] = (
+            "waiting", "Waiting for an active YouTube livestream." if self._twitch_stream_is_live(broadcaster_id)
+            else "Waiting for the Twitch stream to go live."
+        )
 
-        if self.started and settings.YOUTUBE_CONFIGURED:
+        if self.started and settings.YOUTUBE_CONFIGURED and self._twitch_stream_is_live(broadcaster_id):
             self._start_watcher(broadcaster_id)
 
         LOGGER.info("[Live Chat] Connected YouTube channel %s to broadcaster %s.", channel.channel_id, broadcaster_id)
@@ -1160,6 +1169,29 @@ class LiveChatService:
 
         task = asyncio.create_task(self._watch_youtube(str(broadcaster_id)), name=f"youtube-chat-{broadcaster_id}")
         self.tasks[str(broadcaster_id)] = task
+
+    def _twitch_stream_is_live(self, broadcaster_id: str) -> bool:
+        services = getattr(self.bot, "services", None)
+        stream_logs = getattr(services, "stream_logs", None)
+        return bool(stream_logs and stream_logs.get_active_session(str(broadcaster_id)))
+
+    def start_youtube_for_twitch_stream(self, broadcaster_id: str) -> None:
+        broadcaster_id = str(broadcaster_id)
+        if not self.started or not settings.YOUTUBE_CONFIGURED or broadcaster_id not in self.connections:
+            return
+        if broadcaster_id not in self.tasks:
+            self.youtube_statuses[broadcaster_id] = ("waiting", "Waiting for an active YouTube livestream.")
+            self._start_watcher(broadcaster_id)
+
+    async def stop_youtube_for_twitch_stream(self, broadcaster_id: str) -> None:
+        broadcaster_id = str(broadcaster_id)
+        task = self.tasks.pop(broadcaster_id, None)
+        if task:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        self.active_youtube_chat_ids.pop(broadcaster_id, None)
+        if broadcaster_id in self.connections:
+            self.youtube_statuses[broadcaster_id] = ("waiting", "Waiting for the Twitch stream to go live.")
 
     async def _watch_youtube(self, broadcaster_id: str) -> None:
         connection_failed = False

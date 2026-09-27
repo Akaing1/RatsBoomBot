@@ -52,6 +52,7 @@ class StreamEvents(commands.Component):
         )
 
         await services.stream_logs.start_session(broadcaster_id=broadcaster_id, stream_id=stream_id, channel_name=channel_name)
+        services.live_chat.start_youtube_for_twitch_stream(broadcaster_id)
         await services.passive_points.start_for_stream(broadcaster_id, stream_id)
         active_event = await services.raid_bosses.get_active_event(broadcaster_id)
         event, failed_reward = await services.raid_bosses.register_stream(broadcaster_id, stream_id)
@@ -107,6 +108,7 @@ class StreamEvents(commands.Component):
 
         await services.raid_bosses.cancel_announcements(broadcaster_id)
         await services.passive_points.stop_for_stream(broadcaster_id)
+        await services.live_chat.stop_youtube_for_twitch_stream(broadcaster_id)
         await services.stream_logs.end_session(broadcaster_id)
         if getattr(services, "live_chat", None) is not None:
             await services.live_chat.clear_pinned_message(broadcaster_id)
