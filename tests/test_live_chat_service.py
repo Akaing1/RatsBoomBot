@@ -893,6 +893,25 @@ async def test_dashboard_viewer_queue_next_uses_selected_count(monkeypatch, next
 
 
 @pytest.mark.asyncio
+async def test_dashboard_viewer_queue_next_rejects_stale_highlight(monkeypatch):
+    queue = SimpleNamespace(
+        next_viewers=AsyncMock(),
+        list_queue=lambda _: ["bob", "alice"]
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=SimpleNamespace(viewer_queue=queue)))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/viewer-queue/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_viewer_queue_action(request, "next", "csrf", 0, 0, 2, "alice,bob")
+
+    assert response.status_code == 409
+    queue.next_viewers.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("next_count", [0, 11])
 async def test_dashboard_viewer_queue_next_rejects_out_of_range_count(monkeypatch, next_count):
     queue = SimpleNamespace(next_viewers=AsyncMock())
@@ -1551,15 +1570,48 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "dashboard-viewer-queue.js" in dashboard
     assert 'data-queue-action="next"' in dashboard
     assert 'data-queue-next-select' in dashboard
+    assert '.queue-next-picker:focus-within' not in dashboard_styles
+    assert '.queue-next-picker select:focus-visible' in dashboard_styles
+    assert 'nextCountPicker.classList.add("is-selection-committed")' in queue_script
     assert 'data-queue-next-count>4</span>' in dashboard
     assert 'range(1, 11)' in dashboard
     assert 'data-queue-action="clear"' in dashboard
     assert 'href="/channel/viewer-queue/blacklist"' in dashboard
     assert 'data-queue-count' in dashboard
-    assert '.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-inline: auto; padding: 5px 9px; border: 0;' in dashboard_styles
+    assert '.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-left: auto; padding: 5px 9px; border: 0;' in dashboard_styles
     assert 'color: var(--text); font-size: 13px; font-weight: 800;' in dashboard_styles
-    assert 'item.draggable = true' in queue_script
-    assert 'runAction("reorder", draggingPosition, position)' in queue_script
+    assert 'queueContent.addEventListener("pointerdown"' in queue_script
+    assert 'runAction("reorder", originalPosition, newPosition)' in queue_script
+    assert 'queueContent.addEventListener("touchstart"' in queue_script
+    assert 'document.addEventListener("touchmove"' in queue_script
+    assert 'list.insertBefore(placeholder, rows[destination] || null)' in queue_script
+    assert 'shiftAnimations.set(item, item.animate(' in queue_script
+    assert '.queue-drop-placeholder' in dashboard_styles
+    assert '.queue-list .queue-list-item.dragging { display: none !important; }' in dashboard_styles
+    assert '.queue-drag-ghost.is-dropping' in dashboard_styles
+    assert 'ghost.querySelector(".queue-position").textContent = String(newPosition + 1)' in queue_script
+    assert 'item.classList.toggle("is-next-preview", index < nextCount)' in queue_script
+    assert 'highlightNext();' in queue_script
+    assert '.queue-list-item.is-next-preview' in dashboard_styles
+    assert '#viewer-queue-content > .queue-list::before { position: absolute; z-index: 1; top: var(--queue-line-top, 0px); left: 14px; width: 3px; height: var(--queue-line-height, 0px);' in dashboard_styles
+    assert 'list.style.setProperty("--queue-line-height", `${Math.max(0, center(last) - top)}px`)' in queue_script
+    assert 'function updateDragPreviewOrder()' in queue_script
+    assert 'const order = previewOrder(list, source, placeholder)' in queue_script
+    assert 'item.classList.toggle("is-next-preview", index <= lastHighlighted)' in queue_script
+    assert 'ghost.classList.toggle("is-next-preview", newPosition <= lastHighlighted)' in queue_script
+    assert 'updatePreviewLine(list, order)' in queue_script
+    assert 'item.style.setProperty("--queue-preview-delay"' in queue_script
+    assert 'const removedRows = previousRows.filter(item => !currentNames.has(item.dataset.username))' in queue_script
+    assert 'item.classList.add("is-removing")' in queue_script
+    assert 'item.classList.add("is-appearing")' in queue_script
+    assert 'trackPreviewLine(list, previousRows, exitDuration)' in queue_script
+    assert '@keyframes queue-slide-away' in dashboard_styles
+    assert '@keyframes queue-fold-in' in dashboard_styles
+    assert 'window.dashboardQueueTest = {' in queue_script
+    assert 'simulationActive = true;' in queue_script
+    assert 'simulationActive = false;' in queue_script
+    assert 'if (!simulationActive) renderQueue(actualState);' in queue_script
+    assert 'if (simulationActive) {' in queue_script
     assert 'moveIcon("top")' in queue_script
     assert 'moveIcon("bottom")' in queue_script
     assert 'actionButton("🗑"' in queue_script

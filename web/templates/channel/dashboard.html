@@ -388,7 +388,7 @@
                 {% if queue_members %}
                     <ul class="queue-list">
                     {% for member in queue_members %}
-                        <li class="queue-list-item">
+                        <li class="queue-list-item" data-username="{{ member.username }}">
                             <span class="queue-position">{{ loop.index }}</span>
                             <strong class="queue-username">{{ member.label }}</strong>
 

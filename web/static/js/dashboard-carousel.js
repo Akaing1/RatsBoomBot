@@ -100,7 +100,7 @@
     previous.addEventListener("click", () => showCard(activeIndex - 1));
     next.addEventListener("click", () => showCard(activeIndex + 1));
     deck.addEventListener("touchstart", event => {
-        if (event.target.closest(".dashboard-tabs, .chat-emote-picker, input, textarea, select, [contenteditable]")) return;
+        if (event.target.closest(".dashboard-tabs, .chat-emote-picker, .queue-list, input, textarea, select, [contenteditable]")) return;
         const touch = event.changedTouches[0];
         touchStart = {x: touch.clientX, y: touch.clientY};
     }, {passive: true});
