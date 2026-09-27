@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import asqlite
 import pytest
@@ -65,3 +65,16 @@ async def test_guard_blocks_before_callback_and_error_is_silent():
     with pytest.raises(SlowmodeBlocked) as error:
         await TwitchBot.global_guard(bot, context("smart"))
     await TwitchBot.event_command_error(bot, SimpleNamespace(exception=error.value))
+
+
+@pytest.mark.asyncio
+async def test_unknown_chat_command_does_not_log_as_application_error(monkeypatch):
+    from twitchio.ext.commands.exceptions import CommandNotFound
+    from bot import bot as bot_module
+
+    error_log = Mock()
+    monkeypatch.setattr(bot_module.LOGGER, "error", error_log)
+    await TwitchBot.event_command_error(
+        SimpleNamespace(), SimpleNamespace(exception=CommandNotFound('The command "typo" was not found.'))
+    )
+    error_log.assert_not_called()

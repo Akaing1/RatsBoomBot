@@ -2,6 +2,8 @@ import asyncio
 import logging
 import time
 
+from twitchio.exceptions import HTTPException
+
 from bot.profiles import FeatureName, get_active_profile
 from config.settings import settings
 
@@ -11,6 +13,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 class PassivePointsService:
     POINTS_PER_INTERVAL = 15
     INTERVAL_SECONDS = 120
+    PERMISSION_RETRY_SECONDS = 900
 
     def __init__(self, bot, db, points, chat_identity, features):
         self.bot = bot
@@ -19,6 +22,7 @@ class PassivePointsService:
         self.chat_identity = chat_identity
         self.features = features
         self.tasks: dict[str, asyncio.Task] = {}
+        self.permission_retry_at: dict[str, float] = {}
 
     async def setup(self) -> None:
         async with self.db.acquire() as connection:
@@ -41,6 +45,7 @@ class PassivePointsService:
     async def start_for_stream(self, broadcaster_id: str, stream_id: str) -> None:
         broadcaster_id = str(broadcaster_id)
         await self.stop_for_stream(broadcaster_id)
+        self.permission_retry_at.pop(broadcaster_id, None)
         self.tasks[broadcaster_id] = asyncio.create_task(
             self._run(broadcaster_id, str(stream_id)),
             name=f"passive-points-{broadcaster_id}"
@@ -74,10 +79,27 @@ class PassivePointsService:
         while True:
             await asyncio.sleep(self.INTERVAL_SECONDS)
 
+            if time.monotonic() < self.permission_retry_at.get(broadcaster_id, 0):
+                continue
+
             try:
                 await self.award_interval(broadcaster_id, stream_id)
+                if self.permission_retry_at.pop(broadcaster_id, None) is not None:
+                    LOGGER.info("[Passive Points] Chatter access restored for broadcaster %s.", broadcaster_id)
             except asyncio.CancelledError:
                 raise
+            except HTTPException as error:
+                if error.status != 403:
+                    LOGGER.exception("[Passive Points] Failed to award a passive interval for broadcaster %s.", broadcaster_id)
+                    continue
+                self.permission_retry_at[broadcaster_id] = time.monotonic() + self.PERMISSION_RETRY_SECONDS
+                LOGGER.warning(
+                    "[Passive Points] Chat identity %s cannot view chatters for broadcaster %s. "
+                    "Grant that account moderator access; passive points will retry in %d minutes.",
+                    self.chat_identity.sender_id(broadcaster_id), broadcaster_id,
+                    self.PERMISSION_RETRY_SECONDS // 60,
+                    extra={"broadcaster_id": broadcaster_id, "category": "POINTS"}
+                )
             except Exception:
                 LOGGER.exception(
                     "[Passive Points] Failed to award a passive interval for broadcaster %s.",
