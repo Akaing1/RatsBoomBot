@@ -266,11 +266,27 @@ def get_queue_members(services, broadcaster_id: str) -> list[dict[str, str]]:
     return members
 
 
+def dashboard_activity_time(value: object) -> datetime:
+    try:
+        timestamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=UTC)
+    return timestamp.replace(tzinfo=UTC) if timestamp.tzinfo is None else timestamp.astimezone(UTC)
+
+
 async def get_redemption_dashboard_data(services, broadcaster_id: str) -> dict[str, object]:
     activity = await services.redeems.get_dashboard_activity(broadcaster_id=broadcaster_id)
     for collection in (activity.get("checkins", []), activity.get("redemptions", [])):
         for entry in collection:
             entry["user_label"] = format_dashboard_username(services, broadcaster_id, entry.get("username", ""))
+    activity["feed"] = sorted(
+        [{**entry, "kind": kind} for kind, entries in (
+            ("checkin", activity.get("checkins", [])),
+            ("redemption", activity.get("redemptions", []))
+        ) for entry in entries],
+        key=lambda entry: dashboard_activity_time(entry.get("redeemed_at")),
+        reverse=True
+    )
     activity.update(services.live_chat.get_moderation_activity(broadcaster_id))
 
     return activity
@@ -433,7 +449,8 @@ async def channel_viewer_queue_action(
     csrf_token: str = Form(...),
     position: int = Form(0),
     new_position: int = Form(0),
-    count: int = Form(4)
+    count: int = Form(4),
+    expected_users: str = Form("")
 ):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
     if not broadcaster_id:
@@ -452,6 +469,10 @@ async def channel_viewer_queue_action(
         next_count = count if action == "next" else (4 if action == "next4" else 5)
         if not 1 <= next_count <= 10:
             return JSONResponse({"detail": "Choose between 1 and 10 viewers."}, status_code=400)
+        if isinstance(expected_users, str) and expected_users:
+            highlighted = expected_users.split(",")
+            if queue.list_queue(broadcaster_id)[:next_count] != highlighted:
+                return JSONResponse({"detail": "The queue changed. Review the next viewers again."}, status_code=409)
         _, selected, message = await queue.next_viewers(broadcaster_id, next_count)
     elif action == "clear":
         message = await queue.clear(broadcaster_id)

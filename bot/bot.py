@@ -3,6 +3,7 @@ import logging
 
 from twitchio import web
 from twitchio.ext import commands
+from twitchio.ext.commands.exceptions import CommandNotFound
 
 from bot.component_loader import load_components
 from bot.context import ChannelContext
@@ -325,7 +326,7 @@ class TwitchBot(commands.AutoBot):
 
     async def event_command_error(self, payload) -> None:
         exception = getattr(payload, "exception", None)
-        if isinstance(exception, SlowmodeBlocked):
+        if isinstance(exception, (SlowmodeBlocked, CommandNotFound)):
             return
         context = getattr(payload, "context", None)
         command = getattr(context, "command", None)

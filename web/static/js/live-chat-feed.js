@@ -17,12 +17,16 @@
         return element.scrollHeight - element.scrollTop - element.clientHeight;
     }
 
-    function updateJumpButton(feed) {
-        const atBottom = distanceFromBottom(feed.element) <= 24;
-        feed.jumpButton.hidden = atBottom;
+    function atNewest(feed) {
+        return feed.newestFirst ? feed.element.scrollTop <= 24 : distanceFromBottom(feed.element) <= 24;
+    }
 
-        if (atBottom) feed.hasUnseenMessages = false;
-        feed.jumpButton.classList.toggle("has-unseen", feed.hasUnseenMessages && !atBottom);
+    function updateJumpButton(feed) {
+        const atPresent = atNewest(feed);
+        feed.jumpButton.hidden = atPresent;
+
+        if (atPresent) feed.hasUnseenMessages = false;
+        feed.jumpButton.classList.toggle("has-unseen", feed.hasUnseenMessages && !atPresent);
     }
 
     function scrollToBottom(feed) {
@@ -39,6 +43,15 @@
             finishScroll();
             window.requestAnimationFrame(finishScroll);
         });
+    }
+
+    function scrollToNewest(feed) {
+        if (feed.newestFirst) {
+            if (feed.followNewest) feed.element.scrollTop = 0;
+            updateJumpButton(feed);
+        } else {
+            scrollToBottom(feed);
+        }
     }
 
     function visibleMessageName(message) {
@@ -188,7 +201,9 @@
             return;
         }
         if (feed.seen.has(message.id)) return;
-        const shouldFollowNewest = distanceFromBottom(feed.element) <= 24;
+        const shouldFollowNewest = atNewest(feed);
+        const previousFirst = feed.newestFirst ? feed.element.querySelector(".live-chat-message") : null;
+        const previousFirstTop = previousFirst?.getBoundingClientRect().top;
         feed.seen.add(message.id);
         feed.element.querySelector(".compact-empty-state")?.remove();
 
@@ -293,7 +308,8 @@
             actions.append(reply, pin, remove);
             row.appendChild(actions);
         }
-        feed.element.appendChild(row);
+        if (feed.newestFirst) feed.element.prepend(row);
+        else feed.element.appendChild(row);
 
         if (feed.followRowObserver) {
             feed.followRowObserver.disconnect();
@@ -301,7 +317,8 @@
         }
 
         while (feed.element.querySelectorAll(".live-chat-message").length > feed.maxMessages) {
-            const oldest = feed.element.querySelector(".live-chat-message");
+            const messages = feed.element.querySelectorAll(".live-chat-message");
+            const oldest = feed.newestFirst ? messages[messages.length - 1] : messages[0];
             if (!oldest) break;
             feed.seen.delete(oldest.dataset.messageId);
             oldest.remove();
@@ -309,20 +326,23 @@
 
         if (shouldFollowNewest) {
             feed.followNewest = true;
-            scrollToBottom(feed);
+            scrollToNewest(feed);
             if ("ResizeObserver" in window) {
                 feed.followRowObserver = new ResizeObserver(() => {
-                    if (feed.followNewest) scrollToBottom(feed);
+                    if (feed.followNewest) scrollToNewest(feed);
                 });
                 feed.followRowObserver.observe(row);
             }
             row.querySelectorAll("img").forEach(image => {
                 if (!image.complete) image.addEventListener("load", () => {
-                    if (feed.followNewest) scrollToBottom(feed);
+                    if (feed.followNewest) scrollToNewest(feed);
                 }, {once: true});
             });
         } else {
             feed.followNewest = false;
+            if (feed.newestFirst && previousFirst?.isConnected) {
+                feed.element.scrollTop += previousFirst.getBoundingClientRect().top - previousFirstTop;
+            }
             feed.hasUnseenMessages = true;
             updateJumpButton(feed);
         }
@@ -344,6 +364,7 @@
         let connectionFadeTimer = null;
         const feed = {
             element,
+            newestFirst: element.dataset.newestFirst === "true",
             seen: new Set(),
             maxMessages: Number(element.dataset.maxMessages || 100),
             hasUnseenMessages: false,
@@ -358,7 +379,7 @@
             pinExpiryTimer: null,
             pinnedContainer: element.dataset.pinnedUrl ? makeElement("aside", "live-chat-pinned") : null,
             connectionStatus,
-            jumpButton: makeElement("button", "live-chat-jump", "↓ Jump to present")
+            jumpButton: makeElement("button", "live-chat-jump", element.dataset.newestFirst === "true" ? "↑ Jump to present" : "↓ Jump to present")
         };
         function showConnectionStatus(connected) {
             if (!connectionStatus) return;
@@ -388,7 +409,7 @@
         feed.jumpButton.addEventListener("click", () => {
             feed.hasUnseenMessages = false;
             feed.followNewest = true;
-            scrollToBottom(feed);
+            scrollToNewest(feed);
         });
         ["wheel", "touchmove"].forEach(eventName => {
             element.addEventListener(eventName, () => { feed.followNewest = false; }, {passive: true});
@@ -397,7 +418,7 @@
             if (event.target === element) feed.followNewest = false;
         }, {passive: true});
         element.addEventListener("scroll", () => {
-            if (distanceFromBottom(element) <= 24) feed.followNewest = true;
+            if (atNewest(feed)) feed.followNewest = true;
             updateJumpButton(feed);
         }, {passive: true});
         if (feed.pinnedContainer) {

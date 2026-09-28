@@ -615,6 +615,124 @@ async def test_youtube_watcher_squelches_forbidden_discovery_traceback(monkeypat
     )
 
 
+@pytest.mark.asyncio
+async def test_youtube_watcher_waits_for_quota_reset(monkeypatch):
+    request = httpx.Request("GET", "https://www.googleapis.com/youtube/v3/liveBroadcasts")
+    response = httpx.Response(403, request=request, json={
+        "error": {"message": "Daily quota exceeded", "errors": [{"reason": "quotaExceeded"}]}
+    })
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._find_active_live_chat = AsyncMock(side_effect=httpx.HTTPStatusError(
+        "Forbidden", request=request, response=response
+    ))
+    service._seconds_until_youtube_quota_reset = lambda: 9876.0
+    sleep = AsyncMock(side_effect=asyncio.CancelledError)
+    monkeypatch.setattr("bot.services.channels.live_chat.asyncio.sleep", sleep)
+
+    with pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube("channel-1")
+
+    sleep.assert_awaited_once_with(9876.0)
+    assert service.youtube_statuses["channel-1"] == (
+        "unavailable", "YouTube API quota is exhausted. Chat discovery will resume after the daily reset."
+    )
+
+
+@pytest.mark.asyncio
+async def test_youtube_watcher_logs_chat_attachment_for_stream_session(monkeypatch, caplog):
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._find_active_live_chat = AsyncMock(return_value="chat-1")
+    service._stream_live_chat = AsyncMock(side_effect=asyncio.CancelledError)
+
+    with caplog.at_level("INFO", logger="RatBoomBot"), pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube("channel-1")
+
+    attachment = next(record for record in caplog.records if "Attached to YouTube live chat" in record.message)
+    assert attachment.broadcaster_id == "channel-1"
+
+
+@pytest.mark.asyncio
+async def test_youtube_polling_quota_error_reaches_watcher():
+    request = httpx.Request("GET", "https://www.googleapis.com/youtube/v3/liveChat/messages")
+    response = httpx.Response(403, request=request, json={
+        "error": {"errors": [{"reason": "quotaExceeded"}]}
+    })
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._youtube_get = AsyncMock(side_effect=httpx.HTTPStatusError(
+        "Forbidden", request=request, response=response
+    ))
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await service._poll_live_chat("channel-1", "chat-1")
+
+
+@pytest.mark.asyncio
+async def test_youtube_watcher_reuses_known_chat_after_temporary_failure(monkeypatch, caplog):
+    request = httpx.Request("GET", "https://www.googleapis.com/youtube/v3/liveChat/messages")
+    response = httpx.Response(403, request=request, json={
+        "error": {"errors": [{"reason": "quotaExceeded"}]}
+    })
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._find_active_live_chat = AsyncMock(return_value="chat-1")
+    service._stream_live_chat = AsyncMock(side_effect=[
+        httpx.HTTPStatusError("Quota exceeded", request=request, response=response),
+        asyncio.CancelledError(),
+    ])
+    service._seconds_until_youtube_quota_reset = lambda: 10.0
+    sleep = AsyncMock()
+    monkeypatch.setattr("bot.services.channels.live_chat.asyncio.sleep", sleep)
+
+    with caplog.at_level("WARNING", logger="RatBoomBot"), pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube("channel-1")
+
+    service._find_active_live_chat.assert_awaited_once_with("channel-1")
+    assert service._stream_live_chat.await_count == 2
+    sleep.assert_awaited_once_with(10.0)
+    assert any("YouTube chat unavailable" in record.message for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_youtube_watchers_only_run_during_twitch_stream(monkeypatch):
+    monkeypatch.setattr("bot.services.channels.live_chat.settings.YOUTUBE_CLIENT_ID", "client")
+    monkeypatch.setattr("bot.services.channels.live_chat.settings.YOUTUBE_CLIENT_SECRET", "secret")
+    monkeypatch.setattr("bot.services.channels.live_chat.httpx.AsyncClient", lambda **kwargs: SimpleNamespace(aclose=AsyncMock()))
+    live = set()
+    stream_logs = SimpleNamespace(get_active_session=lambda channel: object() if channel in live else None)
+    broadcasters = SimpleNamespace(get_broadcasters=lambda: {})
+    bot = SimpleNamespace(services=SimpleNamespace(stream_logs=stream_logs, broadcasters=broadcasters))
+    service = LiveChatService(None, bot=bot)
+    service.connections["channel-1"] = SimpleNamespace(channel_id="youtube-1", channel_title="Channel")
+    service._refresh_seventv_global_loop = AsyncMock()
+    service._start_watcher = Mock()
+
+    await service.start()
+    service._start_watcher.assert_not_called()
+    assert service.get_youtube_state("channel-1").detail == "Waiting for the Twitch stream to go live."
+
+    live.add("channel-1")
+    service.start_youtube_for_twitch_stream("channel-1")
+    service._start_watcher.assert_called_once_with("channel-1")
+
+    live.clear()
+    await service.stop_youtube_for_twitch_stream("channel-1")
+    assert service.get_youtube_state("channel-1").detail == "Waiting for the Twitch stream to go live."
+    await service.stop()
+
+    service._start_watcher.reset_mock()
+    live.add("channel-1")
+    await service.start()
+    service._start_watcher.assert_called_once_with("channel-1")
+    await service.stop()
+
+
 def test_chat_view_normalization_and_matching():
     chat = UnifiedChatMessage("1", "twitch", "chat", "viewer", "Viewer", "hello", datetime.now(UTC).isoformat())
     command = UnifiedChatMessage("2", "youtube", "command", "viewer", "Viewer", "!hello", datetime.now(UTC).isoformat())
@@ -890,6 +1008,25 @@ async def test_dashboard_viewer_queue_next_uses_selected_count(monkeypatch, next
 
     assert response.status_code == 200
     queue.next_viewers.assert_awaited_once_with("channel-1", next_count)
+
+
+@pytest.mark.asyncio
+async def test_dashboard_viewer_queue_next_rejects_stale_highlight(monkeypatch):
+    queue = SimpleNamespace(
+        next_viewers=AsyncMock(),
+        list_queue=lambda _: ["bob", "alice"]
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=SimpleNamespace(viewer_queue=queue)))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/api/viewer-queue/action", "headers": [],
+        "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
+        "scheme": "http", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}
+    })
+
+    response = await dashboard_router.channel_viewer_queue_action(request, "next", "csrf", 0, 0, 2, "alice,bob")
+
+    assert response.status_code == 409
+    queue.next_viewers.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -1400,6 +1537,23 @@ def test_dashboard_carousel_keeps_stream_player_mounted_across_breakpoints():
     assert "index === 0 ? card.elements.slice(1) : card.elements" in carousel
     assert "slides.slice(1).forEach(slide => slide.remove());" in carousel
     assert "deck.replaceChildren()" not in carousel
+    assert 'const media = window.matchMedia("(max-width: 768px)")' in carousel
+    assert 'deck.setAttribute("aria-roledescription", "carousel")' in carousel
+    assert 'deck.addEventListener("keydown", event =>' in carousel
+    assert 'deck.addEventListener("touchmove", event =>' in carousel
+    assert 'event.target.closest(".dashboard-tabs' not in carousel
+    assert 'event.target.closest(".queue-list") && !event.target.closest("button")' in carousel
+    assert 'if (!media.matches || event.touches.length !== 1) return;' in carousel
+    assert 'suppressClickUntil = performance.now() + 350;' in carousel
+    assert 'event.preventDefault()' in carousel
+
+
+def test_dashboard_mobile_activity_panels_keep_tabs_above_scrollable_events():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+
+    assert '.channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel > .activity-tabs { flex: 0 0 auto; }' in styles
+    assert '.channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel > [data-activity-panel]:not([hidden]) { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow: hidden; }' in styles
+    assert '.channel-page-overview .dashboard-carousel-slide .activity-scroll,' in styles
 
 
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
@@ -1423,13 +1577,29 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert dashboard.count("data-connection-status-target") == 1
     assert "Waiting for chat messages" not in dashboard
     assert "Waiting for commands" not in dashboard
-    assert 'data-activity-tab="redeems"' in dashboard
-    assert 'data-activity-tab="checkins"' in dashboard
-    assert '<h4 class="activity-subheading">Check-ins</h4>' not in dashboard
+    assert 'data-activity-tab="redeems">Redeems</button>' in dashboard
+    assert 'data-activity-tab="checkins"' not in dashboard
+    assert 'data-activity-panel="checkins"' not in dashboard
+    assert 'id="community-activity-content"' in dashboard
+    assert '{% for entry in redemption_activity.feed %}' in dashboard
+    assert 'renderFeed(feed)' in dashboard
+    assert 'activity: "redeems"' in dashboard
     assert '<h4>No commands yet</h4>' in dashboard
     assert '<p>Chat commands will appear here.</p>' in dashboard
     assert 'data-activity-tab="mod-actions"' in dashboard
     assert 'data-activity-tab="automod"' in dashboard
+    assert 'data-newest-first="true"' in dashboard
+    assert dashboard.count('data-newest-first="true"') == 1
+    assert 'const feedScroller = createTopScroller(feedContent);' in dashboard
+    assert 'const modActionScroller = createTopScroller(modActionContent);' in dashboard
+    assert 'const automodScroller = createTopScroller(automodContent);' in dashboard
+    assert 'const activityEndpoint = "/channel/api/redemptions";' in dashboard
+    assert 'window.setInterval(refreshActivity, 2000);' in dashboard
+    assert 'renderModeration(data);' in dashboard
+    assert 'const anchor = atTop ? null : [...element.querySelectorAll("[data-activity-key]")]' in dashboard
+    assert 'element.scrollTop += replacement' in dashboard
+    assert 'renderTopScroller(feedScroller, () => renderFeed(feed), lastFeedSignature !== null);' in dashboard
+    assert '.activity-feed-shell { position: relative; display: flex; min-height: 0; flex: 1; flex-direction: column; }' in dashboard_styles
     assert '.dashboard-tabs.activity-tabs { flex-wrap: nowrap;' in dashboard_styles
     assert '.dashboard-tabs.activity-tabs .dashboard-tab { min-width: max-content; min-height: 34px; flex: 1 0 auto;' in dashboard_styles
     assert '.queue-toolbar button, .queue-toolbar a { display: inline-flex; width: 100%;' in dashboard_styles
@@ -1517,7 +1687,10 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '"live-chat-pinned-action live-chat-unpin"' in live_chat_script
     assert '["", "∞"]' in live_chat_script
     assert 'window.requestAnimationFrame(finishScroll)' in live_chat_script
-    assert 'if (feed.followNewest) scrollToBottom(feed)' in live_chat_script
+    assert 'if (feed.followNewest) scrollToNewest(feed)' in live_chat_script
+    assert 'return feed.newestFirst ? feed.element.scrollTop <= 24 : distanceFromBottom(feed.element) <= 24;' in live_chat_script
+    assert 'if (feed.newestFirst) feed.element.prepend(row);' in live_chat_script
+    assert 'const oldest = feed.newestFirst ? messages[messages.length - 1] : messages[0];' in live_chat_script
     assert 'const shouldFollowNewest = feed.followNewest && distanceFromBottom(feed.element) <= 24' in live_chat_script
     assert '["wheel", "touchmove"]' in live_chat_script
     assert 'feed.followRowObserver = new ResizeObserver' in live_chat_script
@@ -1551,18 +1724,70 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "dashboard-viewer-queue.js" in dashboard
     assert 'data-queue-action="next"' in dashboard
     assert 'data-queue-next-select' in dashboard
+    assert '.queue-next-picker:focus-within' not in dashboard_styles
+    assert '.queue-next-picker select:focus-visible' in dashboard_styles
+    assert 'nextCountPicker.classList.add("is-selection-committed")' in queue_script
     assert 'data-queue-next-count>4</span>' in dashboard
+    assert '#viewer-queue-content { width: calc(100% + 8px); max-height: 430px; margin-right: -8px; padding-right: 8px;' in dashboard_styles
     assert 'range(1, 11)' in dashboard
     assert 'data-queue-action="clear"' in dashboard
     assert 'href="/channel/viewer-queue/blacklist"' in dashboard
     assert 'data-queue-count' in dashboard
-    assert '.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-inline: auto; padding: 5px 9px; border: 0;' in dashboard_styles
+    assert '.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-left: auto; padding: 5px 9px; border: 0;' in dashboard_styles
     assert 'color: var(--text); font-size: 13px; font-weight: 800;' in dashboard_styles
-    assert 'item.draggable = true' in queue_script
-    assert 'runAction("reorder", draggingPosition, position)' in queue_script
+    assert 'queueContent.addEventListener("pointerdown"' in queue_script
+    assert 'runAction("reorder", originalPosition, newPosition)' in queue_script
+    assert 'queueContent.addEventListener("touchstart"' in queue_script
+    assert 'document.addEventListener("touchmove"' in queue_script
+    assert 'list.insertBefore(placeholder, rows[destination] || null)' in queue_script
+    assert 'shiftAnimations.set(item, item.animate(' in queue_script
+    assert '.queue-drop-placeholder' in dashboard_styles
+    assert '.queue-list .queue-list-item.dragging { display: none !important; }' in dashboard_styles
+    assert '.queue-drag-ghost.is-dropping' in dashboard_styles
+    assert 'ghost.querySelector(".queue-position").textContent = String(newPosition + 1)' in queue_script
+    assert 'item.classList.toggle("is-next-preview", index < nextCount)' in queue_script
+    assert 'highlightNext();' in queue_script
+    assert 'const nextList = list || document.createElement("ul")' in queue_script
+    assert 'if (!list) queueContent.replaceChildren(nextList)' in queue_script
+    assert '.queue-list-item.is-next-preview' in dashboard_styles
+    assert '#viewer-queue-content > .queue-list::before { position: absolute; z-index: 1; top: var(--queue-line-top, 0px); left: 22px; width: 3px; height: var(--queue-line-height, 0px);' in dashboard_styles
+    assert 'list.style.setProperty("--queue-line-height", `${Math.max(0, center(last) - top)}px`)' in queue_script
+    assert 'function updateDragPreviewOrder()' in queue_script
+    assert 'const order = previewOrder(list, source, placeholder)' in queue_script
+    assert 'item.classList.toggle("is-next-preview", index <= lastHighlighted)' in queue_script
+    assert 'ghost.classList.toggle("is-next-preview", newPosition <= lastHighlighted)' in queue_script
+    assert 'updatePreviewLine(list, order)' in queue_script
+    assert 'item.style.setProperty("--queue-preview-delay"' in queue_script
+    assert 'const removedRows = previousRows.filter(item => !currentNames.has(item.dataset.username))' in queue_script
+    assert 'item.classList.add("is-removing")' in queue_script
+    assert 'item.classList.add("is-appearing")' in queue_script
+    assert 'trackPreviewLine(list, previousRows, exitDuration)' in queue_script
+    assert 'generation !== previewLineGeneration || rows.some(row => row.parentElement !== list)' in queue_script
+    assert '@keyframes queue-slide-away' in dashboard_styles
+    assert '@keyframes queue-fold-in' in dashboard_styles
+    assert 'window.dashboardQueueTest = {' in queue_script
+    assert 'simulationActive = true;' in queue_script
+    assert 'simulationActive = false;' in queue_script
+    assert 'if (!simulationActive) renderQueue(actualState);' in queue_script
+    assert 'if (simulationActive) {' in queue_script
     assert 'moveIcon("top")' in queue_script
     assert 'moveIcon("bottom")' in queue_script
+    assert 'if (index > 0) actions.appendChild(actionButton(moveIcon("top")' in queue_script
+    assert 'if (index < users.length - 1) actions.appendChild(actionButton(moveIcon("bottom")' in queue_script
+    assert 'button.dataset.queueItemAction = action;' in queue_script
+    assert '.queue-item-actions { display: grid; grid-template-columns: repeat(3, 28px);' in dashboard_styles
+    assert '.queue-item-actions > [data-queue-item-action="top"] { grid-column: 1; }' in dashboard_styles
+    assert '.queue-item-actions > [data-queue-item-action="bottom"] { grid-column: 2; }' in dashboard_styles
+    assert 'const previousTops = movedUsername && !reduceMotion.matches' in queue_script
+    assert 'renderQueue(result, false, action === "top" || action === "bottom" ? position : 0)' in queue_script
+    assert '{duration: 320, easing: "cubic-bezier(.2,.8,.2,1)"}' in queue_script
+    assert '.queue-list-item.is-moving { z-index: 3; }' in dashboard_styles
     assert 'actionButton("🗑"' in queue_script
+    assert 'item.append(positionLabel, usernameLabel, grabIndicator(), actions);' in queue_script
+    assert 'class="queue-grab-indicator" aria-hidden="true"' in dashboard
+    assert '@media (hover: none) { .queue-item-actions { opacity: 1; pointer-events: auto; } .queue-grab-indicator { opacity: 1; } }' in dashboard_styles
+    assert '.queue-grab-indicator { position: absolute; z-index: 2; top: 50%; left: calc(50% + 8px);' in dashboard_styles
+    assert '.queue-grab-indicator::before, .queue-grab-indicator::after { width: 16px; height: 2px;' in dashboard_styles
     assert '.queue-item-action svg' in dashboard_styles
     assert 'fetch(endpoint' in metadata_script
     assert "searchGames" in metadata_script
@@ -1616,14 +1841,19 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "('both', 'Both'" in customization
     assert ".live-chat-feed::-webkit-scrollbar" in dashboard_styles
     assert "#viewer-queue-content::-webkit-scrollbar" in dashboard_styles
-    assert "#viewer-queue-content { max-height: 430px; overflow-y: auto;" in dashboard_styles
+    assert "padding-right: 8px; overflow-y: auto; scrollbar-gutter: stable;" in dashboard_styles
+    assert '.queue-list .queue-list-item, .queue-list .queue-drop-placeholder { padding-left: 8px; }' in dashboard_styles
+    assert '.queue-list-item.is-next-preview { border-top-color: transparent; background: rgba(139,92,246,.16); }' in dashboard_styles
+    assert '.channel-page-overview .dashboard-activity-panel .activity-scroll,' in dashboard_styles
+    assert '.channel-page-overview .dashboard-activity-panel .dashboard-command-feed,' in dashboard_styles
+    assert '.channel-page-overview .dashboard-activity-panel .dashboard-raid-tab #dashboard-raid { width: calc(100% + 8px); margin-right: -8px; padding-right: 8px; scrollbar-gutter: stable; }' in dashboard_styles
     assert "background: #0f1115" in widget_styles
     assert "background: transparent" not in widget_styles.split("body {", 1)[0]
     assert ".widget-chat-feed::-webkit-scrollbar" in widget_styles
     assert "overflow-y: auto" in widget_styles
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
-    assert '"live-chat-jump", "↓ Jump to present"' in chat_script
+    assert 'element.dataset.newestFirst === "true" ? "↑ Jump to present" : "↓ Jump to present"' in chat_script
     assert 'makeElement("div", "live-chat-feed-shell")' in chat_script
     assert 'element.addEventListener("scroll", () => {' in chat_script
     assert "updateJumpButton(feed);" in chat_script
@@ -1631,7 +1861,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "feed.hasUnseenMessages = true" in chat_script
     assert 'maxMessages: Number(element.dataset.maxMessages || 100)' in chat_script
     assert 'data-max-messages="150"' in dashboard
-    assert 'classList.toggle("has-unseen", feed.hasUnseenMessages && !atBottom)' in chat_script
+    assert 'classList.toggle("has-unseen", feed.hasUnseenMessages && !atPresent)' in chat_script
     assert "display: flex; flex: 0 0 auto;" in dashboard_styles
     assert "display: flex; min-width: 0; flex: 1; flex-wrap: wrap;" in dashboard_styles
     assert ".live-chat-time { position: absolute; top: 1px; right: 0;" in dashboard_styles
@@ -1668,7 +1898,16 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
     assert '.channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }' in dashboard_styles
     assert 'grid-template-areas: "stats" "player" "queue" "activities" "chat"' in dashboard_styles
-    assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' not in dashboard_styles
+    assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' in dashboard_styles
+    assert '@media (min-width: 769px) and (max-width: 1100px)' in dashboard_styles
+    assert '@media (max-width: 600px) {\n    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-header-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }' in dashboard_styles
+    assert 'height: calc(200dvh - var(--dashboard-stats-height, 36px) - 52px)' in dashboard_styles
+    assert 'grid-template-rows: max-content minmax(0,3fr) minmax(0,2fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 32px)' in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 16px; display: flex; grid-area: stats; min-width: 0; margin-bottom: -6px; padding-bottom: 6px;' in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side { grid-area: stats; margin-bottom: 0;' not in dashboard_styles
+    assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side::before { position: absolute; z-index: -1; top: -16px; right: -16px; bottom: -6px; left: -16px; background: var(--background);' in dashboard_styles
+    assert '.channel-page-overview .viewer-queue-column > [data-viewer-queue-panel] { height: auto; min-height: 0; flex: 1 1 0; overflow-y: auto; }' in dashboard_styles
+    assert '.channel-page-overview .live-chat-panel { height: 100%; min-height: 0; overflow: hidden; }' in dashboard_styles
     assert '.dashboard-activity-grid { display: grid; grid-area: activities;' in dashboard_styles
     assert '<header class="page-header dashboard-channel-profile" hidden>' in dashboard
     assert dashboard.index('class="panel dashboard-video-card"') < dashboard.index('class="panel live-chat-panel"')
@@ -1677,16 +1916,28 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '{% if broadcaster.is_live %}Online{% else %}Offline{% endif %}' in dashboard
     assert 'data-stream-status' in dashboard and 'aria-pressed="true"' in dashboard
     assert 'class="panel-header dashboard-video-header"' in dashboard
-    assert '.dashboard-video-header { display: grid; min-width: 0; grid-template-columns: minmax(0,2fr) minmax(0,1fr);' in dashboard_styles
-    assert '.dashboard-video-header [data-channel-field="title"]:is(:focus, .editing) { position: relative; z-index: 10; }' in dashboard_styles
-    assert 'const maxWidth = Math.max(0, cardBounds.right - rightPadding - fieldBounds.left);' in metadata_script
-    assert 'Math.max(fieldBounds.width, titleField.scrollWidth + 2)' in metadata_script
-    assert 'titleField.style.removeProperty("width")' in metadata_script
-    assert '[data-channel-field].metadata-truncated:not(:focus):not(.editing)::after' in dashboard_styles
+    assert dashboard.index('data-channel-field="game"') < dashboard.index('data-channel-metadata-status') < dashboard.index('class="dashboard-video-frame"')
+    assert '.dashboard-video-header .twitch-game-field { position: relative; }' in dashboard_styles
+    assert '[data-channel-field="game"]:not(:focus):not(.editing) { padding-right: var(--metadata-status-padding, 8px); }' in dashboard_styles
+    assert '[data-channel-field="game"].metadata-truncated:not(:focus):not(.editing)::after { right: var(--metadata-status-pencil-right, 8px); }' in dashboard_styles
+    assert '.channel-metadata-status { position: absolute; z-index: 1; right: 0; bottom: 6px; max-width: min(60%,240px);' in dashboard_styles
+    assert '.twitch-game-field:focus-within .channel-metadata-status { opacity: 0; }' in dashboard_styles
+    assert 'setStatusSpace(Math.ceil(status.getBoundingClientRect().width))' in metadata_script
+    assert 'statusSpaceTimer = window.setTimeout(() => setStatusSpace(0), 450)' in metadata_script
+    assert '.dashboard-video-header { --metadata-label-width: 88px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: var(--metadata-label-width) minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field > h3 { margin: 0; line-height: 1.2; text-align: right;' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field strong { box-sizing: border-box; width: 100%;' in dashboard_styles
+    assert 'updateTitleEditingWidth' not in metadata_script
+    assert 'range.selectNodeContents(field)' in metadata_script
+    assert 'textWidth + pencilWidth > availableWidth + 1' in metadata_script
+    assert '[data-channel-field].metadata-truncated:not(:focus):not(.editing)::after { position: absolute; top: 50%; right: 8px;' in dashboard_styles
     assert '[titleField, gameField].filter(Boolean).forEach(field => {' in metadata_script
     assert 'new MutationObserver(updateFieldPencil)' in metadata_script
     assert 'new ResizeObserver(updateFieldPencil)' in metadata_script
-    assert 'if (document.activeElement !== gameField) gameField.scrollLeft = 0;' in metadata_script
+    assert 'field.addEventListener("blur", () => {' in metadata_script
+    assert 'field.scrollLeft = 0;' in metadata_script
+    assert 'if (document.activeElement === field) return;' in metadata_script
     assert '<h3>Title</h3>' in dashboard
     assert '<h3>Category</h3>' in dashboard
     assert '<h3>Twitch stream</h3>' not in dashboard
@@ -1709,7 +1960,13 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'localStorage.setItem(storageKey, String(desktopCollapsed))' in sidebar_script
     assert ".dashboard-page:not(.channel-page-overview) .main-content" in dashboard_styles
     assert "left: -36px; width: min(1250px,calc(100vw - 144px));" in dashboard_styles
-    assert 'window.matchMedia("(max-width: 1100px)")' in sidebar_script
+    assert 'window.matchMedia("(max-width: 768px)")' in sidebar_script
+    assert 'window.matchMedia("(min-width: 769px) and (max-width: 1100px)")' in sidebar_script
+    assert 'compactMedia.matches ? !compactExpanded : desktopCollapsed' in sidebar_script
+    assert 'enableTransitionsAfterLayout()' in sidebar_script
+    assert 'sidebar-hover-locked' in sidebar_script
+    assert '@media (min-width: 769px) {\n    .dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked) .sidebar:hover' in dashboard_styles
+    assert dashboard_styles.index('.dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked):has(> .sidebar:hover) { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }') < dashboard_styles.index('@media (min-width: 901px)')
     assert 'mobile ? (collapsed ? "☰" : "×")' in sidebar_script
     assert 'position: sticky;' in dashboard_styles
     assert '.navigation { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; gap: 7px; overflow-x: hidden; overflow-y: auto; }' in dashboard_styles
@@ -1721,7 +1978,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'visibility: hidden; opacity: 0; transform: translateY(-10px); pointer-events: none;' in dashboard_styles
     assert '.navigation .nav-link { width: 100%; flex: 0 0 auto; justify-content: flex-start; }' in dashboard_styles
     assert '.sidebar .navigation,' in dashboard_styles
-    assert ".sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 17px; padding-left: 17px; }" in dashboard_styles
+    assert ".sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 11px; padding-left: 11px; }" in dashboard_styles
+    assert '.dashboard-page .sidebar-logout .button { justify-content: center; gap: 10px; overflow: hidden; padding-right: 11px; padding-left: 11px;' in dashboard_styles
+    assert '.dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-logout .button { gap: 0; justify-content: center; }' in dashboard_styles
+    assert '.dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked) .sidebar:hover { width: var(--sidebar-width); padding-right: 14px; padding-left: 14px;' in dashboard_styles
+    assert 'overflow: hidden;\n    padding: 11px 12px;\n    border-radius: 9px;' in dashboard_styles
     assert "window.localStorage.setItem(storageKey" in header_stats_script
     assert "dashboard-stat-visibility" in header_stats_script
     assert "const refreshInterval = 60000" in header_stats_script
@@ -1798,7 +2059,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'if (!previewActive) applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert 'applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert ".dashboard-stream-stat.state-live .status-indicator { animation: dashboard-live-pulse" in dashboard_styles
-    assert ".sidebar:not(:hover) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
+    assert ".sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
 
 
 @pytest.mark.asyncio

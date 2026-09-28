@@ -546,6 +546,16 @@ class PointsService:
 
                     if game == "gamble":
                         outcome = "win" if payout > bet else "loss"
+                        await connection.execute(
+                            """
+                            INSERT INTO viewer_gamble_outcomes (broadcaster_id, user_id, wins, losses)
+                            VALUES (?, ?, ?, ?)
+                            ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
+                                wins = wins + excluded.wins,
+                                losses = losses + excluded.losses
+                            """,
+                            (broadcaster_id, user_id, int(outcome == "win"), int(outcome == "loss"))
+                        )
                         await connection.execute("""
                             INSERT INTO gamble_streaks (broadcaster_id,user_id,outcome,length,channel_name)
                             VALUES (?,?,?,1,?)

@@ -46,7 +46,8 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
                     balance = await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id=? AND user_id=?", (broadcaster_id, user_id))
                     items = await connection.fetchall("SELECT item_id,quantity FROM raid_boss_inventory WHERE broadcaster_id=? AND user_id=? AND quantity>0", (broadcaster_id, user_id))
                 profile = {"identity": {"user_id": user_id, "login": "alice", "display_name": "Alice"}, "channel": {"id": broadcaster_id, "login": channel_name, "display_name": "TestChannel" if broadcaster_id == "channel-1" else "OtherChannel", "profile_image_url": None}, "current_points": balance["points"], "currency_name": "Points" if broadcaster_id == "channel-1" else "Crumbs", "inventory": [{"item_id": row["item_id"], "quantity": row["quantity"], "display_name": row["item_id"], "durability": 10, "equipped": False} for row in items], "consumables": [], "recent_raids": [], "achievements": []}
-                profile.update({key: 0 for key in ("messages_sent", "lifetime_points_earned", "daily_check_ins", "firsts", "damage_dealt", "highest_contribution", "raid_reward_points", "top_contributor_finishes", "bosses_attacked", "bosses_defeated", "final_hits", "raids_rewarded")})
+                profile.update({key: 0 for key in ("messages_sent", "lifetime_points_earned", "daily_check_ins", "firsts", "damage_dealt", "highest_contribution", "raid_reward_points", "top_contributor_finishes", "bosses_attacked", "bosses_defeated", "final_hits", "raids_rewarded", "gamble_wins", "gamble_total")})
+                profile["gamble_win_rate"] = None
                 return profile
 
         async def exchange(*, code, redirect_uri):

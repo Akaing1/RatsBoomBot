@@ -52,6 +52,7 @@ from storage.migrations.v047_compact_channel_quotes import migrate as migrate_co
 from storage.migrations.v048_global_pets import migrate as migrate_global_pets
 from storage.migrations.v049_pet_asset_path import migrate as migrate_pet_asset_path
 from storage.migrations.v050_viewer_sessions import migrate as migrate_viewer_sessions
+from storage.migrations.v051_gamble_outcomes import migrate as migrate_gamble_outcomes
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -114,4 +115,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=48, name="global_pets", run=migrate_global_pets)
     , Migration(version=49, name="pet_asset_path", run=migrate_pet_asset_path)
     , Migration(version=50, name="viewer_sessions", run=migrate_viewer_sessions)
+    , Migration(version=51, name="gamble_outcomes", run=migrate_gamble_outcomes)
 )
