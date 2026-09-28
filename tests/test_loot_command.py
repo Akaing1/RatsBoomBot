@@ -139,7 +139,7 @@ async def test_attack_after_completed_raid_reports_no_active_boss_without_zero_p
 
     await command.attack.callback(command, context)
 
-    assert context.replies == ["There is no active raid boss."]
+    assert context.replies == ["There is no active boss."]
 
 
 @pytest.mark.asyncio

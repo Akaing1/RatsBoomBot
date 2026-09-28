@@ -218,7 +218,7 @@
         </div>
     </section>
 
-    <section class="panel activity-panel dashboard-activity-panel dashboard-community-panel {% if raid_enabled %}has-raid{% endif %}" data-activity-group>
+    <section class="panel activity-panel dashboard-activity-panel dashboard-community-panel" data-activity-group>
         <div class="panel-header">
             <div>
                 <h3>Activity</h3>
@@ -236,9 +236,6 @@
         <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Activity feed">
             <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-activity-tab="redeems">Redeems</button>
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="commands">Commands</button>
-            {% if raid_enabled %}
-                <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="raid">Raid</button>
-            {% endif %}
         </div>
 
         <div data-activity-panel="redeems">
@@ -295,11 +292,6 @@
             </div>
         </div>
 
-        {% if raid_enabled %}
-            <div class="dashboard-raid-tab" data-activity-panel="raid" hidden>
-                {% include "channel/raid_summary.html" %}
-            </div>
-        {% endif %}
     </section>
     </div>
 

@@ -120,6 +120,10 @@ Profiles can automatically shout out selected users when they send their first m
 
 Incoming raids can trigger chat and shoutout behavior. Broadcasters can also start outgoing raids with subscriber and non-subscriber messages configured by profile.
 
+### Boss Hunt
+
+Boss Hunt is the separate RPG minigame with scheduled bosses, attacks, weapons, and loyalty point rewards. Streamers can monitor and manage encounters from the Boss Hunt sidebar page. Viewers use the existing `!raid` commands and `/raid/{channel}` guide; those names remain valid so saved commands and links continue to work. This feature is distinct from Twitch raids.
+
 ### Clips
 
 `!clip` or `!clips` creates a 60-second clip. Adding `short` requests a 30-second clip. Clip creation includes per-channel cooldowns, in-progress protection, live validation, and profile-specific responses.

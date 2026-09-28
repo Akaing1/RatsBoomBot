@@ -270,8 +270,8 @@
                     {% set display_name = "Gifted Subscription Responses" %}
                     {% set description = "Controls the condensed message sent once per gifted-sub batch." %}
                 {% elif feature.value == "raid_bosses" %}
-                    {% set display_name = "Raid Bosses" %}
-                    {% set description = "Enable raid bosses, raid commands, and the raid shop. Uses default boss names until you customize them." %}
+                    {% set display_name = "Boss Hunt" %}
+                    {% set description = "Enable Boss Hunt encounters, commands, and the shop. Uses default boss names until you customize them." %}
                 {% else %}
                     {% set display_name = feature.value | replace("_", " ") | title %}
                     {% set description = none %}

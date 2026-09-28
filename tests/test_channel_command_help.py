@@ -115,7 +115,7 @@ def test_command_help_includes_raid_boss_commands_for_raid_enabled_channels() ->
     profile = ChannelProfile(channel_name="channel", features=FeatureDefaults(raid_bosses=True), raid_bosses=RaidBossConfig(enabled=True))
     activate_profile(broadcaster_id, profile)
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
-    raid_bosses = get_group(groups, "Raid Bosses")
+    raid_bosses = get_group(groups, "Boss Hunt")
 
     assert get_command(raid_bosses, "!raid attack").enabled is True
     assert get_command(raid_bosses, "!raid craft <sword|bow|tome>").enabled is True
@@ -149,7 +149,7 @@ def test_command_help_keeps_raid_boss_testing_controls_hidden() -> None:
     profile = ChannelProfile(channel_name="channel", raid_bosses=RaidBossConfig(enabled=True, offline_testing_enabled=True))
     activate_profile(broadcaster_id, profile)
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
-    raid_bosses = get_group(groups, "Raid Bosses")
+    raid_bosses = get_group(groups, "Boss Hunt")
 
     assert "!raid next" not in {command.syntax for command in raid_bosses.commands}
 

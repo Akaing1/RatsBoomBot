@@ -1610,7 +1610,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.queue-toolbar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr));' in dashboard_styles
     assert '.queue-toolbar .queue-next-control > button { min-width: 0; flex: 1; width: auto; gap: 4px;' in dashboard_styles
     assert '.queue-next-picker select' in dashboard_styles
-    assert dashboard.index('data-activity-tab="raid"') < dashboard.index('include "channel/raid_summary.html"')
+    assert 'data-activity-tab="raid"' not in dashboard
+    boss_hunt = open("web/templates/channel/boss_hunt.html", encoding="utf-8").read()
+    sidebar = open("web/templates/channel/layout.html", encoding="utf-8").read()
+    assert 'include "channel/raid_summary.html"' in boss_hunt
+    assert 'href="/channel/boss-hunt"' in sidebar
     assert 'data-chat-composer' in dashboard
     assert 'data-channel-id="{{ broadcaster.id }}"' in dashboard
     assert 'data-reply-context' in dashboard
@@ -2073,3 +2077,102 @@ async def test_youtube_discovery_uses_only_one_filter(items, expected):
         "channel-1", "/liveBroadcasts",
         {"part": "id,snippet", "broadcastStatus": "active", "broadcastType": "all", "maxResults": 10}
     )
+
+@pytest.mark.asyncio
+async def test_boss_hunt_dashboard_schedules_with_channel_config(monkeypatch):
+    config = object()
+    boss_service = SimpleNamespace(
+        has_completed_tutorial=AsyncMock(return_value=False),
+        schedule_spawn=AsyncMock(return_value=True),
+        get_active_event=AsyncMock(return_value=None),
+    )
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": SimpleNamespace(id="channel-1")}),
+        features=SimpleNamespace(is_enabled=lambda *_: True),
+        raid_bosses=boss_service,
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    monkeypatch.setattr(dashboard_router, "get_active_profile", lambda _: SimpleNamespace(raid_bosses=config))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/boss-hunt/action", "headers": [],
+        "query_string": b"", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"},
+    })
+
+    response = await dashboard_router.channel_boss_hunt_action(request, "schedule", "csrf", "mini", "melee")
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("result=scheduled")
+    boss_service.schedule_spawn.assert_awaited_once_with("channel-1", config, "mini", "melee")
+
+
+@pytest.mark.asyncio
+async def test_boss_hunt_dashboard_ends_and_announces_active_encounter(monkeypatch):
+    event = SimpleNamespace(boss_name="Training Dummy", boss_tier="tutorial", max_hp=1000, current_hp=600, stream_limit=2)
+    boss_service = SimpleNamespace(
+        get_active_event=AsyncMock(return_value=event),
+        resolve=AsyncMock(return_value=200),
+    )
+    chat_identity = SimpleNamespace(send_message=AsyncMock())
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": SimpleNamespace(id="channel-1")}),
+        features=SimpleNamespace(is_enabled=lambda *_: True),
+        raid_bosses=boss_service,
+        chat_identity=chat_identity,
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(
+        services=services, create_partialuser=lambda _: SimpleNamespace(id="channel-1"),
+    ))
+    monkeypatch.setattr(dashboard_router, "get_active_profile", lambda _: SimpleNamespace(raid_bosses=object()))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/boss-hunt/action", "headers": [],
+        "query_string": b"", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"},
+    })
+
+    response = await dashboard_router.channel_boss_hunt_action(request, "end", "csrf")
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("result=ended")
+    boss_service.resolve.assert_awaited_once_with("channel-1", defeated=False)
+    chat_identity.send_message.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_boss_hunt_page_renders_for_connected_channel(monkeypatch):
+    from web.app import app
+
+    broadcaster = SimpleNamespace(id="channel-1", name="Test Channel", login="testchannel")
+    raid_bosses = SimpleNamespace(
+        get_dashboard_metrics=AsyncMock(return_value=None),
+        get_active_event=AsyncMock(return_value=None),
+        spawn_tasks={},
+    )
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
+        features=SimpleNamespace(is_enabled=lambda *_: True),
+        raid_bosses=raid_bosses,
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    request = Request({
+        "type": "http", "method": "GET", "path": "/channel/boss-hunt", "headers": [],
+        "query_string": b"", "scheme": "http", "server": ("testserver", 80),
+        "root_path": "", "app": app,
+        "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"},
+    })
+
+    response = await dashboard_router.channel_boss_hunt(request)
+    assert response.status_code == 200
+    assert b"Schedule boss" in response.body
+    assert b"Boss Hunt activity" in response.body
+    assert b"/channel/boss-hunt" in response.body
+
+@pytest.mark.asyncio
+async def test_boss_hunt_action_requires_matching_csrf(monkeypatch):
+    boss_service = SimpleNamespace(resolve=AsyncMock(), schedule_spawn=AsyncMock())
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=SimpleNamespace(raid_bosses=boss_service)))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/boss-hunt/action", "headers": [],
+        "query_string": b"", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"},
+    })
+
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as error:
+        await dashboard_router.channel_boss_hunt_action(request, "end", "wrong-token")
+    assert error.value.status_code == 403
+    boss_service.resolve.assert_not_awaited()

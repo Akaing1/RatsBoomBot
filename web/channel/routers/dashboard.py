@@ -1128,6 +1128,93 @@ async def channel_dashboard(request: Request):
     )
 
 
+@router.get("/channel/boss-hunt", response_class=HTMLResponse)
+async def channel_boss_hunt(request: Request):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return RedirectResponse(url="/connect", status_code=303)
+
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return HTMLResponse("Bot runtime unavailable.", status_code=503)
+
+    services = runtime_bot.services
+    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+    if broadcaster is None:
+        logout_channel_user(request)
+        return RedirectResponse(url="/connect", status_code=303)
+
+    enabled = services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
+    return templates.TemplateResponse(
+        request=request,
+        name="channel/boss_hunt.html",
+        context={
+            "active_page": "boss-hunt",
+            "broadcaster": broadcaster,
+            "boss_hunt_enabled": enabled,
+            "raid_metrics": await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if enabled else None,
+            "active_encounter": await services.raid_bosses.get_active_event(broadcaster_id) if enabled else None,
+            "spawn_scheduled": str(broadcaster_id) in services.raid_bosses.spawn_tasks if enabled else False,
+            "action_result": request.query_params.get("result"),
+            "csrf_token": get_csrf_token(request),
+        },
+    )
+
+
+@router.post("/channel/boss-hunt/action", response_class=RedirectResponse)
+async def channel_boss_hunt_action(
+    request: Request,
+    action: str = Form(...),
+    csrf_token: str = Form(...),
+    tier: str = Form(""),
+    boss_type: str = Form(""),
+):
+    validate_csrf_token(request, csrf_token)
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return RedirectResponse(url="/connect", status_code=303)
+
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return HTMLResponse("Bot runtime unavailable.", status_code=503)
+
+    services = runtime_bot.services
+    if services.broadcasters.get_broadcasters().get(str(broadcaster_id)) is None:
+        logout_channel_user(request)
+        return RedirectResponse(url="/connect", status_code=303)
+    profile = get_active_profile(str(broadcaster_id))
+    if profile is None or not services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES):
+        return RedirectResponse(url="/channel/boss-hunt?result=disabled", status_code=303)
+
+    if action == "schedule":
+        if tier not in {"tutorial", "mini", "main"} or boss_type not in {"melee", "ranged", "magic", "random"}:
+            result = "invalid"
+        elif tier == "tutorial" and await services.raid_bosses.has_completed_tutorial(broadcaster_id):
+            result = "tutorial-complete"
+        else:
+            import random
+            selected_type = random.choice(("melee", "ranged", "magic")) if boss_type == "random" else boss_type
+            scheduled = await services.raid_bosses.schedule_spawn(broadcaster_id, profile.raid_bosses, tier, selected_type)
+            result = "scheduled" if scheduled else "already-active"
+    elif action == "end":
+        event = await services.raid_bosses.get_active_event(broadcaster_id)
+        if event is None:
+            result = "no-encounter"
+        else:
+            from bot.services.engagement.raid_boss import raid_conclusion_message
+            reward = await services.raid_bosses.resolve(broadcaster_id, defeated=False)
+            damage_dealt = event.max_hp - event.current_hp
+            await services.chat_identity.send_message(
+                runtime_bot.create_partialuser(str(broadcaster_id)),
+                raid_conclusion_message(event, damage_dealt, reward),
+            )
+            result = "ended"
+    else:
+        result = "invalid"
+
+    return RedirectResponse(url=f"/channel/boss-hunt?result={result}", status_code=303)
+
+
 @router.get("/channel/viewer-queue/blacklist", response_class=HTMLResponse)
 async def channel_viewer_queue_blacklist(request: Request):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
