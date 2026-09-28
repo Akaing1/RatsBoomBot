@@ -9,6 +9,7 @@ from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, Pro
 from bot.services.channels.feature_toggle import FeatureToggleService
 from bot.services.channels.profile_settings import ProfileSettingsService
 from bot.shared.commands.points import PointsCommandHandler
+from bot.shared.commands.raid_boss import RaidBossCommands
 from bot.shared.commands.utility import UtilityCommands
 
 
@@ -49,6 +50,25 @@ async def test_channel_without_code_profile_loads_and_runs_shared_commands(monke
     assert not features.is_enabled("123", FeatureName.GIFTED_SUBSCRIPTION_RESPONSES)
     assert not features.is_profile_feature_enabled("123", ProfileFeatureName.LEAGUE)
     assert not features.is_profile_feature_enabled("123", ProfileFeatureName.OVERWATCH)
+
+
+@pytest.mark.asyncio
+async def test_generic_channel_can_enable_raids_with_default_configuration(tmp_path):
+    activate_profile("123", create_generic_profile("new_streamer"))
+    async with asqlite.create_pool(str(tmp_path / "features.db")) as db:
+        features = FeatureToggleService(db)
+        await features.setup()
+        assert FeatureName.RAID_BOSSES in features.get_channel_features("123")
+        assert not features.is_enabled("123", FeatureName.RAID_BOSSES)
+
+        await features.set_enabled("123", FeatureName.RAID_BOSSES, True, "streamer:123")
+        reloaded = FeatureToggleService(db)
+        await reloaded.setup()
+        assert reloaded.is_enabled("123", FeatureName.RAID_BOSSES)
+
+        bot = SimpleNamespace(services=SimpleNamespace(features=reloaded))
+        ctx = SimpleNamespace(broadcaster=SimpleNamespace(id="123"))
+        assert RaidBossCommands(bot).get_context(ctx) == ("123", get_active_profile("123").raid_bosses)
 
 
 @pytest.mark.asyncio

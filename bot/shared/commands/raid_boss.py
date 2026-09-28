@@ -35,7 +35,7 @@ class RaidBossCommands(commands.Component):
 
         profile = get_active_profile(broadcaster_id)
 
-        if profile is None or not profile.raid_bosses.enabled:
+        if profile is None:
             return None
 
         return broadcaster_id, profile.raid_bosses

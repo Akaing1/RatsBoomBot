@@ -167,7 +167,7 @@ async def public_chatter_channel_profile(request: Request, chatter_name: str, ch
         is_owner and channel_profile is not None and features is not None
         and features.is_enabled(broadcaster_id, FeatureName.POINTS)
     )
-    shop_available = bool(gamble_available and channel_profile.raid_bosses.enabled
+    shop_available = bool(gamble_available
                           and features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES))
     actions_signed_in = bool(
         gamble_available and (runtime_db := get_db()) is not None
