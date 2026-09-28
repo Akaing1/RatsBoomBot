@@ -51,6 +51,8 @@
                 <article><span>Points earned</span><strong>{{ "{:,}".format(profile.lifetime_points_earned) }}</strong></article>
                 <article><span>Total daily check-ins</span><strong>{{ "{:,}".format(profile.daily_check_ins) }}</strong></article>
                 <article><span>Favorite channel</span><strong>{{ profile.favorite_channel.display_name if profile.favorite_channel else "Not enough activity" }}</strong></article>
+                {% set gamble_losses = profile.gamble_total - profile.gamble_wins %}
+                <article><span>Gamble win rate</span><strong>{{ "%.1f%%" | format(profile.gamble_win_rate) if profile.gamble_win_rate is not none else "—" }}</strong><small>{{ profile.gamble_wins }} {{ "win" if profile.gamble_wins == 1 else "wins" }} / {{ gamble_losses }} {{ "loss" if gamble_losses == 1 else "losses" }}</small></article>
             </div>
 
             <section class="chatter-section">

@@ -108,7 +108,10 @@ UTILITY_COMMANDS = CommandGroupDefinition(
         CommandDefinition("!pp [username]", "Generate a measurement from -1in through 20in.", global_command=GlobalCommandName.PP),
         CommandDefinition("!lurk", "Let chat know you are stepping away to lurk.", global_command=GlobalCommandName.LURK),
         CommandDefinition("!help", "Show the compact command list in Twitch chat.", global_command=GlobalCommandName.HELP),
-        CommandDefinition("!stats [username]", "Open your public chatter profile or another chatter's profile.", global_command=GlobalCommandName.STATS)
+        CommandDefinition("!stats [username]", "Open your public chatter profile or another chatter's profile.", global_command=GlobalCommandName.STATS),
+        CommandDefinition("!quote [random|number]", "Show a random quote or one by number.", global_command=GlobalCommandName.QUOTE),
+        CommandDefinition("!quote add <message>", "Add a quote to this channel.", global_command=GlobalCommandName.QUOTE),
+        CommandDefinition("!quote remove <number>", "Remove a quote by number.", CommandPermission.MODERATOR, global_command=GlobalCommandName.QUOTE)
     )
 )
 

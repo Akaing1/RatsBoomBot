@@ -10,6 +10,8 @@ jinja2
 markdown~=3.9
 bleach~=6.2.0
 httpx~=0.28.1
+grpcio~=1.84.0
+protobuf~=7.35.1
 
 rich~=14.1.0
 

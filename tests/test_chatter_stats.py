@@ -166,6 +166,45 @@ async def test_chatter_profiles_aggregate_global_and_channel_activity(tmp_path) 
 
 
 @pytest.mark.asyncio
+async def test_gamble_win_rate_is_recorded_per_channel_and_aggregated_globally(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "gamble-rate.db")) as database:
+        await run_migrations(database)
+        await seed_identity(database)
+        async with database.acquire() as connection:
+            await connection.execute(
+                "INSERT INTO chatter_channel_observations (broadcaster_id, user_id) VALUES ('channel-2', 'user-1')"
+            )
+        broadcasters = FakeBroadcasters()
+        broadcasters.items["channel-2"] = SimpleNamespace(
+            id="channel-2", login="secondchannel", display_name="SecondChannel", profile_image_url=None
+        )
+        stats = ChatterStatsService(SimpleNamespace(bot_id="main-bot"), database, broadcasters)
+        points = PointsService(bot=None, db=database, chatter_stats=stats)
+        await points.setup()
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await points.add_points("channel-2", "user-1", "alice", 1000)
+
+        initial = await stats.get_channel_profile("alice", "testchannel")
+        assert initial["gamble_win_rate"] is None
+        assert initial["gamble_total"] == 0
+
+        for payout in (20, 20, 0):
+            await points.settle_wager("channel-1", "user-1", "alice", bet=10, payout=payout, game="gamble")
+        await points.settle_wager("channel-2", "user-1", "alice", bet=10, payout=0, game="gamble")
+        await points.settle_wager("channel-1", "user-1", "alice", bet=10, payout=20, game="roulette")
+        assert await points.settle_wager("channel-1", "user-1", "alice", bet=5000, payout=0, game="gamble") is None
+
+        first = await stats.get_channel_profile("alice", "testchannel")
+        second = await stats.get_channel_profile("alice", "secondchannel")
+        global_profile = await stats.get_global_profile("alice")
+
+        assert (first["gamble_wins"], first["gamble_total"]) == (2, 3)
+        assert first["gamble_win_rate"] == pytest.approx(66.6667)
+        assert (second["gamble_wins"], second["gamble_total"], second["gamble_win_rate"]) == (0, 1, 0)
+        assert (global_profile["gamble_wins"], global_profile["gamble_total"], global_profile["gamble_win_rate"]) == (2, 4, 50)
+
+
+@pytest.mark.asyncio
 async def test_global_profile_refreshes_and_caches_twitch_profile_image(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "profile-image.db")) as database:
         await run_migrations(database)

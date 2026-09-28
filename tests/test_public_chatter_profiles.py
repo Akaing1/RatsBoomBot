@@ -21,6 +21,9 @@ class FakeChatterStats:
             "lifetime_points_earned": 4500,
             "channels_interacted": 1,
             "daily_check_ins": 20,
+            "gamble_wins": 5,
+            "gamble_total": 8,
+            "gamble_win_rate": 62.5,
             "favorite_channel": {"display_name": "TestChannel"},
             "damage_dealt": 9000,
             "highest_contribution": 3000,
@@ -46,6 +49,9 @@ class FakeChatterStats:
             "currency_name": "cheese",
             "daily_check_ins": 20,
             "firsts": 3,
+            "gamble_wins": 2,
+            "gamble_total": 3,
+            "gamble_win_rate": 200 / 3,
             "damage_dealt": 9000,
             "highest_contribution": 3000,
             "raid_reward_points": 2000,
@@ -77,6 +83,9 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert "1,200" in response.text
     assert "TestChannel" in response.text
     assert "Total daily check-ins" in response.text
+    assert "Gamble win rate" in response.text
+    assert "62.5%" in response.text
+    assert "5 wins / 3 losses" in response.text
     assert "Recent raid history" in response.text
     assert "#2 of 12" in response.text
     assert 'data-chatter-tab="overview"' in response.text
@@ -98,6 +107,9 @@ def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
     assert response.status_code == 200
     assert "Current cheese" in response.text
     assert "Daily check-ins" in response.text
+    assert "Gamble win rate" in response.text
+    assert "66.7%" in response.text
+    assert "2 wins / 1 loss" in response.text
     assert "Sword" in response.text
     assert "Basic Bow" in response.text
     assert "Power Potion" in response.text

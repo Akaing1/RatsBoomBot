@@ -18,6 +18,7 @@ from bot.shared.commands.shoutout import ShoutoutCommands
 from bot.shared.commands.socials import SocialCommands
 from bot.shared.commands.stats import StatsCommands
 from bot.shared.commands.utility import UtilityCommands
+from bot.shared.commands.quotes import QuoteCommands
 from bot.shared.commands.viewer_queue import ViewerQueueCommands
 from bot.shared.events.chat import ChatEvents
 from bot.shared.events.community import CommunityEvents
@@ -30,6 +31,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 GLOBAL_COMPONENTS: tuple[type[commands.Component], ...] = (
     UtilityCommands,
+    QuoteCommands,
     ClipCommands,
     SocialCommands,
     StatsCommands,
