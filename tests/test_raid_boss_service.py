@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import asqlite
 import pytest
 
-from bot.profiles import ChannelProfile, RaidBossConfig, RaidBossNames, activate_profile, clear_profiles
+from bot.profiles import ChannelProfile, RaidBossConfig, RaidBossNames, activate_profile, clear_profiles, get_active_profile
 from bot.services.engagement.points import PointsService
 from bot.services.engagement.raid_boss import RaidBossEvent, RaidBossService
 from storage.migration_runner import run_migrations
@@ -210,7 +210,10 @@ async def test_scheduled_boss_uses_names_changed_before_spawn(tmp_path, monkeypa
     try:
         async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
             await run_migrations(database)
-            service = RaidBossService(bot=FakeRaidBot(), db=database)
+            service = RaidBossService(
+                bot=FakeRaidBot(), db=database,
+                config_provider=lambda broadcaster_id: get_active_profile(broadcaster_id).raid_bosses,
+            )
             await service.setup()
 
             async def change_name_before_spawn(target):

@@ -5,7 +5,7 @@ from typing import Any
 from bot.profiles import get_active_profile
 from bot.services.channels.achievements import AchievementService
 from bot.services.channels.chatter_levels import ChatterLevelService
-from bot.services.engagement.raid_boss import public_raid_status
+from rpg_minigame import public_raid_status
 from config.settings import settings
 
 LOGGER = logging.getLogger("RatBoomBot")

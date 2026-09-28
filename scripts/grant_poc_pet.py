@@ -4,7 +4,7 @@ from pathlib import Path
 
 import asqlite
 
-from bot.services.engagement.pets import PetService
+from pets import PetService
 from config.settings import settings
 from storage.migration_runner import run_migrations
 

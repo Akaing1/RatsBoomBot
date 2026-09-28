@@ -5,7 +5,7 @@ from urllib.parse import quote
 from twitchio.ext import commands
 
 from bot.profiles import FeatureName, RaidBossConfig, get_active_profile
-from bot.services.engagement.raid_boss import raid_conclusion_message
+from rpg_minigame import raid_conclusion_message
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
 from config.settings import settings
 

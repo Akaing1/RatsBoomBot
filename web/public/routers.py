@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 from bot.command_registry import build_enabled_command_help_groups
 from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels.live_chat import normalize_chat_view
-from bot.services.engagement.raid_boss import CRAFTING_RECIPES, OVERCLOCKED_WEAPON_TYPES, SELLABLE_WEAPON_TYPES
+from rpg_minigame import CRAFTING_RECIPES, OVERCLOCKED_WEAPON_TYPES, SELLABLE_WEAPON_TYPES
 from config.settings import settings
 from storage.patch_notes_repository import get_note, list_notes
 from storage.viewer_sessions import valid_viewer_session

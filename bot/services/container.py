@@ -2,7 +2,9 @@ import logging
 
 from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatIdentityService, ChatterIdentityService, ChatterStatsService, FeatureToggleService, LiveChatService, ProfileSettingsService
-from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PassivePointsService, PetService, PointsService, RaidBossService, RedeemService, ViewerQueueService
+from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PassivePointsService, PointsService, RedeemService, ViewerQueueService
+from pets import PetService
+from rpg_minigame import RaidBossService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
 from config.settings import settings
@@ -38,7 +40,12 @@ class ServiceContainer:
         self.pets = PetService(db)
         self.points = PointsService(bot, db, self.chatter_stats, self.pets)
         self.passive_points = PassivePointsService(bot, db, self.points, self.chat_identity, self.features)
-        self.raid_bosses = RaidBossService(bot, db, self.chatter_stats, self.points)
+        self.raid_bosses = RaidBossService(
+            bot, db, self.chatter_stats, self.points,
+            config_provider=lambda broadcaster_id: (
+                profile.raid_bosses if (profile := get_active_profile(broadcaster_id)) is not None else None
+            ),
+        )
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
         self.viewer_queue = ViewerQueueService(bot, db)

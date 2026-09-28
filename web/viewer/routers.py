@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config.settings import settings
 from bot.profiles import FeatureName, get_active_profile
-from bot.services.engagement.raid_boss import BASIC_WEAPON_TYPES, CRAFTING_RECIPES, OVERCLOCKED_WEAPON_TYPES, SELLABLE_WEAPON_TYPES
+from rpg_minigame import BASIC_WEAPON_TYPES, CRAFTING_RECIPES, OVERCLOCKED_WEAPON_TYPES, SELLABLE_WEAPON_TYPES
 from storage.viewer_sessions import claim_viewer_action, create_viewer_session, revoke_viewer_session, valid_viewer_session
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.shared.common import templates
