@@ -3,7 +3,7 @@ import logging
 from twitchio.ext import commands
 
 from bot.profiles import FeatureName, get_active_profile
-from bot.services.engagement.raid_boss import raid_conclusion_message
+from rpg_minigame import raid_conclusion_message
 
 LOGGER = logging.getLogger("RatBoomBot")
 

@@ -72,7 +72,7 @@ echo "[Deploy] Installing dependencies."
 "$VENV_DIR/bin/python" -m pip install -r requirements.txt
 
 echo "[Deploy] Running compile checks."
-"$VENV_DIR/bin/python" -m compileall app bot config storage web main.py
+"$VENV_DIR/bin/python" -m compileall app bot config storage web rpg_minigame pets main.py
 
 APP_VERSION="$("$VENV_DIR/bin/python" -c 'from config.version import APP_VERSION; print(APP_VERSION)')"
 DEPLOYMENT_STAMP="$(date '+%m.%d.%Y')-v$APP_VERSION"

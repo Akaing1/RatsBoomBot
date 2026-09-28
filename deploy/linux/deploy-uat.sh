@@ -53,7 +53,7 @@ NEW_COMMIT="$(git rev-parse FETCH_HEAD)"
 git checkout --detach "$NEW_COMMIT"
 
 "$VENV_DIR/bin/python" -m pip install -r requirements.txt
-"$VENV_DIR/bin/python" -m compileall app bot config storage web main.py
+"$VENV_DIR/bin/python" -m compileall app bot config storage web rpg_minigame pets main.py
 
 APP_VERSION="$("$VENV_DIR/bin/python" -c 'from config.version import APP_VERSION; print(APP_VERSION)')"
 SHORT_COMMIT="$(git rev-parse --short=8 HEAD)"

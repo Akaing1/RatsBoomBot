@@ -48,13 +48,15 @@ RatsBoomBot
 │   ├── channels/           Broadcaster profiles, commands, and game modules
 │   ├── services/
 │   │   ├── channels/       Broadcaster state, settings, and feature overrides
-│   │   ├── engagement/     Points, redeems, clips, queues, and game services
+│   │   ├── engagement/     Points, redeems, clips, and queues
 │   │   ├── stream/         Timers, ads, shoutouts, and stream logs
 │   │   └── support/        Help and moderation services
 │   └── shared/             Reusable commands and EventSub listeners
 ├── config/                 Environment settings and application version
 ├── deploy/                 Linux, systemd, backup, and Windows deployment tools
 ├── docs/                   Project documentation and style guide
+├── pets/                   Pet ownership and passive bonuses
+├── rpg_minigame/           Boss encounters, inventory, loot, and RPG settings
 ├── scripts/                Administration and data-import utilities
 ├── storage/                Database access and versioned migrations
 ├── tests/                  Automated tests
