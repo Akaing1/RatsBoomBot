@@ -114,7 +114,7 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert "Gamble win rate" in response.text
     assert "62.5%" in response.text
     assert "5 wins / 3 losses" in response.text
-    assert "Recent raid history" in response.text
+    assert "Recent Boss Hunt history" in response.text
     assert "#2 of 12" in response.text
     assert 'data-chatter-tab="overview"' in response.text
     assert 'data-chatter-tab="raids"' in response.text
@@ -161,7 +161,7 @@ def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
     assert "Equipped" in response.text
     assert "#2 of 12" in response.text
     assert "Top Contributor finishes" in response.text
-    assert "Recent raid history" in response.text
+    assert "Recent Boss Hunt history" in response.text
     assert "/me/connect?next=/chatters/alice/channels/testchannel" in response.text
     assert 'class="public-command-navigation chatter-channel-navigation"' in response.text
     assert 'class="button secondary chatter-channel-back"' in response.text

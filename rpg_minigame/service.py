@@ -13,8 +13,8 @@ from storage.transactions import immediate_transaction
 LOGGER = logging.getLogger("RatBoomBot")
 MINI_BOSS_HP_TIERS = (10000, 20000, 35000, 50000, 70000)
 HEALTH_CHECKPOINT_MESSAGES = {
-    25: "The raid has finally managed to leave a dent in {boss_name}! 75% HP remains.",
-    50: "{boss_name} is starting to falter! The raid has forced the boss down to 50% HP.",
+    25: "The hunters have finally managed to leave a dent in {boss_name}! 75% HP remains.",
+    50: "{boss_name} is starting to falter! The hunters have forced the boss down to 50% HP.",
     75: "{boss_name} is on the ropes! Only 25% HP remains—finish the fight!"
 }
 
@@ -33,12 +33,12 @@ def raid_conclusion_message(event: "RaidBossEvent", damage_dealt: int, reward: i
     if event.boss_tier == "main":
         return (
             f"{event.boss_name} has fled{stream_text} and will return again... "
-            f"Raiders dealt {damage_dealt:,} damage, and {reward:,} points will be distributed through raid rank."
+            f"Hunters dealt {damage_dealt:,} damage, and {reward:,} points will be distributed based on contribution rank."
         )
 
     return (
-        f"The raid against {event.boss_name} has failed{stream_text}. "
-        f"Raiders dealt {damage_dealt:,} damage and earned {reward:,} points through raid rank."
+        f"The hunt against {event.boss_name} has failed{stream_text}. "
+        f"Hunters dealt {damage_dealt:,} damage and earned {reward:,} points based on contribution rank."
     )
 
 BASIC_WEAPON_TYPES = {
@@ -342,7 +342,7 @@ class RaidBossService:
                 await self._sleep_until(warning_at)
 
             if not warning_sent and datetime.now(UTC) < spawn_at:
-                await self._send_message(broadcaster_id, "A dangerous presence is approaching... Prepare yourselves for the raid in 10 minutes!")
+                await self._send_message(broadcaster_id, "A dangerous presence is approaching... Prepare for Boss Hunt in 10 minutes!")
 
                 async with self.db.acquire() as connection:
                     await connection.execute("UPDATE raid_boss_schedules SET warning_sent = 1 WHERE broadcaster_id = ?", (broadcaster_id,))
@@ -511,7 +511,7 @@ class RaidBossService:
     @staticmethod
     def _reminder_message(event: RaidBossEvent) -> str:
         percent = event.current_hp / event.max_hp * 100
-        return f"Raid reminder: {event.boss_name} has {event.current_hp:,}/{event.max_hp:,} HP remaining ({percent:.1f}%). Use !raid attack before the stream ends!"
+        return f"Boss Hunt reminder: {event.boss_name} has {event.current_hp:,}/{event.max_hp:,} HP remaining ({percent:.1f}%). Use !raid attack before the stream ends!"
 
     async def get_active_event(self, broadcaster_id: str) -> RaidBossEvent | None:
         query = """
@@ -662,7 +662,7 @@ class RaidBossService:
         event = await self.get_active_event(broadcaster_id)
 
         if event is None:
-            return RaidAttackResult(0, 0, "", None, False, False, error="There is no active raid boss.")
+            return RaidAttackResult(0, 0, "", None, False, False, error="There is no active boss.")
 
         stream_id = str(stream_id)
         player = await self._get_player(broadcaster_id, user_id)
@@ -836,7 +836,7 @@ class RaidBossService:
         async with self.db.acquire() as connection, immediate_transaction(connection):
             before = await connection.fetchone("SELECT current_hp FROM raid_boss_events WHERE id=? AND status='active'", (event.id,))
             if before is None:
-                return RaidAttackResult(0, 0, event.boss_name, weapon, potion_used, False, error="The raid ended before your attack landed.")
+                return RaidAttackResult(0, 0, event.boss_name, weapon, potion_used, False, error="The encounter ended before your attack landed.")
             attack_row = await connection.fetchone(
                 """
                 INSERT INTO raid_boss_attacks (
@@ -916,7 +916,7 @@ class RaidBossService:
                     await connection.execute("UPDATE raid_boss_inventory SET durability = MAX(durability - ?, 0) WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?", (durability_cost, self.inventory_scope(broadcaster_id, weapon_used), user_id, weapon_used))
 
         if row is None:
-            return RaidAttackResult(0, 0, event.boss_name, weapon, potion_used, False, error="The raid ended before your attack landed.")
+            return RaidAttackResult(0, 0, event.boss_name, weapon, potion_used, False, error="The encounter ended before your attack landed.")
 
         current_hp = int(row["current_hp"])
         reward = 0

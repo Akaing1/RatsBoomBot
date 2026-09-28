@@ -118,13 +118,13 @@ def test_public_raid_page_shows_live_shop_mechanics_commands_and_history(monkeyp
         state_response = client.get("/api/raid/MeinyaYozakura")
 
     assert response.status_code == 200
-    assert "Raid shop" in response.text
+    assert "Boss Hunt shop" in response.text
     assert "Weapons" in response.text
     assert "Consumables" in response.text
     assert "Buffs" in response.text
     assert "!raid buy potion" in response.text
-    assert "How raids work" in response.text
-    assert "Raid rewards" in response.text
+    assert "How Boss Hunt works" in response.text
+    assert "Boss Hunt rewards" in response.text
     assert "View leaderboard" in response.text
     assert "Training Dummy" in response.text
     assert "Show all 12 contributors" in response.text
