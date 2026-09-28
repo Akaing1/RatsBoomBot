@@ -63,6 +63,12 @@ PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("overwatch.player_id", "Overwatch", "BattleTag", "The broadcaster's Overwatch BattleTag.", maximum_length=100, rows=1),
     ProfileSettingDefinition("overwatch.platform", "Overwatch", "Platform", "The OverFast platform code, such as pc.", maximum_length=20, rows=1),
     ProfileSettingDefinition("overwatch.display_name", "Overwatch", "Display name", "Name used in Overwatch command responses.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("raid_bosses.names.melee", "Raid boss names", "Main melee boss names", "Add one name per line. A name is chosen at random when a main melee boss spawns.", value_type="names", maximum_length=1000, rows=3),
+    ProfileSettingDefinition("raid_bosses.names.ranged", "Raid boss names", "Main ranged boss names", "Add one name per line. A name is chosen at random when a main ranged boss spawns.", value_type="names", maximum_length=1000, rows=3),
+    ProfileSettingDefinition("raid_bosses.names.magic", "Raid boss names", "Main magic boss names", "Add one name per line. A name is chosen at random when a main magic boss spawns.", value_type="names", maximum_length=1000, rows=3),
+    ProfileSettingDefinition("raid_bosses.mini_names.melee", "Raid boss names", "Mini melee boss names", "Add one name per line. A name is chosen at random when a mini melee boss spawns.", value_type="names", maximum_length=1000, rows=3),
+    ProfileSettingDefinition("raid_bosses.mini_names.ranged", "Raid boss names", "Mini ranged boss names", "Add one name per line. A name is chosen at random when a mini ranged boss spawns.", value_type="names", maximum_length=1000, rows=3),
+    ProfileSettingDefinition("raid_bosses.mini_names.magic", "Raid boss names", "Mini magic boss names", "Add one name per line. A name is chosen at random when a mini magic boss spawns.", value_type="names", maximum_length=1000, rows=3),
     ProfileSettingDefinition("raid_bosses.item_names.potion", "Raid item names", "Power Potion name", "Custom display and purchase name for Power Potion.", maximum_length=100, rows=1),
     ProfileSettingDefinition("raid_bosses.item_names.second_wind", "Raid item names", "Second Wind name", "Custom display and purchase name for Second Wind.", maximum_length=100, rows=1),
     ProfileSettingDefinition("raid_bosses.item_names.berserk", "Raid item names", "Berserk name", "Custom display and purchase name for Berserk.", maximum_length=100, rows=1),
@@ -405,6 +411,8 @@ class ProfileSettingsService:
 
         if setting_name == "timer_messages":
             value = parse_timers(str(value))
+        elif setting_name.startswith(("raid_bosses.names.", "raid_bosses.mini_names.")):
+            value = tuple(str(value).splitlines())
 
         def replace_nested(current, remaining: list[str]):
             field = remaining[0]
@@ -439,6 +447,17 @@ class ProfileSettingsService:
             value = format_timers(tuple(type(entry)(entry.message.strip(), entry.kind, entry.color) for entry in entries if entry.message.strip()))
             if len(value) > definition.maximum_length:
                 raise ValueError("Timer messages are too long.")
+            return value
+
+        if definition.value_type == "names":
+            names = [line.strip() for line in raw_value.splitlines() if line.strip()]
+            if not names:
+                raise ValueError(f"{definition.label} needs at least one name. Use Default to restore the channel names.")
+            if any(len(name) > 100 for name in names):
+                raise ValueError("Each boss name must be 100 characters or fewer.")
+            value = "\n".join(names)
+            if len(value) > definition.maximum_length:
+                raise ValueError(f"{definition.label} must be {definition.maximum_length} characters or fewer.")
             return value
 
         value = raw_value.strip()
@@ -476,7 +495,10 @@ class ProfileSettingsService:
         if definition.value_type == "integer" and not isinstance(value, int):
             raise TypeError("Expected an integer setting.")
 
-        if definition.value_type in {"text", "lines"} and not isinstance(value, str):
+        if definition.value_type in {"text", "lines", "names"} and not isinstance(value, str):
             raise TypeError("Expected a text setting.")
+
+        if definition.value_type == "names":
+            return ProfileSettingsService.validate_value(definition, value)
 
         return value
