@@ -7,7 +7,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from bot.profiles import RaidBossConfig
+from bot.profiles import RaidBossConfig, get_active_profile
 from storage.transactions import immediate_transaction
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -347,6 +347,11 @@ class RaidBossService:
                     await connection.execute("UPDATE raid_boss_schedules SET warning_sent = 1 WHERE broadcaster_id = ?", (broadcaster_id,))
 
             await self._sleep_until(spawn_at)
+
+            # A streamer may edit names while a spawn is already scheduled.
+            profile = get_active_profile(broadcaster_id)
+            if profile is not None:
+                config = profile.raid_bosses
 
             automatic = boss_tier is None or boss_type is None
             event = await self.spawn_automatic(broadcaster_id, config) if automatic else await self.spawn(broadcaster_id, str(boss_type), config, str(boss_tier))

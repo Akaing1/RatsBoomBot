@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import asqlite
 import pytest
 
-from bot.profiles import RaidBossConfig, RaidBossNames
+from bot.profiles import ChannelProfile, RaidBossConfig, RaidBossNames, activate_profile, clear_profiles
 from bot.services.engagement.points import PointsService
 from bot.services.engagement.raid_boss import RaidBossEvent, RaidBossService
 from storage.migration_runner import run_migrations
@@ -200,6 +200,29 @@ async def test_reminder_deadline_and_chat_count_restore_after_restart(tmp_path) 
         assert restarted_service.reminder_message_counts["channel-1"] == 7
         assert str(restored_schedule["next_reminder_at"]) == str(original_schedule["next_reminder_at"])
         await restarted_service.stop()
+
+
+@pytest.mark.asyncio
+async def test_scheduled_boss_uses_names_changed_before_spawn(tmp_path, monkeypatch) -> None:
+    original = build_config(names=RaidBossNames(melee="Old Name"))
+    updated = build_config(names=RaidBossNames(melee="New Name"))
+    activate_profile("channel-1", ChannelProfile(channel_name="test", raid_bosses=original))
+    try:
+        async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+            await run_migrations(database)
+            service = RaidBossService(bot=FakeRaidBot(), db=database)
+            await service.setup()
+
+            async def change_name_before_spawn(target):
+                activate_profile("channel-1", ChannelProfile(channel_name="test", raid_bosses=updated))
+
+            monkeypatch.setattr(service, "_sleep_until", change_name_before_spawn)
+            await service.schedule_spawn("channel-1", original, "main", "melee")
+            await service.spawn_tasks["channel-1"]
+            assert (await service.get_active_event("channel-1")).boss_name == "New Name"
+            await service.stop()
+    finally:
+        clear_profiles()
 
 
 @pytest.mark.asyncio
