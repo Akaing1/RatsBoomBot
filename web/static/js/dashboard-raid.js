@@ -10,13 +10,13 @@
         loading = true;
         try {
             const response = await fetch(`/api/raid/${encodeURIComponent(panel.dataset.channel)}`, {cache: "no-store"});
-            if (!response.ok) throw new Error("Raid unavailable");
+            if (!response.ok) throw new Error("Boss Hunt unavailable");
             const {metrics} = await response.json();
             element("details").hidden = !metrics;
-            element("title").textContent = metrics ? metrics.boss_name : "No raids yet";
+            element("title").textContent = metrics ? metrics.boss_name : "No encounters yet";
             element("status").textContent = metrics
                 ? [metrics.status, metrics.boss_tier, metrics.boss_type].map(capitalize).join(" · ")
-                : "The next encounter will appear here when a raid spawns.";
+                : "The next encounter will appear here when a boss spawns.";
             if (metrics) {
                 element("hp").textContent = `${metrics.current_hp.toLocaleString()} / ${metrics.max_hp.toLocaleString()} HP`;
                 element("bar").style.width = `${Math.max(0, Math.min(100, metrics.hp_percent))}%`;
@@ -26,7 +26,7 @@
             }
             element("refresh").textContent = "Updates automatically every 15 seconds.";
         } catch {
-            element("refresh").textContent = "Unable to refresh raid activity. Displayed information may be out of date; retrying automatically.";
+            element("refresh").textContent = "Unable to refresh Boss Hunt activity. Displayed information may be out of date; retrying automatically.";
         } finally {
             loading = false;
         }

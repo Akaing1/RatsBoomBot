@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Raid boss guide, shop, commands, and live encounter for {{ broadcaster.name or broadcaster.id }}.">
+    <meta name="description" content="Boss Hunt guide, shop, commands, and live encounter for {{ broadcaster.name or broadcaster.id }}.">
 
-    <title>Raids | {{ broadcaster.name or broadcaster.id }} | RatsBoomBot</title>
+    <title>Boss Hunt | {{ broadcaster.name or broadcaster.id }} | RatsBoomBot</title>
 
     <link rel="canonical" href="{{ public_base_url }}/raid/{{ broadcaster.login or broadcaster.id }}">
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
@@ -16,7 +16,7 @@
     <header class="public-command-navigation">
         <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
             <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
-            <span><strong>RatsBoomBot</strong><small>Channel raid guide</small></span>
+            <span><strong>RatsBoomBot</strong><small>Boss Hunt guide</small></span>
         </a>
 
         <nav class="public-raid-navigation" aria-label="Channel links">
@@ -34,7 +34,7 @@
             {% endif %}
 
             <div>
-                <p class="eyebrow">Raid headquarters</p>
+                <p class="eyebrow">Boss Hunt headquarters</p>
                 <h1>{{ broadcaster.name or broadcaster.id }}</h1>
                 <p>Live encounter progress, contributor rankings, shop items, mechanics, rewards, and commands.</p>
             </div>
@@ -86,17 +86,17 @@
                 </div>
             {% else %}
                 <div class="compact-empty-state public-raid-idle">
-                    <p class="eyebrow">Raid encounter</p>
-                    <h2>No active raid boss</h2>
+                    <p class="eyebrow">Boss Hunt encounter</p>
+                    <h2>No active boss</h2>
                     <p>The next encounter will appear here automatically after it spawns.</p>
                 </div>
             {% endif %}
         </section>
 
-        <section class="public-raid-guide" aria-label="Raid guide">
+        <section class="public-raid-guide" aria-label="Boss Hunt guide">
             <details class="panel public-command-group" open>
                 <summary class="public-command-group-summary">
-                    <span class="public-command-group-copy"><span class="eyebrow">Spend loyalty points</span><span class="public-command-group-title">Raid shop</span><span class="public-command-group-description">Weapons persist in your inventory. Potions add automatic powered attacks.</span></span>
+                    <span class="public-command-group-copy"><span class="eyebrow">Spend loyalty points</span><span class="public-command-group-title">Boss Hunt shop</span><span class="public-command-group-description">Weapons persist in your inventory. Potions add automatic powered attacks.</span></span>
                     <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
                 </summary>
 
@@ -172,7 +172,7 @@
 
             <details class="panel public-command-group">
                 <summary class="public-command-group-summary">
-                    <span class="public-command-group-copy"><span class="eyebrow">Damage and equipment</span><span class="public-command-group-title">How raids work</span><span class="public-command-group-description">Understand attack limits, weapon matching, potions, and critical hits.</span></span>
+                    <span class="public-command-group-copy"><span class="eyebrow">Damage and equipment</span><span class="public-command-group-title">How Boss Hunt works</span><span class="public-command-group-description">Understand attack limits, weapon matching, potions, and critical hits.</span></span>
                     <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
                 </summary>
 
@@ -185,7 +185,7 @@
 
             <details class="panel public-command-group">
                 <summary class="public-command-group-summary">
-                    <span class="public-command-group-copy"><span class="eyebrow">Points and drops</span><span class="public-command-group-title">Raid rewards</span><span class="public-command-group-description">Rewards use equal base shares, with bonuses for the highest-ranked contributors.</span></span>
+                    <span class="public-command-group-copy"><span class="eyebrow">Points and drops</span><span class="public-command-group-title">Boss Hunt rewards</span><span class="public-command-group-description">Rewards use equal base shares, with bonuses for the highest-ranked contributors.</span></span>
                     <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
                 </summary>
 
@@ -193,14 +193,14 @@
                     <p>Defeating a boss starts with an equal base share of its full HP value for every contributor. The top 15% receive <strong>1.5×</strong>, the next 15% receive <strong>1.25×</strong>, the next 20% receive <strong>1.10×</strong>, and everyone else receives the base share.</p>
                     <p>The final hitter also receives a <strong>{{ "{:,}".format(config.final_hit_reward) }}-point</strong> bonus on main bosses or <strong>{{ "{:,}".format(config.mini_final_hit_reward) }} points</strong> on mini bosses.</p>
                     <p>Every contributor to a defeated encounter earns chatter XP: <strong>25 XP</strong> for a tutorial, <strong>50 XP</strong> for a mini boss, and <strong>100 XP</strong> for a main boss.</p>
-                    <p>Successful non-tutorial raids can drop mythical melee, ranged, or magic weapons. Tutorial participants receive a starter weapon they do not own, or {{ "{:,}".format(config.tutorial_complete_collection_points) }} points after completing the full starter collection.</p>
-                    <p>Encounters that end before the boss is defeated distribute a point pool based on the damage dealt, without raid-clear XP, finishing bonuses, or drops.</p>
+                    <p>Successful non-tutorial encounters can drop mythical melee, ranged, or magic weapons. Tutorial participants receive a starter weapon they do not own, or {{ "{:,}".format(config.tutorial_complete_collection_points) }} points after completing the full starter collection.</p>
+                    <p>Encounters that end before the boss is defeated distribute a point pool based on the damage dealt, without boss-clear XP, finishing bonuses, or drops.</p>
                 </div>
             </details>
 
             <details class="panel public-command-group">
                 <summary class="public-command-group-summary">
-                    <span class="public-command-group-copy"><span class="eyebrow">{{ raid_commands | length }} viewer commands</span><span class="public-command-group-title">Raid commands</span><span class="public-command-group-description">Everything viewers need to fight, shop, manage equipment, and check rewards.</span></span>
+                    <span class="public-command-group-copy"><span class="eyebrow">{{ raid_commands | length }} viewer commands</span><span class="public-command-group-title">Boss Hunt commands</span><span class="public-command-group-description">Everything viewers need to fight, shop, manage equipment, and check rewards.</span></span>
                     <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
                 </summary>
 
@@ -213,7 +213,7 @@
 
             <details class="panel public-command-group">
                 <summary class="public-command-group-summary">
-                    <span class="public-command-group-copy"><span class="eyebrow">{{ recent_events | length }} recent encounters</span><span class="public-command-group-title">Recent raid history</span><span class="public-command-group-description">The latest completed encounters for this channel.</span></span>
+                    <span class="public-command-group-copy"><span class="eyebrow">{{ recent_events | length }} recent encounters</span><span class="public-command-group-title">Recent Boss Hunt history</span><span class="public-command-group-description">The latest completed encounters for this channel.</span></span>
                     <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
                 </summary>
 
@@ -235,7 +235,7 @@
                             {% endfor %}
                         </div>
                     {% else %}
-                        <div class="compact-empty-state"><h3>No completed raids yet</h3><p>Completed encounters will appear here.</p></div>
+                        <div class="compact-empty-state"><h3>No completed encounters yet</h3><p>Completed encounters will appear here.</p></div>
                     {% endif %}
                 </div>
             </details>

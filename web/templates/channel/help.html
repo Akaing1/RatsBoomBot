@@ -52,13 +52,13 @@
 >
     <div class="panel-header raid-contributor-header">
         <div>
-            <p class="eyebrow">Live raid leaderboard</p>
-            <h3>Current Raid Contributors</h3>
+            <p class="eyebrow">Live Boss Hunt leaderboard</p>
+            <h3>Current Boss Hunt Contributors</h3>
             <p id="raid-contributor-boss" class="panel-description">
                 {% if raid_contributor_data.active %}
                     {{ raid_contributor_data.boss_name }} · {{ "{:,}".format(raid_contributor_data.current_hp) }}/{{ "{:,}".format(raid_contributor_data.max_hp) }} HP
                 {% else %}
-                    No active raid boss.
+                    No active boss.
                 {% endif %}
             </p>
         </div>
@@ -140,7 +140,7 @@
         panel.hidden = false;
 
         if (!data.active) {
-            boss.textContent = "No active raid boss.";
+            boss.textContent = "No active boss.";
             list.replaceChildren();
             return;
         }
