@@ -93,7 +93,7 @@ class ServiceContainer:
         for session in self.stream_logs.active_sessions.values():
             profile = get_active_profile(session.broadcaster_id)
 
-            if profile is not None and profile.raid_bosses.enabled and self.features.is_enabled(session.broadcaster_id, FeatureName.RAID_BOSSES):
+            if profile is not None and self.features.is_enabled(session.broadcaster_id, FeatureName.RAID_BOSSES):
                 await self.raid_bosses.restore_session(session.broadcaster_id, session.stream_id, profile.raid_bosses)
 
             if profile is not None and self.features.is_enabled(session.broadcaster_id, FeatureName.POINTS):

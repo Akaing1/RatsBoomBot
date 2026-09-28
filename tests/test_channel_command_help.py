@@ -132,13 +132,16 @@ def test_command_help_includes_stream_information_settings() -> None:
     assert get_command(settings_group, "!set title <stream title>").permission == "Broadcaster/mod"
 
 
-def test_raid_boss_toggle_is_hidden_for_unconfigured_profiles() -> None:
+def test_raid_boss_toggle_is_available_with_default_names() -> None:
     broadcaster_id = "channel-1"
     profile = ChannelProfile(channel_name="channel")
     activate_profile(broadcaster_id, profile)
     features = FeatureToggleService(db=None).get_channel_features(broadcaster_id)
 
-    assert FeatureName.RAID_BOSSES not in features
+    assert FeatureName.RAID_BOSSES in features
+    assert not features[FeatureName.RAID_BOSSES].effective_enabled
+    assert profile.raid_bosses.names.choices_for("melee") == ("Ironclad Brute",)
+    assert profile.raid_bosses.mini_names.choices_for("magic") == ("Arcane Tyrant",)
 
 
 def test_command_help_keeps_raid_boss_testing_controls_hidden() -> None:

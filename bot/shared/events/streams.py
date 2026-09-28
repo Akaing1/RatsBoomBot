@@ -57,7 +57,7 @@ class StreamEvents(commands.Component):
         active_event = await services.raid_bosses.get_active_event(broadcaster_id)
         event, failed_reward = await services.raid_bosses.register_stream(broadcaster_id, stream_id)
         profile = get_active_profile(broadcaster_id)
-        raids_enabled = profile is not None and profile.raid_bosses.enabled and services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
+        raids_enabled = profile is not None and services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
 
         if active_event is not None and event is None:
             damage_dealt = active_event.max_hp - active_event.current_hp

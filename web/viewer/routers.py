@@ -150,7 +150,7 @@ async def shop_context(request: Request, channel_name: str):
 
     runtime_db, services, profile, channel_profile, token = context
     broadcaster_id = str(profile["channel"]["id"])
-    if (channel_profile is None or not channel_profile.raid_bosses.enabled
+    if (channel_profile is None
             or not services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
             or not services.features.is_enabled(broadcaster_id, FeatureName.POINTS)):
         raise HTTPException(404, "Raid shop is unavailable for this channel.")
