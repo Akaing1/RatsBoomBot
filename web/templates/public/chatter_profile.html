@@ -38,7 +38,7 @@
             </div>
             {% if profile.pet %}
                 <div class="chatter-pet" title="{{ profile.pet.display_name }} ({{ profile.pet.rarity | replace('_', ' ') | title }}) · Level {{ profile.pet.level }} · {{ profile.pet.passive_name }} ({{ profile.pet.passive_rarity | replace('_', ' ') | title }})">
-                    <div class="chatter-pet-sprite" style="--pet-sprite: url('{{ profile.pet.sprite_path }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ profile.pet.frame_count }}" role="img" aria-label="{{ profile.pet.display_name }}"></div>
+                    <div class="chatter-pet-sprite{% if profile.pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% endif %}" style="--pet-sprite: url('{{ profile.pet.sprite_path }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ profile.pet.frame_count }}" role="img" aria-label="{{ profile.pet.display_name }}"></div>
                     <span>{{ profile.pet.display_name }} · {{ profile.pet.rarity | replace('_', ' ') | title }}</span>
                     <small>{{ profile.pet.passive_name }} · {{ profile.pet.passive_rarity | replace('_', ' ') | title }}</small>
                     <small>{{ profile.pet.passive_percent_label }}% {{ profile.pet.passive_description }}</small>
