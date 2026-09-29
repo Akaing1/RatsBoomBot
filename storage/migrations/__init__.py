@@ -54,6 +54,7 @@ from storage.migrations.v049_pet_asset_path import migrate as migrate_pet_asset_
 from storage.migrations.v050_viewer_sessions import migrate as migrate_viewer_sessions
 from storage.migrations.v051_gamble_outcomes import migrate as migrate_gamble_outcomes
 from storage.migrations.v052_pet_passive_tiers import migrate as migrate_pet_passive_tiers
+from storage.migrations.v053_repair_explosive_rat_seed import migrate as migrate_repair_explosive_rat_seed
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -118,4 +119,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=50, name="viewer_sessions", run=migrate_viewer_sessions)
     , Migration(version=51, name="gamble_outcomes", run=migrate_gamble_outcomes)
     , Migration(version=52, name="pet_passive_tiers", run=migrate_pet_passive_tiers)
+    , Migration(version=53, name="repair_explosive_rat_seed", run=migrate_repair_explosive_rat_seed)
 )
