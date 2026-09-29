@@ -25,6 +25,6 @@ async def migrate(connection) -> None:
     await connection.execute(
         """
         INSERT INTO pet_definitions (id, display_name, rarity, sprite_path, frame_count, max_level)
-        VALUES ('explosive_rat', 'Explosive Rats', 'common', '/assets/explosive_rat.png', 4, 50)
+        VALUES ('explosive_rat', 'Explosive Rat', 'common', '/assets/explosive_rat.png', 4, 50)
         """
     )
