@@ -1,6 +1,6 @@
 # Pets and passives
 
-Pets belong to a chatter globally. One pet can be equipped at a time, and its passive applies in every channel. The Dungeon Bat remains available with its fixed 10% loyalty gain. The Explosive Rat is a Common pet with a four-frame sprite.
+Pets belong to a chatter globally. One pet can be equipped at a time, and its passive applies in every channel. The Silly Bat remains available with its fixed 10% loyalty gain. The Explosive Rat is a Common pet with a four-frame sprite.
 
 Pet rarity and passive rarity are separate. Both use Common, Rare, and Ultra Rare tiers. A pet has one passive, chosen when it is first granted. The same pet can be equipped again without resetting its level or passive. Each chatter can own one of each pet type for now.
 

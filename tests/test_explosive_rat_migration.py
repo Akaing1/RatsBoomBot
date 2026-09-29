@@ -10,7 +10,7 @@ from storage import migration_runner
 async def test_previous_rat_seed_is_repaired_without_losing_equipment(tmp_path, monkeypatch, already_owned):
     async with asqlite.create_pool(str(tmp_path / "pets.db")) as db:
         migrations = migration_runner.MIGRATIONS
-        monkeypatch.setattr(migration_runner, "MIGRATIONS", migrations[:-1])
+        monkeypatch.setattr(migration_runner, "MIGRATIONS", migrations[:-2])
         await migration_runner.run_migrations(db)
         pets = PetService(db)
         old_pet = await pets.grant_rat("viewer") if already_owned else None
@@ -28,7 +28,7 @@ async def test_previous_rat_seed_is_repaired_without_losing_equipment(tmp_path, 
         await migration_runner.run_migrations(db)
         rat = await pets.grant_rat("viewer")
         assert (rat.pet_id, rat.display_name, rat.sprite_path) == (
-            "explosive_rat", "Explosive Rat", "/assets/explosive_rat.png"
+            "explosive_rat", "Explosive Rat", "/assets/Explosive%20Rat.png"
         )
         if old_pet is not None:
             assert rat.user_pet_id == old_pet.user_pet_id
