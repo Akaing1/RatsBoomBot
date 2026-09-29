@@ -37,10 +37,11 @@
                 <p>@{{ profile.identity.login }} &middot; Seen in {{ profile.channels_interacted }} RatsBoomBot {{ "channel" if profile.channels_interacted == 1 else "channels" }}</p>
             </div>
             {% if profile.pet %}
-                <div class="chatter-pet" title="{{ profile.pet.display_name }} · Level {{ profile.pet.level }} · +{{ profile.pet.passive_percent_label }}% loyalty points">
+                <div class="chatter-pet" title="{{ profile.pet.display_name }} ({{ profile.pet.rarity | replace('_', ' ') | title }}) · Level {{ profile.pet.level }} · {{ profile.pet.passive_name }} ({{ profile.pet.passive_rarity | replace('_', ' ') | title }})">
                     <div class="chatter-pet-sprite" style="--pet-sprite: url('{{ profile.pet.sprite_path }}'); --pet-frames: {{ profile.pet.frame_count }}" role="img" aria-label="{{ profile.pet.display_name }}"></div>
-                    <span>{{ profile.pet.display_name }}</span>
-                    <small>+{{ profile.pet.passive_percent_label }}% loyalty points</small>
+                    <span>{{ profile.pet.display_name }} · {{ profile.pet.rarity | replace('_', ' ') | title }}</span>
+                    <small>{{ profile.pet.passive_name }} · {{ profile.pet.passive_rarity | replace('_', ' ') | title }}</small>
+                    <small>{{ profile.pet.passive_percent_label }}% {{ profile.pet.passive_description }}</small>
                 </div>
             {% endif %}
             <div class="chatter-level-summary" title="{{ '{:,}'.format(profile.level.achievement_xp) }} XP from achievements and {{ '{:,}'.format(profile.level.raid_xp) }} XP from boss clears">

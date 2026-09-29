@@ -42,6 +42,7 @@ class ServiceContainer:
         self.passive_points = PassivePointsService(bot, db, self.points, self.chat_identity, self.features)
         self.raid_bosses = RaidBossService(
             bot, db, self.chatter_stats, self.points,
+            pets=self.pets,
             config_provider=lambda broadcaster_id: (
                 profile.raid_bosses if (profile := get_active_profile(broadcaster_id)) is not None else None
             ),

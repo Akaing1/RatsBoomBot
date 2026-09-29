@@ -506,7 +506,14 @@ class PointsService:
                             (username, payout, broadcaster_id, user_id)
                         )
 
-                    loss = max(bet - payout, 0)
+                    refund = await self.pets.gamble_loss_refund(user_id, bet, connection) if game == "gamble" and payout == 0 and self.pets is not None else 0
+                    if refund:
+                        await connection.execute(
+                            "UPDATE viewers SET points = points + ? WHERE broadcaster_id = ? AND user_id = ?",
+                            (refund, broadcaster_id, user_id)
+                        )
+
+                    loss = max(bet - payout - refund, 0)
 
                     if loss:
                         await connection.execute(
