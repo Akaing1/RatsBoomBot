@@ -92,14 +92,14 @@ class FakePets:
     async def get_equipped_pet(self, user_id: str):
         assert user_id == "user-1"
         return SimpleNamespace(
-            display_name="Dungeon Bat",
+            display_name="Silly Bat",
             rarity="common",
             level=1,
             passive_name="Loyalty Gain",
             passive_rarity="common",
             passive_description="bonus loyalty points earned",
             passive_percent_label="10",
-            sprite_path="/assets/bat.png",
+            sprite_path="/assets/Silly%20Bat.png",
             frame_count=4
         )
 
@@ -139,9 +139,9 @@ def test_public_global_chatter_profile_renders_equipped_pet(monkeypatch) -> None
         response = client.get("/chatters/alice")
 
     assert response.status_code == 200
-    assert "Dungeon Bat" in response.text
+    assert "Silly Bat" in response.text
     assert "10% bonus loyalty points earned" in response.text
-    assert "/assets/bat.png" in response.text
+    assert "/assets/Silly%20Bat.png" in response.text
     assert "--pet-frames: 4" in response.text
 
 

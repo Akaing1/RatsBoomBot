@@ -55,6 +55,7 @@ from storage.migrations.v050_viewer_sessions import migrate as migrate_viewer_se
 from storage.migrations.v051_gamble_outcomes import migrate as migrate_gamble_outcomes
 from storage.migrations.v052_pet_passive_tiers import migrate as migrate_pet_passive_tiers
 from storage.migrations.v053_repair_explosive_rat_seed import migrate as migrate_repair_explosive_rat_seed
+from storage.migrations.v054_pet_display_names import migrate as migrate_pet_display_names
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -120,4 +121,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=51, name="gamble_outcomes", run=migrate_gamble_outcomes)
     , Migration(version=52, name="pet_passive_tiers", run=migrate_pet_passive_tiers)
     , Migration(version=53, name="repair_explosive_rat_seed", run=migrate_repair_explosive_rat_seed)
+    , Migration(version=54, name="pet_display_names", run=migrate_pet_display_names)
 )
