@@ -1153,6 +1153,7 @@ async def channel_boss_hunt(request: Request):
             "broadcaster": broadcaster,
             "boss_hunt_enabled": enabled,
             "raid_metrics": await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if enabled else None,
+            "raid_contributor_data": await get_raid_contributor_data(services, broadcaster_id) if enabled else {"active": False, "contributors": []},
             "active_encounter": await services.raid_bosses.get_active_event(broadcaster_id) if enabled else None,
             "spawn_scheduled": str(broadcaster_id) in services.raid_bosses.spawn_tasks if enabled else False,
             "action_result": request.query_params.get("result"),

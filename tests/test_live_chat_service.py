@@ -2141,6 +2141,7 @@ async def test_boss_hunt_page_renders_for_connected_channel(monkeypatch):
     raid_bosses = SimpleNamespace(
         get_dashboard_metrics=AsyncMock(return_value=None),
         get_active_event=AsyncMock(return_value=None),
+        get_contributors=AsyncMock(return_value=[]),
         spawn_tasks={},
     )
     services = SimpleNamespace(
@@ -2160,6 +2161,8 @@ async def test_boss_hunt_page_renders_for_connected_channel(monkeypatch):
     assert response.status_code == 200
     assert b"Schedule boss" in response.body
     assert b"Boss Hunt activity" in response.body
+    assert b"Current Leaderboard" in response.body
+    assert b"No active encounter yet." in response.body
     assert b"/channel/boss-hunt" in response.body
 
 @pytest.mark.asyncio
@@ -2176,3 +2179,39 @@ async def test_boss_hunt_action_requires_matching_csrf(monkeypatch):
         await dashboard_router.channel_boss_hunt_action(request, "end", "wrong-token")
     assert error.value.status_code == 403
     boss_service.resolve.assert_not_awaited()
+
+@pytest.mark.asyncio
+async def test_boss_hunt_leaderboard_shows_current_contributors(monkeypatch):
+    from web.app import app
+
+    broadcaster = SimpleNamespace(id="channel-1", name="Test Channel", login="testchannel")
+    event = SimpleNamespace(boss_name="Training Dummy", current_hp=7600, max_hp=10000)
+    raid_bosses = SimpleNamespace(
+        get_dashboard_metrics=AsyncMock(return_value={
+            "boss_name": "Training Dummy", "status": "active", "boss_tier": "tutorial", "boss_type": "melee",
+            "current_hp": 7600, "max_hp": 10000, "hp_percent": 76,
+            "unique_attackers": 2, "total_attacks": 2, "total_damage": 2400, "streams_used": 1,
+        }),
+        get_active_event=AsyncMock(return_value=event),
+        get_contributors=AsyncMock(return_value=[("alice", 1500), ("bob", 900)]),
+        spawn_tasks={},
+    )
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
+        features=SimpleNamespace(is_enabled=lambda *_: True),
+        raid_bosses=raid_bosses,
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    request = Request({
+        "type": "http", "method": "GET", "path": "/channel/boss-hunt", "headers": [],
+        "query_string": b"", "scheme": "http", "server": ("testserver", 80),
+        "root_path": "", "app": app,
+        "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"},
+    })
+
+    response = await dashboard_router.channel_boss_hunt(request)
+    markup = response.body.decode()
+    assert markup.index("Boss Hunt activity") < markup.index("Current Leaderboard")
+    assert markup.index("#1") < markup.index("alice") < markup.index("#2") < markup.index("bob")
+    assert "1,500 damage" in markup and "900 damage" in markup
+    raid_bosses.get_contributors.assert_awaited_once_with("channel-1")

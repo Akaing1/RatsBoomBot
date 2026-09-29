@@ -30,7 +30,10 @@
 {% if action_result in notices %}<p class="boss-hunt-notice" role="status">{{ notices[action_result] }}</p>{% endif %}
 
 <div class="boss-hunt-layout">
-    {% include "channel/raid_summary.html" %}
+    <div class="boss-hunt-activity-column">
+        {% include "channel/raid_summary.html" %}
+        {% include "channel/raid_leaderboard.html" %}
+    </div>
 
     <section class="panel boss-hunt-controls">
         <div class="panel-header">
@@ -76,6 +79,7 @@
 {% endblock %}
 
 {% block page_scripts %}
+<script src="{{ url_for('static', path='/js/channel-raid-leaderboard.js') }}?v={{ deployment_stamp() }}" defer></script>
 <script>
     document.querySelector("[data-boss-hunt-end]")?.addEventListener("submit", event => {
         if (!window.confirm("End this Boss Hunt encounter and distribute earned rewards? This cannot be undone.")) event.preventDefault();
