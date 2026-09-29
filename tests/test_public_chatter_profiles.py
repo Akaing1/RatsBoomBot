@@ -141,7 +141,7 @@ def test_public_global_chatter_profile_renders_equipped_pet(monkeypatch) -> None
     assert response.status_code == 200
     assert "Silly Bat" in response.text
     assert "10% bonus loyalty points earned" in response.text
-    assert "/assets/Silly%20Bat.png" in response.text
+    assert "/assets/Silly%20Bat.png?v=" in response.text
     assert "--pet-frames: 4" in response.text
 
 
