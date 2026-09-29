@@ -5,7 +5,7 @@ from pets.passives import GAMBLE_LOSS_REFUND, LOYALTY_GAIN, PASSIVES, RAID_DAMAG
 
 LOYALTY_GAIN_PASSIVE = LOYALTY_GAIN
 POC_BAT_ID = "dungeon_bat"
-RAT_ID = "dungeon_rat"
+RAT_ID = "explosive_rat"
 POC_LOYALTY_BONUS_BPS = 1_000
 
 
