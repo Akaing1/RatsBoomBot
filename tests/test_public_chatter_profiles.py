@@ -93,7 +93,11 @@ class FakePets:
         assert user_id == "user-1"
         return SimpleNamespace(
             display_name="Dungeon Bat",
+            rarity="common",
             level=1,
+            passive_name="Loyalty Gain",
+            passive_rarity="common",
+            passive_description="bonus loyalty points earned",
             passive_percent_label="10",
             sprite_path="/assets/bat.png",
             frame_count=4
@@ -136,7 +140,7 @@ def test_public_global_chatter_profile_renders_equipped_pet(monkeypatch) -> None
 
     assert response.status_code == 200
     assert "Dungeon Bat" in response.text
-    assert "+10% loyalty points" in response.text
+    assert "10% bonus loyalty points earned" in response.text
     assert "/assets/bat.png" in response.text
     assert "--pet-frames: 4" in response.text
 

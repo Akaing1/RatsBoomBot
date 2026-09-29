@@ -334,6 +334,10 @@ class ModActionCommands(commands.Component):
         self.start_kamikaze_cooldown(broadcaster_id, caller_id)
 
         bomb_roll = random.randint(1, 100)
+        pets = getattr(services, "pets", None)
+        from pets.passives import KAMIKAZE_ODDS
+        bonus_bps = await pets.bonus_bps(caller_id, KAMIKAZE_ODDS) if pets is not None else 0
+        success_threshold = max(0, self.KAMIKAZE_SUCCESS_THRESHOLD - bonus_bps // 100)
 
         LOGGER.debug(
             "[Commands] !kamikaze rolled %d for user %s against %s.",
@@ -342,7 +346,7 @@ class ModActionCommands(commands.Component):
             target.name
         )
 
-        if bomb_roll > self.KAMIKAZE_SUCCESS_THRESHOLD:
+        if bomb_roll > success_threshold:
             timed_out = await self.timeout_with_moderator_restore(channel, broadcaster_id, target_id, target.name)
 
             if not timed_out:

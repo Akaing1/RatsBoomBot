@@ -244,14 +244,19 @@ async def viewer_gamble(request: Request, channel_name: str, amount: str = Form(
         message = "You have no points to gamble." if balance <= 0 else "Enter a bet within your current balance."
         request.session[GAMBLE_RESULT_KEY] = {"channel_id": broadcaster_id, "message": message}
     else:
-        won = random.random() < config.gamble_win_chance
+        pets = getattr(services, "pets", None)
+        win_chance = await pets.gamble_win_chance(user_id, config.gamble_win_chance) if pets is not None else config.gamble_win_chance
+        won = random.random() < win_chance
         new_balance = await services.points.settle_wager(
             broadcaster_id, user_id, str(profile["identity"]["login"]), bet,
             bet * 2 if won else 0, game="gamble", channel_name=str(profile["channel"]["login"]),
         )
         request.session[GAMBLE_RESULT_KEY] = (
             {"channel_id": broadcaster_id, "message": "Your balance changed before the bet was placed. Please try again."}
-            if new_balance is None else {"channel_id": broadcaster_id, "won": won, "bet": bet, "balance": new_balance}
+            if new_balance is None else {
+                "channel_id": broadcaster_id, "won": won, "bet": bet, "balance": new_balance,
+                "refund": await pets.gamble_loss_refund(user_id, bet) if not won and pets is not None else 0,
+            }
         )
 
     return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=gamble", status_code=303, headers=PRIVATE_HEADERS)
