@@ -615,7 +615,9 @@ button, input { font: inherit; }
 .panel-note { margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; line-height: 1.5; }
 .raid-monitor-panel { margin-bottom: 24px; }
 .boss-hunt-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); align-items: start; gap: 20px; }
-.boss-hunt-layout > .panel { min-width: 0; }
+.boss-hunt-layout > .panel, .boss-hunt-activity-column { min-width: 0; }
+.boss-hunt-activity-column { display: grid; align-content: start; gap: 20px; }
+.boss-hunt-activity-column .raid-contributor-panel { margin-bottom: 0; }
 .boss-hunt-notice { margin: 0 0 18px; padding: 12px 16px; border: 1px solid rgba(139,92,246,.5); border-radius: 10px; background: rgba(139,92,246,.12); }
 .boss-hunt-controls > p { color: var(--muted); font-size: 13px; line-height: 1.55; }
 .boss-hunt-schedule { display: grid; gap: 10px; margin-top: 20px; }
