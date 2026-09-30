@@ -10,7 +10,7 @@ from storage import migration_runner
 async def test_previous_rat_seed_is_repaired_without_losing_equipment(tmp_path, monkeypatch, already_owned):
     async with asqlite.create_pool(str(tmp_path / "pets.db")) as db:
         migrations = migration_runner.MIGRATIONS
-        monkeypatch.setattr(migration_runner, "MIGRATIONS", migrations[:-2])
+        monkeypatch.setattr(migration_runner, "MIGRATIONS", tuple(m for m in migrations if m.version < 53))
         await migration_runner.run_migrations(db)
         pets = PetService(db)
         old_pet = await pets.grant_rat("viewer") if already_owned else None

@@ -6,6 +6,7 @@ from pets.passives import GAMBLE_LOSS_REFUND, LOYALTY_GAIN, PASSIVES, RAID_DAMAG
 LOYALTY_GAIN_PASSIVE = LOYALTY_GAIN
 POC_BAT_ID = "dungeon_bat"
 RAT_ID = "explosive_rat"
+FOX_ID = "sleepy_fox"
 POC_LOYALTY_BONUS_BPS = 1_000
 
 
@@ -100,8 +101,11 @@ class PetService:
     async def grant_rat(self, user_id: str, passive_type: str = RAID_DAMAGE) -> EquippedPet:
         return await self.grant_pet(user_id, RAT_ID, passive_type)
 
+    async def grant_fox(self, user_id: str, passive_type: str = RAID_DAMAGE) -> EquippedPet:
+        return await self.grant_pet(user_id, FOX_ID, passive_type)
+
     async def grant_pet(self, user_id: str, pet_id: str, passive_type: str) -> EquippedPet:
-        if pet_id not in {POC_BAT_ID, RAT_ID} or passive_type not in PASSIVES:
+        if pet_id not in {POC_BAT_ID, RAT_ID, FOX_ID} or passive_type not in PASSIVES:
             raise ValueError("Unknown pet or passive.")
 
         user_id = str(user_id)

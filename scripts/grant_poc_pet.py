@@ -32,7 +32,11 @@ async def grant_pet(chatter: str, pet_id: str = "bat", passive_type: str = RAID_
             raise SystemExit(f"No chatter identity found for '{chatter}'.")
 
         service = PetService(database)
-        pet = await (service.grant_poc_bat(str(identity["user_id"])) if pet_id == "bat" else service.grant_rat(str(identity["user_id"]), passive_type))
+        if pet_id == "bat":
+            pet = await service.grant_poc_bat(str(identity["user_id"]))
+        else:
+            catalog_id = {"rat": "explosive_rat", "fox": "sleepy_fox"}[pet_id]
+            pet = await service.grant_pet(str(identity["user_id"]), catalog_id, passive_type)
         print(
             f"Equipped {pet.display_name} for {identity['display_name']} "
             f"({pet.rarity}) with {pet.passive_name} ({pet.passive_rarity}): "
@@ -43,8 +47,8 @@ async def grant_pet(chatter: str, pet_id: str = "bat", passive_type: str = RAID_
 def main() -> None:
     parser = argparse.ArgumentParser(description="Grant and equip a test pet on the selected environment.")
     parser.add_argument("chatter", help="Twitch login, display name, or user ID")
-    parser.add_argument("--pet", choices=("bat", "rat"), default="bat")
-    parser.add_argument("--passive", choices=tuple(PASSIVES), default=RAID_DAMAGE, help="Rat passive (bat keeps its loyalty bonus)")
+    parser.add_argument("--pet", choices=("bat", "rat", "fox"), default="bat")
+    parser.add_argument("--passive", choices=tuple(PASSIVES), default=RAID_DAMAGE, help="Rat or fox passive (bat keeps its loyalty bonus)")
     arguments = parser.parse_args()
     asyncio.run(grant_pet(arguments.chatter, arguments.pet, arguments.passive))
 
