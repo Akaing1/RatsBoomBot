@@ -151,7 +151,7 @@ def test_public_profile_uses_rat_idle_animation(monkeypatch) -> None:
         async def get_equipped_pet(self, user_id: str):
             pet = await super().get_equipped_pet(user_id)
             pet.pet_id = "explosive_rat"
-            pet.display_name = "Explosive Rat"
+            pet.display_name = "Little Rat"
             pet.sprite_path = "/assets/Explosive%20Rat.png"
             return pet
 

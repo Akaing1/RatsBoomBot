@@ -25,8 +25,10 @@ async def test_existing_equipped_pets_keep_ownership_after_rename(tmp_path, monk
         assert (bat_after.user_pet_id, bat_after.pet_id, bat_after.display_name, bat_after.sprite_path) == (
             bat_before.user_pet_id, "dungeon_bat", "Silly Bat", "/assets/Silly%20Bat.png"
         )
+        assert bat_after.rarity == rat_after.rarity == "common"
+        assert rat_after.passive_type == rat_before.passive_type
         assert (rat_after.user_pet_id, rat_after.pet_id, rat_after.display_name, rat_after.sprite_path) == (
-            rat_before.user_pet_id, "explosive_rat", "Explosive Rat", "/assets/Explosive%20Rat.png"
+            rat_before.user_pet_id, "explosive_rat", "Little Rat", "/assets/Explosive%20Rat.png"
         )
 
 

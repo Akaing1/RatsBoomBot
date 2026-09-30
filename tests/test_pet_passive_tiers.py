@@ -18,7 +18,7 @@ async def test_rat_and_passive_tiers_are_seeded_and_level_scaled(tmp_path):
         await run_migrations(db)
         pets = PetService(db)
         rat = await pets.grant_rat('viewer')
-        assert (rat.pet_id, rat.display_name, rat.rarity, rat.sprite_path, rat.frame_count) == ('explosive_rat', 'Explosive Rat', 'rare', '/assets/Explosive%20Rat.png', 4)
+        assert (rat.pet_id, rat.display_name, rat.rarity, rat.sprite_path, rat.frame_count) == ('explosive_rat', 'Little Rat', 'common', '/assets/Explosive%20Rat.png', 4)
         assert rat.passive_type == RAID_DAMAGE
         assert (rat.passive_rarity, rat.passive_percent) == ('common', 10)
 

@@ -23,10 +23,10 @@ async def balance(database):
 @pytest.mark.parametrize('roll,pet_id,passive,rarity,refund', [
     (0, 'dungeon_bat', LOYALTY_GAIN, 'common', 12_500),
     (6999, 'dungeon_bat', LOYALTY_GAIN, 'common', 12_500),
-    (7000, 'explosive_rat', KAMIKAZE_ODDS, 'rare', 25_000),
-    (8999, 'explosive_rat', KAMIKAZE_ODDS, 'rare', 25_000),
-    (9000, 'sleepy_fox', GAMBLE_LOSS_REFUND, 'ultra_rare', 50_000),
-    (9999, 'sleepy_fox', GAMBLE_LOSS_REFUND, 'ultra_rare', 50_000),
+    (7000, 'explosive_rat', KAMIKAZE_ODDS, 'common', 12_500),
+    (8999, 'explosive_rat', KAMIKAZE_ODDS, 'common', 12_500),
+    (9000, 'sleepy_fox', GAMBLE_LOSS_REFUND, 'common', 12_500),
+    (9999, 'sleepy_fox', GAMBLE_LOSS_REFUND, 'common', 12_500),
 ])
 async def test_summon_boundaries_fixed_passives_and_duplicate_refund(tmp_path, monkeypatch, roll, pet_id, passive, rarity, refund):
     monkeypatch.setattr('pets.service.randbelow', lambda _: roll)
@@ -81,10 +81,10 @@ async def test_global_collection_equip_and_concurrent_summons(tmp_path, monkeypa
         assert sum(isinstance(result, ValueError) for result in results) == 1
         assert (await pets.get_equipped_pet('viewer')).user_pet_id == bat.user_pet_id
         assert len(await pets.get_collection('viewer')) == 2
-        assert (await pets.equip('viewer', 'Explosive Rat')).passive_type == KAMIKAZE_ODDS
+        assert (await pets.equip('viewer', 'Little Rat')).passive_type == KAMIKAZE_ODDS
         assert await pets.bonus_bps('viewer', LOYALTY_GAIN) == 0
         with pytest.raises(ValueError, match="don't own"):
-            await pets.equip('other-user', 'Explosive Rat')
+            await pets.equip('other-user', 'Little Rat')
         assert await pets.get_equipped_pet('other-user') is None
 
 

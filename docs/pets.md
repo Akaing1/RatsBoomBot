@@ -1,6 +1,6 @@
 # Pets and passives
 
-Pets belong to a chatter globally. One pet can be equipped at a time, and its passive applies in every channel. The Silly Bat remains available with its fixed 10% loyalty gain. The Explosive Rat is a Rare pet with a four-frame sprite.
+Pets belong to a chatter globally. One pet can be equipped at a time, and its passive applies in every channel. The Silly Bat remains available with its fixed 10% loyalty gain. The Little Rat is a Common pet with a four-frame sprite.
 
 Pet rarity and passive rarity are separate. Both use Common, Rare, and Ultra Rare tiers. A pet has one passive, chosen when it is first granted. The same pet can be equipped again without resetting its level or passive. Each chatter can own one of each pet type for now.
 
@@ -36,7 +36,7 @@ After deployment, grant Sleepy Fox with:
 sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet fox
 ```
 
-Sleepy Fox is UR. Administrator grants still default to Boss Hunt Damage, like the rat, and `--passive` can select an existing passive. Self-service summons use the fixed passives below.
+Sleepy Fox is Common. Administrator grants still default to Boss Hunt Damage, like the rat, and `--passive` can select an existing passive. Self-service summons use the fixed passives below.
 
 ## Summoning (release 13)
 
@@ -48,8 +48,10 @@ Sleepy Fox is UR. Administrator grants still default to Boss Hunt Damage, like t
 | Pet | Rarity | Chance | Fixed summon passive | Duplicate refund |
 | --- | --- | --- | --- | --- |
 | Silly Bat | Common | 70% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
-| Explosive Rat | Rare | 20% | Kamikaze Luck: +5 percentage points hit chance | 25,000 points |
-| Sleepy Fox | UR | 10% | Second Chance: 10% of lost gamble bets refunded | 50,000 points |
+| Little Rat | Common | 20% | Kamikaze Luck: +5 percentage points hit chance | 12,500 points |
+| Sleepy Fox | Common | 10% | Second Chance: 10% of lost gamble bets refunded | 12,500 points |
+
+All three starter pets are Common for now; the 70/20/10 weights select the species directly. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Passive mappings remain provisional until selected.
 
 Duplicates return points to the ticket's original purchase channel, without loyalty bonuses or earned-point XP. Purchases and summons are atomic to prevent double spending. Existing granted pets retain their passives. No leveling, feeding, essence purchases, or passive rerolls are added here.
 
@@ -58,6 +60,6 @@ Duplicates return points to the ticket's original purchase channel, without loya
 1. Give a test chatter at least 50,000 channel points using the channel's moderator points command.
 2. Run each purchase alias and confirm exactly 50,000 points is deducted per ticket.
 3. Run `!pets summon`, then `!pets`, and check the sprite and collection on the linked profile.
-4. Obtain a second pet and run `!pets equip Explosive Rat` (or its full name). Check that it is equipped in another channel too.
+4. Obtain a second pet and run `!pets equip Little Rat` (or its full name). Check that it is equipped in another channel too.
 5. Summon a duplicate and verify the refund against the table in the ticket's purchase channel, even if summoned elsewhere.
 6. Confirm an empty balance cannot buy and an empty ticket inventory cannot summon.

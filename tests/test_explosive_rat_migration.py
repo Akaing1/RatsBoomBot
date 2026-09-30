@@ -28,7 +28,7 @@ async def test_previous_rat_seed_is_repaired_without_losing_equipment(tmp_path, 
         await migration_runner.run_migrations(db)
         rat = await pets.grant_rat("viewer")
         assert (rat.pet_id, rat.display_name, rat.sprite_path) == (
-            "explosive_rat", "Explosive Rat", "/assets/Explosive%20Rat.png"
+            "explosive_rat", "Little Rat", "/assets/Explosive%20Rat.png"
         )
         if old_pet is not None:
             assert rat.user_pet_id == old_pet.user_pet_id

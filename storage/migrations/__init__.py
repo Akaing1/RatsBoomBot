@@ -61,6 +61,8 @@ from storage.migrations.v055_sleepy_fox import migrate as migrate_sleepy_fox
 
 from storage.migrations.v056_pet_summons import migrate as migrate_pet_summons
 
+from storage.migrations.v057_common_pet_catalog import migrate as migrate_common_pet_catalog
+
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
 
@@ -128,4 +130,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=54, name="pet_display_names", run=migrate_pet_display_names)
     , Migration(version=55, name="sleepy_fox", run=migrate_sleepy_fox)
     , Migration(version=56, name="pet_summons", run=migrate_pet_summons)
+    , Migration(version=57, name="common_pet_catalog", run=migrate_common_pet_catalog)
 )

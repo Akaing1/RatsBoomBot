@@ -46,7 +46,7 @@ class PetsCommands(commands.Component):
         except ValueError as error:
             await ctx.reply(str(error))
             return
-        await ctx.reply(f"Bought 1 summon ticket for 50,000 points. Balance: {balance:,}. Use !pets summon. Odds: 70% Common / 20% Rare / 10% UR.")
+        await ctx.reply(f"Bought 1 summon ticket for 50,000 points. Balance: {balance:,}. Use !pets summon. Odds: 70% Silly Bat / 20% Little Rat / 10% Sleepy Fox (all Common).")
 
     @pets.command(name="summon")
     async def summon(self, ctx: commands.Context, *, item: str = "ticket") -> None:
