@@ -29,7 +29,7 @@ class PetsCommands(commands.Component):
         login = str(identity["login"]) if identity else str(ctx.chatter.name)
         url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/chatters/{quote(login, safe='')}#pets"
         status = f"{pet.display_name} ({rarity_label(pet.rarity)}) equipped: {pet.passive_percent_label}% {pet.passive_description}." if pet else "No pet equipped."
-        await ctx.reply(f"{status} Summon tickets: {tickets}. Buy: !pets buy ticket (50,000 points). Use: !pets summon. Collection: {url}")
+        await ctx.reply(f"{status} View Collection: {url}")
 
     @pets.command(name="buy")
     async def buy(self, ctx: commands.Context, *, item: str = "") -> None:
