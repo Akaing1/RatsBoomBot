@@ -1,13 +1,32 @@
 from dataclasses import dataclass
+from secrets import randbelow
 from typing import Any
 
-from pets.passives import GAMBLE_LOSS_REFUND, LOYALTY_GAIN, PASSIVES, RAID_DAMAGE, scaled_bps
+from pets.passives import GAMBLE_LOSS_REFUND, GAMBLE_ODDS, LOYALTY_GAIN, PASSIVES, RAID_DAMAGE, scaled_bps
+from storage.transactions import immediate_transaction
 
 LOYALTY_GAIN_PASSIVE = LOYALTY_GAIN
 POC_BAT_ID = "dungeon_bat"
 RAT_ID = "explosive_rat"
 FOX_ID = "sleepy_fox"
 POC_LOYALTY_BONUS_BPS = 1_000
+TICKET_PRICE = 50_000
+SUMMON_POOL = (
+    (7_000, POC_BAT_ID, "common", GAMBLE_ODDS, 12_500),
+    (9_000, RAT_ID, "common", LOYALTY_GAIN, 12_500),
+    (10_000, FOX_ID, "common", RAID_DAMAGE, 12_500),
+)
+
+
+@dataclass(frozen=True)
+class SummonResult:
+    pet_id: str
+    display_name: str
+    rarity: str
+    duplicate: bool
+    refund: int
+    refund_channel: str
+    equipped: bool
 
 
 @dataclass(frozen=True)
@@ -78,6 +97,108 @@ class PetService:
 
         return self._from_row(row) if row is not None else None
 
+    async def get_collection(self, user_id: str) -> list[EquippedPet]:
+        async with self.db.acquire() as connection:
+            rows = await connection.fetchall("""
+            SELECT owned.id AS user_pet_id, definitions.id AS pet_id,
+                   definitions.display_name, definitions.rarity,
+                   definitions.sprite_path, definitions.frame_count,
+                   definitions.max_level, owned.level, owned.xp,
+                   owned.passive_type, owned.passive_value_bps,
+                   passives.display_name AS passive_name,
+                   passives.rarity AS passive_rarity,
+                   passives.max_bps AS passive_max_bps
+            FROM user_pets AS owned
+            JOIN pet_definitions AS definitions ON definitions.id = owned.pet_id
+            JOIN pet_passive_definitions AS passives ON passives.id = owned.passive_type
+            WHERE owned.user_id = ?
+            ORDER BY definitions.display_name
+            """, (str(user_id),))
+        return [self._from_row(row) for row in rows]
+
+    async def ticket_count(self, user_id: str) -> int:
+        async with self.db.acquire() as connection:
+            row = await connection.fetchone(
+                "SELECT COUNT(*) AS count FROM pet_summon_tickets WHERE user_id = ?",
+                (str(user_id),),
+            )
+        return int(row["count"])
+
+    async def buy_ticket(self, broadcaster_id: str, user_id: str) -> int:
+        broadcaster_id, user_id = str(broadcaster_id), str(user_id)
+        async with self.db.acquire() as connection:
+            async with immediate_transaction(connection):
+                row = await connection.fetchone(
+                    "SELECT points FROM viewers WHERE broadcaster_id = ? AND user_id = ?",
+                    (broadcaster_id, user_id),
+                )
+                if row is None or int(row["points"]) < TICKET_PRICE:
+                    raise ValueError("You need 50,000 loyalty points in this channel to buy a summon ticket.")
+                await connection.execute(
+                    "UPDATE viewers SET points = points - ? WHERE broadcaster_id = ? AND user_id = ?",
+                    (TICKET_PRICE, broadcaster_id, user_id),
+                )
+                await connection.execute(
+                    "INSERT INTO pet_summon_tickets (user_id, broadcaster_id) VALUES (?, ?)",
+                    (user_id, broadcaster_id),
+                )
+                balance = int(row["points"]) - TICKET_PRICE
+        return balance
+
+    async def summon(self, user_id: str, username: str) -> SummonResult:
+        user_id = str(user_id)
+        async with self.db.acquire() as connection:
+            async with immediate_transaction(connection):
+                ticket = await connection.fetchone(
+                    "SELECT id, broadcaster_id FROM pet_summon_tickets WHERE user_id = ? ORDER BY id LIMIT 1",
+                    (user_id,),
+                )
+                if ticket is None:
+                    raise ValueError("You have no summon tickets. Buy one with !pets buy ticket (50,000 points).")
+                roll = randbelow(10_000)
+                _, pet_id, rarity, passive, refund = next(entry for entry in SUMMON_POOL if roll < entry[0])
+                definition = await connection.fetchone("SELECT display_name FROM pet_definitions WHERE id = ?", (pet_id,))
+                owned = await connection.fetchone("SELECT id FROM user_pets WHERE user_id = ? AND pet_id = ?", (user_id, pet_id))
+                duplicate = owned is not None
+                equipped = False
+                source = str(ticket["broadcaster_id"])
+                if duplicate:
+                    # Refund purchased points directly, without earned-point bonuses or XP.
+                    await connection.execute(
+                        """INSERT INTO viewers (broadcaster_id, user_id, username, points)
+                           VALUES (?, ?, ?, ?) ON CONFLICT(broadcaster_id, user_id)
+                           DO UPDATE SET points = viewers.points + excluded.points""",
+                        (source, user_id, username, refund),
+                    )
+                else:
+                    await connection.execute(
+                        """INSERT INTO user_pets (user_id, pet_id, level, xp, passive_type, passive_value_bps)
+                           VALUES (?, ?, 1, 0, ?, ?)""",
+                        (user_id, pet_id, passive, PASSIVES[passive].min_bps),
+                    )
+                    owned = await connection.fetchone("SELECT id FROM user_pets WHERE user_id = ? AND pet_id = ?", (user_id, pet_id))
+                    equipped = await self.get_equipped_pet(user_id, connection) is None
+                    if equipped:
+                        await connection.execute("INSERT INTO user_pet_loadouts (user_id, user_pet_id) VALUES (?, ?)", (user_id, owned["id"]))
+                await connection.execute("DELETE FROM pet_summon_tickets WHERE id = ?", (ticket["id"],))
+                result = SummonResult(pet_id, str(definition["display_name"]), rarity, duplicate, refund if duplicate else 0, source, equipped)
+        return result
+
+    async def equip(self, user_id: str, name: str) -> EquippedPet:
+        collection = await self.get_collection(str(user_id))
+        name = name.strip().casefold()
+        pet = next((pet for pet in collection if name in {pet.pet_id.casefold(), pet.display_name.casefold()}), None)
+        if pet is None:
+            raise ValueError("You don't own that pet. Use its full name from your collection.")
+        async with self.db.acquire() as connection:
+            async with immediate_transaction(connection):
+                await connection.execute(
+                    """INSERT INTO user_pet_loadouts (user_id, user_pet_id) VALUES (?, ?)
+                       ON CONFLICT(user_id) DO UPDATE SET user_pet_id = excluded.user_pet_id,
+                       equipped_at = CURRENT_TIMESTAMP""", (str(user_id), pet.user_pet_id),
+                )
+        return pet
+
     async def loyalty_bonus(self, user_id: str, base_amount: int, connection=None) -> int:
         if base_amount <= 0:
             return 0
@@ -96,9 +217,9 @@ class PetService:
         return (bet * await self.bonus_bps(user_id, GAMBLE_LOSS_REFUND, connection)) // 10_000
 
     async def grant_poc_bat(self, user_id: str) -> EquippedPet:
-        return await self.grant_pet(user_id, POC_BAT_ID, LOYALTY_GAIN_PASSIVE)
+        return await self.grant_pet(user_id, POC_BAT_ID, GAMBLE_ODDS)
 
-    async def grant_rat(self, user_id: str, passive_type: str = RAID_DAMAGE) -> EquippedPet:
+    async def grant_rat(self, user_id: str, passive_type: str = LOYALTY_GAIN) -> EquippedPet:
         return await self.grant_pet(user_id, RAT_ID, passive_type)
 
     async def grant_fox(self, user_id: str, passive_type: str = RAID_DAMAGE) -> EquippedPet:

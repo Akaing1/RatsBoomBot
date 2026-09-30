@@ -5,12 +5,12 @@ from pathlib import Path
 import asqlite
 
 from pets import PetService
-from pets.passives import PASSIVES, RAID_DAMAGE
+from pets.passives import PASSIVES, GAMBLE_ODDS, LOYALTY_GAIN, RAID_DAMAGE
 from config.settings import settings
 from storage.migration_runner import run_migrations
 
 
-async def grant_pet(chatter: str, pet_id: str = "bat", passive_type: str = RAID_DAMAGE) -> None:
+async def grant_pet(chatter: str, pet_id: str = "bat", passive_type: str | None = None) -> None:
     database_path = Path(settings.DATABASE_PATH)
     normalized = chatter.strip().removeprefix("@").strip()
 
@@ -32,11 +32,9 @@ async def grant_pet(chatter: str, pet_id: str = "bat", passive_type: str = RAID_
             raise SystemExit(f"No chatter identity found for '{chatter}'.")
 
         service = PetService(database)
-        if pet_id == "bat":
-            pet = await service.grant_poc_bat(str(identity["user_id"]))
-        else:
-            catalog_id = {"rat": "explosive_rat", "fox": "sleepy_fox"}[pet_id]
-            pet = await service.grant_pet(str(identity["user_id"]), catalog_id, passive_type)
+        catalog_id = {"bat": "dungeon_bat", "rat": "explosive_rat", "fox": "sleepy_fox"}[pet_id]
+        default_passive = {"bat": GAMBLE_ODDS, "rat": LOYALTY_GAIN, "fox": RAID_DAMAGE}[pet_id]
+        pet = await service.grant_pet(str(identity["user_id"]), catalog_id, passive_type or default_passive)
         print(
             f"Equipped {pet.display_name} for {identity['display_name']} "
             f"({pet.rarity}) with {pet.passive_name} ({pet.passive_rarity}): "
@@ -48,7 +46,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Grant and equip a test pet on the selected environment.")
     parser.add_argument("chatter", help="Twitch login, display name, or user ID")
     parser.add_argument("--pet", choices=("bat", "rat", "fox"), default="bat")
-    parser.add_argument("--passive", choices=tuple(PASSIVES), default=RAID_DAMAGE, help="Rat or fox passive (bat keeps its loyalty bonus)")
+    parser.add_argument("--passive", choices=tuple(PASSIVES), default=None, help="Override the pet's fixed passive for testing")
     arguments = parser.parse_args()
     asyncio.run(grant_pet(arguments.chatter, arguments.pet, arguments.passive))
 
