@@ -1,6 +1,6 @@
 # Pets and passives
 
-Pets belong to a chatter globally. One pet can be equipped at a time, and its passive applies in every channel. The Silly Bat remains available with its fixed 10% loyalty gain. The Little Rat is a Common pet with a four-frame sprite.
+Pets belong to a chatter globally. One pet can be equipped at a time, and its passive applies in every channel. The Silly Bat has Gamble Luck (+5 percentage points to gamble win chance). The Little Rat is a Common pet with a four-frame sprite.
 
 Pet rarity and passive rarity are separate. Both use Common, Rare, and Ultra Rare tiers. A pet has one passive, chosen when it is first granted. The same pet can be equipped again without resetting its level or passive. Each chatter can own one of each pet type for now.
 
@@ -36,7 +36,7 @@ After deployment, grant Sleepy Fox with:
 sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet fox
 ```
 
-Sleepy Fox is Common. Administrator grants still default to Boss Hunt Damage, like the rat, and `--passive` can select an existing passive. Self-service summons use the fixed passives below.
+Sleepy Fox is Common. Administrator grants use the fixed mappings below by default; `--passive` can override them for testing. Self-service summons use the fixed passives below.
 
 ## Summoning (release 13)
 
@@ -47,13 +47,13 @@ Sleepy Fox is Common. Administrator grants still default to Boss Hunt Damage, li
 
 | Pet | Rarity | Chance | Fixed summon passive | Duplicate refund |
 | --- | --- | --- | --- | --- |
-| Silly Bat | Common | 70% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
-| Little Rat | Common | 20% | Kamikaze Luck: +5 percentage points hit chance | 12,500 points |
-| Sleepy Fox | Common | 10% | Second Chance: 10% of lost gamble bets refunded | 12,500 points |
+| Silly Bat | Common | 70% | Gamble Luck: +5 percentage points win chance | 12,500 points |
+| Little Rat | Common | 20% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
+| Sleepy Fox | Common | 10% | Boss Hunt Damage: +10% damage | 12,500 points |
 
-All three starter pets are Common for now; the 70/20/10 weights select the species directly. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Passive mappings remain provisional until selected.
+All three starter pets are Common for now; the 70/20/10 weights select the species directly. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
 
-Duplicates return points to the ticket's original purchase channel, without loyalty bonuses or earned-point XP. Purchases and summons are atomic to prevent double spending. Existing granted pets retain their passives. No leveling, feeding, essence purchases, or passive rerolls are added here.
+Duplicates return points to the ticket's original purchase channel, without loyalty bonuses or earned-point XP. Purchases and summons are atomic to prevent double spending. Existing pets are aligned with the selected mappings on migration. No leveling, feeding, essence purchases, or passive rerolls are added here.
 
 ### UAT check
 

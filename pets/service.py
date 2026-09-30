@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from secrets import randbelow
 from typing import Any
 
-from pets.passives import GAMBLE_LOSS_REFUND, KAMIKAZE_ODDS, LOYALTY_GAIN, PASSIVES, RAID_DAMAGE, scaled_bps
+from pets.passives import GAMBLE_LOSS_REFUND, GAMBLE_ODDS, LOYALTY_GAIN, PASSIVES, RAID_DAMAGE, scaled_bps
 from storage.transactions import immediate_transaction
 
 LOYALTY_GAIN_PASSIVE = LOYALTY_GAIN
@@ -12,9 +12,9 @@ FOX_ID = "sleepy_fox"
 POC_LOYALTY_BONUS_BPS = 1_000
 TICKET_PRICE = 50_000
 SUMMON_POOL = (
-    (7_000, POC_BAT_ID, "common", LOYALTY_GAIN, 12_500),
-    (9_000, RAT_ID, "common", KAMIKAZE_ODDS, 12_500),
-    (10_000, FOX_ID, "common", GAMBLE_LOSS_REFUND, 12_500),
+    (7_000, POC_BAT_ID, "common", GAMBLE_ODDS, 12_500),
+    (9_000, RAT_ID, "common", LOYALTY_GAIN, 12_500),
+    (10_000, FOX_ID, "common", RAID_DAMAGE, 12_500),
 )
 
 
@@ -217,9 +217,9 @@ class PetService:
         return (bet * await self.bonus_bps(user_id, GAMBLE_LOSS_REFUND, connection)) // 10_000
 
     async def grant_poc_bat(self, user_id: str) -> EquippedPet:
-        return await self.grant_pet(user_id, POC_BAT_ID, LOYALTY_GAIN_PASSIVE)
+        return await self.grant_pet(user_id, POC_BAT_ID, GAMBLE_ODDS)
 
-    async def grant_rat(self, user_id: str, passive_type: str = RAID_DAMAGE) -> EquippedPet:
+    async def grant_rat(self, user_id: str, passive_type: str = LOYALTY_GAIN) -> EquippedPet:
         return await self.grant_pet(user_id, RAT_ID, passive_type)
 
     async def grant_fox(self, user_id: str, passive_type: str = RAID_DAMAGE) -> EquippedPet:

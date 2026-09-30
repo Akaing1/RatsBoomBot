@@ -3,7 +3,7 @@ import asyncio
 import asqlite
 import pytest
 
-from pets.passives import GAMBLE_LOSS_REFUND, KAMIKAZE_ODDS, LOYALTY_GAIN
+from pets.passives import GAMBLE_ODDS, LOYALTY_GAIN, RAID_DAMAGE
 from pets.service import PetService
 from storage.migration_runner import run_migrations
 
@@ -21,12 +21,12 @@ async def balance(database):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('roll,pet_id,passive,rarity,refund', [
-    (0, 'dungeon_bat', LOYALTY_GAIN, 'common', 12_500),
-    (6999, 'dungeon_bat', LOYALTY_GAIN, 'common', 12_500),
-    (7000, 'explosive_rat', KAMIKAZE_ODDS, 'common', 12_500),
-    (8999, 'explosive_rat', KAMIKAZE_ODDS, 'common', 12_500),
-    (9000, 'sleepy_fox', GAMBLE_LOSS_REFUND, 'common', 12_500),
-    (9999, 'sleepy_fox', GAMBLE_LOSS_REFUND, 'common', 12_500),
+    (0, 'dungeon_bat', GAMBLE_ODDS, 'common', 12_500),
+    (6999, 'dungeon_bat', GAMBLE_ODDS, 'common', 12_500),
+    (7000, 'explosive_rat', LOYALTY_GAIN, 'common', 12_500),
+    (8999, 'explosive_rat', LOYALTY_GAIN, 'common', 12_500),
+    (9000, 'sleepy_fox', RAID_DAMAGE, 'common', 12_500),
+    (9999, 'sleepy_fox', RAID_DAMAGE, 'common', 12_500),
 ])
 async def test_summon_boundaries_fixed_passives_and_duplicate_refund(tmp_path, monkeypatch, roll, pet_id, passive, rarity, refund):
     monkeypatch.setattr('pets.service.randbelow', lambda _: roll)
@@ -81,8 +81,8 @@ async def test_global_collection_equip_and_concurrent_summons(tmp_path, monkeypa
         assert sum(isinstance(result, ValueError) for result in results) == 1
         assert (await pets.get_equipped_pet('viewer')).user_pet_id == bat.user_pet_id
         assert len(await pets.get_collection('viewer')) == 2
-        assert (await pets.equip('viewer', 'Little Rat')).passive_type == KAMIKAZE_ODDS
-        assert await pets.bonus_bps('viewer', LOYALTY_GAIN) == 0
+        assert (await pets.equip('viewer', 'Little Rat')).passive_type == LOYALTY_GAIN
+        assert await pets.bonus_bps('viewer', GAMBLE_ODDS) == 0
         with pytest.raises(ValueError, match="don't own"):
             await pets.equip('other-user', 'Little Rat')
         assert await pets.get_equipped_pet('other-user') is None
@@ -136,3 +136,27 @@ async def test_pet_commands_respect_disabled_flags():
     ctx.reply.reset_mock()
     await command.pets.callback(command, ctx)
     ctx.reply.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_selected_passive_migration_preserves_collection_loadout_and_progress(tmp_path, monkeypatch):
+    from storage import migration_runner
+    async with asqlite.create_pool(str(tmp_path / 'pets.db')) as database:
+        migrations = migration_runner.MIGRATIONS
+        monkeypatch.setattr(migration_runner, 'MIGRATIONS', tuple(m for m in migrations if m.version < 58))
+        await migration_runner.run_migrations(database)
+        pets = PetService(database)
+        bat = await pets.grant_pet('viewer', 'dungeon_bat', LOYALTY_GAIN)
+        rat = await pets.grant_pet('viewer', 'explosive_rat', RAID_DAMAGE)
+        fox = await pets.grant_pet('viewer', 'sleepy_fox', 'gamble_loss_refund')
+        async with database.acquire() as connection:
+            await connection.execute("UPDATE user_pets SET level = 3, xp = 42 WHERE user_id = 'viewer'")
+            await connection.commit()
+        monkeypatch.setattr(migration_runner, 'MIGRATIONS', migrations)
+        await migration_runner.run_migrations(database)
+        collection = {pet.pet_id: pet for pet in await pets.get_collection('viewer')}
+        for old, passive, bps in [(bat, GAMBLE_ODDS, 500), (rat, LOYALTY_GAIN, 1000), (fox, RAID_DAMAGE, 1000)]:
+            pet = collection[old.pet_id]
+            assert (pet.user_pet_id, pet.passive_type, pet.passive_value_bps) == (old.user_pet_id, passive, bps)
+            assert (pet.level, pet.xp) == (3, 42)
+        assert (await pets.get_equipped_pet('viewer')).user_pet_id == fox.user_pet_id

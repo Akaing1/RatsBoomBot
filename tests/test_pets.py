@@ -13,7 +13,7 @@ async def test_poc_bat_is_global_and_buffs_earned_points_only(tmp_path) -> None:
         await run_migrations(database)
         pets = PetService(database)
         points = PointsService(bot=None, db=database, pets=pets)
-        pet = await pets.grant_poc_bat("viewer-1")
+        pet = await pets.grant_pet("viewer-1", "dungeon_bat", LOYALTY_GAIN_PASSIVE)
 
         assert pet.pet_id == "dungeon_bat"
         assert pet.passive_type == LOYALTY_GAIN_PASSIVE
@@ -57,7 +57,7 @@ async def test_transfers_and_gambling_payouts_do_not_receive_pet_bonus(tmp_path)
         await run_migrations(database)
         pets = PetService(database)
         points = PointsService(bot=None, db=database, pets=pets)
-        await pets.grant_poc_bat("viewer-1")
+        await pets.grant_pet("viewer-1", "dungeon_bat", LOYALTY_GAIN_PASSIVE)
 
         await points.add_points("channel-1", "viewer-1", "viewer", 100, earned=False)
         await points.add_points("channel-1", "sender-1", "sender", 50, earned=False)
