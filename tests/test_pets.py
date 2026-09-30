@@ -104,3 +104,28 @@ async def test_sleepy_fox_grant_preserves_ownership_and_equips(tmp_path) -> None
             'sleepy_fox', 'Sleepy Fox', 'common', '/assets/Sleepy%20Fox.png', 4
         )
         assert (await pets.get_equipped_pet('viewer')).pet_id == 'sleepy_fox'
+
+
+@pytest.mark.asyncio
+async def test_horned_wolf_upgrade_and_repeat_grant_preserve_existing_pets(tmp_path, monkeypatch):
+    from storage import migration_runner
+    from pets.passives import RAID_DAMAGE
+    migrations = migration_runner.MIGRATIONS
+    async with asqlite.create_pool(str(tmp_path / 'wolf.db')) as database:
+        monkeypatch.setattr(migration_runner, 'MIGRATIONS', tuple(m for m in migrations if m.version < 59))
+        await run_migrations(database)
+        pets = PetService(database)
+        bat = await pets.grant_poc_bat('viewer')
+        monkeypatch.setattr(migration_runner, 'MIGRATIONS', migrations)
+        await run_migrations(database)
+        await run_migrations(database)
+        assert (await pets.get_equipped_pet('viewer')).user_pet_id == bat.user_pet_id
+        first = await pets.grant_pet('viewer', 'horned_wolf', RAID_DAMAGE)
+        second = await pets.grant_pet('viewer', 'horned_wolf', RAID_DAMAGE)
+        assert first.user_pet_id == second.user_pet_id
+        assert (second.display_name, second.rarity, second.sprite_path, second.frame_count) == (
+            'Horned Wolf', 'common', '/assets/Horned%20Wolf.png', 4
+        )
+        assert await pets.bonus_bps('viewer', RAID_DAMAGE) == 1000
+        assert len(await pets.get_collection('viewer')) == 2
+        assert (await pets.equip('viewer', 'Horned Wolf')).user_pet_id == first.user_pet_id

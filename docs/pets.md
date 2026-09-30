@@ -47,11 +47,12 @@ Sleepy Fox is Common. Administrator grants use the fixed mappings below by defau
 
 | Pet | Rarity | Chance | Fixed summon passive | Duplicate refund |
 | --- | --- | --- | --- | --- |
-| Silly Bat | Common | 33.3% | Gamble Luck: +5 percentage points win chance | 12,500 points |
-| Little Rat | Common | 33.3% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
-| Sleepy Fox | Common | 33.3% | Boss Hunt Damage: +10% damage | 12,500 points |
+| Silly Bat | Common | 25% | Gamble Luck: +5 percentage points win chance | 12,500 points |
+| Little Rat | Common | 25% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
+| Sleepy Fox | Common | 25% | Boss Hunt Damage: +10% damage | 12,500 points |
+| Horned Wolf | Common | 25% | Boss Hunt Damage: +10% damage | 12,500 points |
 
-Summons first roll rarity with 70% Common / 20% Rare / 10% UR weights, excluding empty tiers and normalizing the remaining weights. They then choose uniformly within that rarity. All three starter pets are Common, so currently Common is 100% and each pet is 1/3 (about 33.3%). The Pets tab has an expandable Rates popup anchored to the Rates control, showing the standard rarity rates and the available pets in each tier. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
+Summons first roll rarity with 70% Common / 20% Rare / 10% UR weights, excluding empty tiers and normalizing the remaining weights. They then choose uniformly within that rarity. All four pets are Common, so currently Common is 100% and each pet has a 25% chance. The Pets tab has an expandable Rates popup anchored to the Rates control, showing the standard rarity rates and the available pets in each tier. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
 
 Duplicates return points to the ticket's original purchase channel, without loyalty bonuses or earned-point XP. Purchases and summons are atomic to prevent double spending. Existing pets are aligned with the selected mappings on migration. No leveling, feeding, essence purchases, or passive rerolls are added here.
 
@@ -63,3 +64,9 @@ Duplicates return points to the ticket's original purchase channel, without loya
 4. Obtain a second pet and run `!pets equip Little Rat` (or its full name). Check that it is equipped in another channel too.
 5. Summon a duplicate and verify the refund against the table in the ticket's purchase channel, even if summoned elsewhere.
 6. Confirm an empty balance cannot buy and an empty ticket inventory cannot summon.
+
+### Horned Wolf preview
+
+Migration 59 adds Horned Wolf with the approved four-frame artwork in `assets/Horned Wolf.png`. The profile plays the strip using its existing CSS sprite animation at a 2.4-second cycle; no generated GIF or procedural breathing warp is used. Frames are packed into equal cells with a shared ground baseline.
+
+Grant and equip it for UAT preview: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet <tester_login> --pet wolf`. An owned wolf can also be equipped with `!pets equip Horned Wolf`.
