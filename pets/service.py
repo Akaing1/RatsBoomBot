@@ -11,11 +11,10 @@ RAT_ID = "explosive_rat"
 FOX_ID = "sleepy_fox"
 POC_LOYALTY_BONUS_BPS = 1_000
 TICKET_PRICE = 50_000
-SUMMON_POOL = (
-    (7_000, POC_BAT_ID, "common", GAMBLE_ODDS, 12_500),
-    (9_000, RAT_ID, "common", LOYALTY_GAIN, 12_500),
-    (10_000, FOX_ID, "common", RAID_DAMAGE, 12_500),
-)
+SUMMON_PASSIVES = {POC_BAT_ID: GAMBLE_ODDS, RAT_ID: LOYALTY_GAIN, FOX_ID: RAID_DAMAGE}
+RARITY_WEIGHTS = (("common", 70), ("rare", 20), ("ultra_rare", 10))
+DUPLICATE_REFUNDS = {"common": 12_500, "rare": 25_000, "ultra_rare": 50_000}
+
 
 
 @dataclass(frozen=True)
@@ -116,6 +115,36 @@ class PetService:
             """, (str(user_id),))
         return [self._from_row(row) for row in rows]
 
+    async def _summon_pools(self, connection) -> dict[str, list[Any]]:
+        rows = await connection.fetchall(
+            "SELECT id, display_name, rarity FROM pet_definitions ORDER BY display_name"
+        )
+        return {
+            rarity: [row for row in rows if row["rarity"] == rarity and row["id"] in SUMMON_PASSIVES]
+            for rarity, _ in RARITY_WEIGHTS
+        }
+
+    async def get_summon_rates(self) -> list[dict[str, Any]]:
+        async with self.db.acquire() as connection:
+            pools = await self._summon_pools(connection)
+        total_weight = sum(weight for rarity, weight in RARITY_WEIGHTS if pools[rarity])
+        return [
+            {
+                "rarity": rarity,
+                "base_percent": weight,
+                "effective_percent": weight * 100 / total_weight if pools[rarity] and total_weight else 0,
+                "pets": [
+                    {
+                        "pet_id": str(row["id"]),
+                        "display_name": str(row["display_name"]),
+                        "percent": weight * 100 / total_weight / len(pools[rarity]),
+                    }
+                    for row in pools[rarity]
+                ],
+            }
+            for rarity, weight in RARITY_WEIGHTS
+        ]
+
     async def ticket_count(self, user_id: str) -> int:
         async with self.db.acquire() as connection:
             row = await connection.fetchone(
@@ -155,9 +184,19 @@ class PetService:
                 )
                 if ticket is None:
                     raise ValueError("You have no summon tickets. Buy one with !pets buy ticket (50,000 points).")
-                roll = randbelow(10_000)
-                _, pet_id, rarity, passive, refund = next(entry for entry in SUMMON_POOL if roll < entry[0])
-                definition = await connection.fetchone("SELECT display_name FROM pet_definitions WHERE id = ?", (pet_id,))
+                pools = await self._summon_pools(connection)
+                available = [(rarity, weight) for rarity, weight in RARITY_WEIGHTS if pools[rarity]]
+                if not available:
+                    raise ValueError("No pets are available to summon right now. Your ticket has been kept.")
+                roll = randbelow(sum(weight for _, weight in available))
+                for rarity, weight in available:
+                    if roll < weight:
+                        break
+                    roll -= weight
+                definition = pools[rarity][randbelow(len(pools[rarity]))]
+                pet_id = str(definition["id"])
+                passive = SUMMON_PASSIVES[pet_id]
+                refund = DUPLICATE_REFUNDS[rarity]
                 owned = await connection.fetchone("SELECT id FROM user_pets WHERE user_id = ? AND pet_id = ?", (user_id, pet_id))
                 duplicate = owned is not None
                 equipped = False

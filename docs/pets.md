@@ -25,7 +25,7 @@ Available `--passive` values are `loyalty_gain`, `raid_damage`, `gamble_odds`, `
 
 1. Put a transparent PNG sprite sheet in `assets/`, named after the pet (for example `Sleepy Fox.png`). Current pets use four equal 112 × 149 frames in a 448 × 149 strip. Align the feet/contact baseline and leave room for the whole sprite. Review an animated preview before publishing.
 2. Add a **new** numbered migration in `storage/migrations/` inserting its stable ID, display name, rarity (`common`, `rare`, or `ultra_rare`), URL-encoded asset path, frame count, and maximum level into `pet_definitions`. Register it in `storage/migrations/__init__.py`. Never edit an already applied migration to rename or update a pet; add a new migration.
-3. Add its ID to the allowed catalog in `pets/service.py` and optionally add a convenience grant method. Existing passives can be selected without adding new gameplay code.
+3. Add its ID and fixed passive to `SUMMON_PASSIVES` in `pets/service.py`, add its ID to the allowed grant catalog, and optionally add a convenience grant method. The summon pool and Rates popup then use its seeded rarity automatically. Existing passives can be selected without adding new gameplay code.
 4. Add a short selector to `scripts/grant_poc_pet.py` (Sleepy Fox uses `--pet fox`). The script runs migrations, grants ownership, and equips the pet without resetting an existing copy.
 5. The global profile renders the sprite from the database. For custom timing, add a pet-specific class in `web/templates/public/chatter_profile.html` and its animation in `web/static/css/style.css`. Sleepy Fox uses a 2.4-second breathing cycle. Respect the existing reduced-motion rule.
 6. Check fresh-database seeding, repeat grants, the profile render, and the animation. Run the tests and open a PR against the current release.
@@ -47,11 +47,11 @@ Sleepy Fox is Common. Administrator grants use the fixed mappings below by defau
 
 | Pet | Rarity | Chance | Fixed summon passive | Duplicate refund |
 | --- | --- | --- | --- | --- |
-| Silly Bat | Common | 70% | Gamble Luck: +5 percentage points win chance | 12,500 points |
-| Little Rat | Common | 20% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
-| Sleepy Fox | Common | 10% | Boss Hunt Damage: +10% damage | 12,500 points |
+| Silly Bat | Common | 33.3% | Gamble Luck: +5 percentage points win chance | 12,500 points |
+| Little Rat | Common | 33.3% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
+| Sleepy Fox | Common | 33.3% | Boss Hunt Damage: +10% damage | 12,500 points |
 
-All three starter pets are Common for now; the 70/20/10 weights select the species directly. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
+Summons first roll rarity with 70% Common / 20% Rare / 10% UR weights, excluding empty tiers and normalizing the remaining weights. They then choose uniformly within that rarity. All three starter pets are Common, so currently Common is 100% and each pet is 1/3 (about 33.3%). The Pets tab has an expandable Rates popup showing the standard and effective tier rates and each available pet. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
 
 Duplicates return points to the ticket's original purchase channel, without loyalty bonuses or earned-point XP. Purchases and summons are atomic to prevent double spending. Existing pets are aligned with the selected mappings on migration. No leveling, feeding, essence purchases, or passive rerolls are added here.
 

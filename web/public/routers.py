@@ -132,6 +132,8 @@ async def public_chatter_profile(request: Request, chatter_name: str):
     profile["pet"] = await pets.get_equipped_pet(profile["identity"]["user_id"]) if pets is not None else None
     collection = getattr(pets, "get_collection", None)
     profile["pets"] = await collection(profile["identity"]["user_id"]) if callable(collection) else []
+    rates = getattr(pets, "get_summon_rates", None)
+    profile["pet_rates"] = await rates() if callable(rates) else []
     signed_in_user_id = viewer_user_id(request)
     is_owner = signed_in_user_id == str(profile["identity"]["user_id"])
     return templates.TemplateResponse(

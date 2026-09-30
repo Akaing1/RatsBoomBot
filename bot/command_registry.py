@@ -279,7 +279,7 @@ PET_COMMANDS = CommandGroupDefinition(
     commands=(
         CommandDefinition("!pets", "Show your equipped pet, tickets, and collection link.", global_command=GlobalCommandName.PETS),
         CommandDefinition("!pets buy <ticket|summon|summon ticket>", "Buy a global summon ticket for 50,000 channel points.", feature=FeatureName.POINTS, global_command=GlobalCommandName.PETS),
-        CommandDefinition("!pets summon [ticket]", "Use a ticket: 70% Silly Bat, 20% Little Rat, 10% Sleepy Fox (all Common).", global_command=GlobalCommandName.PETS),
+        CommandDefinition("!pets summon [ticket]", "Use a ticket: 70% Common, 20% Rare, 10% UR; empty tiers excluded.", global_command=GlobalCommandName.PETS),
         CommandDefinition("!pets equip <pet name>", "Equip an owned pet across every channel.", global_command=GlobalCommandName.PETS),
     ),
 )

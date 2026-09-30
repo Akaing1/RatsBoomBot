@@ -21,15 +21,12 @@ async def balance(database):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('roll,pet_id,passive,rarity,refund', [
-    (0, 'dungeon_bat', GAMBLE_ODDS, 'common', 12_500),
-    (6999, 'dungeon_bat', GAMBLE_ODDS, 'common', 12_500),
-    (7000, 'explosive_rat', LOYALTY_GAIN, 'common', 12_500),
-    (8999, 'explosive_rat', LOYALTY_GAIN, 'common', 12_500),
-    (9000, 'sleepy_fox', RAID_DAMAGE, 'common', 12_500),
-    (9999, 'sleepy_fox', RAID_DAMAGE, 'common', 12_500),
+    (0, 'explosive_rat', LOYALTY_GAIN, 'common', 12_500),
+    (1, 'dungeon_bat', GAMBLE_ODDS, 'common', 12_500),
+    (2, 'sleepy_fox', RAID_DAMAGE, 'common', 12_500),
 ])
 async def test_summon_boundaries_fixed_passives_and_duplicate_refund(tmp_path, monkeypatch, roll, pet_id, passive, rarity, refund):
-    monkeypatch.setattr('pets.service.randbelow', lambda _: roll)
+    monkeypatch.setattr('pets.service.randbelow', lambda bound: roll if bound == 3 else 69)
     async with asqlite.create_pool(str(tmp_path / 'pets.db')) as database:
         await run_migrations(database)
         await fund(database)
@@ -70,7 +67,7 @@ async def test_purchase_is_channel_local_and_atomic(tmp_path):
 
 @pytest.mark.asyncio
 async def test_global_collection_equip_and_concurrent_summons(tmp_path, monkeypatch):
-    monkeypatch.setattr('pets.service.randbelow', lambda _: 7000)
+    monkeypatch.setattr('pets.service.randbelow', lambda _: 0)
     async with asqlite.create_pool(str(tmp_path / 'pets.db')) as database:
         await run_migrations(database)
         await fund(database)
@@ -160,3 +157,66 @@ async def test_selected_passive_migration_preserves_collection_loadout_and_progr
             assert (pet.user_pet_id, pet.passive_type, pet.passive_value_bps) == (old.user_pet_id, passive, bps)
             assert (pet.level, pet.xp) == (3, 42)
         assert (await pets.get_equipped_pet('viewer')).user_pet_id == fox.user_pet_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('roll,expected', [
+    (0, 'dungeon_bat'), (69, 'dungeon_bat'),
+    (70, 'explosive_rat'), (89, 'explosive_rat'),
+    (90, 'sleepy_fox'), (99, 'sleepy_fox'),
+])
+async def test_rarity_roll_boundaries_before_pet_selection(tmp_path, monkeypatch, roll, expected):
+    draws = []
+    def choose(bound):
+        draws.append(bound)
+        return roll if bound == 100 else 0
+    monkeypatch.setattr('pets.service.randbelow', choose)
+    async with asqlite.create_pool(str(tmp_path / 'pets.db')) as database:
+        await run_migrations(database)
+        await fund(database)
+        async with database.acquire() as connection:
+            await connection.execute("UPDATE pet_definitions SET rarity = 'rare' WHERE id = 'explosive_rat'")
+            await connection.execute("UPDATE pet_definitions SET rarity = 'ultra_rare' WHERE id = 'sleepy_fox'")
+            await connection.commit()
+        pets = PetService(database)
+        rates = await pets.get_summon_rates()
+        assert [tier['effective_percent'] for tier in rates] == [70, 20, 10]
+        await pets.buy_ticket('source', 'viewer')
+        assert (await pets.summon('viewer', 'viewer')).pet_id == expected
+        assert draws == [100, 1]
+
+
+@pytest.mark.asyncio
+async def test_common_only_rates_are_uniform_and_empty_tiers_disabled(tmp_path):
+    async with asqlite.create_pool(str(tmp_path / 'pets.db')) as database:
+        await run_migrations(database)
+        pets = PetService(database)
+        rates = await pets.get_summon_rates()
+        assert [tier['base_percent'] for tier in rates] == [70, 20, 10]
+        assert [tier['effective_percent'] for tier in rates] == [100, 0, 0]
+        assert {pet['display_name'] for pet in rates[0]['pets']} == {'Silly Bat', 'Little Rat', 'Sleepy Fox'}
+        assert [pet['percent'] for pet in rates[0]['pets']] == pytest.approx([100 / 3] * 3)
+        assert rates[1]['pets'] == rates[2]['pets'] == []
+
+
+@pytest.mark.asyncio
+async def test_partial_pool_normalizes_and_empty_catalog_keeps_ticket(tmp_path, monkeypatch):
+    monkeypatch.setattr('pets.service.randbelow', lambda bound: 70 if bound == 80 else 0)
+    async with asqlite.create_pool(str(tmp_path / 'pets.db')) as database:
+        await run_migrations(database)
+        await fund(database)
+        async with database.acquire() as connection:
+            await connection.execute("UPDATE pet_definitions SET rarity = 'ultra_rare' WHERE id = 'sleepy_fox'")
+            await connection.commit()
+        pets = PetService(database)
+        assert [tier['effective_percent'] for tier in await pets.get_summon_rates()] == [87.5, 0, 12.5]
+        await pets.buy_ticket('source', 'viewer')
+        assert (await pets.summon('viewer', 'viewer')).pet_id == 'sleepy_fox'
+        await pets.buy_ticket('source', 'viewer')
+        # Unsupported tiers cannot be summoned even if catalog rows exist.
+        async with database.acquire() as connection:
+            await connection.execute("UPDATE pet_definitions SET rarity = 'unavailable'")
+            await connection.commit()
+        with pytest.raises(ValueError, match='No pets are available'):
+            await pets.summon('viewer', 'viewer')
+        assert await pets.ticket_count('viewer') == 1
