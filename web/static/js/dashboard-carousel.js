@@ -21,8 +21,8 @@
     }));
     if (cards.some(card => card.elements.some(element => !element))) return;
 
-    // Place the iframe in its permanent slide before dashboard-stream-player.js sets src.
-    // Reparenting a loaded iframe at a breakpoint would restart the Twitch player.
+    // Mount the player in its permanent slide before Twitch creates its iframe.
+    // Reparenting a loaded embed at a breakpoint would restart playback.
     const player = cards[0].elements[0];
     const playerSlide = document.createElement("section");
     playerSlide.className = "dashboard-carousel-slide";
