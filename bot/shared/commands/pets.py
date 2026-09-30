@@ -58,7 +58,7 @@ class PetsCommands(commands.Component):
         except ValueError as error:
             await ctx.reply(self.currency_text(str(error), get_context_broadcaster_id(ctx)))
             return
-        await ctx.reply(f"Bought 1 summon ticket for 50,000 {currency}. Balance: {balance:,} {currency}. Use !pets summon. See current summon rates on your collection page (!pets).")
+        await ctx.reply(f"Bought 1 summon ticket for 50,000 {currency}. Use !pets summon. See rates and current collection using !pets")
 
     @pets.command(name="summon")
     async def summon(self, ctx: commands.Context, *, item: str = "ticket") -> None:
@@ -72,7 +72,7 @@ class PetsCommands(commands.Component):
         except ValueError as error:
             await ctx.reply(self.currency_text(str(error), get_context_broadcaster_id(ctx)))
             return
-        status = f"Duplicate! {result.refund:,} {self.currency_name(result.refund_channel)} returned to the ticket's purchase channel." if result.duplicate else ("Equipped globally!" if result.equipped else f"Added to your collection. Equip with !pets equip {result.display_name}.")
+        status = f"Duplicate! {result.refund:,} {self.currency_name(result.refund_channel)} has been gifted as compensation." if result.duplicate else ("Equipped!" if result.equipped else f"Added to your collection. Equip with !pets equip {result.display_name}.")
         await ctx.reply(f"Summoned {result.display_name} ({rarity_label(result.rarity)}). {status}")
 
     @pets.command(name="equip")
@@ -85,4 +85,4 @@ class PetsCommands(commands.Component):
             await ctx.reply(self.currency_text(str(error), get_context_broadcaster_id(ctx)))
             return
         description = self.currency_text(pet.passive_description, get_context_broadcaster_id(ctx))
-        await ctx.reply(f"{pet.display_name} equipped across all channels: {pet.passive_percent_label}% {description}.")
+        await ctx.reply(f"{pet.display_name} equipped: {pet.passive_percent_label}% {description}.")
