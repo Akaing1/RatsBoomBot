@@ -93,6 +93,8 @@ async def my_account(request: Request):
     if profile is not None and str(profile["identity"]["user_id"]) == user_id:
         pets = getattr(runtime_bot.services, "pets", None)
         profile["pet"] = await pets.get_equipped_pet(user_id) if pets is not None else None
+        collection = getattr(pets, "get_collection", None)
+        profile["pets"] = await collection(user_id) if callable(collection) else []
         return templates.TemplateResponse(
             request=request,
             name="public/chatter_profile.html",
