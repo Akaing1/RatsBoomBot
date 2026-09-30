@@ -2002,6 +2002,7 @@ body.landing-page {
 img.chatter-profile-avatar { display: block; }
 .chatter-pet { display: grid; min-width: 122px; justify-items: center; align-self: center; color: var(--text); text-align: center; }
 .chatter-pet-sprite { width: 112px; height: 120px; background-image: var(--pet-sprite); background-position: 0 center; background-repeat: no-repeat; background-size: calc(112px * var(--pet-frames)) auto; image-rendering: pixelated; animation: chatter-pet-idle .72s steps(var(--pet-frames)) infinite; }
+.chatter-pet-sprite--wolf { animation-duration: 2.4s; }
 .chatter-pet-sprite--fox { animation-duration: 2.4s; }
 .chatter-pet-sprite--rat { animation: chatter-rat-idle 1.8s step-end infinite; }
 .chatter-pet span { margin-top: -10px; font-size: 11px; font-weight: 800; }

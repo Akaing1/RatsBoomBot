@@ -32,8 +32,8 @@ async def grant_pet(chatter: str, pet_id: str = "bat", passive_type: str | None 
             raise SystemExit(f"No chatter identity found for '{chatter}'.")
 
         service = PetService(database)
-        catalog_id = {"bat": "dungeon_bat", "rat": "explosive_rat", "fox": "sleepy_fox"}[pet_id]
-        default_passive = {"bat": GAMBLE_ODDS, "rat": LOYALTY_GAIN, "fox": RAID_DAMAGE}[pet_id]
+        catalog_id = {"bat": "dungeon_bat", "rat": "explosive_rat", "fox": "sleepy_fox", "wolf": "horned_wolf"}[pet_id]
+        default_passive = {"bat": GAMBLE_ODDS, "rat": LOYALTY_GAIN, "fox": RAID_DAMAGE, "wolf": RAID_DAMAGE}[pet_id]
         pet = await service.grant_pet(str(identity["user_id"]), catalog_id, passive_type or default_passive)
         print(
             f"Equipped {pet.display_name} for {identity['display_name']} "
@@ -45,7 +45,7 @@ async def grant_pet(chatter: str, pet_id: str = "bat", passive_type: str | None 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Grant and equip a test pet on the selected environment.")
     parser.add_argument("chatter", help="Twitch login, display name, or user ID")
-    parser.add_argument("--pet", choices=("bat", "rat", "fox"), default="bat")
+    parser.add_argument("--pet", choices=("bat", "rat", "fox", "wolf"), default="bat")
     parser.add_argument("--passive", choices=tuple(PASSIVES), default=None, help="Override the pet's fixed passive for testing")
     arguments = parser.parse_args()
     asyncio.run(grant_pet(arguments.chatter, arguments.pet, arguments.passive))
