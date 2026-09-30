@@ -66,16 +66,15 @@
                     <summary aria-label="Show pet summon rates">* Rates</summary>
                     <div class="pet-rates-popup">
                         <strong>Summon rates</strong>
-                        <p>Roll a rarity, then choose an equal-chance pet from that tier. Empty tiers are excluded and their weight is redistributed.</p>
                         <table>
-                            <thead><tr><th>Tier</th><th>Standard</th><th>Currently</th></tr></thead>
+                            <thead><tr><th>Tier</th><th>Rate</th></tr></thead>
                             <tbody>{% for tier in profile.pet_rates %}
-                                <tr><td>{{ 'UR' if tier.rarity == 'ultra_rare' else tier.rarity | title }}</td><td>{{ tier.base_percent }}%</td><td>{{ "%.1f" | format(tier.effective_percent) }}%</td></tr>
+                                <tr><td>{{ 'UR' if tier.rarity == 'ultra_rare' else tier.rarity | title }}</td><td>{{ tier.base_percent }}%</td></tr>
                             {% endfor %}</tbody>
                         </table>
                         {% for tier in profile.pet_rates %}
                             <p><strong>{{ 'UR' if tier.rarity == 'ultra_rare' else tier.rarity | title }}</strong>:
-                                {% for pet in tier.pets %}{{ pet.display_name }} ({{ "%.1f" | format(pet.percent) }}%){% if not loop.last %}, {% endif %}{% else %}No pets available{% endfor %}
+                                {% for pet in tier.pets %}{{ pet.display_name }}{% if not loop.last %}, {% endif %}{% else %}No pets available{% endfor %}
                             </p>
                         {% endfor %}
                     </div>

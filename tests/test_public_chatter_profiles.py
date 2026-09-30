@@ -304,8 +304,12 @@ def test_public_profile_renders_full_pet_collection(monkeypatch):
     assert 'data-chatter-tab="pets"' in response.text
     assert 'data-chatter-panel="pets" aria-label="Pet collection" hidden' in response.text
     assert 'class="pet-rates"' in response.text
-    assert "100.0%" in response.text
-    assert "Little Rat (33.3%)" in response.text
+    assert "100.0%" not in response.text
+    assert "Little Rat (33.3%)" not in response.text
+    assert "Roll a rarity" not in response.text
+    assert "<th>Currently</th>" not in response.text
+    assert "<th>Rate</th>" in response.text
+    assert "Silly Bat, Little Rat, Sleepy Fox" in response.text
     assert "No pets available" in response.text
     assert "70% Silly Bat" not in response.text
     assert 'id="pets"' in response.text
