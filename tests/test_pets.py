@@ -90,3 +90,17 @@ async def test_pet_asset_migration_updates_existing_bat_path(tmp_path) -> None:
             )
 
         assert row["sprite_path"] == "/assets/bat.png"
+
+
+@pytest.mark.asyncio
+async def test_sleepy_fox_grant_preserves_ownership_and_equips(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / 'fox.db')) as database:
+        await run_migrations(database)
+        pets = PetService(database)
+        first = await pets.grant_fox('viewer')
+        second = await pets.grant_fox('viewer')
+        assert first.user_pet_id == second.user_pet_id
+        assert (second.pet_id, second.display_name, second.rarity, second.sprite_path, second.frame_count) == (
+            'sleepy_fox', 'Sleepy Fox', 'common', '/assets/Sleepy%20Fox.png', 4
+        )
+        assert (await pets.get_equipped_pet('viewer')).pet_id == 'sleepy_fox'

@@ -57,6 +57,8 @@ from storage.migrations.v052_pet_passive_tiers import migrate as migrate_pet_pas
 from storage.migrations.v053_repair_explosive_rat_seed import migrate as migrate_repair_explosive_rat_seed
 from storage.migrations.v054_pet_display_names import migrate as migrate_pet_display_names
 
+from storage.migrations.v055_sleepy_fox import migrate as migrate_sleepy_fox
+
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
 
@@ -122,4 +124,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=52, name="pet_passive_tiers", run=migrate_pet_passive_tiers)
     , Migration(version=53, name="repair_explosive_rat_seed", run=migrate_repair_explosive_rat_seed)
     , Migration(version=54, name="pet_display_names", run=migrate_pet_display_names)
+    , Migration(version=55, name="sleepy_fox", run=migrate_sleepy_fox)
 )

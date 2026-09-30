@@ -11,7 +11,7 @@ from web.app import app
 async def test_existing_equipped_pets_keep_ownership_after_rename(tmp_path, monkeypatch):
     async with asqlite.create_pool(str(tmp_path / "pets.db")) as database:
         migrations = migration_runner.MIGRATIONS
-        monkeypatch.setattr(migration_runner, "MIGRATIONS", migrations[:-1])
+        monkeypatch.setattr(migration_runner, "MIGRATIONS", tuple(m for m in migrations if m.version < 54))
         await migration_runner.run_migrations(database)
         pets = PetService(database)
         bat_before = await pets.grant_poc_bat("bat-owner")
@@ -32,7 +32,7 @@ async def test_existing_equipped_pets_keep_ownership_after_rename(tmp_path, monk
 
 def test_named_sprite_urls_are_served():
     with TestClient(app) as client:
-        for name in ("Silly%20Bat", "Explosive%20Rat"):
+        for name in ("Silly%20Bat", "Explosive%20Rat", "Sleepy%20Fox"):
             response = client.get(f"/assets/{name}.png")
             assert response.status_code == 200
             assert response.headers["content-type"] == "image/png"
