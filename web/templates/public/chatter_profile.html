@@ -51,9 +51,36 @@
             </div>
         </header>
 
-        <section id="pets" class="chatter-section" aria-label="Pet collection">
+        <nav class="chatter-tabs" aria-label="Chatter profile sections">
+            <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
+            <button type="button" data-chatter-tab="raids" aria-selected="false">Boss Hunt</button>
+            <button type="button" data-chatter-tab="achievements" aria-selected="false">Achievements</button>
+            <button type="button" data-chatter-tab="pets" aria-selected="false">Pets</button>
+        </nav>
+
+        <section id="pets" class="chatter-section" data-chatter-panel="pets" aria-label="Pet collection" hidden>
             <div class="chatter-section-heading"><div><p class="eyebrow">Global companions</p><h2>Pet collection</h2></div></div>
-            <p>Buy a ticket with <code>!pets buy ticket</code> for 50,000 channel points, then use <code>!pets summon</code>. Odds: 70% Silly Bat · 20% Little Rat · 10% Sleepy Fox (all Common). One pet equipped across all channels.</p>
+            <div class="pet-summon-info">
+                <span>Buy a ticket with <code>!pets buy ticket</code> for 50,000 channel points, then use <code>!pets summon</code></span>
+                <details class="pet-rates">
+                    <summary aria-label="Show pet summon rates">* Rates</summary>
+                    <div class="pet-rates-popup">
+                        <strong>Summon rates</strong>
+                        <p>Roll a rarity, then choose an equal-chance pet from that tier. Empty tiers are excluded and their weight is redistributed.</p>
+                        <table>
+                            <thead><tr><th>Tier</th><th>Standard</th><th>Currently</th></tr></thead>
+                            <tbody>{% for tier in profile.pet_rates %}
+                                <tr><td>{{ 'UR' if tier.rarity == 'ultra_rare' else tier.rarity | title }}</td><td>{{ tier.base_percent }}%</td><td>{{ "%.1f" | format(tier.effective_percent) }}%</td></tr>
+                            {% endfor %}</tbody>
+                        </table>
+                        {% for tier in profile.pet_rates %}
+                            <p><strong>{{ 'UR' if tier.rarity == 'ultra_rare' else tier.rarity | title }}</strong>:
+                                {% for pet in tier.pets %}{{ pet.display_name }} ({{ "%.1f" | format(pet.percent) }}%){% if not loop.last %}, {% endif %}{% else %}No pets available{% endfor %}
+                            </p>
+                        {% endfor %}
+                    </div>
+                </details>
+            </div>
             <div class="chatter-stat-grid">
                 {% for pet in profile.pets %}
                 <article>
@@ -66,12 +93,6 @@
                 {% else %}<p>No pets collected yet. Your first summon is equipped automatically.</p>{% endfor %}
             </div>
         </section>
-
-        <nav class="chatter-tabs" aria-label="Chatter profile sections">
-            <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
-            <button type="button" data-chatter-tab="raids" aria-selected="false">Boss Hunt</button>
-            <button type="button" data-chatter-tab="achievements" aria-selected="false">Achievements</button>
-        </nav>
 
         <section data-chatter-panel="overview">
             <p><strong>{{ profile.achievements.unlocked if profile.achievements else 0 }} achievement tiers unlocked</strong> · Explore the Achievements tab for badges and progress.</p>

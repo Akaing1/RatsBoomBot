@@ -272,6 +272,16 @@ def test_another_chatter_profile_stays_public_after_sign_in(monkeypatch) -> None
 
 def test_public_profile_renders_full_pet_collection(monkeypatch):
     class CollectionPets(FakePets):
+        async def get_summon_rates(self):
+            return [
+                {"rarity": "common", "base_percent": 70, "effective_percent": 100,
+                 "pets": [{"display_name": "Silly Bat", "percent": 100 / 3},
+                          {"display_name": "Little Rat", "percent": 100 / 3},
+                          {"display_name": "Sleepy Fox", "percent": 100 / 3}]},
+                {"rarity": "rare", "base_percent": 20, "effective_percent": 0, "pets": []},
+                {"rarity": "ultra_rare", "base_percent": 10, "effective_percent": 0, "pets": []},
+            ]
+
         async def get_collection(self, user_id):
             bat = await self.get_equipped_pet(user_id)
             bat.user_pet_id = 1
@@ -291,6 +301,13 @@ def test_public_profile_renders_full_pet_collection(monkeypatch):
     with TestClient(app) as client:
         response = client.get("/chatters/alice")
     assert response.status_code == 200
+    assert 'data-chatter-tab="pets"' in response.text
+    assert 'data-chatter-panel="pets" aria-label="Pet collection" hidden' in response.text
+    assert 'class="pet-rates"' in response.text
+    assert "100.0%" in response.text
+    assert "Little Rat (33.3%)" in response.text
+    assert "No pets available" in response.text
+    assert "70% Silly Bat" not in response.text
     assert 'id="pets"' in response.text
     assert "Common · Equipped" in response.text
     assert "UR" in response.text

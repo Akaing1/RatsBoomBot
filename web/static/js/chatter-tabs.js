@@ -14,7 +14,14 @@ chatterTabs.forEach((tab) => {
         selectChatterTab(tab.dataset.chatterTab);
     });
 });
-const selectedTab = new URLSearchParams(window.location.search).get("tab");
+const selectedTab = new URLSearchParams(window.location.search).get("tab") || window.location.hash.slice(1);
 if (selectedTab && Array.from(chatterTabs).some((tab) => tab.dataset.chatterTab === selectedTab)) {
     selectChatterTab(selectedTab);
 }
+
+window.addEventListener("hashchange", () => {
+    const selected = window.location.hash.slice(1);
+    if (Array.from(chatterTabs).some((tab) => tab.dataset.chatterTab === selected)) {
+        selectChatterTab(selected);
+    }
+});
