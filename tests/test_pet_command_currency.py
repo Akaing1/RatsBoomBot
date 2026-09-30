@@ -35,7 +35,7 @@ def setup_command():
 async def test_purchase_responses_use_channel_currency():
     command, ctx, service = setup_command()
     await command.buy.callback(command, ctx, item='ticket')
-    assert '50,000 Shards. Balance: 50,000 Shards.' in ctx.reply.call_args.args[0]
+    assert ctx.reply.call_args.args[0] == 'Bought 1 summon ticket for 50,000 Shards. Use !pets summon. See rates and current collection using !pets'
     await command.buy.callback(command, ctx, item='invalid')
     assert '50,000 Shards:' in ctx.reply.call_args.args[0]
     service.buy_ticket.side_effect = ValueError('You need 50,000 loyalty points in this channel to buy a summon ticket.')
@@ -50,7 +50,7 @@ async def test_purchase_responses_use_channel_currency():
 async def test_summon_error_and_cross_channel_refund_currency():
     command, ctx, service = setup_command()
     await command.summon.callback(command, ctx)
-    assert "12,500 Cookies returned to the ticket's purchase channel" in ctx.reply.call_args.args[0]
+    assert "12,500 Cookies has been gifted as compensation." in ctx.reply.call_args.args[0]
     service.summon.side_effect = ValueError('You have no summon tickets. Buy one with !pets buy ticket (50,000 points).')
     await command.summon.callback(command, ctx)
     assert '(50,000 Shards)' in ctx.reply.call_args.args[0]
@@ -70,3 +70,15 @@ def test_currency_fallback_and_literal_currency_name():
     assert command.currency_name('unknown') == 'Points'
     activate_profile('channel', ChannelProfile(channel_name='channel', points=PointsConfig(display_name='Star points')))
     assert command.currency_text('50,000 loyalty points', 'channel') == '50,000 Star points'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('text', ['Little Rat', 'Silly Bat', 'Sleepy Fox'])
+async def test_equip_parser_preserves_full_pet_name(text):
+    from twitchio.ext.commands.view import StringView
+    command, ctx, service = setup_command()
+    ctx._view = StringView(text)
+    _, kwargs = await command.equip._parse_arguments(ctx)
+    await command.equip.callback(command, ctx, **kwargs)
+    service.equip.assert_awaited_once_with('viewer', text)
+    assert ctx.reply.call_args.args[0] == 'Little Rat equipped: 10% bonus Shards earned.'

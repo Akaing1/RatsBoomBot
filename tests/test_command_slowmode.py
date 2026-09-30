@@ -78,3 +78,21 @@ async def test_unknown_chat_command_does_not_log_as_application_error(monkeypatc
         SimpleNamespace(), SimpleNamespace(exception=CommandNotFound('The command "typo" was not found.'))
     )
     error_log.assert_not_called()
+
+
+def test_pet_equip_remains_responsive_after_viewing_collection():
+    from bot.shared.commands.pets import PetsCommands
+    service = CommandSlowmodeService(None)
+    service.enabled_channels.add('channel')
+    collection = context()
+    collection.command = PetsCommands.pets
+    assert service.allow(collection)
+    equip = context()
+    equip.command = PetsCommands.equip
+    assert equip.command.qualified_name == 'pets equip'
+    assert service.allow(equip)
+    assert service.allow(equip)  # Parent and child guards both run.
+    purchase = context()
+    purchase.command = PetsCommands.buy
+    assert not service.allow(purchase)
+    assert not service.allow(context('smart'))
