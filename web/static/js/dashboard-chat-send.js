@@ -590,6 +590,7 @@
         showStatus("Sending…");
 
         const outgoingMessage = messageInput.value.trim();
+        let messageSent = false;
         const data = new FormData(form);
         data.set("message", outgoingMessage);
         data.set("target", selectedTarget);
@@ -599,6 +600,7 @@
             const result = await response.json();
 
             if (!response.ok) throw new Error(result.detail || "The message could not be sent.");
+            messageSent = true;
 
             const sent = (result.sent || []).map(platform => platform === "youtube" ? "YouTube" : "Twitch");
             const failures = Object.values(result.errors || {});
@@ -618,6 +620,7 @@
             sending = false;
             sendButton.disabled = false;
             messageInput.focus();
+            if (messageSent) document.dispatchEvent(new CustomEvent("dashboard-chat-sent"));
         }
     });
 

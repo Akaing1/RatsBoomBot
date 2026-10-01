@@ -139,7 +139,17 @@
             <div>
                 <h3 class="chat-heading">Combined Chat <span class="chat-platform-dot twitch active" title="Twitch connected" aria-label="Twitch connected"></span><span class="chat-platform-dot youtube {% if youtube_chat.connected %}active{% endif %}" title="YouTube {% if youtube_chat.connected %}connected{% else %}off{% endif %}" aria-label="YouTube {% if youtube_chat.connected %}connected{% else %}off{% endif %}"></span></h3>
             </div>
-            <button type="button" class="channel-state live chat-command-toggle" data-chat-command-toggle aria-pressed="true">Commands on</button>
+            <div class="dashboard-chat-header-actions">
+                <button type="button" class="channel-state live chat-command-toggle" data-chat-command-toggle aria-pressed="true">Commands on</button>
+                <button type="button" class="dashboard-chat-control dashboard-chat-lock" data-chat-lock aria-pressed="false" aria-label="Lock automatic chat resizing" title="Lock automatic chat resizing">
+                    <svg class="chat-unlocked-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0M12 14v3"/></svg>
+                    <svg class="chat-locked-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3"/></svg>
+                </button>
+                <button type="button" class="dashboard-chat-control dashboard-chat-expand" data-chat-expand aria-pressed="false" aria-label="Expand chat to full height" title="Expand chat to full height">
+                    <svg class="chat-expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M3 3l6 6m7 12h5v-5m0 5-6-6"/></svg>
+                    <svg class="chat-collapse-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h6V3M9 9 3 3m18 12h-6v6m0-6 6 6"/></svg>
+                </button>
+            </div>
         </div>
 
         <div

@@ -299,6 +299,8 @@ button, input { font: inherit; }
 .dashboard-chat-column { display: flex; grid-area: chat; min-width: 0; min-height: 0; flex-direction: column; }
 .dashboard-chat-column > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }
 .dashboard-chat-column > .live-chat-panel { grid-area: chat; min-height: 0; flex: 1 1 auto; }
+.dashboard-chat-header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+.dashboard-chat-control { display: none; }
 .dashboard-activity-grid > .dashboard-activity-panel { min-width: 0; }
 .admin-channel-dashboard-layout .admin-activity-panel { grid-area: activity; }
 .admin-channel-dashboard-layout { grid-template-areas: "header header chat" "stream stream chat" "queue activity chat"; }
@@ -896,19 +898,20 @@ body.landing-page {
 .landing-footer p { max-width: 430px; margin: 0; color: #707989; font-size: 11px; text-align: right; }
 
 @media (max-width: 768px) {
-    .app-shell { display: block; padding-top: 74px; }
+    :root { --mobile-nav-height: 62px; }
+    .app-shell { display: block; padding-top: var(--mobile-nav-height); }
     .channel-page-overview .sidebar-brand-subtitle { display: none; }
     .sidebar,
-    .channel-page-overview .sidebar { position: fixed; z-index: 50; top: 0; right: 0; left: 0; width: 100%; height: 100dvh; max-height: 100dvh; min-height: 0; padding: 16px 20px; overflow: hidden; border-right: 0; border-bottom: 1px solid var(--border); box-shadow: 0 18px 38px rgba(0,0,0,.4); }
+    .channel-page-overview .sidebar { position: fixed; z-index: 50; top: 0; right: 0; left: 0; width: 100%; height: 100dvh; max-height: 100dvh; min-height: 0; padding: 10px 20px; overflow: hidden; border-right: 0; border-bottom: 1px solid var(--border); box-shadow: 0 18px 38px rgba(0,0,0,.4); }
     .dashboard-page .app-shell.sidebar-collapsed .sidebar,
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:hover { width: 100%; height: 74px; min-height: 0; padding: 16px 20px; overflow: hidden; box-shadow: none; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:hover { width: 100%; height: var(--mobile-nav-height); min-height: 0; padding: 10px 20px; overflow: hidden; box-shadow: none; }
     .dashboard-page .brand { min-height: 42px; margin-bottom: 20px; padding-right: 44px; }
     .dashboard-page .app-shell.sidebar-collapsed .sidebar .brand { margin-top: 0; margin-bottom: 0; padding-right: 44px; }
     .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .brand-copy,
     .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .nav-link-label,
     .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-button-label { width: auto; opacity: 1; transform: none; pointer-events: auto; }
     .sidebar-toggle,
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-toggle { top: 23px; right: 20px; display: grid; font-size: 19px; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(:hover) .sidebar-toggle { top: calc((var(--mobile-nav-height) - 28px) / 2); right: 20px; display: grid; font-size: 19px; }
     .sidebar-toggle span { display: block; transition: transform .24s ease, opacity .18s ease; }
     .dashboard-page .app-shell:not(.sidebar-collapsed) .sidebar-toggle span { transform: rotate(90deg); }
     .navigation { width: 100%; min-height: 0; flex-direction: column; justify-content: flex-start; gap: 7px; overflow-x: hidden; overflow-y: auto; }
@@ -969,12 +972,12 @@ body.landing-page {
 }
 
 @media (max-width: 768px) {
-    .channel-page-overview .dashboard-carousel-navbar-label { position: absolute; top: 37px; right: 58px; left: 185px; display: flex; min-width: 0; justify-content: flex-end; gap: 4px; overflow: hidden; color: var(--muted); font-size: 12px; white-space: nowrap; transform: translateY(-50%); }
+    .channel-page-overview .dashboard-carousel-navbar-label { position: absolute; top: calc(var(--mobile-nav-height) / 2); right: 58px; left: 185px; display: flex; min-width: 0; justify-content: flex-end; gap: 4px; overflow: hidden; color: var(--muted); font-size: 12px; white-space: nowrap; transform: translateY(-50%); }
     .channel-page-overview .dashboard-carousel-navbar-count { flex: 0 0 auto; }
     .channel-page-overview .dashboard-carousel-navbar-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .channel-page-overview,
     .channel-page-overview .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
-    .channel-page-overview .streamer-main-content { height: calc(100dvh - 74px); min-height: 0; padding: 12px; overflow: hidden; }
+    .channel-page-overview .streamer-main-content { height: calc(var(--dashboard-mobile-viewport-height, 100dvh) - var(--mobile-nav-height)); min-height: 0; padding: 12px; overflow: hidden; }
     .channel-page-overview .channel-dashboard-layout.has-carousel { position: relative; display: block; width: 100%; height: 100%; min-height: 0; flex: 0 0 auto; margin: 0; overflow: hidden; }
     .channel-page-overview .channel-dashboard-layout.has-carousel > .channel-live-layout,
     .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-chat-column { display: contents; }
@@ -985,19 +988,40 @@ body.landing-page {
     .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-header-stats > .dashboard-ad-sticky { display: flex; min-height: 30px; align-items: center; gap: 6px; padding: 4px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 10px; white-space: nowrap; }
     .channel-page-overview .dashboard-ad-sticky strong { color: var(--text); font-size: 11px; font-weight: 700; }
     .channel-page-overview .dashboard-carousel-deck { display: none; }
-    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-carousel-deck { position: absolute; top: calc(var(--dashboard-stats-height, 36px) + 8px); right: 0; bottom: 0; left: 0; display: block; overflow: hidden; touch-action: pan-y; }
-    .channel-page-overview .dashboard-carousel-slide { position: absolute; top: 0; right: 26px; bottom: 0; left: 26px; display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 10px; overflow-x: hidden; overflow-y: auto; opacity: 0; visibility: hidden; pointer-events: none; transform: translateX(calc(100% + 14px)); transition: transform .3s ease, opacity .3s ease, visibility 0s linear .3s; }
+    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-carousel-deck { position: absolute; z-index: 0; top: calc(var(--dashboard-stats-height, 36px) + 8px); right: 0; bottom: 0; left: 0; display: block; overflow: hidden; touch-action: pan-y; }
+    .channel-page-overview .dashboard-carousel-slide { position: absolute; top: 0; right: 26px; bottom: 0; left: 26px; display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 10px; overflow-x: hidden; overflow-y: auto; touch-action: pan-y; opacity: 0; visibility: hidden; pointer-events: none; transform: translateX(calc(100% + 14px)); transition: transform .3s ease, opacity .3s ease, visibility 0s linear .3s; }
+    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-carousel-slide button { touch-action: pan-y; }
     .channel-page-overview .dashboard-carousel-slide.is-active { opacity: 1; visibility: visible; pointer-events: auto; transform: translateX(0); transition: transform .3s ease, opacity .3s ease, visibility 0s; }
     .channel-page-overview .dashboard-carousel-slide.is-neighbor { opacity: .65; visibility: visible; transition: transform .3s ease, opacity .3s ease, visibility 0s; }
     .channel-page-overview .dashboard-carousel-slide.is-before { transform: translateX(calc(-100% - 14px)); }
-    .channel-page-overview .dashboard-carousel-slide:focus-visible,
     .channel-page-overview .dashboard-carousel-deck:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .channel-page-overview .dashboard-carousel-slide:focus-visible { outline: none; }
+    .channel-page-overview .dashboard-carousel-slide:focus-visible::after { position: absolute; z-index: 30; inset: 0; border: 2px solid var(--accent); border-radius: 14px; content: ""; pointer-events: none; }
     .channel-page-overview .dashboard-carousel-slide > .panel { width: 100%; min-width: 0; min-height: 0; max-height: none; margin: 0; }
     .channel-page-overview .dashboard-carousel-slide > .dashboard-video-card { flex: 0 0 auto; }
-    .channel-page-overview .dashboard-carousel-slide > .dashboard-ads-panel { flex: 1 0 auto; }
-    .channel-page-overview .dashboard-carousel-slide .dashboard-ad-actions { min-height: 120px; flex: 1 1 auto; grid-template-columns: 1fr; grid-template-rows: repeat(3, minmax(34px, 1fr)); }
+    .channel-page-overview .dashboard-carousel-slide > .dashboard-ads-panel { flex: 0 0 auto; }
+    .channel-page-overview .dashboard-carousel-slide .dashboard-ad-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .channel-page-overview .dashboard-carousel-slide > [data-viewer-queue-panel],
-    .channel-page-overview .dashboard-carousel-slide > .live-chat-panel { height: 100%; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+    .channel-page-overview .dashboard-carousel-slide > .live-chat-panel { height: 0; min-height: 0; flex: 1 1 0; overflow: hidden; }
+    .channel-page-overview .dashboard-carousel-slide[data-dashboard-carousel-slide="0"] { overflow: hidden; }
+    .channel-page-overview .dashboard-carousel-slide > .live-chat-panel { position: absolute; z-index: 2; top: var(--dashboard-chat-top, 50%); right: 0; bottom: 0; left: 0; height: auto; background: var(--surface); transition: top .28s cubic-bezier(.22,1,.36,1); }
+    .channel-page-overview .dashboard-carousel-slide.is-chat-expanded > .live-chat-panel { top: 0; }
+    .channel-page-overview .dashboard-carousel-slide > .live-chat-panel > .panel-header { display: grid; flex: 0 0 auto; grid-template-columns: minmax(0, 1fr) 32px 32px; align-items: start; gap: 8px; }
+    .channel-page-overview .dashboard-carousel-slide .dashboard-chat-header-actions { display: contents; }
+    .channel-page-overview .dashboard-carousel-slide .chat-command-toggle { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+    .channel-page-overview .dashboard-chat-lock { grid-column: 2; grid-row: 1; }
+    .channel-page-overview .dashboard-chat-expand { grid-column: 3; grid-row: 1; }
+    .channel-page-overview .dashboard-carousel-slide .dashboard-chat-composer { flex: 0 0 auto; }
+    .channel-page-overview .dashboard-carousel-slide .chat-heading { font-size: 18px; gap: 5px; }
+    .channel-page-overview .dashboard-chat-control { display: grid; width: 32px; height: 32px; padding: 6px; place-items: center; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--text); cursor: pointer; }
+    .channel-page-overview .dashboard-chat-control:hover:not(:disabled), .channel-page-overview .dashboard-chat-control:focus-visible { border-color: var(--accent); background: rgba(139,92,246,.18); }
+    .dashboard-chat-control:disabled { opacity: .45; cursor: not-allowed; }
+    .dashboard-chat-lock[aria-pressed="true"] { border-color: var(--accent); color: #c7b7ff; background: rgba(139,92,246,.18); }
+    .dashboard-chat-control svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .dashboard-chat-lock .chat-locked-icon, .dashboard-chat-lock[aria-pressed="true"] .chat-unlocked-icon { display: none; }
+    .dashboard-chat-lock[aria-pressed="true"] .chat-locked-icon { display: block; }
+    .dashboard-chat-expand .chat-collapse-icon, .dashboard-chat-expand[aria-pressed="true"] .chat-expand-icon { display: none; }
+    .dashboard-chat-expand[aria-pressed="true"] .chat-collapse-icon { display: block; }
     .channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel { height: auto; min-height: 0; flex: 1 1 0; overflow: hidden; }
     .channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel > .panel-header,
     .channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel > .activity-tabs { flex: 0 0 auto; }
@@ -1008,13 +1032,14 @@ body.landing-page {
     .channel-page-overview .dashboard-carousel-slide .dashboard-command-feed { min-height: 0; max-height: none; flex: 1; overflow-y: auto; }
     .channel-page-overview .dashboard-carousel-slide .dashboard-chat-feed { min-height: 0; flex: 1; overflow-y: auto; }
     .dashboard-carousel-controls { display: none; }
-    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-carousel-controls { position: absolute; z-index: 8; inset: 0; display: block; pointer-events: none; }
-    .dashboard-carousel-peek { position: absolute; top: calc(var(--dashboard-stats-height, 36px) + 8px); bottom: 0; width: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; pointer-events: auto; }
-    .dashboard-carousel-peek:hover:not(:disabled) { background: rgba(139,92,246,.08); }
+    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-carousel-controls { position: fixed; z-index: 8; top: var(--mobile-nav-height); right: 0; left: 0; height: calc(var(--dashboard-mobile-viewport-height, 100dvh) - var(--mobile-nav-height)); display: block; pointer-events: none; }
+    .dashboard-carousel-peek { position: absolute; top: 0; bottom: 0; width: 38px; padding: 0; border: 0; background: transparent; cursor: pointer; pointer-events: auto; }
+    .dashboard-carousel-peek::before { position: absolute; inset: 0; background: linear-gradient(var(--carousel-edge-direction, to right), rgba(139,92,246,.4), transparent); opacity: 0; transition: opacity .18s ease; content: ""; pointer-events: none; }
+    .dashboard-carousel-peek:is(:hover, :active, :focus-visible):not(:disabled)::before { opacity: 1; }
     .dashboard-carousel-peek:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .dashboard-carousel-peek:disabled { visibility: hidden; pointer-events: none; }
-    .dashboard-carousel-peek[data-dashboard-carousel-prev] { left: 0; }
-    .dashboard-carousel-peek[data-dashboard-carousel-next] { right: 0; }
+    .dashboard-carousel-peek[data-dashboard-carousel-prev] { left: 0; --carousel-edge-direction: to right; }
+    .dashboard-carousel-peek[data-dashboard-carousel-next] { right: 0; --carousel-edge-direction: to left; }
 }
 
 .channel-page-overview .dashboard-activity-panel .activity-scroll,
@@ -1029,6 +1054,8 @@ body.landing-page {
 
 @media (max-width: 768px) and (prefers-reduced-motion: reduce) {
     .channel-page-overview .dashboard-carousel-slide { transition: none; }
+    .channel-page-overview .dashboard-carousel-slide > .live-chat-panel { transition: none; }
+    .dashboard-carousel-peek::before { transition: none; }
 }
 
 @media (max-width: 520px) {
