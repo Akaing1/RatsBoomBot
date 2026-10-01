@@ -86,16 +86,16 @@ button, input { font: inherit; }
 .dashboard-page:not(.channel-page-overview) .app-shell.sidebar-collapsed .main-content { position: relative; left: -36px; width: min(1250px,calc(100vw - 144px)); max-width: none; }
 .dashboard-page .app-shell.sidebar-collapsed .sidebar { width: 72px; padding-right: 14px; padding-left: 14px; }
 @media (min-width: 769px) {
-    .dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked) .sidebar:hover { width: var(--sidebar-width); padding-right: 14px; padding-left: 14px; box-shadow: 18px 0 38px rgba(0,0,0,.38); }
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .brand-copy,
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .nav-link-label,
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-button-label { width: 0; opacity: 0; transform: translateX(-8px); pointer-events: none; }
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .brand { padding-right: 0; }
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-toggle { top: 35px; right: -14px; }
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .nav-link { gap: 0; justify-content: flex-start; }
-    .dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-logout .button { gap: 0; justify-content: center; }
-    .dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked):has(> .sidebar:hover) { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
-    .dashboard-page:not(.channel-page-overview):not(.admin-channel-overview) .app-shell.sidebar-collapsed:not(.sidebar-hover-locked):has(> .sidebar:hover) .main-content { position: static; left: auto; width: 100%; max-width: 1250px; }
+    .dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded .sidebar { width: var(--sidebar-width); padding-right: 14px; padding-left: 14px; box-shadow: 18px 0 38px rgba(0,0,0,.38); }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .brand-copy,
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .nav-link-label,
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .sidebar-button-label { width: 0; opacity: 0; transform: translateX(-8px); pointer-events: none; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .brand { padding-right: 0; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .sidebar-toggle { top: 35px; right: -14px; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .nav-link { gap: 0; justify-content: flex-start; }
+    .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .sidebar-logout .button { gap: 0; justify-content: center; }
+    .dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
+    .dashboard-page:not(.channel-page-overview):not(.admin-channel-overview) .app-shell.sidebar-collapsed.sidebar-hover-expanded .main-content { position: static; left: auto; width: 100%; max-width: 1250px; }
 }
 .nav-link:hover, .nav-link.active { background: var(--surface-raised); color: var(--text); }
 .nav-link.disabled { opacity: .45; pointer-events: none; }

@@ -1969,8 +1969,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'compactMedia.matches ? !compactExpanded : desktopCollapsed' in sidebar_script
     assert 'enableTransitionsAfterLayout()' in sidebar_script
     assert 'sidebar-hover-locked' in sidebar_script
-    assert '@media (min-width: 769px) {\n    .dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked) .sidebar:hover' in dashboard_styles
-    assert dashboard_styles.index('.dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked):has(> .sidebar:hover) { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }') < dashboard_styles.index('@media (min-width: 901px)')
+    assert '@media (min-width: 769px) {\n    .dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded .sidebar' in dashboard_styles
+    assert dashboard_styles.index('.dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }') < dashboard_styles.index('@media (min-width: 901px)')
     assert 'mobile ? (collapsed ? "☰" : "×")' in sidebar_script
     assert 'position: sticky;' in dashboard_styles
     assert '.navigation { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; gap: 7px; overflow-x: hidden; overflow-y: auto; }' in dashboard_styles
@@ -1984,8 +1984,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.sidebar .navigation,' in dashboard_styles
     assert ".sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 11px; padding-left: 11px; }" in dashboard_styles
     assert '.dashboard-page .sidebar-logout .button { justify-content: center; gap: 10px; overflow: hidden; padding-right: 11px; padding-left: 11px;' in dashboard_styles
-    assert '.dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-logout .button { gap: 0; justify-content: center; }' in dashboard_styles
-    assert '.dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked) .sidebar:hover { width: var(--sidebar-width); padding-right: 14px; padding-left: 14px;' in dashboard_styles
+    assert '.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .sidebar-logout .button { gap: 0; justify-content: center; }' in dashboard_styles
+    assert '.dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded .sidebar { width: var(--sidebar-width); padding-right: 14px; padding-left: 14px;' in dashboard_styles
     assert 'overflow: hidden;\n    padding: 11px 12px;\n    border-radius: 9px;' in dashboard_styles
     assert "window.localStorage.setItem(storageKey" in header_stats_script
     assert "dashboard-stat-visibility" in header_stats_script
@@ -2063,7 +2063,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'if (!previewActive) applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert 'applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert ".dashboard-stream-stat.state-live .status-indicator { animation: dashboard-live-pulse" in dashboard_styles
-    assert ".sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
+    assert ".sidebar:not(.sidebar-hover-expanded) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
 
 
 @pytest.mark.asyncio
