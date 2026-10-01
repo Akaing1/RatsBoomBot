@@ -67,6 +67,6 @@ Duplicates return points to the ticket's original purchase channel, without loya
 
 ### Horned Wolf preview
 
-Migration 59 adds Horned Wolf with the approved four-frame artwork in `assets/Horned Wolf.png`. The profile plays the strip using its existing CSS sprite animation at a 2.4-second cycle; no generated GIF or procedural breathing warp is used. Frames are packed into equal cells with a shared ground baseline.
+Migration 59 adds Horned Wolf with the approved four-frame artwork in `assets/Horned Wolf.png`. The pixel-art strip synchronizes subtle breathing with the tail rising on inhale and lowering on exhale. The profile plays the four frames using its existing CSS sprite animation at a 1.2-second cycle; no generated GIF or procedural breathing warp is used. Frames are packed into equal cells with a shared ground baseline.
 
 Grant and equip it for UAT preview: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet <tester_login> --pet wolf`. An owned wolf can also be equipped with `!pets equip Horned Wolf`.
