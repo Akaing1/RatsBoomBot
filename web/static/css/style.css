@@ -2007,6 +2007,7 @@ img.chatter-profile-avatar { display: block; }
 .chatter-pet-sprite { width: 112px; height: 120px; background-image: var(--pet-sprite); background-position: 0 center; background-repeat: no-repeat; background-size: calc(112px * var(--pet-frames)) auto; image-rendering: pixelated; animation: chatter-pet-idle .72s steps(var(--pet-frames)) infinite; }
 .chatter-pet-sprite--wolf { animation-duration: 1.2s; }
 .chatter-pet-sprite--fox { animation-duration: 2.4s; }
+.chatter-pet-sprite--raven { animation: chatter-raven-idle 1.29s step-end infinite; }
 .chatter-pet-sprite--rat { animation: chatter-rat-idle 1.8s step-end infinite; }
 .chatter-pet span { margin-top: -10px; font-size: 11px; font-weight: 800; }
 .chatter-pet small { margin-top: 3px; color: var(--accent); font-size: 10px; font-weight: 800; }
@@ -2016,6 +2017,12 @@ img.chatter-profile-avatar { display: block; }
     27.78%, 55.55% { background-position-x: -112px; }
     55.56%, 63.33% { background-position-x: -224px; }
     63.34%, 100% { background-position-x: -336px; }
+}
+@keyframes chatter-raven-idle {
+    0%, 34.88% { background-position-x: 0; }
+    34.89%, 62.01% { background-position-x: -112px; }
+    62.02%, 72.86% { background-position-x: -224px; }
+    72.87%, 100% { background-position-x: -336px; }
 }
 @media (prefers-reduced-motion: reduce) { .chatter-pet-sprite { animation: none; } }
 .chatter-level-summary { width: min(260px, 24vw); }
