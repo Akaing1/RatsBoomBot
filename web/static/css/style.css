@@ -296,7 +296,9 @@ button, input { font: inherit; }
 .dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }
 .dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; background: #0f1115; }
 .dashboard-video-player iframe { display: block; width: 100%; height: 100%; border: 0; }
-.dashboard-video-playback-status { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+/* Avoid clipping the embed's corners: Twitch tracks visual occlusion. */
+.dashboard-video-player[data-stream-player] { overflow: visible; border-radius: 0; }
+.dashboard-video-playback-status { max-width: 100%; flex: 0 0 auto; align-self: flex-end; margin: 8px 0 0; color: #f5c451; font-size: 12px; text-align: right; }
 .dashboard-video-playback-status[hidden] { display: none; }
 .dashboard-video-unavailable { display: grid; min-width: 0; aspect-ratio: 16 / 9; place-items: center; margin: 0; border-radius: 8px; background: #0f1115; color: var(--muted); text-align: center; }
 .dashboard-chat-column { display: flex; grid-area: chat; min-width: 0; min-height: 0; flex-direction: column; }
@@ -980,6 +982,8 @@ body.landing-page {
     .channel-page-overview .dashboard-carousel-slide { position: absolute; top: 0; right: 26px; bottom: 0; left: 26px; display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 10px; overflow-x: hidden; overflow-y: auto; opacity: 0; visibility: hidden; pointer-events: none; transform: translateX(calc(100% + 14px)); transition: transform .3s ease, opacity .3s ease, visibility 0s linear .3s; }
     .channel-page-overview .dashboard-carousel-slide.is-active { opacity: 1; visibility: visible; pointer-events: auto; transform: translateX(0); transition: transform .3s ease, opacity .3s ease, visibility 0s; }
     .channel-page-overview .dashboard-carousel-slide.is-neighbor { opacity: .65; visibility: visible; transition: transform .3s ease, opacity .3s ease, visibility 0s; }
+    /* Keep the active embed outside the slide's fading/transformed state. */
+    .channel-page-overview .dashboard-carousel-slide[data-dashboard-carousel-slide="0"].is-active { opacity: 1; transform: none; transition: none; }
     .channel-page-overview .dashboard-carousel-slide.is-before { transform: translateX(calc(-100% - 14px)); }
     .channel-page-overview .dashboard-carousel-slide:focus-visible,
     .channel-page-overview .dashboard-carousel-deck:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -999,8 +1003,10 @@ body.landing-page {
     .channel-page-overview .dashboard-carousel-slide .dashboard-command-feed { min-height: 0; max-height: none; flex: 1; overflow-y: auto; }
     .channel-page-overview .dashboard-carousel-slide .dashboard-chat-feed { min-height: 0; flex: 1; overflow-y: auto; }
     .dashboard-carousel-controls { display: none; }
-    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-carousel-controls { position: absolute; z-index: 8; inset: 0; display: block; pointer-events: none; }
-    .dashboard-carousel-peek { position: absolute; top: calc(var(--dashboard-stats-height, 36px) + 8px); bottom: 0; width: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; pointer-events: auto; }
+    /* A full-panel overlay can fail Twitch's visual-occlusion check even
+       with pointer-events disabled. Only the side buttons need boxes. */
+    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-carousel-controls { display: contents; }
+    .dashboard-carousel-peek { position: absolute; z-index: 8; top: calc(var(--dashboard-stats-height, 36px) + 8px); bottom: 0; width: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; pointer-events: auto; }
     .dashboard-carousel-peek:hover:not(:disabled) { background: rgba(139,92,246,.08); }
     .dashboard-carousel-peek:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .dashboard-carousel-peek:disabled { visibility: hidden; pointer-events: none; }
