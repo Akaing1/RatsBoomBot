@@ -21,6 +21,8 @@
 
     function applyState(collapsed) {
         const mobile = mobileMedia.matches;
+        shell.classList.remove("sidebar-hover-expanded");
+        sidebar?.classList.remove("sidebar-hover-expanded");
         shell.classList.toggle("sidebar-collapsed", collapsed);
         toggle.setAttribute("aria-expanded", String(!collapsed));
         toggle.setAttribute("aria-label", mobile
@@ -67,7 +69,22 @@
         }
     });
 
-    sidebar?.addEventListener("mouseleave", () => {
+    function expandOnPointer(event) {
+        if (event.pointerType === "touch" || mobileMedia.matches
+            || !shell.classList.contains("sidebar-collapsed")
+            || shell.classList.contains("sidebar-hover-locked")
+            || toggle.matches(":hover")) return;
+        shell.classList.add("sidebar-hover-expanded");
+        sidebar.classList.add("sidebar-hover-expanded");
+    }
+
+    // Entering the floating toggle must not move it away from the pointer.
+    // Moving from the toggle into the menu still opens the hover preview.
+    sidebar?.addEventListener("pointerenter", expandOnPointer);
+    sidebar?.addEventListener("pointermove", expandOnPointer);
+    sidebar?.addEventListener("pointerleave", () => {
+        shell.classList.remove("sidebar-hover-expanded");
+        sidebar.classList.remove("sidebar-hover-expanded");
         shell.classList.remove("sidebar-hover-locked");
         sidebar.classList.remove("sidebar-hover-locked");
     });
