@@ -1596,6 +1596,10 @@ def test_mobile_dashboard_reclaims_card_space_and_places_stats_in_navbar():
     assert 'document.querySelector("[data-dashboard-carousel]")' in stats
     assert '.sidebar .brand { z-index: 52; }' in mobile
     assert 'z-index: 51;' in stats_rule
+    assert '.sidebar .brand { pointer-events: none; }' in mobile
+    assert '.sidebar .brand .sidebar-logo-toggle { pointer-events: auto; }' in mobile
+    assert 'container.querySelectorAll("[data-dashboard-stat]").forEach' in stats
+    assert ': container.querySelector(`[data-dashboard-stat=' in stats
 
 
 def test_mobile_dashboard_feeds_do_not_reserve_empty_scrollbar_gutters():
@@ -1778,7 +1782,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'class="dashboard-header-stat dashboard-points-stat"' not in dashboard
     assert '.dashboard-header-stats > .dashboard-header-stat { flex: 1 0 auto; justify-content: center; }' in dashboard_styles
     assert '.dashboard-points-stat { display: inline-flex; max-width: 65%; min-width: 0; min-height: 30px; align-items: center; gap: 6px; margin-left: auto; padding: 5px 9px; border: 0;' in dashboard_styles
-    assert 'dashboard.querySelectorAll("[data-dashboard-stat]")' in header_stats_script
+    assert 'container.querySelectorAll("[data-dashboard-stat]")' in header_stats_script
     assert 'dashboard.querySelector("[data-dashboard-points-lost]")' in header_stats_script
     assert "data-stream-status" in dashboard
     assert 'class="dashboard-ad-stat state-{{ ad_status.state }}"' in dashboard

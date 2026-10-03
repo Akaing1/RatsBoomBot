@@ -119,7 +119,7 @@
         saveVisibility();
     });
 
-    dashboard.querySelectorAll("[data-dashboard-stat]").forEach(button => {
+    container.querySelectorAll("[data-dashboard-stat]").forEach(button => {
         const key = button.dataset.dashboardStat;
         applyVisibility(button, hiddenStats.has(key));
         button.addEventListener("click", () => {
@@ -140,7 +140,7 @@
             (Array.isArray(payload.stats) ? payload.stats : []).forEach(stat => {
                 const statContainer = stat.key === "points_lost"
                     ? dashboard.querySelector("[data-dashboard-points-lost]")
-                    : dashboard.querySelector(`[data-dashboard-stat="${CSS.escape(String(stat.key || ""))}"]`);
+                    : container.querySelector(`[data-dashboard-stat="${CSS.escape(String(stat.key || ""))}"]`);
                 const value = statContainer?.querySelector("[data-dashboard-stat-value]");
                 const displayValue = String(stat.display_value ?? "—");
                 if (stat.key === "viewers") actualViewerCount = displayValue;

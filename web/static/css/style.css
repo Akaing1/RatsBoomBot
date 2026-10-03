@@ -1024,6 +1024,9 @@ body.landing-page {
     .channel-page-overview .app-shell.sidebar-collapsed .sidebar .brand-copy { display: none; }
     /* Mobile stats and the brand share the sidebar's stacking context. */
     .channel-page-overview .sidebar .brand { z-index: 52; }
+    /* Keep the logo above the stats without its full-width wrapper blocking them. */
+    .channel-page-overview .sidebar .brand { pointer-events: none; }
+    .channel-page-overview .sidebar .brand .sidebar-logo-toggle { pointer-events: auto; }
     .channel-page-overview .app-shell.sidebar-collapsed .sidebar .brand { align-items: flex-start; }
     .channel-page-overview .app-shell.sidebar-collapsed .sidebar .brand-mark { width: 32px; height: 32px; flex-basis: 32px; }
     .channel-page-overview .app-shell:not(.sidebar-collapsed) .dashboard-carousel-navbar-label { display: none; }
