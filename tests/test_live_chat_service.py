@@ -1548,6 +1548,17 @@ def test_dashboard_carousel_keeps_stream_player_mounted_across_breakpoints():
     assert 'event.preventDefault()' in carousel
 
 
+def test_dashboard_first_carousel_card_retains_shared_slide_animation():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    selector = '.channel-page-overview .dashboard-carousel-slide[data-dashboard-carousel-slide="0"].is-active'
+    first_card_rule = styles.split(selector, 1)[1].split("}", 1)[0]
+
+    # Leave the embed untransformed at rest without snapping over the outgoing card.
+    assert "transform: none;" in first_card_rule
+    assert "transition:" not in first_card_rule
+    assert '.dashboard-carousel-slide.is-active { opacity: 1; visibility: visible; pointer-events: auto; transform: translateX(0); transition: transform .3s ease, opacity .3s ease, visibility 0s; }' in styles
+
+
 def test_dashboard_mobile_activity_panels_keep_tabs_above_scrollable_events():
     styles = open("web/static/css/style.css", encoding="utf-8").read()
 
