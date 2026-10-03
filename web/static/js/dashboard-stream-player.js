@@ -27,45 +27,44 @@
     let live = mount.dataset.isLive === "true";
     let actualLive = live;
     let testMode = false;
-    let manualPaused = false;
     let playing = false;
     let selectedChannel = channel;
     let loadedChannel = channel;
 
+    function updatePlaybackPrompt() {
+        if (!ready) return;
+        // The user must press Twitch's own Play control, not a scripted button,
+        // so Twitch recognizes manual playback for background viewing.
+        showStatus(live && !playing ? "Press Play in the Twitch player to start the preview." : "");
+    }
+
     function selectChannel(nextChannel) {
         selectedChannel = nextChannel;
         if (ready && loadedChannel !== selectedChannel) {
+            if (playing) twitchPlayer.pause();
+            playing = false;
             twitchPlayer.setChannel(selectedChannel);
             loadedChannel = selectedChannel;
         }
     }
 
-    function startIfAllowed() {
-        if (!ready || !live || manualPaused) return;
-        showStatus();
-        twitchPlayer.play();
-    }
-
     function setLive(isLive) {
-        if (live === isLive) return;
         live = isLive;
-        if (live) {
-            startIfAllowed();
-        } else {
-            manualPaused = false;
-            showStatus();
-            if (ready && playing) twitchPlayer.pause();
+        if (!live && ready && playing) {
+            playing = false;
+            twitchPlayer.pause();
         }
+        updatePlaybackPrompt();
     }
 
     twitchPlayer.addEventListener(Twitch.Player.READY, () => {
         ready = true;
         selectChannel(selectedChannel);
-        startIfAllowed();
+        updatePlaybackPrompt();
     });
     twitchPlayer.addEventListener(Twitch.Player.ONLINE, () => {
         if (!testMode) setLive(true);
-        else startIfAllowed();
+        else updatePlaybackPrompt();
     });
     twitchPlayer.addEventListener(Twitch.Player.OFFLINE, () => {
         if (!testMode) setLive(false);
@@ -73,20 +72,20 @@
     });
     twitchPlayer.addEventListener(Twitch.Player.PLAY, () => {
         playing = true;
-        manualPaused = false;
         showStatus();
     });
     twitchPlayer.addEventListener(Twitch.Player.PLAYING, () => {
         playing = true;
-        manualPaused = false;
         showStatus();
     });
     twitchPlayer.addEventListener(Twitch.Player.PAUSE, () => {
-        if (live && playing) manualPaused = true;
         playing = false;
+        if (live) showStatus("Preview paused. Press Play in the Twitch player to resume.");
+        else showStatus();
     });
     twitchPlayer.addEventListener(Twitch.Player.PLAYBACK_BLOCKED, () => {
-        showStatus("Autoplay was blocked. Press Play in the Twitch player to watch.");
+        playing = false;
+        showStatus("Playback was blocked. Press Play in the Twitch player to watch.");
     });
     window.addEventListener("dashboard-stream-live-changed", event => {
         if (typeof event.detail?.isLive !== "boolean") return;
@@ -97,18 +96,14 @@
         const testChannel = event.detail?.channel;
         if (typeof testChannel !== "string") return;
         testMode = true;
-        manualPaused = false;
         selectChannel(testChannel);
-        live = true;
-        startIfAllowed();
+        setLive(true);
     });
     window.addEventListener("dashboard-stream-test-stop", event => {
         if (!testMode) return;
         testMode = false;
-        manualPaused = false;
         actualLive = typeof event.detail?.isLive === "boolean" ? event.detail.isLive : actualLive;
         selectChannel(channel);
-        live = !actualLive;
         setLive(actualLive);
     });
 })();
