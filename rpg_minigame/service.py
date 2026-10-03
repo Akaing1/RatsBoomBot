@@ -146,18 +146,23 @@ class RaidBossService:
     REPEAT_REMINDER_SECONDS = 60 * 60
     REQUIRED_REMINDER_MESSAGES = 20
 
-    def __init__(self, bot, db, chatter_stats=None, points=None, *, config_provider=None, pets=None):
+    def __init__(self, bot, db, chatter_stats=None, points=None, *, config_provider=None, enabled_provider=None, pets=None):
         self.bot = bot
         self.db = db
         self.chatter_stats = chatter_stats
         self.points = points
         self.pets = pets
         self.config_provider = config_provider
+        self.enabled_provider = enabled_provider
         self._shared_inventory_lock = asyncio.Lock()
         self.spawn_tasks: dict[str, asyncio.Task] = {}
         self.reminder_tasks: dict[str, asyncio.Task] = {}
         self.reminder_message_counts: dict[str, int] = {}
         self.reminder_activity_events: dict[str, asyncio.Event] = {}
+
+    def is_enabled(self, broadcaster_id: str) -> bool:
+        """Check the host's live toggle, including channel/profile overrides."""
+        return self.enabled_provider is None or self.enabled_provider(str(broadcaster_id))
 
     @staticmethod
     def inventory_scope(broadcaster_id: str, weapon: str) -> str:
@@ -244,6 +249,9 @@ class RaidBossService:
     async def schedule_spawn(self, broadcaster_id: str, config: RaidBossConfig, boss_tier: str | None = None, boss_type: str | None = None, stream_id: str | None = None) -> bool:
         broadcaster_id = str(broadcaster_id)
 
+        if not self.is_enabled(broadcaster_id):
+            return False
+
         if broadcaster_id in self.spawn_tasks or await self.get_active_event(broadcaster_id) is not None:
             return False
 
@@ -259,6 +267,10 @@ class RaidBossService:
 
     async def restore_session(self, broadcaster_id: str, stream_id: str, config: RaidBossConfig) -> None:
         broadcaster_id = str(broadcaster_id)
+
+        if not self.is_enabled(broadcaster_id):
+            await self.cancel_announcements(broadcaster_id)
+            return
         stream_id = str(stream_id)
         active_event = await self.get_active_event(broadcaster_id)
 
@@ -295,6 +307,10 @@ class RaidBossService:
 
     async def start_reminders(self, broadcaster_id: str, stream_id: str | None = None) -> None:
         broadcaster_id = str(broadcaster_id)
+
+        if not self.is_enabled(broadcaster_id):
+            await self.cancel_announcements(broadcaster_id)
+            return
         existing = self.reminder_tasks.pop(broadcaster_id, None)
 
         if existing is not None:
@@ -315,6 +331,11 @@ class RaidBossService:
 
     async def track_message(self, payload) -> None:
         broadcaster_id = str(payload.broadcaster.id)
+
+        if not self.is_enabled(broadcaster_id):
+            if broadcaster_id in self.spawn_tasks or broadcaster_id in self.reminder_tasks:
+                await self.cancel_announcements(broadcaster_id)
+            return
 
         if broadcaster_id not in self.reminder_tasks:
             return
@@ -343,6 +364,9 @@ class RaidBossService:
             if warning_delay:
                 await self._sleep_until(warning_at)
 
+            if not self.is_enabled(broadcaster_id):
+                return
+
             if not warning_sent and datetime.now(UTC) < spawn_at:
                 await self._send_message(broadcaster_id, "A dangerous presence is approaching... Prepare for Boss Hunt in 10 minutes!")
 
@@ -350,6 +374,9 @@ class RaidBossService:
                     await connection.execute("UPDATE raid_boss_schedules SET warning_sent = 1 WHERE broadcaster_id = ?", (broadcaster_id,))
 
             await self._sleep_until(spawn_at)
+
+            if not self.is_enabled(broadcaster_id):
+                return
 
             # A streamer may edit names while a spawn is already scheduled.
             current_config = self.config_provider(broadcaster_id) if self.config_provider is not None else None
@@ -382,6 +409,9 @@ class RaidBossService:
     async def _reminder_loop(self, broadcaster_id: str) -> None:
         try:
             while True:
+                if not self.is_enabled(broadcaster_id):
+                    return
+
                 event = await self.get_active_event(broadcaster_id)
 
                 if event is None:
@@ -390,7 +420,11 @@ class RaidBossService:
                 schedule = await self._get_schedule(broadcaster_id)
                 next_reminder_at = datetime.fromisoformat(str(schedule["next_reminder_at"])) if schedule is not None and schedule["next_reminder_at"] else datetime.now(UTC)
                 await self._sleep_until(next_reminder_at)
+                if not self.is_enabled(broadcaster_id):
+                    return
                 await self._wait_for_reminder_activity(broadcaster_id)
+                if not self.is_enabled(broadcaster_id):
+                    return
                 event = await self.get_active_event(broadcaster_id)
 
                 if event is None:
@@ -488,11 +522,13 @@ class RaidBossService:
             await connection.execute(query, (broadcaster_id, stream_id, next_reminder_at.isoformat(), message_count))
 
     async def _send_message(self, broadcaster_id: str, message: str) -> None:
+        if not self.is_enabled(broadcaster_id):
+            return
         channel = self.bot.create_partialuser(str(broadcaster_id))
         await self.bot.services.chat_identity.send_message(channel, message)
 
     async def send_announcement(self, broadcaster_id: str, message: str, color: str) -> None:
-        if self.bot is None:
+        if self.bot is None or not self.is_enabled(broadcaster_id):
             return
 
         channel = self.bot.create_partialuser(str(broadcaster_id))
@@ -501,7 +537,7 @@ class RaidBossService:
             await self.bot.services.chat_identity.send_announcement(channel, message, color)
         except Exception:
             LOGGER.warning("[Raid Bosses] Could not send a raid announcement for broadcaster %s. Falling back to a chat message.", broadcaster_id, exc_info=True, extra={"broadcaster_id": str(broadcaster_id)})
-            await self.bot.services.chat_identity.send_message(channel, message)
+            await self._send_message(broadcaster_id, message)
 
     @staticmethod
     def _spawn_message(event: RaidBossEvent) -> str:
@@ -538,6 +574,8 @@ class RaidBossService:
         return bool(row and row["tutorial_completed"])
 
     async def spawn_automatic(self, broadcaster_id: str, config: RaidBossConfig) -> RaidBossEvent | None:
+        if not self.is_enabled(broadcaster_id):
+            return None
         if not config.automatic_spawning_enabled or not await self.has_completed_tutorial(broadcaster_id):
             return None
 
@@ -600,6 +638,8 @@ class RaidBossService:
         return int(row["contributors"])
 
     async def spawn(self, broadcaster_id: str, boss_type: str, config: RaidBossConfig, boss_tier: str = "main") -> RaidBossEvent | None:
+        if not self.is_enabled(broadcaster_id):
+            return None
         boss_type = boss_type.lower()
         boss_tier = boss_tier.lower()
         active_event = await self.get_active_event(broadcaster_id)
@@ -957,6 +997,8 @@ class RaidBossService:
         return max(reached, default=None)
 
     async def register_stream(self, broadcaster_id: str, stream_id: str) -> tuple[RaidBossEvent | None, int]:
+        if not self.is_enabled(broadcaster_id):
+            return await self.get_active_event(broadcaster_id), 0
         event = await self.get_active_event(broadcaster_id)
 
         if event is None:

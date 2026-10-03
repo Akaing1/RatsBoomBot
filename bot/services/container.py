@@ -43,6 +43,7 @@ class ServiceContainer:
         self.raid_bosses = RaidBossService(
             bot, db, self.chatter_stats, self.points,
             pets=self.pets,
+            enabled_provider=lambda broadcaster_id: self.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES),
             config_provider=lambda broadcaster_id: (
                 profile.raid_bosses if (profile := get_active_profile(broadcaster_id)) is not None else None
             ),
