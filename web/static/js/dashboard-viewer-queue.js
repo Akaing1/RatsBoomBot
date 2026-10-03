@@ -249,6 +249,7 @@
                 item.style.setProperty("--queue-row-height", `${item.getBoundingClientRect().height}px`);
                 item.style.setProperty("--queue-enter-delay", `${Math.min(index * 45, 600)}ms`);
                 item.classList.add("is-appearing");
+                window.dashboardActivityMotion?.highlight(item, Math.min(index * 45, 600));
                 item.addEventListener("animationend", () => item.classList.remove("is-appearing"), {once: true});
             });
             if (addedRows.length) {

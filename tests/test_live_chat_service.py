@@ -1672,6 +1672,28 @@ def test_dashboard_scrollbars_appear_on_panel_hover_or_keyboard_focus():
     assert f'.panel:is(:hover, :focus-within) {feeds}::-webkit-scrollbar {{ width: 8px; }}' in styles
 
 
+def test_activity_motion_covers_feeds_automod_commands_and_tabs_without_chat_changes():
+    dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    motion = open("web/static/js/dashboard-activity-motion.js", encoding="utf-8").read()
+    chat = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+
+    assert 'dashboardActivityMotion.reconcile(element, render)' in dashboard
+    assert 'dashboardActivityMotion.remove(automodContent, row)' in dashboard
+    assert 'if (wasHidden && !panel.hidden) window.dashboardActivityMotion?.switchTab(panel)' in dashboard
+    assert 'if (feed.newestFirst) window.dashboardActivityMotion?.enter(feed.element, row, shouldFollowNewest)' in chat
+    assert 'initialized.has(container) && visible(container) && !reduced.matches' in motion
+    assert 'new Set(previous.map(key))' in motion
+    assert '@keyframes activity-fold-in' in styles
+    assert '@keyframes activity-slide-away' in styles
+    assert 'row.inert = true;' in motion
+    queue = open("web/static/js/dashboard-viewer-queue.js", encoding="utf-8").read()
+    assert 'window.dashboardActivityMotion?.highlight(item, Math.min(index * 45, 600));' in queue
+    assert 'if (!removing) highlight(row, delay);' in motion
+    assert 'background: rgba(139,92,246,.16);' in styles
+    assert '@keyframes entry-added-highlight' in styles
+
+
 def test_dashboard_mobile_activity_panels_keep_tabs_above_scrollable_events():
     styles = open("web/static/css/style.css", encoding="utf-8").read()
 

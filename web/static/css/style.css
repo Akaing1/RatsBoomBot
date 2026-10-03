@@ -609,6 +609,27 @@ button, input { font: inherit; }
 .activity-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .activity-list-item { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 13px 0; border-top: 1px solid var(--border); }
 .activity-list-item:first-child { border-top: 0; }
+.is-new-entry { position: relative; }
+.is-new-entry::after { position: absolute; inset: 0; border-radius: inherit; background: rgba(139,92,246,.16); opacity: 0; content: ""; pointer-events: none; animation: entry-added-highlight .9s ease-out var(--entry-highlight-delay, 0ms) both; }
+@keyframes entry-added-highlight {
+    0% { opacity: 0; }
+    15%, 40% { opacity: 1; }
+    100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .is-new-entry::after { display: none; animation: none; } }
+.is-activity-appearing, .is-activity-removing { box-sizing: border-box; min-height: 0; flex: 0 0 auto; overflow: hidden; transform-origin: top center; }
+.is-activity-appearing { animation: activity-fold-in .36s cubic-bezier(.2,.8,.2,1) var(--activity-motion-delay, 0ms) both; }
+.is-activity-removing { pointer-events: none; animation: activity-slide-away .36s ease-in var(--activity-motion-delay, 0ms) forwards; }
+@keyframes activity-fold-in {
+    from { height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; transform: perspective(600px) rotateX(-80deg); }
+    to { height: var(--activity-row-height); padding-top: var(--activity-padding-top); padding-bottom: var(--activity-padding-bottom); opacity: 1; transform: none; }
+}
+@keyframes activity-slide-away {
+    0% { height: var(--activity-row-height); padding-top: var(--activity-padding-top); padding-bottom: var(--activity-padding-bottom); opacity: 1; transform: translateX(0); }
+    60% { height: var(--activity-row-height); padding-top: var(--activity-padding-top); padding-bottom: var(--activity-padding-bottom); opacity: 0; transform: translateX(44px); }
+    100% { height: 0; padding-top: 0; padding-bottom: 0; border-width: 0; opacity: 0; transform: translateX(44px); }
+}
+@media (prefers-reduced-motion: reduce) { .is-activity-appearing, .is-activity-removing { animation: none; } }
 .activity-main { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
 .activity-main strong { overflow-wrap: anywhere; font-size: 13px; }
 .activity-main span { color: var(--muted); font-size: 11px; }
