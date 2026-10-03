@@ -71,22 +71,19 @@
     </div>
     <div class="dashboard-video-frame">
         {% if broadcaster.login %}
-            <iframe
+            <div
+                id="dashboard-twitch-player"
                 class="dashboard-video-player"
                 data-stream-player
                 data-channel="{{ broadcaster.login }}"
-                title="{{ broadcaster.name or broadcaster.login }} live stream preview"
-                width="640"
-                height="360"
-                loading="lazy"
-                allow="autoplay; fullscreen; picture-in-picture"
-                allowfullscreen
-                referrerpolicy="strict-origin-when-cross-origin"
-            ></iframe>
+                data-is-live="{{ 'true' if broadcaster.is_live else 'false' }}"
+                aria-label="{{ broadcaster.name or broadcaster.login }} live stream preview"
+            ></div>
         {% else %}
             <p class="dashboard-video-unavailable">A Twitch channel login is needed to show the stream preview.</p>
         {% endif %}
     </div>
+    {% if broadcaster.login %}<p class="dashboard-video-playback-status" data-stream-playback-status role="status" hidden></p>{% endif %}
 </section>
 
 <div class="channel-live-layout">
@@ -918,6 +915,7 @@
 {% block page_scripts %}
     <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-carousel.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="https://player.twitch.tv/js/embed/v1.js" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-stream-player.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-channel-metadata.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-viewer-queue.js') }}?v={{ deployment_stamp() }}" defer></script>

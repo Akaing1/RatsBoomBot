@@ -1950,9 +1950,16 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'dashboard-header-stat-break' not in dashboard
     assert 'data-stream-player' in dashboard
     assert 'dashboard-stream-player.js' in dashboard
-    assert 'url.searchParams.set("parent", window.location.hostname)' in stream_player_script
-    assert 'url.searchParams.set("autoplay", "false")' in stream_player_script
-    assert 'url.searchParams.set("muted", "true")' in stream_player_script
+    assert 'https://player.twitch.tv/js/embed/v1.js' in dashboard
+    assert dashboard.index('https://player.twitch.tv/js/embed/v1.js') < dashboard.index('dashboard-stream-player.js')
+    assert 'data-is-live="{{ \'true\' if broadcaster.is_live else \'false\' }}"' in dashboard
+    assert 'new Twitch.Player(mount.id, {' in stream_player_script
+    assert 'parent: [window.location.hostname]' in stream_player_script
+    assert 'autoplay: false' in stream_player_script
+    assert 'muted: true' in stream_player_script
+    assert 'twitchPlayer.addEventListener(Twitch.Player.PAUSE' in stream_player_script
+    assert 'twitchPlayer.addEventListener(Twitch.Player.PLAYBACK_BLOCKED' in stream_player_script
+    assert 'if (liveChanged) window.dispatchEvent(new CustomEvent("dashboard-stream-live-changed"' in header_stats_script
     assert '.dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }' in dashboard_styles
     assert '.dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9;' in dashboard_styles
     assert 'aspect-ratio: 16 / 9;' in dashboard_styles
@@ -2056,6 +2063,12 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'container.querySelector("[data-stream-status]")?.addEventListener("click", () => {' in header_stats_script
     assert 'hiddenStats.has("stream_timer")' in header_stats_script
     assert 'window.dashboardLiveTest = {' in header_stats_script
+    assert 'start(channelOrMinutes = 0, minutes = 0) {' in header_stats_script
+    assert 'new CustomEvent("dashboard-stream-test-start", {detail: {channel: login}})' in header_stats_script
+    assert 'new CustomEvent("dashboard-stream-test-stop", {detail: {isLive: actualStreamStatus.isLive}})' in header_stats_script
+    assert 'twitchPlayer.setChannel(selectedChannel);' in stream_player_script
+    assert 'window.addEventListener("dashboard-stream-test-start"' in stream_player_script
+    assert 'window.addEventListener("dashboard-stream-test-stop"' in stream_player_script
     assert 'applyStreamStatus(true, new Date(Date.now() - elapsedMinutes * 60000).toISOString());' in header_stats_script
     assert 'viewerValue.textContent = (Math.floor(Math.random() * 500) + 1).toLocaleString();' in header_stats_script
     assert 'viewerValue.textContent = actualViewerCount;' in header_stats_script

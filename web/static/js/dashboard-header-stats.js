@@ -79,19 +79,26 @@
 
     // Browser-console preview only: no Twitch or server state is changed.
     window.dashboardLiveTest = {
-        start(minutes = 0) {
-            const elapsedMinutes = Number(minutes);
+        start(channelOrMinutes = 0, minutes = 0) {
+            const testingChannel = typeof channelOrMinutes === "string";
+            const login = testingChannel ? channelOrMinutes.replace(/^@/, "").trim().toLowerCase() : "";
+            if (testingChannel && !/^[a-z0-9_]{1,25}$/.test(login)) {
+                throw new TypeError("Enter a Twitch channel login, such as dashboardLiveTest.start('twitch').");
+            }
+            const elapsedMinutes = Number(testingChannel ? minutes : channelOrMinutes);
             if (!Number.isFinite(elapsedMinutes) || elapsedMinutes < 0) {
                 throw new RangeError("Minutes must be a non-negative number.");
             }
             previewActive = true;
             applyStreamStatus(true, new Date(Date.now() - elapsedMinutes * 60000).toISOString());
             if (viewerValue) viewerValue.textContent = (Math.floor(Math.random() * 500) + 1).toLocaleString();
+            if (testingChannel) window.dispatchEvent(new CustomEvent("dashboard-stream-test-start", {detail: {channel: login}}));
         },
         stop() {
             previewActive = false;
             applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);
             if (viewerValue) viewerValue.textContent = actualViewerCount;
+            window.dispatchEvent(new CustomEvent("dashboard-stream-test-stop", {detail: {isLive: actualStreamStatus.isLive}}));
             void refreshStats();
         }
     };
@@ -139,8 +146,10 @@
                 if (value && !(previewActive && stat.key === "viewers")) value.textContent = displayValue;
             });
             if (streamStatus && typeof payload.is_live === "boolean") {
+                const liveChanged = actualStreamStatus.isLive !== payload.is_live;
                 actualStreamStatus = {isLive: payload.is_live, startedAt: payload.started_at || ""};
                 if (!previewActive) applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);
+                if (liveChanged) window.dispatchEvent(new CustomEvent("dashboard-stream-live-changed", {detail: {isLive: actualStreamStatus.isLive}}));
             }
             lastRefreshAt = Date.now();
         } catch (_error) {

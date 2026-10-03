@@ -38,7 +38,7 @@
             </div>
             {% if profile.pet %}
                 <div class="chatter-pet" title="{{ profile.pet.display_name }} ({{ profile.pet.rarity | replace('_', ' ') | title }}) · Level {{ profile.pet.level }} · {{ profile.pet.passive_name }} ({{ profile.pet.passive_rarity | replace('_', ' ') | title }})">
-                    <div class="chatter-pet-sprite{% if profile.pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif profile.pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ profile.pet.sprite_path }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ profile.pet.frame_count }}" role="img" aria-label="{{ profile.pet.display_name }}"></div>
+                    <div class="chatter-pet-sprite{% if profile.pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif profile.pet.pet_id == 'royal_raven' %} chatter-pet-sprite--raven{% elif profile.pet.pet_id == 'horned_wolf' %} chatter-pet-sprite--wolf{% elif profile.pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ profile.pet.sprite_path }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ profile.pet.frame_count }}" role="img" aria-label="{{ profile.pet.display_name }}"></div>
                     <span>{{ profile.pet.display_name }} · {{ profile.pet.rarity | replace('_', ' ') | title }}</span>
                     <small>{{ profile.pet.passive_name }} · {{ profile.pet.passive_rarity | replace('_', ' ') | title }}</small>
                     <small>{{ profile.pet.passive_percent_label }}% {{ profile.pet.passive_description }}</small>
@@ -83,7 +83,7 @@
             <div class="chatter-stat-grid">
                 {% for pet in profile.pets %}
                 <article>
-                    <div class="chatter-pet-sprite{% if pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ pet.sprite_path }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ pet.frame_count }}" role="img" aria-label="{{ pet.display_name }}"></div>
+                    <div class="chatter-pet-sprite{% if pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif pet.pet_id == 'royal_raven' %} chatter-pet-sprite--raven{% elif pet.pet_id == 'horned_wolf' %} chatter-pet-sprite--wolf{% elif pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ pet.sprite_path }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ pet.frame_count }}" role="img" aria-label="{{ pet.display_name }}"></div>
                     <strong>{{ pet.display_name }}</strong>
                     <span>{{ 'UR' if pet.rarity == 'ultra_rare' else pet.rarity | title }}{% if profile.pet and profile.pet.user_pet_id == pet.user_pet_id %} · Equipped{% endif %}</span>
                     <small>{{ pet.passive_percent_label }}% {{ pet.passive_description }}</small>

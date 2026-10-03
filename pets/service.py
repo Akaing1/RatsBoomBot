@@ -2,16 +2,18 @@ from dataclasses import dataclass
 from secrets import randbelow
 from typing import Any
 
-from pets.passives import GAMBLE_LOSS_REFUND, GAMBLE_ODDS, LOYALTY_GAIN, PASSIVES, RAID_DAMAGE, scaled_bps
+from pets.passives import GAMBLE_LOSS_REFUND, GAMBLE_ODDS, LOYALTY_GAIN, PASSIVES, RAID_DAMAGE, RAID_PROFIT, scaled_bps
 from storage.transactions import immediate_transaction
 
 LOYALTY_GAIN_PASSIVE = LOYALTY_GAIN
 POC_BAT_ID = "dungeon_bat"
 RAT_ID = "explosive_rat"
 FOX_ID = "sleepy_fox"
+WOLF_ID = "horned_wolf"
+RAVEN_ID = "royal_raven"
 POC_LOYALTY_BONUS_BPS = 1_000
 TICKET_PRICE = 50_000
-SUMMON_PASSIVES = {POC_BAT_ID: GAMBLE_ODDS, RAT_ID: LOYALTY_GAIN, FOX_ID: RAID_DAMAGE}
+SUMMON_PASSIVES = {POC_BAT_ID: GAMBLE_ODDS, RAT_ID: LOYALTY_GAIN, FOX_ID: RAID_DAMAGE, WOLF_ID: RAID_DAMAGE, RAVEN_ID: RAID_PROFIT}
 RARITY_WEIGHTS = (("common", 70), ("rare", 20), ("ultra_rare", 10))
 DUPLICATE_REFUNDS = {"common": 12_500, "rare": 25_000, "ultra_rare": 50_000}
 
@@ -265,7 +267,7 @@ class PetService:
         return await self.grant_pet(user_id, FOX_ID, passive_type)
 
     async def grant_pet(self, user_id: str, pet_id: str, passive_type: str) -> EquippedPet:
-        if pet_id not in {POC_BAT_ID, RAT_ID, FOX_ID} or passive_type not in PASSIVES:
+        if pet_id not in {POC_BAT_ID, RAT_ID, FOX_ID, WOLF_ID, RAVEN_ID} or passive_type not in PASSIVES:
             raise ValueError("Unknown pet or passive.")
 
         user_id = str(user_id)

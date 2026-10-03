@@ -67,7 +67,7 @@ async def test_gamble_refund_only_reduces_actual_gamble_loss(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_rat_damage_and_profit_change_raid_results(tmp_path, monkeypatch):
+async def test_rat_damage_and_royal_raven_profit_change_raid_results(tmp_path, monkeypatch):
     monkeypatch.setattr('rpg_minigame.service.random.random', lambda: 1.0)
     async with asqlite.create_pool(str(tmp_path / 'pets.db')) as db:
         await run_migrations(db)
@@ -80,7 +80,7 @@ async def test_rat_damage_and_profit_change_raid_results(tmp_path, monkeypatch):
         assert result.damage == 110
         assert result.current_hp == 890
 
-        await pets.grant_rat('profit-viewer', RAID_PROFIT)
+        await pets.grant_pet('profit-viewer', 'royal_raven', RAID_PROFIT)
         async with db.acquire() as conn:
             await conn.execute("INSERT INTO raid_boss_attacks (event_id,stream_id,attack_number,broadcaster_id,user_id,username,damage,attacked_at) VALUES (1,'stream',1,'channel','profit-viewer','profit-viewer',100,'2026-09-29')")
             await conn.execute("UPDATE raid_boss_events SET current_hp=790 WHERE id=1")
