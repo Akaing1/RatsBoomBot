@@ -1,7 +1,8 @@
 (() => {
     const container = document.querySelector("[data-dashboard-header-stats]");
     if (!container) return;
-    const dashboard = container.closest(".channel-dashboard-layout") || document;
+    const dashboard = container.closest(".channel-dashboard-layout") || document.querySelector("[data-dashboard-carousel]");
+    if (!dashboard) return;
     const statsRow = container.closest(".dashboard-header-side");
 
     function updateDashboardStatsHeight() {

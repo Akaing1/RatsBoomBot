@@ -1559,6 +1559,119 @@ def test_dashboard_first_carousel_card_retains_shared_slide_animation():
     assert '.dashboard-carousel-slide.is-active { opacity: 1; visibility: visible; pointer-events: auto; transform: translateX(0); transition: transform .3s ease, opacity .3s ease, visibility 0s; }' in styles
 
 
+def test_mobile_dashboard_reclaims_card_space_and_places_stats_in_navbar():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    mobile = styles.split('.channel-page-overview .dashboard-carousel-navbar-label {', 1)[1]
+    stats_rule = mobile.split('.sidebar > .dashboard-header-side {', 1)[1].split('}', 1)[0]
+    deck_rule = mobile.split('.dashboard-carousel-deck { position: absolute;', 1)[1].split('}', 1)[0]
+    slide_rule = mobile.split('.dashboard-carousel-slide { position: absolute;', 1)[1].split('}', 1)[0]
+    edge_rule = mobile.split('.dashboard-carousel-peek {', 1)[1].split('}', 1)[0]
+
+    assert 'position: fixed;' in stats_rule
+    assert 'top: calc(var(--mobile-nav-height) / 2);' in stats_rule
+    assert 'transform: translateY(-50%);' in stats_rule
+    assert 'top: 0;' in deck_rule
+    assert 'left: 12px;' in slide_rule and 'right: 12px;' in slide_rule
+    assert '.dashboard-carousel-slide.is-neighbor { opacity: .65; visibility: visible; transform: translateX(calc(100% + 8px));' in mobile
+    assert '.dashboard-carousel-slide.is-before.is-neighbor { transform: translateX(calc(-100% - 8px)); }' in mobile
+    assert 'overflow: hidden;' in slide_rule
+    assert 'width: 16px;' in edge_rule
+    gradient_rule = mobile.split('.dashboard-carousel-peek::before {', 1)[1].split('}', 1)[0]
+    assert 'width: 28px;' in gradient_rule
+    assert 'pointer-events: none;' in gradient_rule
+    assert '.dashboard-carousel-peek[data-dashboard-carousel-next]::before { right: 0; left: auto; }' in mobile
+    assert 'top: var(--mobile-nav-height);' in edge_rule
+    assert 'height: calc(var(--dashboard-mobile-viewport-height, 100dvh) - var(--mobile-nav-height));' in edge_rule
+    main_rule = mobile.split('.streamer-main-content {', 1)[1].split('}', 1)[0]
+    assert 'padding: 8px 0;' in main_rule
+    assert '.streamer-main-content > .channel-dashboard-layout.has-carousel { padding-inline: 4px; }' in mobile
+    assert 'left: 4px;' in deck_rule and 'right: 4px;' in deck_rule
+    assert '.app-shell.sidebar-collapsed .sidebar .brand-copy { display: none; }' in mobile
+    assert '.app-shell:not(.sidebar-collapsed) .sidebar > .dashboard-header-side { opacity: 0; visibility: hidden; pointer-events: none; transition: none; }' in mobile
+    assert '.app-shell.sidebar-collapsed .sidebar > .dashboard-header-side { opacity: 1; visibility: visible; }' in mobile
+    carousel = open("web/static/js/dashboard-carousel.js", encoding="utf-8").read()
+    stats = open("web/static/js/dashboard-header-stats.js", encoding="utf-8").read()
+    assert 'if (sidebar && statsRow) sidebar.append(statsRow);' in carousel
+    assert 'if (statsRow && statsMarker.parentNode) statsMarker.after(statsRow);' in carousel
+    assert 'document.querySelector("[data-dashboard-carousel]")' in stats
+    assert '.sidebar .brand { z-index: 52; }' in mobile
+    assert 'z-index: 51;' in stats_rule
+
+
+def test_mobile_dashboard_feeds_do_not_reserve_empty_scrollbar_gutters():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    assert 'html:has(> body.channel-page-overview) { height: 100dvh; min-height: 0; overflow: hidden; scrollbar-gutter: auto; }' in styles
+    rule = styles.split('/* Reserve space only when a feed actually needs a scrollbar. */', 1)[1].split('}', 1)[0]
+
+    assert '.live-chat-feed-shell > .dashboard-chat-feed' in rule
+    assert '#viewer-queue-content' in rule
+    assert '.activity-scroll' in rule
+    assert '.dashboard-command-feed' in rule
+    assert '.dashboard-raid-tab #dashboard-raid' in rule
+    assert 'width: 100%; margin-right: 0; padding-right: 0; scrollbar-gutter: auto;' in rule
+
+
+def test_mobile_channel_navigation_uses_accessible_logo_toggle():
+    layout = open("web/templates/channel/layout.html", encoding="utf-8").read()
+    script = open("web/static/js/channel-sidebar.js", encoding="utf-8").read()
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+
+    assert 'class="sidebar-logo-toggle" data-sidebar-mobile-toggle aria-controls="channel-navigation"' in layout
+    assert 'document.currentScript.parentElement.classList.add("sidebar-collapsed");' in layout
+    assert layout.index('document.currentScript.parentElement') < layout.index('id="channel-navigation"')
+    assert layout.index('data-sidebar-mobile-back') < layout.index('data-sidebar-mobile-toggle')
+    assert 'mobileBack?.addEventListener("click", () => {' in script
+    assert 'mobileToggle?.focus({preventScroll: true});' in script
+    assert '.sidebar-mobile-back { display: none; }' in styles
+    assert '.sidebar-mobile-back { position: absolute; z-index: 1; top: 0; left: 0; display: block; width: 52px; height: 42px;' in styles
+    back_rule = styles.split('.channel-page .sidebar-mobile-back { position: absolute;', 1)[1].split('}', 1)[0]
+    assert 'transition:' not in back_rule
+    assert '.app-shell:not(.sidebar-collapsed) .sidebar-mobile-back { opacity: 1; visibility: visible; pointer-events: auto; }' in styles
+    assert '.sidebar-mobile-back svg { position: absolute; top: 50%; left: 8px; width: 24px; height: 24px;' in styles
+    assert '.sidebar-logo-toggle { position: relative; z-index: 2;' in styles
+    assert '.app-shell:not(.sidebar-collapsed) .sidebar-logo-toggle { margin-left: 40px; transition: margin-left .24s ease, outline-color .16s ease; }' in styles
+    assert 'id="channel-navigation"' in layout
+    assert 'mobileToggle.disabled = !mobile;' in script
+    assert 'mobileToggle.setAttribute("aria-expanded", String(mobile && !collapsed));' in script
+    assert 'if (mobileMedia.matches) toggleNavigation();' in script
+    assert '☰' not in script
+    assert '.channel-page .sidebar .sidebar-toggle { display: none !important; }' in styles
+    assert '.channel-page .sidebar-logo-toggle:hover,' in styles
+    assert '.channel-page .sidebar .brand { position: relative; overflow: visible; }' in styles
+    assert 'transition: margin-left .24s ease, outline-color .16s ease;' in styles
+    assert '.app-shell:not(.sidebar-collapsed) .sidebar-logo-toggle { transition: none; }' in styles
+    assert '.sidebar-logo-toggle .brand-mark { transition: width .24s ease, height .24s ease, flex-basis .24s ease; }' in styles
+    assert '.sidebar-logo-toggle .brand-mark { transition: none; }' in styles
+    assert '.channel-page .sidebar-logo-toggle:focus-visible { outline-color: #fff; }' in styles
+
+
+def test_queue_names_truncate_before_centered_drag_indicator():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    script = open("web/static/js/dashboard-viewer-queue.js", encoding="utf-8").read()
+    template = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+
+    assert 'grid-template-columns: 30px minmax(0, calc(50% - 59px)) minmax(0, 1fr);' in styles
+    base_row = styles.split('\n.queue-list-item {', 1)[1].split('}', 1)[0]
+    assert 'grid-template-columns: 30px minmax(0, 1fr) auto;' in base_row
+    assert '.queue-list-item:hover, .queue-list-item:focus-within, .queue-list-item.queue-drag-ghost { grid-template-columns: 30px minmax(0, calc(50% - 59px)) minmax(0, 1fr); }' in styles
+    assert '@media (hover: none) { .queue-list-item { grid-template-columns: 30px minmax(0, calc(50% - 59px)) minmax(0, 1fr); } }' in styles
+    assert 'justify-self: end;' in styles.split('\n.queue-item-actions {', 1)[1].split('}', 1)[0]
+    assert 'text-overflow: ellipsis;' in styles.split('\n.queue-username {\n', 1)[1].split('}', 1)[0]
+    assert 'usernameLabel.title = label;' in script
+    assert 'class="queue-username" title="{{ member.label }}"' in template
+
+
+def test_dashboard_scrollbars_appear_on_panel_hover_or_keyboard_focus():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    feeds = ':is(.dashboard-chat-feed, #viewer-queue-content, .activity-scroll, .dashboard-command-feed, #dashboard-raid)'
+
+    assert '@media (hover: hover)' in styles
+    assert f'.panel {feeds} {{ scrollbar-width: none; }}' in styles
+    assert f'.panel:is(:hover, :focus-within) {feeds} {{ scrollbar-width: thin; }}' in styles
+    assert f'.panel {feeds}::-webkit-scrollbar {{ width: 0; }}' in styles
+    assert f'.panel:is(:hover, :focus-within) {feeds}::-webkit-scrollbar {{ width: 8px; }}' in styles
+
+
 def test_dashboard_mobile_activity_panels_keep_tabs_above_scrollable_events():
     styles = open("web/static/css/style.css", encoding="utf-8").read()
 
@@ -1915,7 +2028,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'grid-template-areas: "stats" "player" "queue" "activities" "chat"' in dashboard_styles
     assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' in dashboard_styles
     assert '@media (min-width: 769px) and (max-width: 1100px)' in dashboard_styles
-    assert '@media (max-width: 600px) {\n    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-header-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }' in dashboard_styles
+    assert '@media (max-width: 600px) {\n    .channel-page-overview .dashboard-header-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }' in dashboard_styles
     assert 'height: calc(200dvh - var(--dashboard-stats-height, 36px) - 52px)' in dashboard_styles
     assert 'grid-template-rows: max-content minmax(0,3fr) minmax(0,2fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 32px)' in dashboard_styles
     assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 16px; display: flex; grid-area: stats; min-width: 0; margin-bottom: -6px; padding-bottom: 6px;' in dashboard_styles
@@ -1989,7 +2102,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'sidebar-hover-locked' in sidebar_script
     assert '@media (min-width: 769px) {\n    .dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded .sidebar' in dashboard_styles
     assert dashboard_styles.index('.dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }') < dashboard_styles.index('@media (min-width: 901px)')
-    assert 'mobile ? (collapsed ? "☰" : "×")' in sidebar_script
+    assert 'if (icon) icon.textContent = collapsed ? "›" : "‹";' in sidebar_script
     assert 'position: sticky;' in dashboard_styles
     assert '.navigation { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; gap: 7px; overflow-x: hidden; overflow-y: auto; }' in dashboard_styles
     assert '.channel-page-overview .sidebar { position: fixed; z-index: 50; top: 0; right: 0; left: 0; width: 100%; height: 100dvh;' in dashboard_styles

@@ -375,7 +375,7 @@
                     {% for member in queue_members %}
                         <li class="queue-list-item" data-username="{{ member.username }}">
                             <span class="queue-position">{{ loop.index }}</span>
-                            <strong class="queue-username">{{ member.label }}</strong>
+                            <strong class="queue-username" title="{{ member.label }}">{{ member.label }}</strong>
                             <span class="queue-grab-indicator" aria-hidden="true"></span>
 
                             <div class="queue-item-actions">

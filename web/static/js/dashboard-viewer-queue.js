@@ -215,6 +215,7 @@
             const usernameLabel = document.createElement("strong");
             usernameLabel.className = "queue-username";
             usernameLabel.textContent = label;
+            usernameLabel.title = label;
             const actions = document.createElement("div");
             actions.className = "queue-item-actions";
             if (index > 0) actions.appendChild(actionButton(moveIcon("top"), `Move ${username} to top`, "top", position));
