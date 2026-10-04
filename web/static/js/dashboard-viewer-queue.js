@@ -215,6 +215,7 @@
             const usernameLabel = document.createElement("strong");
             usernameLabel.className = "queue-username";
             usernameLabel.textContent = label;
+            usernameLabel.title = label;
             const actions = document.createElement("div");
             actions.className = "queue-item-actions";
             if (index > 0) actions.appendChild(actionButton(moveIcon("top"), `Move ${username} to top`, "top", position));
@@ -248,6 +249,7 @@
                 item.style.setProperty("--queue-row-height", `${item.getBoundingClientRect().height}px`);
                 item.style.setProperty("--queue-enter-delay", `${Math.min(index * 45, 600)}ms`);
                 item.classList.add("is-appearing");
+                window.dashboardActivityMotion?.highlight(item, Math.min(index * 45, 600));
                 item.addEventListener("animationend", () => item.classList.remove("is-appearing"), {once: true});
             });
             if (addedRows.length) {

@@ -316,12 +316,13 @@
             feed.followRowObserver = null;
         }
 
-        while (feed.element.querySelectorAll(".live-chat-message").length > feed.maxMessages) {
-            const messages = feed.element.querySelectorAll(".live-chat-message");
+        while (feed.element.querySelectorAll(".live-chat-message:not(.is-activity-removing)").length > feed.maxMessages) {
+            const messages = feed.element.querySelectorAll(".live-chat-message:not(.is-activity-removing)");
             const oldest = feed.newestFirst ? messages[messages.length - 1] : messages[0];
             if (!oldest) break;
             feed.seen.delete(oldest.dataset.messageId);
-            oldest.remove();
+            if (feed.newestFirst && window.dashboardActivityMotion) window.dashboardActivityMotion.remove(feed.element, oldest);
+            else oldest.remove();
         }
 
         if (shouldFollowNewest) {
@@ -347,6 +348,7 @@
             updateJumpButton(feed);
         }
         if (feed.historyComplete && feed.element.dataset.activityNotify) {
+            if (feed.newestFirst) window.dashboardActivityMotion?.enter(feed.element, row, shouldFollowNewest);
             document.dispatchEvent(new CustomEvent("dashboard-activity-unread", {
                 detail: {activity: feed.element.dataset.activityNotify}
             }));

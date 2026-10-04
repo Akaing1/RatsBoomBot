@@ -375,7 +375,7 @@
                     {% for member in queue_members %}
                         <li class="queue-list-item" data-username="{{ member.username }}">
                             <span class="queue-position">{{ loop.index }}</span>
-                            <strong class="queue-username">{{ member.label }}</strong>
+                            <strong class="queue-username" title="{{ member.label }}">{{ member.label }}</strong>
                             <span class="queue-grab-indicator" aria-hidden="true"></span>
 
                             <div class="queue-item-actions">
@@ -424,6 +424,7 @@
 </div>
 </div>
 
+<script src="{{ url_for('static', path='/js/dashboard-activity-motion.js') }}?v={{ deployment_stamp() }}"></script>
 <script>
     (() => {
         const tabs = Array.from(document.querySelectorAll("[data-activity-tab]"));
@@ -436,7 +437,9 @@
                 candidate.setAttribute("aria-selected", String(active));
             });
             group.querySelectorAll("[data-activity-panel]").forEach(panel => {
+                const wasHidden = panel.hidden;
                 panel.hidden = panel.dataset.activityPanel !== selected;
+                if (wasHidden && !panel.hidden) window.dashboardActivityMotion?.switchTab(panel);
             });
         }
 
@@ -645,7 +648,8 @@
                 .find(item => item.getBoundingClientRect().bottom > viewportTop);
             const anchorKey = anchor?.dataset.activityKey;
             const anchorTop = anchor?.getBoundingClientRect().top;
-            render();
+            const motionDuration = window.dashboardActivityMotion
+                ? window.dashboardActivityMotion.reconcile(element, render) : (render(), 0);
             if (atTop) {
                 element.scrollTop = 0;
             } else {
@@ -658,6 +662,7 @@
             }
             if (hasNewActivity && !atTop) scroller.hasUnseen = true;
             scroller.update();
+            if (motionDuration) window.dashboardActivityMotion.preserveScroll(element, atTop, motionDuration);
         }
 
         const feedScroller = createTopScroller(feedContent);
@@ -796,7 +801,9 @@
             const response = await fetch(automodActionUrl, {method: "POST", body: data});
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || "The AutoMod message could not be updated.");
-            document.querySelector(`[data-automod-message="${CSS.escape(messageId)}"]`)?.remove();
+            const row = document.querySelector(`[data-automod-message="${CSS.escape(messageId)}"]`);
+            if (row && window.dashboardActivityMotion) window.dashboardActivityMotion.remove(automodContent, row);
+            else row?.remove();
         }
 
         function renderAutomod(messages) {

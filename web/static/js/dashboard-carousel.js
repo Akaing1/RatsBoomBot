@@ -9,6 +9,10 @@
     if (!layout || !deck || !previous || !next || !positionCount || !positionName) return;
 
     const media = window.matchMedia("(max-width: 768px)");
+    const sidebar = document.querySelector("[data-channel-sidebar]");
+    const statsRow = layout.querySelector(".dashboard-header-side");
+    const statsMarker = document.createComment("dashboard desktop stats position");
+    statsRow?.before(statsMarker);
     const groups = [
         {name: "Stream and Chat", selectors: [".dashboard-video-card", ".live-chat-panel"]},
         {name: "Ads and Viewer Queue", selectors: [".dashboard-ads-panel", "[data-viewer-queue-panel]"]},
@@ -155,13 +159,15 @@
         next.disabled = activeIndex === slides.length - 1;
         previous.setAttribute("aria-label", `Previous card: ${cards[Math.max(0, activeIndex - 1)].name}`);
         next.setAttribute("aria-label", `Next card: ${cards[Math.min(slides.length - 1, activeIndex + 1)].name}`);
-        positionCount.textContent = `${activeIndex + 1} / ${slides.length} ·`;
+        positionCount.textContent = `${activeIndex + 1} / ${slides.length}`;
+        position.setAttribute("aria-label", `${cards[activeIndex].name}, card ${activeIndex + 1} of ${slides.length}`);
         positionName.textContent = cards[activeIndex].name;
         if (focusCard) slides[activeIndex].focus({preventScroll: true});
     }
 
     function enableCarousel() {
         if (slides.length) return;
+        if (sidebar && statsRow) sidebar.append(statsRow);
         deck.tabIndex = 0;
         deck.setAttribute("role", "region");
         deck.setAttribute("aria-roledescription", "carousel");
@@ -197,6 +203,7 @@
 
     function disableCarousel() {
         if (!slides.length) return;
+        if (statsRow && statsMarker.parentNode) statsMarker.after(statsRow);
         chatLocked = false;
         setChatExpanded(false, true);
         updateChatControls();

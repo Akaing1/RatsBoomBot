@@ -3,6 +3,8 @@
     const toggle = document.querySelector("[data-sidebar-toggle]");
     if (!shell || !toggle) return;
     const sidebar = shell.querySelector(".sidebar");
+    const mobileToggle = sidebar?.querySelector("[data-sidebar-mobile-toggle]");
+    const mobileBack = sidebar?.querySelector("[data-sidebar-mobile-back]");
 
     const storageKey = shell.dataset.sidebarStorageKey || "ratsboombot-dashboard-sidebar-collapsed";
     const mobileMedia = window.matchMedia("(max-width: 768px)");
@@ -29,8 +31,14 @@
             ? (collapsed ? "Open navigation" : "Close navigation")
             : (collapsed ? "Expand navigation" : "Collapse navigation"));
         toggle.title = toggle.getAttribute("aria-label");
+        if (mobileToggle) {
+            mobileToggle.disabled = !mobile;
+            mobileToggle.setAttribute("aria-expanded", String(mobile && !collapsed));
+            mobileToggle.setAttribute("aria-label", collapsed ? "Open navigation" : "Close navigation");
+            mobileToggle.title = mobileToggle.getAttribute("aria-label");
+        }
         const icon = toggle.querySelector("span");
-        if (icon) icon.textContent = mobile ? (collapsed ? "☰" : "×") : (collapsed ? "›" : "‹");
+        if (icon) icon.textContent = collapsed ? "›" : "‹";
     }
 
     function applyResponsiveState() {
@@ -45,7 +53,7 @@
     applyResponsiveState();
     enableTransitionsAfterLayout();
 
-    toggle.addEventListener("click", () => {
+    function toggleNavigation() {
         if (mobileMedia.matches) {
             mobileExpanded = shell.classList.contains("sidebar-collapsed");
             applyResponsiveState();
@@ -67,6 +75,16 @@
         } catch (error) {
             // The current page still keeps the selected state without persistence.
         }
+    }
+    toggle.addEventListener("click", toggleNavigation);
+    mobileToggle?.addEventListener("click", () => {
+        if (mobileMedia.matches) toggleNavigation();
+    });
+    mobileBack?.addEventListener("click", () => {
+        if (!mobileMedia.matches) return;
+        mobileExpanded = false;
+        applyResponsiveState();
+        mobileToggle?.focus({preventScroll: true});
     });
 
     function expandOnPointer(event) {
