@@ -2048,8 +2048,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
     assert 'const jumpPath = feed.newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";' in chat_script
-    assert 'feed.jumpButton.title = "jump to present";' in chat_script
-    assert 'jumpButton.title = "jump to present";' in dashboard
+    assert 'feed.jumpButton.title = "Jump to present";' in chat_script
+    assert 'jumpButton.title = "Jump to present";' in dashboard
     assert 'makeElement("div", "live-chat-feed-shell")' in chat_script
     assert 'element.addEventListener("scroll", () => {' in chat_script
     assert "updateJumpButton(feed);" in chat_script
