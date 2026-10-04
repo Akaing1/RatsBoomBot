@@ -59,6 +59,19 @@ def test_twitch_messages_are_split_between_chat_and_commands():
     assert chat.accent == "moderator"
 
 
+def test_sidebar_hover_labels_use_existing_names_for_channel_and_admin_navigation():
+    script = open("web/static/js/channel-sidebar.js", encoding="utf-8").read()
+    assert 'querySelectorAll(".nav-link, .sidebar-logout button")' in script
+    assert 'querySelector(".nav-link-label, .sidebar-button-label")?.textContent.trim()' in script
+    assert 'if (label) control.title = label;' in script
+    for path in ("web/templates/channel/layout.html", "web/templates/admin/layout.html"):
+        layout = open(path, encoding="utf-8").read()
+        assert "channel-sidebar.js" in layout
+        assert "hover-labels.js" in layout
+        assert 'class="nav-link-label"' in layout
+        assert 'class="sidebar-button-label"' in layout
+
+
 def test_reward_related_chat_messages_expose_redemption_metadata():
     service = LiveChatService(None)
     custom = twitch_payload("reward input", "custom")
@@ -2034,7 +2047,9 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "overflow-y: auto" in widget_styles
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
-    assert 'element.dataset.newestFirst === "true" ? "↑ Jump to present" : "↓ Jump to present"' in chat_script
+    assert 'const jumpPath = feed.newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";' in chat_script
+    assert 'feed.jumpButton.title = "Jump to present";' in chat_script
+    assert 'jumpButton.title = "Jump to present";' in dashboard
     assert 'makeElement("div", "live-chat-feed-shell")' in chat_script
     assert 'element.addEventListener("scroll", () => {' in chat_script
     assert "updateJumpButton(feed);" in chat_script
@@ -2249,7 +2264,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'applyStreamStatus(true, new Date(Date.now() - elapsedMinutes * 60000).toISOString());' in header_stats_script
     assert 'viewerValue.textContent = (Math.floor(Math.random() * 500) + 1).toLocaleString();' in header_stats_script
     assert 'viewerValue.textContent = actualViewerCount;' in header_stats_script
-    assert 'if (value && !(previewActive && stat.key === "viewers")) value.textContent = displayValue;' in header_stats_script
+    assert 'if (value && !(previewActive && stat.key === "viewers")) {' in header_stats_script
+    assert 'applyVisibility(statContainer, hiddenStats.has(stat.key));' in header_stats_script
     assert 'if (!previewActive) applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert 'applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert ".dashboard-stream-stat.state-live .status-indicator { animation: dashboard-live-pulse" in dashboard_styles

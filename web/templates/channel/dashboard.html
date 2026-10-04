@@ -152,7 +152,7 @@
                                 {% endif %}
                             </div>
                             {% for key, label in entries %}
-                            <label class="chat-filter-row chat-filter-suboption" title="Click to toggle; right-click to show only {{ label }}"><input type="checkbox" data-chat-filter-axis="{{ group_key }}" data-chat-filter-option="{{ key }}"> <span>{{ label }}</span></label>
+                            <label class="chat-filter-row chat-filter-suboption" title="{{ label }}"><input type="checkbox" data-chat-filter-axis="{{ group_key }}" data-chat-filter-option="{{ key }}"> <span>{{ label }}</span></label>
                             {% endfor %}
                         </div>
                         {% endfor %}
@@ -639,7 +639,9 @@
             const jumpButton = document.createElement("button");
             jumpButton.type = "button";
             jumpButton.className = "live-chat-jump";
-            jumpButton.textContent = "↑ Jump to present";
+            jumpButton.title = "Jump to present";
+            jumpButton.setAttribute("aria-label", "Jump to present");
+            jumpButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>';
             jumpButton.hidden = true;
             shell.appendChild(jumpButton);
             const scroller = {element, jumpButton, hasUnseen: false};

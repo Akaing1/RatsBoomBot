@@ -384,7 +384,7 @@
             pinExpiryTimer: null,
             pinnedContainer: element.dataset.pinnedUrl ? makeElement("aside", "live-chat-pinned") : null,
             connectionStatus,
-            jumpButton: makeElement("button", "live-chat-jump", element.dataset.newestFirst === "true" ? "↑ Jump to present" : "↓ Jump to present")
+            jumpButton: makeElement("button", "live-chat-jump")
         };
         function showConnectionStatus(connected) {
             if (!connectionStatus) return;
@@ -411,6 +411,10 @@
             updateJumpButton(feed);
         });
         feed.jumpButton.type = "button";
+        feed.jumpButton.title = "Jump to present";
+        feed.jumpButton.setAttribute("aria-label", "Jump to present");
+        const jumpPath = feed.newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";
+        feed.jumpButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${jumpPath}"/></svg>`;
         feed.jumpButton.hidden = true;
         feed.jumpButton.addEventListener("click", () => {
             feed.hasUnseenMessages = false;
