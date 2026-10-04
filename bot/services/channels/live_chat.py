@@ -65,6 +65,7 @@ class UnifiedChatMessage:
     deleted: bool = False
     mentioned: bool = False
     is_bot: bool = False
+    is_redeem: bool = False
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
@@ -237,7 +238,9 @@ class LiveChatService:
                 and str(getattr(getattr(fragment, "mention", None), "id", "")) == broadcaster_id
                 for fragment in (getattr(payload, "fragments", None) or ())
             ),
-            is_bot=self._has_chat_bot_badge(payload, badges) or self._is_chat_bot(getattr(chatter, "id", None))
+            is_bot=self._has_chat_bot_badge(payload, badges) or self._is_chat_bot(getattr(chatter, "id", None)),
+            is_redeem=bool(getattr(payload, "channel_points_id", None))
+            or str(getattr(payload, "type", "")) in {"channel_points_highlighted", "channel_points_sub_only"}
         )
         self.publish(broadcaster_id, message)
         return message

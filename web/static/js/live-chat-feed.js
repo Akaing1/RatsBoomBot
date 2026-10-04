@@ -208,7 +208,10 @@
         feed.element.querySelector(".compact-empty-state")?.remove();
 
         const row = makeElement("article", `live-chat-message platform-${message.platform} kind-${message.kind}`);
-        row.hidden = message.kind === "command" && feed.hideCommands;
+        const category = window.dashboardChatFilters?.category(message) || {user: "non_subs", type: "messages"};
+        row.dataset.chatUser = category.user;
+        row.dataset.chatType = category.type;
+        row.hidden = feed.filters ? !feed.filters.allows(category) : false;
         if (message.deleted) row.classList.add("is-deleted");
         if (message.mentioned) row.classList.add("is-mentioned");
         if (message.is_bot) row.classList.add("is-bot");
@@ -344,7 +347,7 @@
             if (feed.newestFirst && previousFirst?.isConnected) {
                 feed.element.scrollTop += previousFirst.getBoundingClientRect().top - previousFirstTop;
             }
-            feed.hasUnseenMessages = true;
+            if (!row.hidden) feed.hasUnseenMessages = true;
             updateJumpButton(feed);
         }
         if (feed.historyComplete && feed.element.dataset.activityNotify) {
@@ -395,16 +398,17 @@
                 connectionStatus._connectionFadeTimer = connectionFadeTimer;
             }
         }
-        const commandToggle = element.closest(".live-chat-panel")?.querySelector("[data-chat-command-toggle]");
-        feed.hideCommands = false;
-        commandToggle?.addEventListener("click", () => {
-            const followNewest = distanceFromBottom(element) <= 24;
-            feed.hideCommands = !feed.hideCommands;
-            commandToggle.textContent = feed.hideCommands ? "Commands off" : "Commands on";
-            commandToggle.setAttribute("aria-pressed", String(!feed.hideCommands));
-            commandToggle.classList.toggle("live", !feed.hideCommands);
-            element.querySelectorAll(".kind-command").forEach(row => { row.hidden = feed.hideCommands; });
-            if (followNewest) scrollToBottom(feed);
+        feed.filters = window.dashboardChatFilters?.attach(element, () => {
+            const followNewest = feed.followNewest;
+            const anchor = [...element.querySelectorAll(".live-chat-message")].find(row =>
+                !row.hidden && row.getBoundingClientRect().bottom > element.getBoundingClientRect().top);
+            const anchorTop = anchor?.getBoundingClientRect().top;
+            element.querySelectorAll(".live-chat-message").forEach(row => {
+                row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType});
+            });
+            if (followNewest) scrollToNewest(feed);
+            else if (anchor && !anchor.hidden) element.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
+            updateJumpButton(feed);
         });
         feed.jumpButton.type = "button";
         feed.jumpButton.hidden = true;
