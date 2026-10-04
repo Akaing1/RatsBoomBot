@@ -142,7 +142,11 @@
     } else window.addEventListener("resize", updateChatOffset);
 
     function showCard(index, focusCard = false) {
+        const previousIndex = activeIndex;
         activeIndex = Math.min(Math.max(index, 0), slides.length - 1);
+        if (activeIndex !== previousIndex) {
+            document.dispatchEvent(new CustomEvent("dashboard-carousel-card-changed", {detail: {index: activeIndex}}));
+        }
         if (activeIndex !== 0) {
             setChatExpanded(false);
             if (chat.contains(document.activeElement)) document.activeElement.blur();

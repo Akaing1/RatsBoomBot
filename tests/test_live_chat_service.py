@@ -59,6 +59,33 @@ def test_twitch_messages_are_split_between_chat_and_commands():
     assert chat.accent == "moderator"
 
 
+def test_reward_related_chat_messages_expose_redemption_metadata():
+    service = LiveChatService(None)
+    custom = twitch_payload("reward input", "custom")
+    custom.channel_points_id = "reward-1"
+    highlighted = twitch_payload("highlighted message", "highlighted")
+    highlighted.type = "channel_points_highlighted"
+    assert service.publish_twitch(custom).as_dict()["is_redeem"] is True
+    assert service.publish_twitch(highlighted).is_redeem is True
+    assert service.publish_twitch(twitch_payload("normal", "normal")).is_redeem is False
+
+
+def test_chat_filters_replace_command_toggle_and_only_apply_to_combined_chat():
+    dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    script = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
+    assert 'data-chat-command-toggle' not in dashboard
+    assert 'label class="chat-filter-row chat-filter-suboption"' in dashboard
+    assert 'role="group" aria-label="{{ group }}"' in dashboard
+    assert 'data-chat-filter-group-toggle' not in dashboard
+    filters = open("web/static/js/dashboard-chat-filters.js", encoding="utf-8").read()
+    assert "addEventListener('focusout'" not in filters
+    assert "dashboard-chat-filters.js" in dashboard
+    assert dashboard.index('data-chat-filter-toggle') < dashboard.index('data-chat-lock')
+    assert 'row.hidden = feed.filters ? !feed.filters.allows(category) : false;' in script
+    assert 'element.querySelectorAll(".live-chat-message").forEach(row => {' in script
+    assert 'if (!row.hidden) feed.hasUnseenMessages = true;' in script
+
+
 def test_twitch_first_time_and_role_accents_follow_display_priority():
     service = LiveChatService(None)
     first_time = twitch_payload("Hello!", "first-time")
@@ -1814,7 +1841,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "Open Twitch" not in dashboard
     assert "Twitch + YouTube" not in dashboard
     assert '<h3 class="chat-heading">Combined Chat' in dashboard
-    assert 'data-chat-command-toggle aria-pressed="true"' in dashboard
+    assert 'data-chat-filter-toggle aria-label="Filter chat" aria-expanded="false"' in dashboard
     assert 'data-activity-link="commands"' not in dashboard
     assert "Stream activity" not in dashboard
     assert "Viewer games" not in dashboard

@@ -137,7 +137,28 @@
                 <h3 class="chat-heading">Combined Chat <span class="chat-platform-dot twitch active" title="Twitch connected" aria-label="Twitch connected"></span><span class="chat-platform-dot youtube {% if youtube_chat.connected %}active{% endif %}" title="YouTube {% if youtube_chat.connected %}connected{% else %}off{% endif %}" aria-label="YouTube {% if youtube_chat.connected %}connected{% else %}off{% endif %}"></span></h3>
             </div>
             <div class="dashboard-chat-header-actions">
-                <button type="button" class="channel-state live chat-command-toggle" data-chat-command-toggle aria-pressed="true">Commands on</button>
+                <div class="chat-filter" data-chat-filter data-channel-id="{{ broadcaster.id }}">
+                    <button type="button" class="chat-filter-toggle" data-chat-filter-toggle aria-label="Filter chat" aria-expanded="false" aria-controls="chat-filter-options" title="Filter chat">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="chat-filter-button-label">Filter</span><span data-chat-filter-count aria-hidden="true"></span>
+                    </button>
+                    <div id="chat-filter-options" class="chat-filter-options" data-chat-filter-options popover="manual" role="group" aria-label="Chat filters" hidden>
+                        {% for group, group_key, entries in [('Users', 'users', [('vips', 'VIPs'), ('mods', 'Mods'), ('subs', 'Subs'), ('non_subs', 'Non-subs'), ('bots', 'Bots')]), ('Message types', 'types', [('messages', 'Messages'), ('commands', 'Commands'), ('redeems', 'Redeems')])] %}
+                        <div class="chat-filter-group" role="group" aria-label="{{ group }}">
+                            <div class="chat-filter-options-header chat-filter-section-header">
+                                <span class="chat-filter-group-title">{{ group }}</span>
+                                <button type="button" class="chat-filter-clear" data-chat-filter-clear="{{ group_key }}" aria-label="Reset {{ group | lower }} filters to show everything">Clear</button>
+                                {% if group_key == 'users' %}
+                                <button type="button" class="chat-filter-clear" data-chat-filter-clear="all" aria-label="Reset all filters to show everything">Clear all</button>
+                                {% endif %}
+                            </div>
+                            {% for key, label in entries %}
+                            <label class="chat-filter-row chat-filter-suboption" title="Click to toggle; right-click to show only {{ label }}"><input type="checkbox" data-chat-filter-axis="{{ group_key }}" data-chat-filter-option="{{ key }}"> <span>{{ label }}</span></label>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                        <p class="chat-filter-hint">Right-click to solo.</p>
+                    </div>
+                </div>
                 <button type="button" class="dashboard-chat-control dashboard-chat-lock" data-chat-lock aria-pressed="false" aria-label="Lock automatic chat resizing" title="Lock automatic chat resizing">
                     <svg class="chat-unlocked-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0M12 14v3"/></svg>
                     <svg class="chat-locked-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3"/></svg>
@@ -926,6 +947,7 @@
     <script src="{{ url_for('static', path='/js/dashboard-stream-player.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-channel-metadata.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-viewer-queue.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-chat-filters.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-chat-send.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-ad-status.js') }}?v={{ deployment_stamp() }}" defer></script>
