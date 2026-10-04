@@ -66,8 +66,14 @@
             <h3>Category</h3>
             <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" data-channel-field="game">{{ twitch_channel_metadata.game }}</strong>
             <p class="channel-metadata-status" data-channel-metadata-status aria-live="polite">Click the title or game to edit.</p>
-            <div class="twitch-game-suggestions" data-game-suggestions role="listbox" hidden></div>
+            <div id="dashboard-category-picker" class="twitch-game-suggestions" data-game-suggestions hidden>
+                <div class="twitch-game-options" data-game-options role="listbox"></div>
+                <div class="twitch-game-selection-preview" data-game-selection-preview></div>
+            </div>
         </div>
+        <button type="button" class="twitch-current-category-art" aria-label="Select category" title="{{ twitch_channel_metadata.game }}" aria-controls="dashboard-category-picker" aria-expanded="false">
+            <img data-current-category-art alt="" {% if twitch_channel_metadata.box_art_url %}src="{{ twitch_channel_metadata.box_art_url }}"{% else %}hidden{% endif %}>
+        </button>
     </div>
     <div class="dashboard-video-frame">
         {% if broadcaster.login %}

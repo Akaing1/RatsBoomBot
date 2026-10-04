@@ -21,6 +21,7 @@ from config.settings import settings
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.shared.common import templates
+from web.shared.category_relevance import low_relevance_category_ids
 from web.shared.live_chat import stream_chat_events
 from web.shared.protected_users import (
     ProtectedUserError,
@@ -195,10 +196,30 @@ async def get_dashboard_header_stats(runtime_bot, broadcaster, *, refresh_viewer
 async def get_twitch_channel_metadata(runtime_bot, broadcaster_id: str) -> dict[str, str]:
     try:
         info = await runtime_bot.create_partialuser(str(broadcaster_id)).fetch_channel_info(token_for=str(broadcaster_id))
-        return {"title": str(info.title or "Untitled stream"), "game": str(info.game_name or "No category")}
+        return {"title": str(info.title or "Untitled stream"), "game": str(info.game_name or "No category"),
+                "box_art_url": await get_category_artwork(runtime_bot, broadcaster_id, getattr(info, "game_id", None))}
     except Exception as exc:
         LOGGER.warning("[Dashboard] Failed to fetch Twitch channel metadata for broadcaster %s: %s", broadcaster_id, exc)
         return {"title": "Unavailable", "game": "Unavailable"}
+
+
+def serialize_category(game) -> dict[str, str]:
+    category = {"id": str(game.id), "name": str(game.name)}
+    artwork = getattr(game, "box_art", None)
+    if artwork:
+        category["box_art_url"] = artwork.url_for(96, 128)
+    return category
+
+
+async def get_category_artwork(runtime_bot, broadcaster_id: str, game_id: str | None) -> str:
+    if not game_id or str(game_id) == "0":
+        return ""
+    try:
+        game = await runtime_bot.fetch_game(id=str(game_id), token_for=str(broadcaster_id))
+        return serialize_category(game).get("box_art_url", "") if game else ""
+    except Exception as exc:
+        LOGGER.warning("[Dashboard] Category artwork unavailable for %s: %s", game_id, exc)
+        return ""
 
 
 def category_match_type(name: str, query: str) -> int:
@@ -242,9 +263,19 @@ async def get_top_games_for_search(runtime_bot, broadcaster_id: str) -> list[dic
     if cached is not None and cached[0] > now:
         return cached[1]
     iterator = runtime_bot.fetch_top_games(token_for=str(broadcaster_id), first=100, max_results=100)
-    games = [{"id": str(game.id), "name": str(game.name)} async for game in iterator]
+    games = [serialize_category(game) async for game in iterator]
     runtime_bot._dashboard_top_games_cache = (now + TOP_GAMES_CACHE_SECONDS, games)
     return games
+
+
+async def category_picker_results(runtime_bot, broadcaster_id: str, games: list[dict[str, str]]) -> dict:
+    secondary_ids = await low_relevance_category_ids(runtime_bot, games, broadcaster_id)
+    if not secondary_ids:
+        return {"games": games}
+    return {
+        "games": [game for game in games if game["id"] not in secondary_ids],
+        "more_games": [game for game in games if game["id"] in secondary_ids]
+    }
 
 
 def format_dashboard_username(services, broadcaster_id: str, username: str) -> str:
@@ -560,7 +591,10 @@ async def update_twitch_channel_metadata(
             field, broadcaster_id
         )
 
-    return JSONResponse({"field": field, "value": update.value, "announcement_sent": announcement_sent})
+    result = {"field": field, "value": update.value, "announcement_sent": announcement_sent}
+    if field == "game":
+        result["box_art_url"] = await get_category_artwork(runtime_bot, broadcaster_id, update.game_id)
+    return JSONResponse(result)
 
 
 @router.get("/channel/api/chat/pinned", response_class=JSONResponse)
@@ -770,12 +804,13 @@ async def search_twitch_games(request: Request, query: str = ""):
     try:
         normalized_query = query.strip()
         if not normalized_query:
-            return JSONResponse({"games": (await get_top_games_for_search(runtime_bot, broadcaster_id))[:50]})
+            games = (await get_top_games_for_search(runtime_bot, broadcaster_id))[:50]
+            return JSONResponse(await category_picker_results(runtime_bot, broadcaster_id, games))
 
         iterator = runtime_bot.search_categories(
             normalized_query, token_for=str(broadcaster_id), first=50, max_results=50
         )
-        games = [{"id": str(game.id), "name": str(game.name)} async for game in iterator]
+        games = [serialize_category(game) async for game in iterator]
         popular_games = []
         if callable(getattr(runtime_bot, "fetch_top_games", None)):
             try:
@@ -790,7 +825,7 @@ async def search_twitch_games(request: Request, query: str = ""):
                 games.append(game)
                 existing_ids.add(game["id"])
         games = sort_twitch_games_by_match(games, normalized_query, popular_games)[:50]
-        return JSONResponse({"games": games})
+        return JSONResponse(await category_picker_results(runtime_bot, broadcaster_id, games))
     except Exception:
         LOGGER.exception("[Dashboard] Failed to search Twitch games for broadcaster %s.", broadcaster_id)
         return JSONResponse({"detail": "Twitch game search is temporarily unavailable."}, status_code=502)
