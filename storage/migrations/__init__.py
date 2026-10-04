@@ -66,6 +66,7 @@ from storage.migrations.v057_common_pet_catalog import migrate as migrate_common
 from storage.migrations.v058_fixed_pet_passives import migrate as migrate_fixed_pet_passives
 from storage.migrations.v059_horned_wolf import migrate as migrate_horned_wolf
 from storage.migrations.v060_royal_raven import migrate as migrate_royal_raven
+from storage.migrations.v061_adaptive_mini_bosses import migrate as migrate_adaptive_mini_bosses
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -138,4 +139,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=58, name="fixed_pet_passives", run=migrate_fixed_pet_passives)
     , Migration(version=59, name="horned_wolf", run=migrate_horned_wolf)
     , Migration(version=60, name="royal_raven", run=migrate_royal_raven)
+    , Migration(version=61, name="adaptive_mini_bosses", run=migrate_adaptive_mini_bosses)
 )

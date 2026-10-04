@@ -8,11 +8,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from rpg_minigame.config import RaidBossConfig
+from rpg_minigame.difficulty import HP_TIERS, load_difficulty, save_difficulty
 from storage.transactions import immediate_transaction
 from pets.passives import RAID_DAMAGE, RAID_PROFIT, RARE_DROP_CHANCE
 
 LOGGER = logging.getLogger("RatBoomBot")
-MINI_BOSS_HP_TIERS = (10000, 20000, 35000, 50000, 70000)
 HEALTH_CHECKPOINT_MESSAGES = {
     25: "The hunters have finally managed to leave a dent in {boss_name}! 75% HP remains.",
     50: "{boss_name} is starting to falter! The hunters have forced the boss down to 50% HP.",
@@ -618,25 +618,6 @@ class RaidBossService:
         LOGGER.info("[Raid Bosses] Automatic cycle selected a %s boss for broadcaster %s after %d consecutive mini bosses.", boss_tier, broadcaster_id, consecutive_minis)
         return event
 
-    @staticmethod
-    def mini_boss_hp_pool(contributors: int) -> tuple[int, ...]:
-        return MINI_BOSS_HP_TIERS[:min(len(MINI_BOSS_HP_TIERS), max(0, contributors) // 10 + 1)]
-
-    async def previous_raid_contributors(self, broadcaster_id: str) -> int:
-        query = """
-        SELECT COUNT(DISTINCT user_id) AS contributors
-        FROM raid_boss_contributions
-        WHERE damage > 0 AND event_id = (
-            SELECT id FROM raid_boss_events
-            WHERE broadcaster_id = ? AND boss_tier IN ('main', 'mini')
-              AND status IN ('defeated', 'failed')
-            ORDER BY id DESC LIMIT 1
-        )
-        """
-        async with self.db.acquire() as connection:
-            row = await connection.fetchone(query, (str(broadcaster_id),))
-        return int(row["contributors"])
-
     async def spawn(self, broadcaster_id: str, boss_type: str, config: RaidBossConfig, boss_tier: str = "main") -> RaidBossEvent | None:
         if not self.is_enabled(broadcaster_id):
             return None
@@ -657,10 +638,12 @@ class RaidBossService:
             stream_limit = config.tutorial_duration_streams
         elif boss_tier == "mini":
             boss_name = random.choice(config.mini_names.choices_for(boss_type))
-            contributors = await self.previous_raid_contributors(broadcaster_id)
-            hp_pool = self.mini_boss_hp_pool(contributors)
-            max_hp = random.choice(hp_pool)
-            LOGGER.info("[Raid Bosses] Mini HP selection for broadcaster %s: previous contributors=%d, eligible HP=%s, selected HP=%d.", broadcaster_id, contributors, hp_pool, max_hp)
+            async with self.db.acquire() as connection:
+                async with immediate_transaction(connection):
+                    difficulty = await load_difficulty(connection, broadcaster_id)
+            hp_pool, weights = difficulty.rolls()
+            max_hp = random.choices(hp_pool, weights=weights, k=1)[0]
+            LOGGER.info("[Raid Bosses] Mini HP selection for broadcaster %s: base=%d, HP=%s, weights=%s, selected=%d.", broadcaster_id, HP_TIERS[difficulty.base_tier], hp_pool, weights, max_hp)
             final_hit_reward = config.mini_final_hit_reward
             stream_limit = config.mini_duration_streams
         else:
@@ -1565,67 +1548,73 @@ class RaidBossService:
         status = "defeated" if defeated else "failed"
 
         async with self.db.acquire() as connection:
-            resolution = await connection.fetchone(
-                """
-                UPDATE raid_boss_events
-                SET status = ?, final_hitter_id = ?, final_hitter_name = ?, rewards_paid = 1
-                WHERE id = ? AND status = 'active' AND rewards_paid = 0
-                RETURNING final_hit_reward
-                """,
-                (status, final_hitter_id, final_hitter_name, event.id)
-            )
+            async with immediate_transaction(connection):
+                difficulty = await load_difficulty(connection, broadcaster_id) if event.boss_tier == "mini" else None
+                resolution = await connection.fetchone(
+                    """
+                    UPDATE raid_boss_events
+                    SET status = ?, final_hitter_id = ?, final_hitter_name = ?, rewards_paid = 1
+                    WHERE id = ? AND status = 'active' AND rewards_paid = 0
+                    RETURNING final_hit_reward
+                    """,
+                    (status, final_hitter_id, final_hitter_name, event.id)
+                )
 
-            if resolution is None:
-                return 0
+                if resolution is None:
+                    return 0
 
-            contributions = await connection.fetchall(
-                "SELECT user_id, username, SUM(damage) AS damage FROM raid_boss_contributions WHERE event_id = ? GROUP BY user_id, username ORDER BY damage DESC, username COLLATE NOCASE",
-                (event.id,)
-            )
+                if difficulty is not None:
+                    streams = await connection.fetchone("SELECT COUNT(*) AS count FROM raid_boss_streams WHERE event_id = ?", (event.id,))
+                    await save_difficulty(connection, broadcaster_id, difficulty.after_result(event.max_hp, defeated, int(streams["count"])))
 
-            total_contribution_rewards = 0
+                contributions = await connection.fetchall(
+                    "SELECT user_id, username, SUM(damage) AS damage FROM raid_boss_contributions WHERE event_id = ? GROUP BY user_id, username ORDER BY damage DESC, username COLLATE NOCASE",
+                    (event.id,)
+                )
 
-            if damage_dealt > 0:
-                base_reward = payout_pool // len(contributions) if contributions else 0
+                total_contribution_rewards = 0
 
-                for rank, contribution in enumerate(contributions, start=1):
-                    reward = int(base_reward * self.contribution_reward_multiplier(rank, len(contributions)))
+                if damage_dealt > 0:
+                    base_reward = payout_pool // len(contributions) if contributions else 0
+
+                    for rank, contribution in enumerate(contributions, start=1):
+                        reward = int(base_reward * self.contribution_reward_multiplier(rank, len(contributions)))
+                        if self.pets is not None:
+                            reward += (reward * await self.pets.bonus_bps(contribution["user_id"], RAID_PROFIT, connection)) // 10_000
+                        total_contribution_rewards += reward
+                        await self._add_points(connection, broadcaster_id, contribution["user_id"], contribution["username"], reward)
+                        await connection.execute(
+                            """
+                            INSERT INTO raid_boss_reward_summaries (event_id, broadcaster_id, user_id, username, contribution_points)
+                            VALUES (?, ?, ?, ?, ?)
+                            ON CONFLICT(event_id, user_id) DO UPDATE SET contribution_points = excluded.contribution_points, username = excluded.username
+                            """,
+                            (event.id, str(broadcaster_id), str(contribution["user_id"]), str(contribution["username"]), reward)
+                        )
+
+                if defeated and final_hitter_id and final_hitter_name:
+                    final_hit_reward = int(resolution["final_hit_reward"])
                     if self.pets is not None:
-                        reward += (reward * await self.pets.bonus_bps(contribution["user_id"], RAID_PROFIT, connection)) // 10_000
-                    total_contribution_rewards += reward
-                    await self._add_points(connection, broadcaster_id, contribution["user_id"], contribution["username"], reward)
+                        final_hit_reward += (final_hit_reward * await self.pets.bonus_bps(final_hitter_id, RAID_PROFIT, connection)) // 10_000
+                    await self._add_points(connection, broadcaster_id, final_hitter_id, final_hitter_name, final_hit_reward)
                     await connection.execute(
                         """
-                        INSERT INTO raid_boss_reward_summaries (event_id, broadcaster_id, user_id, username, contribution_points)
+                        INSERT INTO raid_boss_reward_summaries (event_id, broadcaster_id, user_id, username, final_hit_points)
                         VALUES (?, ?, ?, ?, ?)
-                        ON CONFLICT(event_id, user_id) DO UPDATE SET contribution_points = excluded.contribution_points, username = excluded.username
+                        ON CONFLICT(event_id, user_id) DO UPDATE SET final_hit_points = excluded.final_hit_points, username = excluded.username
                         """,
-                        (event.id, str(broadcaster_id), str(contribution["user_id"]), str(contribution["username"]), reward)
+                        (event.id, str(broadcaster_id), str(final_hitter_id), str(final_hitter_name), final_hit_reward)
                     )
 
-            if defeated and final_hitter_id and final_hitter_name:
-                final_hit_reward = int(resolution["final_hit_reward"])
-                if self.pets is not None:
-                    final_hit_reward += (final_hit_reward * await self.pets.bonus_bps(final_hitter_id, RAID_PROFIT, connection)) // 10_000
-                await self._add_points(connection, broadcaster_id, final_hitter_id, final_hitter_name, final_hit_reward)
-                await connection.execute(
-                    """
-                    INSERT INTO raid_boss_reward_summaries (event_id, broadcaster_id, user_id, username, final_hit_points)
-                    VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT(event_id, user_id) DO UPDATE SET final_hit_points = excluded.final_hit_points, username = excluded.username
-                    """,
-                    (event.id, str(broadcaster_id), str(final_hitter_id), str(final_hitter_name), final_hit_reward)
-                )
-
-            if defeated and event.boss_tier == "tutorial":
-                await connection.execute(
-                    """
-                    INSERT INTO raid_boss_channel_state (broadcaster_id, tutorial_completed)
-                    VALUES (?, 1)
-                    ON CONFLICT(broadcaster_id) DO UPDATE SET tutorial_completed = 1
-                    """,
-                    (str(broadcaster_id),)
-                )
+                if defeated and event.boss_tier == "tutorial":
+                    await connection.execute(
+                        """
+                        INSERT INTO raid_boss_channel_state (broadcaster_id, tutorial_completed)
+                        VALUES (?, 1)
+                        ON CONFLICT(broadcaster_id) DO UPDATE SET tutorial_completed = 1
+                        """,
+                        (str(broadcaster_id),)
+                    )
 
         awarded_points = total_contribution_rewards
         LOGGER.info("[Raid Bosses] Resolved %s as %s with %d contribution points awarded.", event.boss_name, status, awarded_points)
