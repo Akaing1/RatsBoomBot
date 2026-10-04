@@ -409,6 +409,7 @@ async def test_critical_hit_adds_fifty_percent_damage(tmp_path, monkeypatch) -> 
 
 @pytest.mark.asyncio
 async def test_mini_boss_uses_tier_specific_name_balance_and_persisted_tier(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("rpg_minigame.service.random.choices", lambda population, **kwargs: [population[0]])
 
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         service = RaidBossService(bot=None, db=database)
