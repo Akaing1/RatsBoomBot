@@ -42,7 +42,7 @@
         if (value) value.hidden = hidden;
         button.classList.toggle("number-hidden", hidden);
         button.setAttribute("aria-pressed", String(hidden));
-        button.title = `${hidden ? "Show" : "Hide"} ${label} count`;
+        button.title = `${label}: ${value?.textContent.trim() || "—"}`;
     }
 
     function formatUptime(startedAt) {
@@ -65,7 +65,9 @@
             : "Offline";
         streamStatus.setAttribute("aria-pressed", String(showTimer));
         streamStatus.setAttribute("aria-label", `${showTimer ? "Hide" : "Show"} online timer`);
-        streamStatus.title = `${showTimer ? "Hide" : "Show"} online timer`;
+        streamStatus.title = isLive
+            ? `Online${streamStatus.dataset.startedAt ? ` · ${formatUptime(streamStatus.dataset.startedAt)}` : ""}`
+            : "Offline";
     }
 
     function applyStreamStatus(isLive, startedAt) {
@@ -144,7 +146,10 @@
                 const value = statContainer?.querySelector("[data-dashboard-stat-value]");
                 const displayValue = String(stat.display_value ?? "—");
                 if (stat.key === "viewers") actualViewerCount = displayValue;
-                if (value && !(previewActive && stat.key === "viewers")) value.textContent = displayValue;
+                if (value && !(previewActive && stat.key === "viewers")) {
+                    value.textContent = displayValue;
+                    if (stat.key !== "points_lost") applyVisibility(statContainer, hiddenStats.has(stat.key));
+                }
             });
             if (streamStatus && typeof payload.is_live === "boolean") {
                 const liveChanged = actualStreamStatus.isLive !== payload.is_live;

@@ -6,6 +6,12 @@
     const mobileToggle = sidebar?.querySelector("[data-sidebar-mobile-toggle]");
     const mobileBack = sidebar?.querySelector("[data-sidebar-mobile-back]");
 
+    // Read the existing text rather than maintaining a second set of menu names.
+    sidebar?.querySelectorAll(".nav-link, .sidebar-logout button").forEach(control => {
+        const label = control.querySelector(".nav-link-label, .sidebar-button-label")?.textContent.trim();
+        if (label) control.title = label;
+    });
+
     const storageKey = shell.dataset.sidebarStorageKey || "ratsboombot-dashboard-sidebar-collapsed";
     const mobileMedia = window.matchMedia("(max-width: 768px)");
     const compactMedia = window.matchMedia("(min-width: 769px) and (max-width: 1100px)");

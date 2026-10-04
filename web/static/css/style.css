@@ -23,6 +23,8 @@ body {
 }
 a { color: inherit; text-decoration: none; }
 button, input { font: inherit; }
+.dashboard-hover-tooltip { position: fixed; z-index: 2000; inset: auto; margin: 0; max-width: min(360px, calc(100vw - 16px)); padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); box-shadow: 0 4px 16px rgba(0,0,0,.3); color: var(--text); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; pointer-events: none; }
+.dashboard-hover-tooltip[hidden] { display: none; }
 
 .app-shell {
     display: grid;
@@ -547,7 +549,8 @@ button, input { font: inherit; }
 .live-chat-emote { width: auto; height: 1.75em; max-width: 8em; margin: -.2em .08em; vertical-align: middle; object-fit: contain; }
 .kind-command .live-chat-text { color: #d8bcff; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .live-chat-empty { display: grid; min-height: 170px; flex: 1; place-items: center; color: var(--muted); font-size: 12px; text-align: center; }
-.live-chat-jump { --jump-fill: rgba(32,36,44,.96); position: absolute; z-index: 5; right: 50%; bottom: 10px; isolation: isolate; overflow: hidden; padding: 7px 11px; transform: translateX(50%); border: 2px solid rgba(139,92,246,.7); border-radius: 999px; background: var(--jump-fill); box-shadow: 0 7px 20px rgba(0,0,0,.35); color: #ddd6fe; font-size: 10px; font-weight: 800; white-space: nowrap; cursor: pointer; backdrop-filter: blur(8px); }
+.live-chat-jump { --jump-fill: rgba(32,36,44,.96); position: absolute; z-index: 5; right: 50%; bottom: 10px; display: grid; width: 36px; height: 36px; place-items: center; isolation: isolate; overflow: hidden; padding: 7px; transform: translateX(50%); border: 2px solid rgba(139,92,246,.7); border-radius: 999px; background: var(--jump-fill); box-shadow: 0 7px 20px rgba(0,0,0,.35); color: #ddd6fe; cursor: pointer; backdrop-filter: blur(8px); }
+.live-chat-jump svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .live-chat-jump.has-unseen { animation: live-chat-jump-alert 3s ease-in-out infinite; }
 .live-chat-jump:hover, .live-chat-jump:focus-visible { --jump-fill: #312653; border-color: #a78bfa; color: #fff; }
 .live-chat-jump[hidden] { display: none; }
