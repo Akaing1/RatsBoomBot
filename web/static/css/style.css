@@ -270,10 +270,27 @@ button, input { font: inherit; }
 .dashboard-video-header .twitch-game-field [data-channel-field="game"]:not(:focus):not(.editing) { padding-right: var(--metadata-status-padding, 8px); }
 .dashboard-video-header .twitch-game-field [data-channel-field="game"].metadata-truncated:not(:focus):not(.editing) { padding-right: max(26px, var(--metadata-status-padding, 8px)); }
 .dashboard-video-header .twitch-game-field [data-channel-field="game"].metadata-truncated:not(:focus):not(.editing)::after { right: var(--metadata-status-pencil-right, 8px); }
-.twitch-game-suggestions { position: absolute; z-index: 25; top: calc(100% + 4px); right: 0; left: calc(var(--metadata-label-width) + 7px); max-height: 240px; overflow-y: auto; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); box-shadow: 0 12px 30px rgba(0,0,0,.38); }
+.dashboard-video-header:has([data-current-category-art]:not([hidden])) { grid-template-columns: minmax(0,1fr) 52px; column-gap: 8px; }
+.dashboard-video-header > .twitch-channel-field { grid-column: 1; }
+.twitch-current-category-art { position: relative; grid-column: 2; grid-row: 1 / span 2; align-self: stretch; min-width: 0; padding: 0; border: 0; border-radius: 5px; background: transparent; cursor: pointer; }
+.twitch-current-category-art:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.twitch-current-category-art:has(img[hidden]) { display: none; }
+.twitch-current-category-art img { position: absolute; top: 0; right: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 5px; transform-origin: top left; }
+@media (prefers-reduced-motion: reduce) { .twitch-current-category-art img { transition: none; } }
+.twitch-game-suggestions { position: absolute; z-index: 25; top: calc(100% + 4px); right: 0; left: calc(var(--metadata-label-width) + 1px); max-height: 240px; overflow: hidden; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); box-shadow: 0 12px 30px rgba(0,0,0,.38); }
+.twitch-game-options { min-width: 0; min-height: 0; max-height: 228px; overflow-y: auto; }
 .twitch-game-suggestions[hidden] { display: none; }
-.twitch-game-option { display: block; width: 100%; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 11px; text-align: left; cursor: pointer; }
+.twitch-game-suggestions.is-art-animating { overflow: visible; }
+.twitch-game-suggestions { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,min(30%,120px)); gap: 8px; }
+.twitch-game-selection-preview { position: relative; min-width: 0; align-self: stretch; }
+.twitch-game-selection-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border-radius: 5px; transform-origin: top left; }
+.twitch-category-art { width: 24px; height: 32px; flex: 0 0 auto; border-radius: 3px; object-fit: cover; }
+.twitch-category-art[hidden] { display: none; }
+.twitch-game-option { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.twitch-game-option > span { min-width: 0; overflow-wrap: anywhere; }
 .twitch-game-option:hover, .twitch-game-option.active { background: rgba(139,92,246,.18); }
+.twitch-game-more { width: 100%; margin-top: 4px; padding: 8px 9px; border: 0; border-top: 1px solid var(--border); background: transparent; color: #c7b7ff; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.twitch-game-more:hover, .twitch-game-more:focus-visible { background: rgba(139,92,246,.18); }
 .channel-metadata-status { position: absolute; z-index: 1; right: 0; bottom: 6px; max-width: min(60%,240px); min-height: 14px; margin: 0; padding-left: 8px; overflow: hidden; background: var(--surface); box-shadow: -6px 0 8px var(--surface); color: var(--muted); font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; opacity: .8; pointer-events: none; transition: opacity .45s ease; }
 .twitch-game-field:focus-within .channel-metadata-status { opacity: 0; }
 .channel-metadata-status.is-fading { opacity: 0; }

@@ -1195,7 +1195,10 @@ async def test_dashboard_metadata_edits_announce_changes_in_chat(
     response = await dashboard_router.update_twitch_channel_metadata(request, field, value, "csrf")
 
     assert response.status_code == 200
-    assert json.loads(response.body) == {"field": field, "value": expected_value, "announcement_sent": True}
+    expected = {"field": field, "value": expected_value, "announcement_sent": True}
+    if field == "game":
+        expected["box_art_url"] = ""
+    assert json.loads(response.body) == expected
     twitch_channel.modify_channel.assert_awaited_once_with(**expected_update)
     chat_identity.send_message.assert_awaited_once_with(twitch_channel, expected_announcement)
     live_chat.tag_command_response.assert_called_once_with("channel-1", "metadata-response")
@@ -1466,7 +1469,7 @@ async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
     async def games():
         yield SimpleNamespace(id="123", name="Retro")
         yield SimpleNamespace(id="509658", name="Just Chatting")
-        yield SimpleNamespace(id="456", name="Chat")
+        yield SimpleNamespace(id="456", name="Chat", box_art=SimpleNamespace(url_for=lambda w, h: f"https://example.com/chat-{w}x{h}.jpg"))
 
     def search_categories(query, **kwargs):
         calls.append((query, kwargs))
@@ -1486,11 +1489,80 @@ async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
     response = await dashboard_router.search_twitch_games(request, "chat")
 
     assert json.loads(response.body) == {"games": [
-        {"id": "456", "name": "Chat"},
+        {"id": "456", "name": "Chat", "box_art_url": "https://example.com/chat-96x128.jpg"},
         {"id": "509658", "name": "Just Chatting"},
         {"id": "123", "name": "Retro"}
     ]}
     assert calls == [("chat", {"token_for": "channel-1", "first": 50, "max_results": 50})]
+
+
+@pytest.mark.asyncio
+async def test_current_category_artwork_uses_channel_category_id():
+    artwork = SimpleNamespace(url_for=Mock(return_value="https://example.com/category.jpg"))
+    runtime_bot = SimpleNamespace(
+        create_partialuser=lambda _: SimpleNamespace(fetch_channel_info=AsyncMock(return_value=SimpleNamespace(
+            title="Title", game_name="Retro", game_id="123"
+        ))),
+        fetch_game=AsyncMock(return_value=SimpleNamespace(id="123", name="Retro", box_art=artwork))
+    )
+    metadata = await dashboard_router.get_twitch_channel_metadata(runtime_bot, "channel-1")
+    assert metadata == {"title": "Title", "game": "Retro", "box_art_url": "https://example.com/category.jpg"}
+    runtime_bot.fetch_game.assert_awaited_once_with(id="123", token_for="channel-1")
+    artwork.url_for.assert_called_once_with(96, 128)
+
+
+@pytest.mark.asyncio
+async def test_category_artwork_failure_keeps_channel_metadata_available():
+    runtime_bot = SimpleNamespace(
+        create_partialuser=lambda _: SimpleNamespace(fetch_channel_info=AsyncMock(return_value=SimpleNamespace(
+            title="Title", game_name="Retro", game_id="123"
+        ))),
+        fetch_game=AsyncMock(side_effect=RuntimeError("Artwork unavailable"))
+    )
+    assert await dashboard_router.get_twitch_channel_metadata(runtime_bot, "channel-1") == {
+        "title": "Title", "game": "Retro", "box_art_url": ""
+    }
+    assert await dashboard_router.get_category_artwork(runtime_bot, "channel-1", "0") == ""
+    assert runtime_bot.fetch_game.await_count == 1
+
+
+def test_category_artwork_spans_metadata_rows_and_previews_picker_selection():
+    dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    script = open("web/static/js/dashboard-channel-metadata.js", encoding="utf-8").read()
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    assert 'data-current-category-art' in dashboard
+    assert 'aria-label="Select category"' in dashboard
+    assert 'categoryArtHome?.addEventListener("click"' in script
+    assert 'categoryArtHome?.setAttribute("aria-expanded", String(visible))' in script
+    assert 'data-category-preview' not in dashboard
+    assert 'data-game-options role="listbox"' in dashboard
+    assert 'grid-row: 1 / span 2' in styles
+    assert 'image.className = "twitch-category-art"' in script
+    assert 'button.appendChild(image)' in script
+    assert 'data-game-suggestions popover="manual"' not in dashboard
+    assert 'gameSuggestions.showPopover()' not in script
+    assert 'setCurrentCategoryArt(game?.box_art_url || "", game?.name || savedCategoryName)' in script
+    assert 'categoryArtHome?.setAttribute("title", name)' in script
+    assert styles.count('.dashboard-hover-tooltip {') == 1
+    assert 'if (!visible && restoreArtwork) setCurrentCategoryArt(savedCategoryArt)' in script
+    assert 'updateCategoryPreview(game);\n        setGameSuggestionsVisible(false, false)' in script
+    assert 'savedCategoryArt = result.box_art_url || ""' in script
+    assert 'card.classList.toggle("is-category-selecting", visible)' in script
+    assert 'data-game-selection-preview' in dashboard
+    assert 'visible ? selectionPreview : categoryArtHome' in script
+    assert 'categoryArtAnimation = currentCategoryArt.animate([' in script
+    assert 'if (gameSuggestions.hidden === !visible' in script
+    assert 'oldRect.left - newRect.left' in script
+    assert 'oldRect.width / newRect.width' in script
+    assert 'grid-template-columns: minmax(0,1fr) minmax(0,min(30%,120px))' in styles
+    assert 'dashboard-carousel-card-changed' in script
+    assert 'gameOptionsList.replaceChildren()' in script
+    assert 'updateCategoryPreview(gameOptions[selectedGame])' in script
+    assert 'pointerenter", () => highlightGame(index, false)' in script
+    assert 'gameOptionsList.children[selectedGame]?.scrollIntoView' in script
+    assert 'normalizedQuery === renderedGameQuery ? gameOptionsList.scrollTop : 0' in script
+    assert 'gameOptionsList.scrollTop = previousScroll' in script
+    assert 'renderGameOptions(result.games, query, result.more_games)' in script
 
 
 def test_dashboard_game_search_ranks_name_matches_and_preserves_top_games_order():
