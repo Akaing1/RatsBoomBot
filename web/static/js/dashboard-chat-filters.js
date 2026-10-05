@@ -1,5 +1,7 @@
 (() => {
-    const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots'], types: ['commands', 'redeems', 'messages']};
+    const platforms = {twitch: ['vips', 'mods', 'subs', 'non_subs', 'bots'],
+        youtube: ['youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots']};
+    const messageTypes = ['commands', 'redeems', 'messages'];
 
     function dropdownPosition(anchor, size, viewport) {
         const minTop = viewport.top + 8;
@@ -15,7 +17,10 @@
             ? 'redeems' : message.kind === 'command' ? 'commands' : 'messages';
         const badges = new Set((message.badges || []).map(badge =>
             String(typeof badge === 'string' ? badge : badge.name || '').toLowerCase()));
-        const user = message.is_bot ? 'bots'
+        const user = message.platform === 'youtube'
+            ? (message.is_bot ? 'youtube_bots' : badges.has('mod') || badges.has('moderator') ? 'youtube_mods'
+                : badges.has('member') ? 'youtube_members' : 'youtube_non_members')
+            : message.is_bot ? 'bots'
             : badges.has('moderator') || message.accent === 'moderator' ? 'mods'
             : badges.has('vip') || message.accent === 'vip' ? 'vips'
             : badges.has('subscriber') || badges.has('founder') || message.accent === 'subscriber' ? 'subs'
@@ -30,6 +35,12 @@
         const options = control.querySelector('[data-chat-filter-options]');
         const countLabel = control.querySelector('[data-chat-filter-count]');
         const inputs = [...control.querySelectorAll('[data-chat-filter-option]')];
+        const platformToggles = [...control.querySelectorAll('[data-chat-filter-platform]')];
+        const connectionBadges = [...control.querySelectorAll('[data-chat-filter-connection]')];
+        const connectedPlatforms = platformToggles.filter(input => !input.disabled)
+            .map(input => input.dataset.chatFilterPlatform);
+        const axes = {users: connectedPlatforms.flatMap(platform => platforms[platform]), types: messageTypes};
+        let connectionBadgesShown = false;
         const clearButtons = [...control.querySelectorAll('[data-chat-filter-clear]')];
         const storageKey = `ratsboombot:chat-filters:${control.dataset.channelId}`;
         const enabled = {users: new Set(axes.users), types: new Set(axes.types)};
@@ -43,6 +54,15 @@
             for (const axis of Object.keys(axes)) {
                 if (Array.isArray(saved?.[axis])) {
                     const keys = saved[axis].filter(key => axes[axis].includes(key));
+                    if (axis === 'users') {
+                        if (!saved.version || saved.version < 3) {
+                            keys.push(...platforms.youtube.filter(key => axes.users.includes(key)));
+                        }
+                        if (Array.isArray(saved.connectedPlatforms)) {
+                            connectedPlatforms.filter(platform => !saved.connectedPlatforms.includes(platform))
+                                .forEach(platform => keys.push(...platforms[platform]));
+                        }
+                    }
                     // An empty section always means all options are enabled.
                     enabled[axis] = new Set(keys.length ? keys : axes[axis]);
                 }
@@ -92,8 +112,16 @@
             button.setAttribute('aria-label', `Filter chat, ${count} options enabled`);
             inputs.forEach(input => {
                 const selection = enabled[input.dataset.chatFilterAxis];
+                input.disabled = !axes[input.dataset.chatFilterAxis].includes(input.dataset.chatFilterOption);
                 input.checked = selection.has(input.dataset.chatFilterOption);
                 input.indeterminate = false;
+            });
+            platformToggles.forEach(input => {
+                input.hidden = connectedPlatforms.length < 2;
+                const keys = platforms[input.dataset.chatFilterPlatform];
+                const count = keys.filter(key => enabled.users.has(key)).length;
+                input.checked = count === keys.length;
+                input.indeterminate = count > 0 && count < keys.length;
             });
             clearButtons.forEach(clear => {
                 const axis = clear.dataset.chatFilterClear;
@@ -119,6 +147,14 @@
             options.showPopover?.();
             positionDropdown();
             button.setAttribute('aria-expanded', 'true');
+            if (!connectionBadgesShown) {
+                connectionBadgesShown = true;
+                window.setTimeout(() => {
+                    connectionBadges.forEach(badge => {
+                        if (badge.dataset.connected === 'true') badge.classList.add('is-fading');
+                    });
+                }, 1500);
+            }
         });
         control.addEventListener('keydown', event => {
             if (event.key === 'Escape' && !options.hidden) {
@@ -127,13 +163,17 @@
         });
         document.addEventListener('click', event => { if (!control.contains(event.target)) close(); });
         document.addEventListener('dashboard-carousel-card-changed', () => close());
+        function persistSelection() {
+            try {
+                window.localStorage.setItem(storageKey, JSON.stringify({version: 4, connectedPlatforms,
+                    users: [...enabled.users], types: [...enabled.types]}));
+            } catch (_) {}
+        }
         function applySelection() {
             for (const axis of Object.keys(axes)) {
                 if (enabled[axis].size === 0) enabled[axis] = new Set(axes[axis]);
             }
-            try {
-                window.localStorage.setItem(storageKey, JSON.stringify({version: 2, users: [...enabled.users], types: [...enabled.types]}));
-            } catch (_) {}
+            persistSelection();
             sync(); onChange();
         }
         clearButtons.forEach(clear => clear.addEventListener('click', () => {
@@ -151,17 +191,31 @@
         control.addEventListener('contextmenu', event => {
             const row = event.target.closest('.chat-filter-row');
             const input = row?.querySelector('[data-chat-filter-option]');
-            if (input && inputs.includes(input)) {
+            if (input && inputs.includes(input) && !input.disabled) {
                 event.preventDefault(); solo(input.dataset.chatFilterAxis, [input.dataset.chatFilterOption]);
+            } else {
+                const platformInput = row?.querySelector('[data-chat-filter-platform]');
+                if (platformInput && platformToggles.includes(platformInput) && !platformInput.disabled && !platformInput.hidden) {
+                    event.preventDefault(); solo('users', platforms[platformInput.dataset.chatFilterPlatform]);
+                }
             }
         });
+        platformToggles.forEach(input => input.addEventListener('change', () => {
+            if (input.disabled || input.hidden) return;
+            platforms[input.dataset.chatFilterPlatform].forEach(key => {
+                if (input.checked) enabled.users.add(key); else enabled.users.delete(key);
+            });
+            applySelection();
+        }));
         inputs.forEach(input => input.addEventListener('change', () => {
+            if (input.disabled) return;
             const selection = enabled[input.dataset.chatFilterAxis];
             const key = input.dataset.chatFilterOption;
             if (input.checked) selection.add(key); else selection.delete(key);
             applySelection();
         }));
         sync();
+        persistSelection();
         return {allows: ({user, type}) =>
             enabled.users.has(user) && enabled.types.has(type)};
     }

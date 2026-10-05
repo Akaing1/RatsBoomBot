@@ -24,7 +24,9 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str):
                 yield ": keep-alive\n\n"
                 continue
 
-            if message_matches_view(message, view):
+            if isinstance(message, dict) and message.get("event") == "chat-clear":
+                yield f"event: chat-clear\ndata: {json.dumps(message, separators=(',', ':'))}\n\n"
+            elif message_matches_view(message, view):
                 yield f"data: {json.dumps(message.as_dict(), separators=(',', ':'))}\n\n"
     finally:
         service.unsubscribe(broadcaster_id, queue)

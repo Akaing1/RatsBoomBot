@@ -295,6 +295,8 @@
                 document.dispatchEvent(new CustomEvent("dashboard-chat-reply", {detail: {
                     messageId: message.id,
                     name: visibleMessageName(message),
+                    username: message.username || "",
+                    displayName: message.display_name || "",
                     message: message.message || ""
                 }}));
             });
@@ -438,11 +440,27 @@
             window.setInterval(() => refreshPinned(feed), 2000);
         }
         shell.appendChild(feed.jumpButton);
+        if ("ResizeObserver" in window) {
+            new ResizeObserver(() => {
+                if (feed.followNewest) scrollToNewest(feed);
+            }).observe(element);
+        }
 
         const source = new EventSource(element.dataset.streamUrl);
         source.onopen = () => showConnectionStatus(true);
         source.onerror = () => showConnectionStatus(false);
         source.addEventListener("history-complete", () => { feed.historyComplete = true; });
+        source.addEventListener("chat-clear", event => {
+            const {platform} = JSON.parse(event.data);
+            if (platform !== "twitch") return;
+            element.querySelectorAll(".live-chat-message.platform-twitch").forEach(row => {
+                feed.seen.delete(row.dataset.messageId);
+                row.remove();
+            });
+            feed.followRowObserver?.disconnect();
+            feed.followRowObserver = null;
+            updateJumpButton(feed);
+        });
         source.onmessage = event => {
             try {
                 renderMessage(feed, JSON.parse(event.data));

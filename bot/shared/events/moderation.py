@@ -29,6 +29,8 @@ class ModerationEvents(commands.Component):
         live_chat = getattr(services, "live_chat", None)
         if live_chat is not None:
             live_chat.record_mod_action(payload)
+            if action == "clear":
+                live_chat.clear_chat(str(payload.broadcaster.id))
 
         if action != "ban" or moderator is None or ban is None:
             return
