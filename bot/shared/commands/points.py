@@ -366,8 +366,7 @@ class PointsCommandHandler:
             await self.send_message(ctx, config.messages.gamble_insufficient, username=username, points=current_points, amount=gamble_amount, command=command_name)
             return
 
-        pets = getattr(services, "pets", None)
-        win_chance = await pets.gamble_win_chance(user_id, config.gamble_win_chance) if pets is not None else config.gamble_win_chance
+        win_chance = config.gamble_win_chance
         won = random.random() < win_chance
 
         try:
@@ -424,11 +423,6 @@ class PointsCommandHandler:
             new_balance=new_balance,
             command=command_name
         )
-
-        if not won and pets is not None:
-            refund = await pets.gamble_loss_refund(user_id, gamble_amount)
-            if refund:
-                await ctx.send(f"{username}'s pet refunded {refund:,} points from that gamble loss.")
 
     async def show_grouped_gamble_usage(self, ctx: commands.Context) -> None:
         self.log_command(ctx, "!gamble")

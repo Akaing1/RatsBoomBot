@@ -91,12 +91,6 @@ async def my_account(request: Request):
 
     profile = await runtime_bot.services.chatter_stats.get_global_profile(user_id)
     if profile is not None and str(profile["identity"]["user_id"]) == user_id:
-        pets = getattr(runtime_bot.services, "pets", None)
-        profile["pet"] = await pets.get_equipped_pet(user_id) if pets is not None else None
-        collection = getattr(pets, "get_collection", None)
-        profile["pets"] = await collection(user_id) if callable(collection) else []
-        rates = getattr(pets, "get_summon_rates", None)
-        profile["pet_rates"] = await rates() if callable(rates) else []
         return templates.TemplateResponse(
             request=request,
             name="public/chatter_profile.html",
@@ -248,8 +242,7 @@ async def viewer_gamble(request: Request, channel_name: str, amount: str = Form(
         message = "You have no points to gamble." if balance <= 0 else "Enter a bet within your current balance."
         request.session[GAMBLE_RESULT_KEY] = {"channel_id": broadcaster_id, "message": message}
     else:
-        pets = getattr(services, "pets", None)
-        win_chance = await pets.gamble_win_chance(user_id, config.gamble_win_chance) if pets is not None else config.gamble_win_chance
+        win_chance = config.gamble_win_chance
         won = random.random() < win_chance
         new_balance = await services.points.settle_wager(
             broadcaster_id, user_id, str(profile["identity"]["login"]), bet,
@@ -259,7 +252,6 @@ async def viewer_gamble(request: Request, channel_name: str, amount: str = Form(
             {"channel_id": broadcaster_id, "message": "Your balance changed before the bet was placed. Please try again."}
             if new_balance is None else {
                 "channel_id": broadcaster_id, "won": won, "bet": bet, "balance": new_balance,
-                "refund": await pets.gamble_loss_refund(user_id, bet) if not won and pets is not None else 0,
             }
         )
 
