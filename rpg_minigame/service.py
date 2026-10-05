@@ -10,7 +10,6 @@ from datetime import UTC, datetime, timedelta
 from rpg_minigame.config import RaidBossConfig
 from rpg_minigame.difficulty import HP_TIERS, load_difficulty, save_difficulty
 from storage.transactions import immediate_transaction
-from pets.passives import RAID_DAMAGE, RAID_PROFIT, RARE_DROP_CHANCE
 
 LOGGER = logging.getLogger("RatBoomBot")
 HEALTH_CHECKPOINT_MESSAGES = {
@@ -146,12 +145,11 @@ class RaidBossService:
     REPEAT_REMINDER_SECONDS = 60 * 60
     REQUIRED_REMINDER_MESSAGES = 20
 
-    def __init__(self, bot, db, chatter_stats=None, points=None, *, config_provider=None, enabled_provider=None, pets=None):
+    def __init__(self, bot, db, chatter_stats=None, points=None, *, config_provider=None, enabled_provider=None):
         self.bot = bot
         self.db = db
         self.chatter_stats = chatter_stats
         self.points = points
-        self.pets = pets
         self.config_provider = config_provider
         self.enabled_provider = enabled_provider
         self._shared_inventory_lock = asyncio.Lock()
@@ -845,8 +843,6 @@ class RaidBossService:
         if weapon_used == "forgotten_daggers":
             damage += weapon_passive_damage
 
-        if self.pets is not None:
-            damage += (damage * await self.pets.bonus_bps(user_id, RAID_DAMAGE)) // 10_000
 
         flag_weapon = random.choice(flag_weapons)["item_id"] if flag_weapons else None
         credited_damage = min(damage, event.current_hp)
@@ -1579,8 +1575,6 @@ class RaidBossService:
 
                     for rank, contribution in enumerate(contributions, start=1):
                         reward = int(base_reward * self.contribution_reward_multiplier(rank, len(contributions)))
-                        if self.pets is not None:
-                            reward += (reward * await self.pets.bonus_bps(contribution["user_id"], RAID_PROFIT, connection)) // 10_000
                         total_contribution_rewards += reward
                         await self._add_points(connection, broadcaster_id, contribution["user_id"], contribution["username"], reward)
                         await connection.execute(
@@ -1594,8 +1588,6 @@ class RaidBossService:
 
                 if defeated and final_hitter_id and final_hitter_name:
                     final_hit_reward = int(resolution["final_hit_reward"])
-                    if self.pets is not None:
-                        final_hit_reward += (final_hit_reward * await self.pets.bonus_bps(final_hitter_id, RAID_PROFIT, connection)) // 10_000
                     await self._add_points(connection, broadcaster_id, final_hitter_id, final_hitter_name, final_hit_reward)
                     await connection.execute(
                         """
@@ -1674,8 +1666,7 @@ class RaidBossService:
                 for contributor in contributors[:top_count]:
                     recipient = (str(contributor["user_id"]), str(contributor["username"]))
 
-                    rare_bonus = await self.pets.bonus_bps(recipient[0], RARE_DROP_CHANCE, connection) / 10_000 if self.pets is not None else 0
-                    if random.random() < config.top_contributor_unique_drop_chance + rare_bonus:
+                    if random.random() < config.top_contributor_unique_drop_chance:
                         awards.append((*recipient, mythical_weapon))
 
                     if event.boss_tier == "main" and random.random() < config.blessed_unique_drop_chance:

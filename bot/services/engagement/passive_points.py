@@ -150,12 +150,7 @@ class PassivePointsService:
 
         async with self.db.acquire() as connection:
             for user_id, username in eligible:
-                apply_earned_bonus = getattr(self.points, "apply_earned_bonus", None)
-                awarded_points = (
-                    await apply_earned_bonus(user_id, self.POINTS_PER_INTERVAL, connection)
-                    if callable(apply_earned_bonus)
-                    else self.POINTS_PER_INTERVAL
-                )
+                awarded_points = self.POINTS_PER_INTERVAL
                 await connection.execute(
                     """
                     INSERT OR IGNORE INTO passive_point_payouts (

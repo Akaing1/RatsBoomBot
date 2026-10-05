@@ -36,14 +36,6 @@
                 <h1>{{ profile.identity.display_name }}</h1>
                 <p>@{{ profile.identity.login }} &middot; Seen in {{ profile.channels_interacted }} RatsBoomBot {{ "channel" if profile.channels_interacted == 1 else "channels" }}</p>
             </div>
-            {% if profile.pet %}
-                <div class="chatter-pet" title="{{ profile.pet.display_name }} ({{ profile.pet.rarity | replace('_', ' ') | title }}) · Level {{ profile.pet.level }} · {{ profile.pet.passive_name }} ({{ profile.pet.passive_rarity | replace('_', ' ') | title }})">
-                    <div class="chatter-pet-sprite{% if profile.pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif profile.pet.pet_id == 'royal_raven' %} chatter-pet-sprite--raven{% elif profile.pet.pet_id == 'horned_wolf' %} chatter-pet-sprite--wolf{% elif profile.pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ profile.pet.sprite_path }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ profile.pet.frame_count }}" role="img" aria-label="{{ profile.pet.display_name }}"></div>
-                    <span>{{ profile.pet.display_name }} · {{ profile.pet.rarity | replace('_', ' ') | title }}</span>
-                    <small>{{ profile.pet.passive_name }} · {{ profile.pet.passive_rarity | replace('_', ' ') | title }}</small>
-                    <small>{{ profile.pet.passive_percent_label }}% {{ profile.pet.passive_description }}</small>
-                </div>
-            {% endif %}
             <div class="chatter-level-summary" title="{{ '{:,}'.format(profile.level.achievement_xp) }} XP from achievements and {{ '{:,}'.format(profile.level.raid_xp) }} XP from boss clears">
                 <div><span>Chatter level</span><strong>Level {{ profile.level.level }}</strong></div>
                 <div class="progress-track chatter-level-progress" role="progressbar" aria-label="Experience toward level {{ profile.level.level + 1 }}" aria-valuemin="0" aria-valuemax="{{ profile.level.xp_required }}" aria-valuenow="{{ profile.level.current_xp }}"><span style="width: {{ profile.level.percent }}%"></span></div>
@@ -55,43 +47,7 @@
             <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
             <button type="button" data-chatter-tab="raids" aria-selected="false">Boss Hunt</button>
             <button type="button" data-chatter-tab="achievements" aria-selected="false">Achievements</button>
-            <button type="button" data-chatter-tab="pets" aria-selected="false">Pets</button>
         </nav>
-
-        <section id="pets" class="chatter-section" data-chatter-panel="pets" aria-label="Pet collection" hidden>
-            <div class="chatter-section-heading"><div><p class="eyebrow">Global companions</p><h2>Pet collection</h2></div></div>
-            <div class="pet-summon-info">
-                <span>Buy a ticket with <code>!pets buy ticket</code> for 50,000 channel points, then use <code>!pets summon</code></span>
-                <details class="pet-rates">
-                    <summary aria-label="Show pet summon rates">* Rates</summary>
-                    <div class="pet-rates-popup">
-                        <strong>Summon rates</strong>
-                        <table>
-                            <thead><tr><th>Tier</th><th>Rate</th></tr></thead>
-                            <tbody>{% for tier in profile.pet_rates %}
-                                <tr><td>{{ 'UR' if tier.rarity == 'ultra_rare' else tier.rarity | title }}</td><td>{{ tier.base_percent }}%</td></tr>
-                            {% endfor %}</tbody>
-                        </table>
-                        {% for tier in profile.pet_rates %}
-                            <p><strong>{{ 'UR' if tier.rarity == 'ultra_rare' else tier.rarity | title }}</strong>:
-                                {% for pet in tier.pets %}{{ pet.display_name }}{% if not loop.last %}, {% endif %}{% else %}No pets available{% endfor %}
-                            </p>
-                        {% endfor %}
-                    </div>
-                </details>
-            </div>
-            <div class="chatter-stat-grid">
-                {% for pet in profile.pets %}
-                <article>
-                    <div class="chatter-pet-sprite{% if pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif pet.pet_id == 'royal_raven' %} chatter-pet-sprite--raven{% elif pet.pet_id == 'horned_wolf' %} chatter-pet-sprite--wolf{% elif pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ pet.sprite_path }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ pet.frame_count }}" role="img" aria-label="{{ pet.display_name }}"></div>
-                    <strong>{{ pet.display_name }}</strong>
-                    <span>{{ 'UR' if pet.rarity == 'ultra_rare' else pet.rarity | title }}{% if profile.pet and profile.pet.user_pet_id == pet.user_pet_id %} · Equipped{% endif %}</span>
-                    <small>{{ pet.passive_percent_label }}% {{ pet.passive_description }}</small>
-                    <small>Equip: <code>!pets equip {{ pet.display_name }}</code></small>
-                </article>
-                {% else %}<p>No pets collected yet. Your first summon is equipped automatically.</p>{% endfor %}
-            </div>
-        </section>
 
         <section data-chatter-panel="overview">
             <p><strong>{{ profile.achievements.unlocked if profile.achievements else 0 }} achievement tiers unlocked</strong> · Explore the Achievements tab for badges and progress.</p>
