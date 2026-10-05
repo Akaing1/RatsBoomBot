@@ -21,6 +21,7 @@ from config.settings import settings
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.shared.common import templates
+from web.shared.category_relevance import low_relevance_category_ids
 from web.shared.live_chat import stream_chat_events
 from web.shared.protected_users import (
     ProtectedUserError,
@@ -34,7 +35,7 @@ from web.state import get_bot
 router = APIRouter()
 LOGGER = logging.getLogger("RatBoomBot")
 CHAT_SEND_TARGETS = {"twitch", "youtube", "both"}
-CHAT_MESSAGE_MAX_LENGTH = 200
+CHAT_MESSAGE_MAX_LENGTH = 500
 TOP_GAMES_CACHE_SECONDS = 300
 
 
@@ -89,6 +90,7 @@ async def execute_twitch_slash_command(runtime_bot, broadcaster_id: str, message
         await broadcaster.unban_user(moderator=moderator_id, user_id=str(user.id))
     elif command == "clear":
         await broadcaster.delete_chat_messages(moderator=moderator_id)
+        runtime_bot.services.live_chat.clear_chat(broadcaster_id)
     elif command == "commercial":
         await broadcaster.start_commercial(length=int(require_argument("a duration in seconds")))
     elif command == "marker":
@@ -195,10 +197,30 @@ async def get_dashboard_header_stats(runtime_bot, broadcaster, *, refresh_viewer
 async def get_twitch_channel_metadata(runtime_bot, broadcaster_id: str) -> dict[str, str]:
     try:
         info = await runtime_bot.create_partialuser(str(broadcaster_id)).fetch_channel_info(token_for=str(broadcaster_id))
-        return {"title": str(info.title or "Untitled stream"), "game": str(info.game_name or "No category")}
+        return {"title": str(info.title or "Untitled stream"), "game": str(info.game_name or "No category"),
+                "box_art_url": await get_category_artwork(runtime_bot, broadcaster_id, getattr(info, "game_id", None))}
     except Exception as exc:
         LOGGER.warning("[Dashboard] Failed to fetch Twitch channel metadata for broadcaster %s: %s", broadcaster_id, exc)
         return {"title": "Unavailable", "game": "Unavailable"}
+
+
+def serialize_category(game) -> dict[str, str]:
+    category = {"id": str(game.id), "name": str(game.name)}
+    artwork = getattr(game, "box_art", None)
+    if artwork:
+        category["box_art_url"] = artwork.url_for(96, 128)
+    return category
+
+
+async def get_category_artwork(runtime_bot, broadcaster_id: str, game_id: str | None) -> str:
+    if not game_id or str(game_id) == "0":
+        return ""
+    try:
+        game = await runtime_bot.fetch_game(id=str(game_id), token_for=str(broadcaster_id))
+        return serialize_category(game).get("box_art_url", "") if game else ""
+    except Exception as exc:
+        LOGGER.warning("[Dashboard] Category artwork unavailable for %s: %s", game_id, exc)
+        return ""
 
 
 def category_match_type(name: str, query: str) -> int:
@@ -242,9 +264,19 @@ async def get_top_games_for_search(runtime_bot, broadcaster_id: str) -> list[dic
     if cached is not None and cached[0] > now:
         return cached[1]
     iterator = runtime_bot.fetch_top_games(token_for=str(broadcaster_id), first=100, max_results=100)
-    games = [{"id": str(game.id), "name": str(game.name)} async for game in iterator]
+    games = [serialize_category(game) async for game in iterator]
     runtime_bot._dashboard_top_games_cache = (now + TOP_GAMES_CACHE_SECONDS, games)
     return games
+
+
+async def category_picker_results(runtime_bot, broadcaster_id: str, games: list[dict[str, str]]) -> dict:
+    secondary_ids = await low_relevance_category_ids(runtime_bot, games, broadcaster_id)
+    if not secondary_ids:
+        return {"games": games}
+    return {
+        "games": [game for game in games if game["id"] not in secondary_ids],
+        "more_games": [game for game in games if game["id"] in secondary_ids]
+    }
 
 
 def format_dashboard_username(services, broadcaster_id: str, username: str) -> str:
@@ -560,7 +592,10 @@ async def update_twitch_channel_metadata(
             field, broadcaster_id
         )
 
-    return JSONResponse({"field": field, "value": update.value, "announcement_sent": announcement_sent})
+    result = {"field": field, "value": update.value, "announcement_sent": announcement_sent}
+    if field == "game":
+        result["box_art_url"] = await get_category_artwork(runtime_bot, broadcaster_id, update.game_id)
+    return JSONResponse(result)
 
 
 @router.get("/channel/api/chat/pinned", response_class=JSONResponse)
@@ -770,12 +805,13 @@ async def search_twitch_games(request: Request, query: str = ""):
     try:
         normalized_query = query.strip()
         if not normalized_query:
-            return JSONResponse({"games": (await get_top_games_for_search(runtime_bot, broadcaster_id))[:50]})
+            games = (await get_top_games_for_search(runtime_bot, broadcaster_id))[:50]
+            return JSONResponse(await category_picker_results(runtime_bot, broadcaster_id, games))
 
         iterator = runtime_bot.search_categories(
             normalized_query, token_for=str(broadcaster_id), first=50, max_results=50
         )
-        games = [{"id": str(game.id), "name": str(game.name)} async for game in iterator]
+        games = [serialize_category(game) async for game in iterator]
         popular_games = []
         if callable(getattr(runtime_bot, "fetch_top_games", None)):
             try:
@@ -790,7 +826,7 @@ async def search_twitch_games(request: Request, query: str = ""):
                 games.append(game)
                 existing_ids.add(game["id"])
         games = sort_twitch_games_by_match(games, normalized_query, popular_games)[:50]
-        return JSONResponse({"games": games})
+        return JSONResponse(await category_picker_results(runtime_bot, broadcaster_id, games))
     except Exception:
         LOGGER.exception("[Dashboard] Failed to search Twitch games for broadcaster %s.", broadcaster_id)
         return JSONResponse({"detail": "Twitch game search is temporarily unavailable."}, status_code=502)
@@ -1118,6 +1154,7 @@ async def channel_dashboard(request: Request):
             "raid_enabled": raid_enabled,
             "raid_metrics": raid_metrics,
             "youtube_chat": services.live_chat.get_youtube_state(broadcaster_id),
+            "twitch_connected": bool((getattr(runtime_bot, "tokens", {}).get(str(broadcaster_id)) or {}).get("token")),
             "ad_status": ad_status,
             "dashboard_header_stats": dashboard_header_stats,
             "twitch_channel_metadata": twitch_channel_metadata,
@@ -1126,6 +1163,94 @@ async def channel_dashboard(request: Request):
             "csrf_token": get_csrf_token(request)
         }
     )
+
+
+@router.get("/channel/boss-hunt", response_class=HTMLResponse)
+async def channel_boss_hunt(request: Request):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return RedirectResponse(url="/connect", status_code=303)
+
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return HTMLResponse("Bot runtime unavailable.", status_code=503)
+
+    services = runtime_bot.services
+    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+    if broadcaster is None:
+        logout_channel_user(request)
+        return RedirectResponse(url="/connect", status_code=303)
+
+    enabled = services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES)
+    return templates.TemplateResponse(
+        request=request,
+        name="channel/boss_hunt.html",
+        context={
+            "active_page": "boss-hunt",
+            "broadcaster": broadcaster,
+            "boss_hunt_enabled": enabled,
+            "raid_metrics": await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if enabled else None,
+            "raid_contributor_data": await get_raid_contributor_data(services, broadcaster_id) if enabled else {"active": False, "contributors": []},
+            "active_encounter": await services.raid_bosses.get_active_event(broadcaster_id) if enabled else None,
+            "spawn_scheduled": str(broadcaster_id) in services.raid_bosses.spawn_tasks if enabled else False,
+            "action_result": request.query_params.get("result"),
+            "csrf_token": get_csrf_token(request),
+        },
+    )
+
+
+@router.post("/channel/boss-hunt/action", response_class=RedirectResponse)
+async def channel_boss_hunt_action(
+    request: Request,
+    action: str = Form(...),
+    csrf_token: str = Form(...),
+    tier: str = Form(""),
+    boss_type: str = Form(""),
+):
+    validate_csrf_token(request, csrf_token)
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return RedirectResponse(url="/connect", status_code=303)
+
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return HTMLResponse("Bot runtime unavailable.", status_code=503)
+
+    services = runtime_bot.services
+    if services.broadcasters.get_broadcasters().get(str(broadcaster_id)) is None:
+        logout_channel_user(request)
+        return RedirectResponse(url="/connect", status_code=303)
+    profile = get_active_profile(str(broadcaster_id))
+    if profile is None or not services.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES):
+        return RedirectResponse(url="/channel/boss-hunt?result=disabled", status_code=303)
+
+    if action == "schedule":
+        if tier not in {"tutorial", "mini", "main"} or boss_type not in {"melee", "ranged", "magic", "random"}:
+            result = "invalid"
+        elif tier == "tutorial" and await services.raid_bosses.has_completed_tutorial(broadcaster_id):
+            result = "tutorial-complete"
+        else:
+            import random
+            selected_type = random.choice(("melee", "ranged", "magic")) if boss_type == "random" else boss_type
+            scheduled = await services.raid_bosses.schedule_spawn(broadcaster_id, profile.raid_bosses, tier, selected_type)
+            result = "scheduled" if scheduled else "already-active"
+    elif action == "end":
+        event = await services.raid_bosses.get_active_event(broadcaster_id)
+        if event is None:
+            result = "no-encounter"
+        else:
+            from bot.services.engagement.raid_boss import raid_conclusion_message
+            reward = await services.raid_bosses.resolve(broadcaster_id, defeated=False)
+            damage_dealt = event.max_hp - event.current_hp
+            await services.chat_identity.send_message(
+                runtime_bot.create_partialuser(str(broadcaster_id)),
+                raid_conclusion_message(event, damage_dealt, reward),
+            )
+            result = "ended"
+    else:
+        result = "invalid"
+
+    return RedirectResponse(url=f"/channel/boss-hunt?result={result}", status_code=303)
 
 
 @router.get("/channel/viewer-queue/blacklist", response_class=HTMLResponse)

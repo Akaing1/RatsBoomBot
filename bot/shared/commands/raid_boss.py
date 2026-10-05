@@ -5,7 +5,7 @@ from urllib.parse import quote
 from twitchio.ext import commands
 
 from bot.profiles import FeatureName, RaidBossConfig, get_active_profile
-from bot.services.engagement.raid_boss import raid_conclusion_message
+from rpg_minigame import raid_conclusion_message
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
 from config.settings import settings
 
@@ -35,7 +35,7 @@ class RaidBossCommands(commands.Component):
 
         profile = get_active_profile(broadcaster_id)
 
-        if profile is None or not profile.raid_bosses.enabled:
+        if profile is None:
             return None
 
         return broadcaster_id, profile.raid_bosses
@@ -50,7 +50,7 @@ class RaidBossCommands(commands.Component):
         event = await self.bot.services.raid_bosses.get_active_event(context[0])
 
         if event is None:
-            await ctx.send("There is no active raid boss right now.")
+            await ctx.send("There is no active boss right now.")
             return
 
         percent = event.current_hp / event.max_hp * 100
@@ -107,13 +107,13 @@ class RaidBossCommands(commands.Component):
         active_event = await self.bot.services.raid_bosses.get_active_event(broadcaster_id)
 
         if active_event is None:
-            await ctx.reply("There is no active raid boss.")
+            await ctx.reply("There is no active boss.")
             return
 
         event, failed_reward = await self.bot.services.raid_bosses.register_stream(broadcaster_id, stream_id)
 
         if event is None:
-            await ctx.send(f"The raid boss's stream limit was reached. Raiders received a reduced {failed_reward:,}-point pool based on contribution.")
+            await ctx.send(f"The boss's stream limit was reached. Raiders received a reduced {failed_reward:,}-point pool based on contribution.")
             return
 
         chatter = ctx.chatter
@@ -205,7 +205,7 @@ class RaidBossCommands(commands.Component):
         profile = get_active_profile(context[0])
         channel_name = profile.channel_name if profile is not None else context[0]
         raid_page_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/raid/{quote(channel_name)}"
-        await ctx.send(f"Raid shop — Weapons: {config.weapon_cost:,} points | {config.item_names.potion}: {config.potion_cost:,} points | {config.item_names.blessing}: {config.blessing_cost:,} points | Full item list: {raid_page_url}")
+        await ctx.send(f"Boss Hunt shop — Weapons: {config.weapon_cost:,} points | {config.item_names.potion}: {config.potion_cost:,} points | {config.item_names.blessing}: {config.blessing_cost:,} points | Full item list: {raid_page_url}")
 
     @raid.command(name="help")
     async def raid_help(self, ctx: commands.Context) -> None:
@@ -217,7 +217,7 @@ class RaidBossCommands(commands.Component):
         profile = get_active_profile(context[0])
         channel_name = profile.channel_name if profile is not None else context[0]
         raid_page_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/raid/{quote(channel_name)}"
-        await ctx.send(f"Raid guide, shop, crafting recipes, equipment, rewards, and live encounter: {raid_page_url}")
+        await ctx.send(f"Boss Hunt guide, shop, crafting recipes, equipment, rewards, and live encounter: {raid_page_url}")
 
     @raid.command(name="buy")
     async def buy(self, ctx: commands.Context, *, item: str | None = None) -> None:
@@ -237,7 +237,7 @@ class RaidBossCommands(commands.Component):
         result = await self.bot.services.raid_bosses.buy(broadcaster_id, str(chatter.id), chatter.name, item, config, stream_id)
 
         if result is None:
-            await ctx.reply("That item is not in the raid shop. Use !raid shop to see the available items.")
+            await ctx.reply("That item is not in the Boss Hunt shop. Use !raid shop to see the available items.")
         elif result == "insufficient":
             await ctx.reply("You do not have enough loyalty points for that item.")
         elif result == "stream_required":
@@ -249,7 +249,7 @@ class RaidBossCommands(commands.Component):
         elif result.startswith("flag_out_of_stock:"):
             await ctx.reply(f"{config.item_names.flag_bearer} is already claimed for this raid by {result.split(':', 1)[1]}!")
         elif result == "active_raid_required":
-            await ctx.reply(f"{config.item_names.flag_bearer} can only be purchased while a raid boss is active.")
+            await ctx.reply(f"{config.item_names.flag_bearer} can only be purchased while a Boss Hunt encounter is active.")
         elif result == "global_buff_limit":
             await ctx.reply("You already control an active global raid buff. Another chatter must claim this one.")
         else:
@@ -418,7 +418,7 @@ class RaidBossCommands(commands.Component):
         entries = await self.bot.services.raid_bosses.get_leaderboard(context[0])
 
         if not entries:
-            await ctx.send("No one has damaged the current raid boss yet.")
+            await ctx.send("No one has damaged the current boss yet.")
             return
 
         leaderboard = " | ".join(f"{position}. {username}: {damage:,}" for position, (username, damage) in enumerate(entries, start=1))
@@ -445,7 +445,7 @@ class RaidBossCommands(commands.Component):
         scheduled = await self.bot.services.raid_bosses.schedule_spawn(context[0], context[1], boss_tier, boss_type)
 
         if not scheduled:
-            await ctx.reply("A raid boss is already active or approaching.")
+            await ctx.reply("A boss is already active or approaching.")
             return
 
     @raid.command(name="nextstream")
@@ -462,7 +462,7 @@ class RaidBossCommands(commands.Component):
         event = await self.bot.services.raid_bosses.get_active_event(context[0])
 
         if event is None:
-            await ctx.reply("There is no active raid boss. Use !raid spawn <tutorial|mini|main> <type|random> first.")
+            await ctx.reply("There is no active boss. Use !raid spawn <tutorial|mini|main> <type|random> first.")
             return
 
         stream_id = self.get_offline_stream_id(event.id, event.streams_used + 1)
@@ -486,7 +486,7 @@ class RaidBossCommands(commands.Component):
         event = await self.bot.services.raid_bosses.get_active_event(context[0])
 
         if event is None:
-            await ctx.reply("There is no active raid boss to end.")
+            await ctx.reply("There is no active boss to end.")
             return
 
         reward = await self.bot.services.raid_bosses.resolve(context[0], defeated=False)

@@ -49,7 +49,24 @@ from storage.migrations.v044_channel_protected_users import migrate as migrate_c
 from storage.migrations.v045_unpublish_test_patch_note import migrate as migrate_unpublish_test_patch_note
 from storage.migrations.v046_channel_quotes import migrate as migrate_channel_quotes
 from storage.migrations.v047_compact_channel_quotes import migrate as migrate_compact_channel_quotes
+from storage.migrations.v048_global_pets import migrate as migrate_global_pets
+from storage.migrations.v049_pet_asset_path import migrate as migrate_pet_asset_path
+from storage.migrations.v050_viewer_sessions import migrate as migrate_viewer_sessions
 from storage.migrations.v051_gamble_outcomes import migrate as migrate_gamble_outcomes
+from storage.migrations.v052_pet_passive_tiers import migrate as migrate_pet_passive_tiers
+from storage.migrations.v053_repair_explosive_rat_seed import migrate as migrate_repair_explosive_rat_seed
+from storage.migrations.v054_pet_display_names import migrate as migrate_pet_display_names
+
+from storage.migrations.v055_sleepy_fox import migrate as migrate_sleepy_fox
+
+from storage.migrations.v056_pet_summons import migrate as migrate_pet_summons
+
+from storage.migrations.v057_common_pet_catalog import migrate as migrate_common_pet_catalog
+
+from storage.migrations.v058_fixed_pet_passives import migrate as migrate_fixed_pet_passives
+from storage.migrations.v059_horned_wolf import migrate as migrate_horned_wolf
+from storage.migrations.v060_royal_raven import migrate as migrate_royal_raven
+from storage.migrations.v061_adaptive_mini_bosses import migrate as migrate_adaptive_mini_bosses
 
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
@@ -109,5 +126,18 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=45, name="unpublish_test_patch_note", run=migrate_unpublish_test_patch_note)
     , Migration(version=46, name="channel_quotes", run=migrate_channel_quotes)
     , Migration(version=47, name="compact_channel_quotes", run=migrate_compact_channel_quotes)
+    , Migration(version=48, name="global_pets", run=migrate_global_pets)
+    , Migration(version=49, name="pet_asset_path", run=migrate_pet_asset_path)
+    , Migration(version=50, name="viewer_sessions", run=migrate_viewer_sessions)
     , Migration(version=51, name="gamble_outcomes", run=migrate_gamble_outcomes)
+    , Migration(version=52, name="pet_passive_tiers", run=migrate_pet_passive_tiers)
+    , Migration(version=53, name="repair_explosive_rat_seed", run=migrate_repair_explosive_rat_seed)
+    , Migration(version=54, name="pet_display_names", run=migrate_pet_display_names)
+    , Migration(version=55, name="sleepy_fox", run=migrate_sleepy_fox)
+    , Migration(version=56, name="pet_summons", run=migrate_pet_summons)
+    , Migration(version=57, name="common_pet_catalog", run=migrate_common_pet_catalog)
+    , Migration(version=58, name="fixed_pet_passives", run=migrate_fixed_pet_passives)
+    , Migration(version=59, name="horned_wolf", run=migrate_horned_wolf)
+    , Migration(version=60, name="royal_raven", run=migrate_royal_raven)
+    , Migration(version=61, name="adaptive_mini_bosses", run=migrate_adaptive_mini_bosses)
 )

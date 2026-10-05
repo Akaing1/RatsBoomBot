@@ -366,7 +366,8 @@ class PointsCommandHandler:
             await self.send_message(ctx, config.messages.gamble_insufficient, username=username, points=current_points, amount=gamble_amount, command=command_name)
             return
 
-        won = random.random() < config.gamble_win_chance
+        win_chance = config.gamble_win_chance
+        won = random.random() < win_chance
 
         try:
             new_balance = await services.points.settle_wager(

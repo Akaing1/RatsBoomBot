@@ -22,7 +22,13 @@
 
 <body class="dashboard-page channel-page channel-page-{{ active_page }}">
     <div class="app-shell" data-dashboard-shell data-sidebar-storage-key="ratsboombot-channel-sidebar-collapsed">
-        <aside class="sidebar" data-channel-sidebar>
+        <script>
+            // Set the mobile state before the sidebar can paint as expanded.
+            if (window.matchMedia("(max-width: 768px)").matches) {
+                document.currentScript.parentElement.classList.add("sidebar-collapsed");
+            }
+        </script>
+        <aside class="sidebar" id="channel-navigation" data-channel-sidebar>
             <button
                 class="sidebar-toggle"
                 type="button"
@@ -34,11 +40,16 @@
                 <span aria-hidden="true">‹</span>
             </button>
             <div class="brand">
+                <button type="button" class="sidebar-mobile-back" data-sidebar-mobile-back aria-label="Close navigation" aria-controls="channel-navigation" title="Back to dashboard">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg>
+                </button>
+                <button type="button" class="sidebar-logo-toggle" data-sidebar-mobile-toggle aria-controls="channel-navigation" aria-label="Open navigation" aria-expanded="false" disabled>
                 <img
                     class="brand-mark"
                     src="{{ url_for('assets', path='/NinjaDoro.ico') }}"
                     alt="RatsBoomBot icon"
                 >
+                </button>
 
                 <div class="brand-copy">
                     <h1>RatsBoomBot</h1>
@@ -46,7 +57,7 @@
                 </div>
             </div>
             {% if active_page == 'overview' %}
-            <span class="dashboard-carousel-navbar-label" data-dashboard-carousel-position role="status" aria-live="polite"><span class="dashboard-carousel-navbar-count" data-dashboard-carousel-count>1 / 4 ·</span><span class="dashboard-carousel-navbar-name" data-dashboard-carousel-name>Stream and Ads</span></span>
+            <span class="dashboard-carousel-navbar-label" data-dashboard-carousel-position role="status" aria-live="polite"><span class="dashboard-carousel-navbar-count" data-dashboard-carousel-count>1 / 3</span><span class="dashboard-carousel-navbar-name" data-dashboard-carousel-name>Stream and Chat</span></span>
             {% endif %}
 
             <nav class="navigation">
@@ -64,6 +75,11 @@
                 >
                     <span class="nav-link-icon" aria-hidden="true">✦</span>
                     <span class="nav-link-label">Features</span>
+                </a>
+
+                <a class="nav-link {% if active_page == 'boss-hunt' %}active{% endif %}" href="/channel/boss-hunt">
+                    <span class="nav-link-icon" aria-hidden="true">⚔</span>
+                    <span class="nav-link-label">Boss Hunt</span>
                 </a>
 
                 <a
@@ -103,6 +119,7 @@
         </main>
     </div>
     <script src="{{ url_for('static', path='/js/channel-sidebar.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/hover-labels.js') }}?v={{ deployment_stamp() }}" defer></script>
     {% block page_scripts %}{% endblock %}
 </body>
 </html>

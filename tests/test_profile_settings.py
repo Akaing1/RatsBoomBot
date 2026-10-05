@@ -1,7 +1,7 @@
 import asqlite
 import pytest
 
-from bot.profiles import ChannelProfile, CommunityMessages, RaidBossConfig, RaidItemNames, activate_profile, clear_profiles, create_generic_profile, get_active_profile
+from bot.profiles import ChannelProfile, CommunityMessages, RaidBossConfig, RaidBossNames, RaidItemNames, activate_profile, clear_profiles, create_generic_profile, get_active_profile
 from bot.services.channels.profile_settings import PROFILE_SETTINGS_BY_KEY, ProfileSettingsService
 
 
@@ -91,6 +91,41 @@ async def test_nested_raid_item_name_override_updates_active_profile(tmp_path) -
         await service.set_override("channel-1", "raid_bosses.item_names.potion", "Damage Boost", "test")
 
         assert get_active_profile("channel-1").raid_bosses.item_names.potion == "Damage Boost"
+
+
+@pytest.mark.asyncio
+async def test_raid_boss_names_support_multiple_choices_and_restore_defaults(tmp_path) -> None:
+    base_profile = ChannelProfile(channel_name="test", raid_bosses=RaidBossConfig(
+        names=RaidBossNames(melee="Original Boss"),
+        mini_names=RaidBossNames(magic=("Original Mini", "Second Mini"))
+    ))
+    activate_profile("channel-1", base_profile)
+    async with asqlite.create_pool(str(tmp_path / "names.db")) as database:
+        service = ProfileSettingsService(database)
+        await service.setup()
+        service.apply_overrides("channel-1", base_profile)
+        main_key = "raid_bosses.names.melee"
+        mini_key = "raid_bosses.mini_names.magic"
+        assert service.get_setting_state("channel-1", mini_key).default_value == "Original Mini\nSecond Mini"
+
+        await service.set_override("channel-1", main_key, "  Dragon King  \n\n Iron Tyrant ", "test")
+        await service.set_override("channel-1", mini_key, "Ahriman", "test")
+        assert get_active_profile("channel-1").raid_bosses.names.choices_for("melee") == ("Dragon King", "Iron Tyrant")
+        assert get_active_profile("channel-1").raid_bosses.mini_names.choices_for("magic") == ("Ahriman",)
+
+        reloaded = ProfileSettingsService(database)
+        await reloaded.setup()
+        effective = reloaded.apply_overrides("channel-1", base_profile)
+        assert effective.raid_bosses.names.choices_for("melee") == ("Dragon King", "Iron Tyrant")
+        await reloaded.clear_override("channel-1", main_key, "test")
+        assert get_active_profile("channel-1").raid_bosses.names.choices_for("melee") == ("Original Boss",)
+
+
+def test_raid_boss_names_require_a_nonempty_choice() -> None:
+    definition = ProfileSettingsService.get_definition("raid_bosses.mini_names.ranged")
+    for invalid in ("  \n  ", "x" * 101):
+        with pytest.raises(ValueError):
+            ProfileSettingsService.validate_value(definition, invalid)
 
 
 @pytest.mark.asyncio

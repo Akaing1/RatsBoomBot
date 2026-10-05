@@ -1,0 +1,32 @@
+<section
+    id="raid-contributor-panel"
+    class="panel raid-contributor-panel"
+>
+    <div class="panel-header raid-contributor-header">
+        <div>
+            <p class="eyebrow">Live Boss Hunt leaderboard</p>
+            <h3>Current Leaderboard</h3>
+            <p id="raid-contributor-boss" class="panel-description">
+                {% if raid_contributor_data.active %}
+                    {{ raid_contributor_data.boss_name }} · {{ "{:,}".format(raid_contributor_data.current_hp) }}/{{ "{:,}".format(raid_contributor_data.max_hp) }} HP
+                {% else %}
+                    No active boss.
+                {% endif %}
+            </p>
+        </div>
+        <span id="raid-contributor-state" class="activity-badge">{{ 'Live' if raid_contributor_data.active else 'Idle' }}</span>
+    </div>
+
+    <ol id="raid-contributor-list" class="raid-contributor-list">
+        {% for contributor in raid_contributor_data.contributors %}
+            <li class="raid-contributor-row">
+                <span class="raid-contributor-rank">#{{ contributor.rank }}</span>
+                <strong class="raid-contributor-name">{{ contributor.user_label }}</strong>
+                <span class="raid-contributor-damage">{{ "{:,}".format(contributor.damage) }} damage</span>
+            </li>
+        {% endfor %}
+        {% if not raid_contributor_data.contributors %}
+            <li class="raid-contributor-empty">{{ 'No contributors yet.' if raid_contributor_data.active else 'No active encounter yet.' }}</li>
+        {% endif %}
+    </ol>
+</section>

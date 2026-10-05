@@ -4,13 +4,18 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 from bot.command_registry import build_enabled_command_help_groups
 from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels.live_chat import normalize_chat_view
+from rpg_minigame import CRAFTING_RECIPES, OVERCLOCKED_WEAPON_TYPES, SELLABLE_WEAPON_TYPES
 from config.settings import settings
 from storage.patch_notes_repository import get_note, list_notes
+from storage.viewer_sessions import valid_viewer_session
+from web.admin.auth import get_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY
 from web.shared.common import templates
 from web.shared.live_chat import stream_chat_events
 from web.shared.markdown import render_markdown
 from web.state import get_bot, get_db
+from web.viewer.auth import VIEWER_SERVER_TOKEN_KEY, viewer_user_id
+from web.viewer.routers import GAMBLE_RESULT_KEY, SHOP_RESULTS, SHOP_WEAPONS
 
 router = APIRouter()
 
@@ -123,7 +128,20 @@ async def public_chatter_profile(request: Request, chatter_name: str):
     if profile is None:
         return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": chatter_name}, status_code=404)
 
-    return templates.TemplateResponse(request=request, name="public/chatter_profile.html", context={"profile": profile, "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")})
+    signed_in_user_id = viewer_user_id(request)
+    is_owner = signed_in_user_id == str(profile["identity"]["user_id"])
+    return templates.TemplateResponse(
+        request=request,
+        name="public/chatter_profile.html",
+        context={
+            "profile": profile,
+            "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
+            "viewer_user_id": signed_in_user_id,
+            "account_mode": is_owner,
+            "csrf_token": get_csrf_token(request) if is_owner else None,
+        },
+        headers={"Cache-Control": "no-store"} if is_owner else None,
+    )
 
 
 @router.get("/chatters/{chatter_name}/channels/{channel_name}", response_class=HTMLResponse)
@@ -138,7 +156,50 @@ async def public_chatter_channel_profile(request: Request, chatter_name: str, ch
     if profile is None:
         return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": chatter_name, "channel_name": channel_name}, status_code=404)
 
-    return templates.TemplateResponse(request=request, name="public/chatter_channel_profile.html", context={"profile": profile, "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")})
+    signed_in_user_id = viewer_user_id(request)
+    is_owner = signed_in_user_id == str(profile["identity"]["user_id"])
+    broadcaster_id = str(profile["channel"]["id"])
+    channel_profile = get_active_profile(broadcaster_id)
+    features = getattr(runtime_bot.services, "features", None)
+    gamble_available = bool(
+        is_owner and channel_profile is not None and features is not None
+        and features.is_enabled(broadcaster_id, FeatureName.POINTS)
+    )
+    shop_available = bool(gamble_available
+                          and features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES))
+    actions_signed_in = bool(
+        gamble_available and (runtime_db := get_db()) is not None
+        and await valid_viewer_session(runtime_db, signed_in_user_id, request.session.get(VIEWER_SERVER_TOKEN_KEY))
+    )
+    shop_signed_in = shop_available and actions_signed_in
+    gamble_result = request.session.get(GAMBLE_RESULT_KEY) if actions_signed_in and request.query_params.get("tab") == "gamble" else None
+    if gamble_result is not None and gamble_result.get("channel_id") == broadcaster_id:
+        request.session.pop(GAMBLE_RESULT_KEY, None)
+    else:
+        gamble_result = None
+    raid_config = channel_profile.raid_bosses if shop_available else None
+    return templates.TemplateResponse(
+        request=request,
+        name="public/chatter_channel_profile.html",
+        context={
+            "profile": profile,
+            "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
+            "viewer_user_id": signed_in_user_id,
+            "owner_mode": is_owner,
+            "shop_available": shop_available,
+            "gamble_available": gamble_available,
+            "gamble_signed_in": actions_signed_in,
+            "gamble_chance": channel_profile.points.gamble_win_chance if gamble_available else None,
+            "gamble_result": gamble_result,
+            "shop_signed_in": shop_signed_in,
+            "shop_weapons": [(item, raid_config.weapon_names.display(item), raid_config.overclocked_weapon_cost if item in OVERCLOCKED_WEAPON_TYPES else raid_config.weapon_cost) for item in SHOP_WEAPONS] if shop_signed_in else [],
+            "shop_recipes": [(item, raid_config.weapon_names.display(item), raid_config.weapon_names.display(ingredient), raid_config.masterwork_crafting_cost if item.startswith(("masterwork_", "archmage_")) else raid_config.refined_crafting_cost) for item, ingredient in CRAFTING_RECIPES.items()] if shop_signed_in else [],
+            "shop_sellable": [item for item in profile["inventory"] if item["item_id"] in SELLABLE_WEAPON_TYPES] if shop_signed_in else [],
+            "shop_message": SHOP_RESULTS.get(request.query_params.get("result")) if shop_signed_in else None,
+            "csrf_token": get_csrf_token(request) if is_owner else None,
+        },
+        headers={"Cache-Control": "no-store"} if is_owner else None,
+    )
 
 
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -146,6 +207,7 @@ async def landing_page(request: Request):
     is_authenticated = bool(request.session.get(CHANNEL_USER_ID_KEY))
     destination = "/channel" if is_authenticated else "/connect/twitch"
     dashboard_url = f"{settings.DASHBOARD_BASE_URL.rstrip('/')}{destination}"
+    viewer_authenticated = viewer_user_id(request) is not None
 
     return templates.TemplateResponse(
         request=request,
@@ -153,6 +215,8 @@ async def landing_page(request: Request):
         context={
             "dashboard_url": dashboard_url,
             "is_authenticated": is_authenticated,
+            "viewer_url": "/me" if viewer_authenticated else "/me/connect",
+            "viewer_authenticated": viewer_authenticated,
             "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
             "release_highlights": HOME_RELEASE_HIGHLIGHTS,
             "release_history_url": PUBLIC_RELEASE_HISTORY_URL

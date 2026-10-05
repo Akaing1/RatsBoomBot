@@ -1,8 +1,23 @@
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
+import pytest
 
 from web.app import app
+
+
+@pytest.fixture(autouse=True)
+def mock_viewer_session_store(monkeypatch):
+    async def create(db, user_id):
+        return "test-server-session"
+
+    async def revoke(db, token):
+        pass
+
+    monkeypatch.setattr("web.viewer.routers.get_db", lambda: object())
+    monkeypatch.setattr("web.viewer.routers.create_viewer_session", create)
+    monkeypatch.setattr("web.viewer.routers.revoke_viewer_session", revoke)
 
 
 class FakeChatterStats:
@@ -72,6 +87,8 @@ class FakeChatterStats:
         }
 
 
+
+
 def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=SimpleNamespace(chatter_stats=FakeChatterStats())))
 
@@ -86,16 +103,24 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert "Gamble win rate" in response.text
     assert "62.5%" in response.text
     assert "5 wins / 3 losses" in response.text
-    assert "Recent raid history" in response.text
+    assert "Recent Boss Hunt history" in response.text
     assert "#2 of 12" in response.text
     assert 'data-chatter-tab="overview"' in response.text
     assert 'data-chatter-tab="raids"' in response.text
     assert 'data-chatter-panel="raids" hidden' in response.text
     assert "/chatters/alice/channels/testchannel" in response.text
+    assert "/me/connect?next=/chatters/alice" in response.text
     assert "Level 3" in response.text
     assert "750 / 2,500 XP" in response.text
     assert 'src="https://example.com/alice.png"' in response.text
     assert "View on Twitch" not in response.text
+    assert 'data-chatter-tab="pets"' not in response.text
+    assert "chatter-pet-sprite" not in response.text
+    assert "!pets" not in response.text
+
+
+
+
 
 
 def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
@@ -118,7 +143,10 @@ def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
     assert "Equipped" in response.text
     assert "#2 of 12" in response.text
     assert "Top Contributor finishes" in response.text
-    assert "Recent raid history" in response.text
+    assert "Recent Boss Hunt history" in response.text
+    assert "/me/connect?next=/chatters/alice/channels/testchannel" in response.text
+    assert 'class="public-command-navigation chatter-channel-navigation"' in response.text
+    assert 'class="button secondary chatter-channel-back"' in response.text
     assert 'data-chatter-tab="overview"' in response.text
     assert 'data-chatter-tab="raids"' in response.text
     assert 'data-chatter-panel="raids" hidden' in response.text
@@ -132,3 +160,68 @@ def test_public_chatter_search_redirects_to_canonical_profile(monkeypatch) -> No
 
     assert response.status_code == 303
     assert response.headers["location"] == "/chatters/alice"
+
+
+def test_sign_in_from_public_profile_keeps_account_available(monkeypatch) -> None:
+    from web.shared.oauth import TwitchTokenResponse, TwitchUser
+
+    async def exchange(*, code, redirect_uri):
+        return TwitchTokenResponse("token", "refresh", 3600, [], "bearer")
+
+    async def fetch(token):
+        return TwitchUser("user-1", "alice", "Alice")
+
+    monkeypatch.setattr("web.viewer.routers.exchange_code_for_token", exchange)
+    monkeypatch.setattr("web.viewer.routers.fetch_twitch_user", fetch)
+    monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=SimpleNamespace(chatter_stats=FakeChatterStats())))
+
+    with TestClient(app) as client:
+        profile = client.get("/chatters/alice")
+        assert "/me/connect?next=/chatters/alice" in profile.text
+        start = client.get("/me/connect?next=/chatters/alice", follow_redirects=False)
+        state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+        callback = client.get(f"/oauth/viewer/connect?code=valid&state={state}", follow_redirects=False)
+        assert callback.headers["location"] == "/chatters/alice"
+        for path in ("/chatters/alice", "/chatters/alice/channels/testchannel"):
+            signed_in = client.get(path)
+            assert signed_in.status_code == 200
+            if path.endswith("/testchannel"):
+                assert "My account" not in signed_in.text
+                assert "Back to global profile" in signed_in.text
+            else:
+                assert "My account" in signed_in.text
+            assert "Sign in with Twitch" not in signed_in.text
+            assert "Sign out" in signed_in.text
+            assert signed_in.headers["cache-control"] == "no-store"
+        assert "My chatter profile" in client.get("/chatters/alice").text
+        assert "Your activity in" in client.get("/chatters/alice/channels/testchannel").text
+
+
+def test_another_chatter_profile_stays_public_after_sign_in(monkeypatch) -> None:
+    from web.shared.oauth import TwitchTokenResponse, TwitchUser
+
+    async def exchange(*, code, redirect_uri):
+        return TwitchTokenResponse("token", "refresh", 3600, [], "bearer")
+
+    async def fetch(token):
+        return TwitchUser("someone-else", "bob", "Bob")
+
+    monkeypatch.setattr("web.viewer.routers.exchange_code_for_token", exchange)
+    monkeypatch.setattr("web.viewer.routers.fetch_twitch_user", fetch)
+    monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=SimpleNamespace(chatter_stats=FakeChatterStats())))
+
+    with TestClient(app) as client:
+        start = client.get("/me/connect", follow_redirects=False)
+        state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+        client.get(f"/oauth/viewer/connect?code=valid&state={state}", follow_redirects=False)
+
+        global_profile = client.get("/chatters/alice")
+        channel_profile = client.get("/chatters/alice/channels/testchannel")
+
+    assert "Public chatter profile" in global_profile.text
+    assert "My chatter profile" not in global_profile.text
+    assert "Sign out" not in global_profile.text
+    assert "@alice in" in channel_profile.text
+    assert "Your activity in" not in channel_profile.text
+    assert "Sign out" not in channel_profile.text
+    assert "My account" not in channel_profile.text

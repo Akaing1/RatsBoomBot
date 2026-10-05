@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="RatsBoomBot gives stream communities customizable commands, loyalty tools, RPG raids, streamer dashboards, and combined Twitch and YouTube chat.">
+    <meta name="description" content="RatsBoomBot gives stream communities customizable commands, loyalty tools, Boss Hunt, streamer dashboards, and combined Twitch and YouTube chat.">
 
     <title>RatsBoomBot | Built for Stream Communities</title>
 
@@ -28,8 +28,8 @@
             <a href="#features">Features</a>
             <a href="#how-it-works">How it works</a>
             <a href="#support">Support</a>
-            <a class="button secondary" href="{{ dashboard_url }}">
-                {% if is_authenticated %}Open Dashboard{% else %}Sign in with Twitch{% endif %}
+            <a class="button secondary" href="{{ viewer_url }}">
+                {% if viewer_authenticated %}My chatter profile{% else %}Sign in with Twitch{% endif %}
             </a>
         </nav>
     </header>
@@ -48,8 +48,8 @@
                 </p>
 
                 <div class="hero-actions">
-                    <a class="button primary landing-primary-action" href="{{ dashboard_url }}">
-                        {% if is_authenticated %}Open Your Dashboard{% else %}Sign in with Twitch{% endif %}
+                    <a class="button primary landing-primary-action" href="{{ viewer_url }}">
+                        {% if viewer_authenticated %}Open Your Chatter Profile{% else %}Sign in to Your Chatter Profile{% endif %}
                     </a>
 
                     <a class="button secondary" href="#features">Explore Features</a>
@@ -166,7 +166,7 @@
                             <code>!hi [username]</code><code>!choice &lt;options&gt;</code><code>!kaboom [username]</code>
                             <code>!stinky [username]</code><code>!lucky [username]</code><code>!smart [username]</code>
                             <code>!height [username]</code><code>!pp [username]</code><code>!lurk</code><code>!help</code>
-                            <code>!stats [username]</code><code>!socials</code><code>!socials discord</code><code>!socials youtube</code>
+                            <code>!stats</code><code>!me</code><code>!socials</code><code>!socials discord</code><code>!socials youtube</code>
                             <code>!set game &lt;game name&gt;</code><code>!set title &lt;stream title&gt;</code><code>!set discord &lt;url&gt;</code><code>!set youtube &lt;url&gt;</code><code>!timers [on|off]</code>
                         </div>
                     </div>
@@ -199,7 +199,7 @@
                         <span class="feature-number">03</span>
                         <span class="feature-heading">
                             <h3>Viewer activities</h3>
-                            <p>Viewer queues, clips, raid tools, community leaderboards, and interactions designed around the stream.</p>
+                            <p>Viewer queues, clips, Boss Hunt tools, community leaderboards, and interactions designed around the stream.</p>
                         </span>
                         <span class="feature-toggle" aria-hidden="true"></span>
                     </summary>
@@ -242,13 +242,13 @@
                     <summary>
                         <span class="feature-number">05</span>
                         <span class="feature-heading">
-                            <h3>RPG raids</h3>
-                            <p>Join stream-wide boss fights, build stronger weapons, and earn raid rewards through contribution.</p>
+                            <h3>Boss Hunt</h3>
+                            <p>Join stream-wide boss fights, build stronger weapons, and earn Boss Hunt rewards through contribution.</p>
                         </span>
                         <span class="feature-toggle" aria-hidden="true"></span>
                     </summary>
                     <div class="feature-command-panel">
-                        <p class="feature-command-label">Raid commands</p>
+                        <p class="feature-command-label">Boss Hunt commands</p>
                         <div class="feature-command-list">
                             <code>!raid</code><code>!raid attack</code><code>!raid shop</code><code>!raid buy &lt;item&gt;</code>
                             <code>!raid craft &lt;sword|bow|tome&gt;</code><code>!raid equip &lt;weapon&gt;</code><code>!raid unequip</code>
@@ -310,13 +310,13 @@
 
         <section class="landing-cta">
             <div>
-                <p class="eyebrow">Ready when you are</p>
-                <h2>{% if is_authenticated %}Your dashboard is waiting.{% else %}Bring your community into the fun.{% endif %}</h2>
-                <p>Manage chat, viewer activities, loyalty tools, and stream controls from one place.</p>
+                <p class="eyebrow">Streamer setup</p>
+                <h2>{% if is_authenticated %}Your streamer dashboard is ready.{% else %}Set up RatsBoomBot for your channel.{% endif %}</h2>
+                <p>For broadcasters: connect your channel to manage chat, loyalty tools, and stream controls.</p>
             </div>
 
             <a class="button primary landing-primary-action" href="{{ dashboard_url }}">
-                {% if is_authenticated %}Open Dashboard{% else %}Continue with Twitch{% endif %}
+                {% if is_authenticated %}Open Streamer Dashboard{% else %}Set Up the Bot{% endif %}
             </a>
         </section>
 

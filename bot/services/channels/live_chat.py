@@ -65,6 +65,7 @@ class UnifiedChatMessage:
     deleted: bool = False
     mentioned: bool = False
     is_bot: bool = False
+    is_redeem: bool = False
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
@@ -237,7 +238,9 @@ class LiveChatService:
                 and str(getattr(getattr(fragment, "mention", None), "id", "")) == broadcaster_id
                 for fragment in (getattr(payload, "fragments", None) or ())
             ),
-            is_bot=self._has_chat_bot_badge(payload, badges) or self._is_chat_bot(getattr(chatter, "id", None))
+            is_bot=self._has_chat_bot_badge(payload, badges) or self._is_chat_bot(getattr(chatter, "id", None)),
+            is_redeem=bool(getattr(payload, "channel_points_id", None))
+            or str(getattr(payload, "type", "")) in {"channel_points_highlighted", "channel_points_sub_only"}
         )
         self.publish(broadcaster_id, message)
         return message
@@ -872,7 +875,19 @@ class LiveChatService:
         return True
 
     def history(self, broadcaster_id: str, view: str = "both") -> list[dict[str, object]]:
-        return [message.as_dict() for message in self.messages.get(str(broadcaster_id), ()) if message_matches_view(message, view)]
+        return [message.as_dict() for message in self.messages.get(str(broadcaster_id), ())
+                if not message.deleted and message_matches_view(message, view)]
+
+    def clear_chat(self, broadcaster_id: str) -> None:
+        """Clear Twitch history and notify open dashboards without touching YouTube."""
+        broadcaster_id = str(broadcaster_id)
+        messages = self.messages[broadcaster_id]
+        self.messages[broadcaster_id] = deque(
+            (message for message in messages if message.platform != "twitch"), maxlen=messages.maxlen)
+        for queue in tuple(self.subscribers.get(broadcaster_id, ())):
+            if queue.full():
+                queue.get_nowait()
+            queue.put_nowait({"event": "chat-clear", "platform": "twitch"})
 
     def find_message(self, broadcaster_id: str, message_id: str) -> dict[str, object] | None:
         message_id = str(message_id)

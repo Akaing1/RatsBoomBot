@@ -208,7 +208,10 @@
         feed.element.querySelector(".compact-empty-state")?.remove();
 
         const row = makeElement("article", `live-chat-message platform-${message.platform} kind-${message.kind}`);
-        row.hidden = message.kind === "command" && feed.hideCommands;
+        const category = window.dashboardChatFilters?.category(message) || {user: "non_subs", type: "messages"};
+        row.dataset.chatUser = category.user;
+        row.dataset.chatType = category.type;
+        row.hidden = feed.filters ? !feed.filters.allows(category) : false;
         if (message.deleted) row.classList.add("is-deleted");
         if (message.mentioned) row.classList.add("is-mentioned");
         if (message.is_bot) row.classList.add("is-bot");
@@ -292,6 +295,8 @@
                 document.dispatchEvent(new CustomEvent("dashboard-chat-reply", {detail: {
                     messageId: message.id,
                     name: visibleMessageName(message),
+                    username: message.username || "",
+                    displayName: message.display_name || "",
                     message: message.message || ""
                 }}));
             });
@@ -316,12 +321,13 @@
             feed.followRowObserver = null;
         }
 
-        while (feed.element.querySelectorAll(".live-chat-message").length > feed.maxMessages) {
-            const messages = feed.element.querySelectorAll(".live-chat-message");
+        while (feed.element.querySelectorAll(".live-chat-message:not(.is-activity-removing)").length > feed.maxMessages) {
+            const messages = feed.element.querySelectorAll(".live-chat-message:not(.is-activity-removing)");
             const oldest = feed.newestFirst ? messages[messages.length - 1] : messages[0];
             if (!oldest) break;
             feed.seen.delete(oldest.dataset.messageId);
-            oldest.remove();
+            if (feed.newestFirst && window.dashboardActivityMotion) window.dashboardActivityMotion.remove(feed.element, oldest);
+            else oldest.remove();
         }
 
         if (shouldFollowNewest) {
@@ -343,10 +349,11 @@
             if (feed.newestFirst && previousFirst?.isConnected) {
                 feed.element.scrollTop += previousFirst.getBoundingClientRect().top - previousFirstTop;
             }
-            feed.hasUnseenMessages = true;
+            if (!row.hidden) feed.hasUnseenMessages = true;
             updateJumpButton(feed);
         }
         if (feed.historyComplete && feed.element.dataset.activityNotify) {
+            if (feed.newestFirst) window.dashboardActivityMotion?.enter(feed.element, row, shouldFollowNewest);
             document.dispatchEvent(new CustomEvent("dashboard-activity-unread", {
                 detail: {activity: feed.element.dataset.activityNotify}
             }));
@@ -379,7 +386,7 @@
             pinExpiryTimer: null,
             pinnedContainer: element.dataset.pinnedUrl ? makeElement("aside", "live-chat-pinned") : null,
             connectionStatus,
-            jumpButton: makeElement("button", "live-chat-jump", element.dataset.newestFirst === "true" ? "↑ Jump to present" : "↓ Jump to present")
+            jumpButton: makeElement("button", "live-chat-jump")
         };
         function showConnectionStatus(connected) {
             if (!connectionStatus) return;
@@ -393,18 +400,23 @@
                 connectionStatus._connectionFadeTimer = connectionFadeTimer;
             }
         }
-        const commandToggle = element.closest(".live-chat-panel")?.querySelector("[data-chat-command-toggle]");
-        feed.hideCommands = false;
-        commandToggle?.addEventListener("click", () => {
-            const followNewest = distanceFromBottom(element) <= 24;
-            feed.hideCommands = !feed.hideCommands;
-            commandToggle.textContent = feed.hideCommands ? "Commands off" : "Commands on";
-            commandToggle.setAttribute("aria-pressed", String(!feed.hideCommands));
-            commandToggle.classList.toggle("live", !feed.hideCommands);
-            element.querySelectorAll(".kind-command").forEach(row => { row.hidden = feed.hideCommands; });
-            if (followNewest) scrollToBottom(feed);
+        feed.filters = window.dashboardChatFilters?.attach(element, () => {
+            const followNewest = feed.followNewest;
+            const anchor = [...element.querySelectorAll(".live-chat-message")].find(row =>
+                !row.hidden && row.getBoundingClientRect().bottom > element.getBoundingClientRect().top);
+            const anchorTop = anchor?.getBoundingClientRect().top;
+            element.querySelectorAll(".live-chat-message").forEach(row => {
+                row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType});
+            });
+            if (followNewest) scrollToNewest(feed);
+            else if (anchor && !anchor.hidden) element.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
+            updateJumpButton(feed);
         });
         feed.jumpButton.type = "button";
+        feed.jumpButton.title = "Jump to present";
+        feed.jumpButton.setAttribute("aria-label", "Jump to present");
+        const jumpPath = feed.newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";
+        feed.jumpButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${jumpPath}"/></svg>`;
         feed.jumpButton.hidden = true;
         feed.jumpButton.addEventListener("click", () => {
             feed.hasUnseenMessages = false;
@@ -428,11 +440,27 @@
             window.setInterval(() => refreshPinned(feed), 2000);
         }
         shell.appendChild(feed.jumpButton);
+        if ("ResizeObserver" in window) {
+            new ResizeObserver(() => {
+                if (feed.followNewest) scrollToNewest(feed);
+            }).observe(element);
+        }
 
         const source = new EventSource(element.dataset.streamUrl);
         source.onopen = () => showConnectionStatus(true);
         source.onerror = () => showConnectionStatus(false);
         source.addEventListener("history-complete", () => { feed.historyComplete = true; });
+        source.addEventListener("chat-clear", event => {
+            const {platform} = JSON.parse(event.data);
+            if (platform !== "twitch") return;
+            element.querySelectorAll(".live-chat-message.platform-twitch").forEach(row => {
+                feed.seen.delete(row.dataset.messageId);
+                row.remove();
+            });
+            feed.followRowObserver?.disconnect();
+            feed.followRowObserver = null;
+            updateJumpButton(feed);
+        });
         source.onmessage = event => {
             try {
                 renderMessage(feed, JSON.parse(event.data));

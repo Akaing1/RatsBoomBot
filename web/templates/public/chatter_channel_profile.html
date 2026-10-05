@@ -10,28 +10,35 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
 </head>
 <body class="chatter-profile-page">
-    <header class="public-command-navigation">
+    <header class="public-command-navigation chatter-channel-navigation">
         <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
             <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
             <span><strong>RatsBoomBot</strong><small>Chatter profiles</small></span>
         </a>
-        <a class="button secondary" href="/chatters/{{ profile.identity.login }}">Back to global profile</a>
+        <a class="button secondary chatter-channel-back" href="/chatters/{{ profile.identity.login }}">Back to global profile</a>
+        {% if owner_mode %}
+            <form method="post" action="/me/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>
+        {% elif not viewer_user_id %}
+            <a class="button secondary chatter-channel-auth" href="/me/connect?next={{ ('/chatters/' ~ profile.identity.login ~ '/channels/' ~ profile.channel.login)|urlencode }}">Sign in with Twitch</a>
+        {% endif %}
     </header>
 
     <main class="chatter-profile-content">
         <header class="chatter-profile-hero channel-profile-hero">
             {% if profile.channel.profile_image_url %}<img src="{{ profile.channel.profile_image_url }}" alt="{{ profile.channel.display_name }}">{% else %}<div class="chatter-profile-avatar">{{ profile.channel.display_name[0] | upper }}</div>{% endif %}
             <div>
-                <p class="eyebrow">@{{ profile.identity.login }} in</p>
+                <p class="eyebrow">{{ 'Your activity in' if owner_mode else '@' ~ profile.identity.login ~ ' in' }}</p>
                 <h1>{{ profile.channel.display_name }}</h1>
-                <p>Channel-specific activity, loyalty progress, redeems, and raid equipment.</p>
+                <p>Channel-specific activity, loyalty progress, redeems, and Boss Hunt equipment.</p>
             </div>
             <a class="button primary" href="https://twitch.tv/{{ profile.channel.login }}">Watch channel</a>
         </header>
 
         <nav class="chatter-tabs" aria-label="Channel profile sections">
             <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
-            <button type="button" data-chatter-tab="raids" aria-selected="false">Raids</button>
+            <button type="button" data-chatter-tab="raids" aria-selected="false">Boss Hunt</button>
+            {% if shop_available %}<button type="button" data-chatter-tab="shop" aria-selected="false">Shop &amp; Craft</button>{% endif %}
+            {% if gamble_available %}<button type="button" data-chatter-tab="gamble" aria-selected="false">Gamble</button>{% endif %}
             {% if profile.achievements %}<button type="button" data-chatter-tab="achievements" aria-selected="false">Achievements</button>{% endif %}
         </nav>
 
@@ -48,25 +55,25 @@
         </section>
 
         <section data-chatter-panel="raids" hidden>
-            <div class="chatter-stat-grid" aria-label="Channel raid statistics">
+            <div class="chatter-stat-grid" aria-label="Channel Boss Hunt statistics">
                 <article><span>Total damage</span><strong>{{ "{:,}".format(profile.damage_dealt) }}</strong></article>
                 <article><span>Best contribution</span><strong>{{ "{:,}".format(profile.highest_contribution) }}</strong></article>
-                <article><span>Raid reward points</span><strong>{{ "{:,}".format(profile.raid_reward_points) }}</strong></article>
+                <article><span>Boss Hunt reward points</span><strong>{{ "{:,}".format(profile.raid_reward_points) }}</strong></article>
                 <article><span>Top Contributor finishes</span><strong>{{ profile.top_contributor_finishes }}</strong></article>
             </div>
             <div class="chatter-detail-grid">
             <article class="panel chatter-detail-panel">
-                <div class="panel-header"><div><p class="eyebrow">Raid record</p><h3>Boss encounters</h3></div></div>
+                <div class="panel-header"><div><p class="eyebrow">Boss Hunt record</p><h3>Boss encounters</h3></div></div>
                 <dl class="chatter-detail-list">
                     <div><dt>Bosses attacked</dt><dd>{{ profile.bosses_attacked }}</dd></div>
                     <div><dt>Successful defeats</dt><dd>{{ profile.bosses_defeated }}</dd></div>
                     <div><dt>Final hits</dt><dd>{{ profile.final_hits }}</dd></div>
-                    <div><dt>Raids rewarded</dt><dd>{{ profile.raids_rewarded }}</dd></div>
+                    <div><dt>Encounters rewarded</dt><dd>{{ profile.raids_rewarded }}</dd></div>
                 </dl>
             </article>
 
             <article class="panel chatter-detail-panel">
-                <div class="panel-header"><div><p class="eyebrow">Raid inventory</p><h3>Current inventory</h3></div></div>
+                <div class="panel-header"><div><p class="eyebrow">Boss Hunt inventory</p><h3>Current inventory</h3></div></div>
                 {% if profile.inventory or profile.consumables %}
                     {% if profile.inventory %}
                         <p class="eyebrow">Weapons</p>
@@ -85,12 +92,12 @@
                         </div>
                     {% endif %}
                 {% else %}
-                    <p class="chatter-empty-copy">No raid items collected in this channel yet.</p>
+                    <p class="chatter-empty-copy">No Boss Hunt items collected in this channel yet.</p>
                 {% endif %}
             </article>
             </div>
             <section class="chatter-section chatter-raid-history-section">
-                <div class="chatter-section-heading"><div><p class="eyebrow">Latest battles</p><h2>Recent raid history</h2></div><p>The five most recent completed raids in this channel.</p></div>
+                <div class="chatter-section-heading"><div><p class="eyebrow">Latest battles</p><h2>Recent Boss Hunt history</h2></div><p>The five most recent completed encounters in this channel.</p></div>
                 {% if profile.recent_raids %}
                     <div class="chatter-raid-history">
                         {% for raid in profile.recent_raids %}
@@ -102,10 +109,64 @@
                         {% endfor %}
                     </div>
                 {% else %}
-                    <div class="panel compact-empty-state"><h3>No completed raids yet</h3><p>Raid results will appear here after this chatter completes a boss encounter.</p></div>
+                    <div class="panel compact-empty-state"><h3>No completed encounters yet</h3><p>Boss Hunt results will appear here after this chatter completes a boss encounter.</p></div>
                 {% endif %}
             </section>
         </section>
+
+        {% if shop_available %}
+        <section class="chatter-shop" data-chatter-panel="shop" hidden>
+            {% if shop_signed_in %}
+                <div class="panel chatter-account-intro"><h2>{{ profile.channel.display_name }} raid shop</h2><p>Balance: <strong>{{ '{:,}'.format(profile.current_points) }} {{ profile.currency_name }}</strong>. Purchases, crafting, and sales use this channel's balance and inventory.</p></div>
+                {% if shop_message %}<div class="panel chatter-shop-result" role="status">{{ shop_message }}</div>{% endif %}
+                <section class="chatter-section"><div class="chatter-section-heading"><div><p class="eyebrow">Shop</p><h2>Weapons</h2></div><p>Buy weapons with channel loyalty points, even when the stream is offline.</p></div>
+                    <div class="chatter-shop-grid">{% for item_id, name, price in shop_weapons %}
+                        <article class="panel chatter-shop-card"><h3>{{ name }}</h3><p>{{ '{:,}'.format(price) }} {{ profile.currency_name }}</p><form method="post" action="/me/channels/{{ profile.channel.login }}/shop/buy"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item_id }}"><button class="button primary" type="submit">Buy</button></form></article>
+                    {% endfor %}</div>
+                </section>
+                <section class="chatter-section"><div class="chatter-section-heading"><div><p class="eyebrow">Crafting</p><h2>Upgrade weapons</h2></div><p>Each recipe consumes two copies of its ingredient and a crafting fee.</p></div>
+                    <div class="chatter-shop-grid">{% for item_id, name, ingredient, price in shop_recipes %}
+                        <article class="panel chatter-shop-card"><h3>{{ name }}</h3><p>2 &times; {{ ingredient }} + {{ '{:,}'.format(price) }} {{ profile.currency_name }}</p><form method="post" action="/me/channels/{{ profile.channel.login }}/shop/craft"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item_id }}"><button class="button secondary" type="submit">Craft</button></form></article>
+                    {% endfor %}</div>
+                </section>
+                <section class="chatter-section"><div class="chatter-section-heading"><div><p class="eyebrow">Inventory</p><h2>Sell weapons</h2></div><p>Sell one eligible copy at a time. Your final equipped copy cannot be sold.</p></div>
+                    {% if shop_sellable %}<div class="chatter-shop-grid">{% for item in shop_sellable %}
+                        <article class="panel chatter-shop-card"><h3>{{ item.display_name }}</h3><p>Owned: {{ item.quantity }}{% if item.equipped %} &middot; Equipped{% endif %}</p><form method="post" action="/me/channels/{{ profile.channel.login }}/shop/sell"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item.item_id }}"><button class="button secondary" type="submit">Sell one</button></form></article>
+                    {% endfor %}</div>{% else %}<div class="panel compact-empty-state"><p>No sellable weapons in this channel yet.</p></div>{% endif %}
+                </section>
+            {% else %}
+                <div class="panel chatter-account-intro"><h2>Sign in to use the {{ profile.channel.display_name }} raid shop</h2><p>Verify your Twitch account to buy, craft, and sell with this channel's loyalty points.</p><a class="button primary" href="/me/connect?next={{ ('/me/channels/' ~ profile.channel.login ~ '/shop')|urlencode }}">Sign in with Twitch</a></div>
+            {% endif %}
+        </section>
+        {% endif %}
+
+        {% if gamble_available %}
+        <section class="chatter-shop" data-chatter-panel="gamble" hidden>
+            {% if gamble_signed_in %}
+                <div class="panel chatter-account-intro"><h2>Gamble in {{ profile.channel.display_name }}</h2><p>Current balance: <strong>{{ '{:,}'.format(profile.current_points) }} {{ profile.currency_name }}</strong>. Each bet has a {{ (gamble_chance * 100)|round(1) }}% chance to double, using this channel's balance only.</p></div>
+                {% if gamble_result %}<div class="panel chatter-shop-result" role="status">
+                    {% if gamble_result.message %}{{ gamble_result.message }}
+                    {% elif gamble_result.won %}You won {{ '{:,}'.format(gamble_result.bet) }} {{ profile.currency_name }}! New balance: {{ '{:,}'.format(gamble_result.balance) }}.
+                    {% else %}You lost {{ '{:,}'.format(gamble_result.bet) }} {{ profile.currency_name }}. New balance: {{ '{:,}'.format(gamble_result.balance) }}.{% endif %}
+                </div>{% endif %}
+                <div class="panel chatter-gamble-form">
+                    <form action="/me/channels/{{ profile.channel.login }}/gamble" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label for="gamble-amount">Bet amount</label>
+                        <input id="gamble-amount" name="amount" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="18" autocomplete="off" required placeholder="Enter {{ profile.currency_name }}">
+                        <button class="button primary" type="submit">Place bet</button>
+                    </form>
+                    <form action="/me/channels/{{ profile.channel.login }}/gamble" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="amount" value="all">
+                        <button class="button secondary" type="submit">Bet all</button>
+                    </form>
+                </div>
+            {% else %}
+                <div class="panel chatter-account-intro"><h2>Sign in to gamble in {{ profile.channel.display_name }}</h2><p>Verify your Twitch account to bet with this channel's loyalty points.</p><a class="button primary" href="/me/connect?next={{ ('/me/channels/' ~ profile.channel.login ~ '/gamble')|urlencode }}">Sign in with Twitch</a></div>
+            {% endif %}
+        </section>
+        {% endif %}
 
         {% if profile.achievements %}{% include 'public/achievements.html' %}{% endif %}
 

@@ -2,7 +2,8 @@ import logging
 
 from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatIdentityService, ChatterIdentityService, ChatterStatsService, FeatureToggleService, LiveChatService, ProfileSettingsService
-from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PassivePointsService, PointsService, RaidBossService, RedeemService, ViewerQueueService
+from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PassivePointsService, PointsService, RedeemService, ViewerQueueService
+from rpg_minigame import RaidBossService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
 from config.settings import settings
@@ -37,7 +38,13 @@ class ServiceContainer:
         self.timers = TimerService(bot, self.broadcasters, self.broadcaster_settings)
         self.points = PointsService(bot, db, self.chatter_stats)
         self.passive_points = PassivePointsService(bot, db, self.points, self.chat_identity, self.features)
-        self.raid_bosses = RaidBossService(bot, db, self.chatter_stats)
+        self.raid_bosses = RaidBossService(
+            bot, db, self.chatter_stats, self.points,
+            enabled_provider=lambda broadcaster_id: self.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES),
+            config_provider=lambda broadcaster_id: (
+                profile.raid_bosses if (profile := get_active_profile(broadcaster_id)) is not None else None
+            ),
+        )
         self.counters = CounterService(bot, db)
         self.ads = AdAnnouncementService(bot, self.broadcasters)
         self.viewer_queue = ViewerQueueService(bot, db)
@@ -91,7 +98,7 @@ class ServiceContainer:
         for session in self.stream_logs.active_sessions.values():
             profile = get_active_profile(session.broadcaster_id)
 
-            if profile is not None and profile.raid_bosses.enabled and self.features.is_enabled(session.broadcaster_id, FeatureName.RAID_BOSSES):
+            if profile is not None and self.features.is_enabled(session.broadcaster_id, FeatureName.RAID_BOSSES):
                 await self.raid_bosses.restore_session(session.broadcaster_id, session.stream_id, profile.raid_bosses)
 
             if profile is not None and self.features.is_enabled(session.broadcaster_id, FeatureName.POINTS):

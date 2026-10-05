@@ -48,13 +48,14 @@ RatsBoomBot
 │   ├── channels/           Broadcaster profiles, commands, and game modules
 │   ├── services/
 │   │   ├── channels/       Broadcaster state, settings, and feature overrides
-│   │   ├── engagement/     Points, redeems, clips, queues, and game services
+│   │   ├── engagement/     Points, redeems, clips, and queues
 │   │   ├── stream/         Timers, ads, shoutouts, and stream logs
 │   │   └── support/        Help and moderation services
 │   └── shared/             Reusable commands and EventSub listeners
 ├── config/                 Environment settings and application version
 ├── deploy/                 Linux, systemd, backup, and Windows deployment tools
 ├── docs/                   Project documentation and style guide
+├── rpg_minigame/           Boss encounters, inventory, loot, and RPG settings
 ├── scripts/                Administration and data-import utilities
 ├── storage/                Database access and versioned migrations
 ├── tests/                  Automated tests
@@ -117,6 +118,10 @@ Viewer queue state and ordered members are stored in SQLite. Open and closed que
 Profiles can automatically shout out selected users when they send their first message of a live stream. Twitch stream IDs are persisted so restarting the bot does not trigger the shoutout again during the same stream.
 
 Incoming raids can trigger chat and shoutout behavior. Broadcasters can also start outgoing raids with subscriber and non-subscriber messages configured by profile.
+
+### Boss Hunt
+
+Boss Hunt is the separate RPG minigame with scheduled bosses, attacks, weapons, and loyalty point rewards. Streamers can monitor and manage encounters from the Boss Hunt sidebar page. Viewers use the existing `!raid` commands and `/raid/{channel}` guide; those names remain valid so saved commands and links continue to work. This feature is distinct from Twitch raids.
 
 ### Clips
 
@@ -311,7 +316,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 | Group | Commands |
 | --- | --- |
-| Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats [username]` |
+| Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats`, `!me` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube` |
 | Settings | `!set discord <url>`, `!set youtube <url>`, `!set game <game name>`, `!set title <stream title>`, `!timers`, `!timers on`, `!timers off` |

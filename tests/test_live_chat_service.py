@@ -59,6 +59,46 @@ def test_twitch_messages_are_split_between_chat_and_commands():
     assert chat.accent == "moderator"
 
 
+def test_sidebar_hover_labels_use_existing_names_for_channel_and_admin_navigation():
+    script = open("web/static/js/channel-sidebar.js", encoding="utf-8").read()
+    assert 'querySelectorAll(".nav-link, .sidebar-logout button")' in script
+    assert 'querySelector(".nav-link-label, .sidebar-button-label")?.textContent.trim()' in script
+    assert 'if (label) control.title = label;' in script
+    for path in ("web/templates/channel/layout.html", "web/templates/admin/layout.html"):
+        layout = open(path, encoding="utf-8").read()
+        assert "channel-sidebar.js" in layout
+        assert "hover-labels.js" in layout
+        assert 'class="nav-link-label"' in layout
+        assert 'class="sidebar-button-label"' in layout
+
+
+def test_reward_related_chat_messages_expose_redemption_metadata():
+    service = LiveChatService(None)
+    custom = twitch_payload("reward input", "custom")
+    custom.channel_points_id = "reward-1"
+    highlighted = twitch_payload("highlighted message", "highlighted")
+    highlighted.type = "channel_points_highlighted"
+    assert service.publish_twitch(custom).as_dict()["is_redeem"] is True
+    assert service.publish_twitch(highlighted).is_redeem is True
+    assert service.publish_twitch(twitch_payload("normal", "normal")).is_redeem is False
+
+
+def test_chat_filters_replace_command_toggle_and_only_apply_to_combined_chat():
+    dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    script = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
+    assert 'data-chat-command-toggle' not in dashboard
+    assert 'label class="chat-filter-row chat-filter-suboption"' in dashboard
+    assert 'role="group" aria-label="{{ group }}"' in dashboard
+    assert 'data-chat-filter-group-toggle' not in dashboard
+    filters = open("web/static/js/dashboard-chat-filters.js", encoding="utf-8").read()
+    assert "addEventListener('focusout'" not in filters
+    assert "dashboard-chat-filters.js" in dashboard
+    assert dashboard.index('data-chat-filter-toggle') < dashboard.index('data-chat-lock')
+    assert 'row.hidden = feed.filters ? !feed.filters.allows(category) : false;' in script
+    assert 'element.querySelectorAll(".live-chat-message").forEach(row => {' in script
+    assert 'if (!row.hidden) feed.hasUnseenMessages = true;' in script
+
+
 def test_twitch_first_time_and_role_accents_follow_display_priority():
     service = LiveChatService(None)
     first_time = twitch_payload("Hello!", "first-time")
@@ -456,7 +496,7 @@ def test_tagged_bot_response_is_kept_with_commands_without_classifying_all_bot_m
 
 
 @pytest.mark.asyncio
-async def test_deleted_chat_messages_remain_in_history_as_deleted_updates():
+async def test_deleted_chat_messages_update_live_but_are_omitted_on_refresh():
     service = LiveChatService(None)
     message = service.publish_twitch(twitch_payload("This will be deleted", "deleted-message"))
     subscriber = service.subscribe("channel-1")
@@ -465,10 +505,88 @@ async def test_deleted_chat_messages_remain_in_history_as_deleted_updates():
 
     history = service.history("channel-1")
     update = subscriber.get_nowait()
-    assert history[0]["message"] == "This will be deleted"
-    assert history[0]["deleted"] is True
+    assert history == []
     assert update.id == message.id
     assert update.deleted is True
+
+
+def test_clear_chat_removes_twitch_history_and_notifies_subscribers():
+    service = LiveChatService(None)
+    twitch = service.publish_twitch(twitch_payload("hello"))
+    youtube = UnifiedChatMessage(id="youtube:1", platform="youtube", kind="chat", username="viewer",
+                                 display_name="Viewer", message="keep me", timestamp=twitch.timestamp)
+    service.publish("channel-1", youtube)
+    queue = service.subscribe("channel-1")
+    other = service.subscribe("other-channel")
+    service.clear_chat("channel-1")
+    assert [item["id"] for item in service.history("channel-1")] == [youtube.id]
+    assert queue.get_nowait() == {"event": "chat-clear", "platform": "twitch"}
+    assert other.empty()
+
+
+@pytest.mark.parametrize("platform,connected,url", [
+    ("twitch", False, "/connect"), ("youtube", False, "/channel/customization?social_tab=youtube#youtube-integration"),
+    ("twitch", True, None), ("youtube", True, None)])
+def test_platform_filter_connection_links(platform, connected, url):
+    from pathlib import Path
+    from jinja2 import Template
+    source = Path("web/templates/channel/dashboard.html").read_text(encoding="utf-8")
+    heading = source.split('<div class="chat-filter-platform-heading">', 1)[1].split('</div>', 1)[0]
+    html = Template(heading).render(platform_key=platform, platform_label=platform.title(), connected=connected,
+                                   twitch_connected=connected, youtube_chat=SimpleNamespace(connected=connected))
+    if url:
+        assert "Not connected" in html
+        assert "disabled" in html
+        assert f'href="{url}"' in html
+    else:
+        assert "Not connected" not in html
+        assert ">Connected</a>" in html
+        assert 'data-connected="true"' in html
+        assert 'href="' in html
+
+
+@pytest.mark.asyncio
+async def test_slash_clear_only_clears_local_chat_after_twitch_accepts():
+    channel = SimpleNamespace(delete_chat_messages=AsyncMock())
+    live_chat = SimpleNamespace(clear_chat=Mock())
+    bot = SimpleNamespace(create_partialuser=lambda _: channel, services=SimpleNamespace(live_chat=live_chat))
+    await dashboard_router.execute_twitch_slash_command(bot, "channel-1", "/clear")
+    live_chat.clear_chat.assert_called_once_with("channel-1")
+    live_chat.clear_chat.reset_mock()
+    channel.delete_chat_messages.side_effect = RuntimeError("Rejected")
+    with pytest.raises(RuntimeError):
+        await dashboard_router.execute_twitch_slash_command(bot, "channel-1", "/clear")
+    live_chat.clear_chat.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_clear_event_is_streamed_even_in_commands_view():
+    from web.shared.live_chat import stream_chat_events
+    service = LiveChatService(None)
+    events = stream_chat_events(SimpleNamespace(is_disconnected=AsyncMock(return_value=False)),
+                                service, "channel-1", "commands")
+    try:
+        assert (await anext(events)).startswith("retry:")
+        assert (await anext(events)).startswith("event: history-complete")
+        service.clear_chat("channel-1")
+        assert (await anext(events)).startswith("event: chat-clear")
+    finally:
+        await events.aclose()
+    assert "channel-1" not in service.subscribers
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("length,status", [(500, 200), (501, 400)])
+async def test_dashboard_enforces_500_character_message_limit(monkeypatch, length, status):
+    channel = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True)))
+    bot = SimpleNamespace(create_partialuser=lambda _: channel, services=SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": SimpleNamespace(id="channel-1")})))
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: bot)
+    request = Request({"type": "http", "session": {
+        CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}})
+    response = await dashboard_router.channel_send_chat_message(request, "x" * length, "twitch", "csrf", "")
+    assert response.status_code == status
+    assert channel.send_message.await_count == (1 if status == 200 else 0)
 
 
 @pytest.mark.asyncio
@@ -1077,7 +1195,10 @@ async def test_dashboard_metadata_edits_announce_changes_in_chat(
     response = await dashboard_router.update_twitch_channel_metadata(request, field, value, "csrf")
 
     assert response.status_code == 200
-    assert json.loads(response.body) == {"field": field, "value": expected_value, "announcement_sent": True}
+    expected = {"field": field, "value": expected_value, "announcement_sent": True}
+    if field == "game":
+        expected["box_art_url"] = ""
+    assert json.loads(response.body) == expected
     twitch_channel.modify_channel.assert_awaited_once_with(**expected_update)
     chat_identity.send_message.assert_awaited_once_with(twitch_channel, expected_announcement)
     live_chat.tag_command_response.assert_called_once_with("channel-1", "metadata-response")
@@ -1348,7 +1469,7 @@ async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
     async def games():
         yield SimpleNamespace(id="123", name="Retro")
         yield SimpleNamespace(id="509658", name="Just Chatting")
-        yield SimpleNamespace(id="456", name="Chat")
+        yield SimpleNamespace(id="456", name="Chat", box_art=SimpleNamespace(url_for=lambda w, h: f"https://example.com/chat-{w}x{h}.jpg"))
 
     def search_categories(query, **kwargs):
         calls.append((query, kwargs))
@@ -1368,11 +1489,80 @@ async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
     response = await dashboard_router.search_twitch_games(request, "chat")
 
     assert json.loads(response.body) == {"games": [
-        {"id": "456", "name": "Chat"},
+        {"id": "456", "name": "Chat", "box_art_url": "https://example.com/chat-96x128.jpg"},
         {"id": "509658", "name": "Just Chatting"},
         {"id": "123", "name": "Retro"}
     ]}
     assert calls == [("chat", {"token_for": "channel-1", "first": 50, "max_results": 50})]
+
+
+@pytest.mark.asyncio
+async def test_current_category_artwork_uses_channel_category_id():
+    artwork = SimpleNamespace(url_for=Mock(return_value="https://example.com/category.jpg"))
+    runtime_bot = SimpleNamespace(
+        create_partialuser=lambda _: SimpleNamespace(fetch_channel_info=AsyncMock(return_value=SimpleNamespace(
+            title="Title", game_name="Retro", game_id="123"
+        ))),
+        fetch_game=AsyncMock(return_value=SimpleNamespace(id="123", name="Retro", box_art=artwork))
+    )
+    metadata = await dashboard_router.get_twitch_channel_metadata(runtime_bot, "channel-1")
+    assert metadata == {"title": "Title", "game": "Retro", "box_art_url": "https://example.com/category.jpg"}
+    runtime_bot.fetch_game.assert_awaited_once_with(id="123", token_for="channel-1")
+    artwork.url_for.assert_called_once_with(96, 128)
+
+
+@pytest.mark.asyncio
+async def test_category_artwork_failure_keeps_channel_metadata_available():
+    runtime_bot = SimpleNamespace(
+        create_partialuser=lambda _: SimpleNamespace(fetch_channel_info=AsyncMock(return_value=SimpleNamespace(
+            title="Title", game_name="Retro", game_id="123"
+        ))),
+        fetch_game=AsyncMock(side_effect=RuntimeError("Artwork unavailable"))
+    )
+    assert await dashboard_router.get_twitch_channel_metadata(runtime_bot, "channel-1") == {
+        "title": "Title", "game": "Retro", "box_art_url": ""
+    }
+    assert await dashboard_router.get_category_artwork(runtime_bot, "channel-1", "0") == ""
+    assert runtime_bot.fetch_game.await_count == 1
+
+
+def test_category_artwork_spans_metadata_rows_and_previews_picker_selection():
+    dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    script = open("web/static/js/dashboard-channel-metadata.js", encoding="utf-8").read()
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    assert 'data-current-category-art' in dashboard
+    assert 'aria-label="Select category"' in dashboard
+    assert 'categoryArtHome?.addEventListener("click"' in script
+    assert 'categoryArtHome?.setAttribute("aria-expanded", String(visible))' in script
+    assert 'data-category-preview' not in dashboard
+    assert 'data-game-options role="listbox"' in dashboard
+    assert 'grid-row: 1 / span 2' in styles
+    assert 'image.className = "twitch-category-art"' in script
+    assert 'button.appendChild(image)' in script
+    assert 'data-game-suggestions popover="manual"' not in dashboard
+    assert 'gameSuggestions.showPopover()' not in script
+    assert 'setCurrentCategoryArt(game?.box_art_url || "", game?.name || savedCategoryName)' in script
+    assert 'categoryArtHome?.setAttribute("title", name)' in script
+    assert styles.count('.dashboard-hover-tooltip {') == 1
+    assert 'if (!visible && restoreArtwork) setCurrentCategoryArt(savedCategoryArt)' in script
+    assert 'updateCategoryPreview(game);\n        setGameSuggestionsVisible(false, false)' in script
+    assert 'savedCategoryArt = result.box_art_url || ""' in script
+    assert 'card.classList.toggle("is-category-selecting", visible)' in script
+    assert 'data-game-selection-preview' in dashboard
+    assert 'visible ? selectionPreview : categoryArtHome' in script
+    assert 'categoryArtAnimation = currentCategoryArt.animate([' in script
+    assert 'if (gameSuggestions.hidden === !visible' in script
+    assert 'oldRect.left - newRect.left' in script
+    assert 'oldRect.width / newRect.width' in script
+    assert 'grid-template-columns: minmax(0,1fr) minmax(0,min(30%,120px))' in styles
+    assert 'dashboard-carousel-card-changed' in script
+    assert 'gameOptionsList.replaceChildren()' in script
+    assert 'updateCategoryPreview(gameOptions[selectedGame])' in script
+    assert 'pointerenter", () => highlightGame(index, false)' in script
+    assert 'gameOptionsList.children[selectedGame]?.scrollIntoView' in script
+    assert 'normalizedQuery === renderedGameQuery ? gameOptionsList.scrollTop : 0' in script
+    assert 'gameOptionsList.scrollTop = previousScroll' in script
+    assert 'renderGameOptions(result.games, query, result.more_games)' in script
 
 
 def test_dashboard_game_search_ranks_name_matches_and_preserves_top_games_order():
@@ -1548,6 +1738,156 @@ def test_dashboard_carousel_keeps_stream_player_mounted_across_breakpoints():
     assert 'event.preventDefault()' in carousel
 
 
+def test_dashboard_first_carousel_card_retains_shared_slide_animation():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    selector = '.channel-page-overview .dashboard-carousel-slide[data-dashboard-carousel-slide="0"].is-active'
+    first_card_rule = styles.split(selector, 1)[1].split("}", 1)[0]
+
+    # Leave the embed untransformed at rest without snapping over the outgoing card.
+    assert "transform: none;" in first_card_rule
+    assert "transition:" not in first_card_rule
+    assert '.dashboard-carousel-slide.is-active { opacity: 1; visibility: visible; pointer-events: auto; transform: translateX(0); transition: transform .3s ease, opacity .3s ease, visibility 0s; }' in styles
+
+
+def test_mobile_dashboard_reclaims_card_space_and_places_stats_in_navbar():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    mobile = styles.split('.channel-page-overview .dashboard-carousel-navbar-label {', 1)[1]
+    stats_rule = mobile.split('.sidebar > .dashboard-header-side {', 1)[1].split('}', 1)[0]
+    deck_rule = mobile.split('.dashboard-carousel-deck { position: absolute;', 1)[1].split('}', 1)[0]
+    slide_rule = mobile.split('.dashboard-carousel-slide { position: absolute;', 1)[1].split('}', 1)[0]
+    edge_rule = mobile.split('.dashboard-carousel-peek {', 1)[1].split('}', 1)[0]
+
+    assert 'position: fixed;' in stats_rule
+    assert 'top: calc(var(--mobile-nav-height) / 2);' in stats_rule
+    assert 'transform: translateY(-50%);' in stats_rule
+    assert 'top: 0;' in deck_rule
+    assert 'left: 12px;' in slide_rule and 'right: 12px;' in slide_rule
+    assert '.dashboard-carousel-slide.is-neighbor { opacity: .65; visibility: visible; transform: translateX(calc(100% + 8px));' in mobile
+    assert '.dashboard-carousel-slide.is-before.is-neighbor { transform: translateX(calc(-100% - 8px)); }' in mobile
+    assert 'overflow: hidden;' in slide_rule
+    assert 'width: 16px;' in edge_rule
+    gradient_rule = mobile.split('.dashboard-carousel-peek::before {', 1)[1].split('}', 1)[0]
+    assert 'width: 28px;' in gradient_rule
+    assert 'pointer-events: none;' in gradient_rule
+    assert '.dashboard-carousel-peek[data-dashboard-carousel-next]::before { right: 0; left: auto; }' in mobile
+    assert 'top: var(--mobile-nav-height);' in edge_rule
+    assert 'height: calc(var(--dashboard-mobile-viewport-height, 100dvh) - var(--mobile-nav-height));' in edge_rule
+    main_rule = mobile.split('.streamer-main-content {', 1)[1].split('}', 1)[0]
+    assert 'padding: 8px 0;' in main_rule
+    assert '.streamer-main-content > .channel-dashboard-layout.has-carousel { padding-inline: 4px; }' in mobile
+    assert 'left: 4px;' in deck_rule and 'right: 4px;' in deck_rule
+    assert '.app-shell.sidebar-collapsed .sidebar .brand-copy { display: none; }' in mobile
+    assert '.app-shell:not(.sidebar-collapsed) .sidebar > .dashboard-header-side { opacity: 0; visibility: hidden; pointer-events: none; transition: none; }' in mobile
+    assert '.app-shell.sidebar-collapsed .sidebar > .dashboard-header-side { opacity: 1; visibility: visible; }' in mobile
+    carousel = open("web/static/js/dashboard-carousel.js", encoding="utf-8").read()
+    stats = open("web/static/js/dashboard-header-stats.js", encoding="utf-8").read()
+    assert 'if (sidebar && statsRow) sidebar.append(statsRow);' in carousel
+    assert 'if (statsRow && statsMarker.parentNode) statsMarker.after(statsRow);' in carousel
+    assert 'document.querySelector("[data-dashboard-carousel]")' in stats
+    assert '.sidebar .brand { z-index: 52; }' in mobile
+    assert 'z-index: 51;' in stats_rule
+    assert '.sidebar .brand { pointer-events: none; }' in mobile
+    assert '.sidebar .brand .sidebar-logo-toggle { pointer-events: auto; }' in mobile
+    assert 'container.querySelectorAll("[data-dashboard-stat]").forEach' in stats
+    assert ': container.querySelector(`[data-dashboard-stat=' in stats
+
+
+def test_mobile_dashboard_feeds_do_not_reserve_empty_scrollbar_gutters():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    assert 'html:has(> body.channel-page-overview) { height: 100dvh; min-height: 0; overflow: hidden; scrollbar-gutter: auto; }' in styles
+    rule = styles.split('/* Reserve space only when a feed actually needs a scrollbar. */', 1)[1].split('}', 1)[0]
+
+    assert '.live-chat-feed-shell > .dashboard-chat-feed' in rule
+    assert '#viewer-queue-content' in rule
+    assert '.activity-scroll' in rule
+    assert '.dashboard-command-feed' in rule
+    assert '.dashboard-raid-tab #dashboard-raid' in rule
+    assert 'width: 100%; margin-right: 0; padding-right: 0; scrollbar-gutter: auto;' in rule
+
+
+def test_mobile_channel_navigation_uses_accessible_logo_toggle():
+    layout = open("web/templates/channel/layout.html", encoding="utf-8").read()
+    script = open("web/static/js/channel-sidebar.js", encoding="utf-8").read()
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+
+    assert 'class="sidebar-logo-toggle" data-sidebar-mobile-toggle aria-controls="channel-navigation"' in layout
+    assert 'document.currentScript.parentElement.classList.add("sidebar-collapsed");' in layout
+    assert layout.index('document.currentScript.parentElement') < layout.index('id="channel-navigation"')
+    assert layout.index('data-sidebar-mobile-back') < layout.index('data-sidebar-mobile-toggle')
+    assert 'mobileBack?.addEventListener("click", () => {' in script
+    assert 'mobileToggle?.focus({preventScroll: true});' in script
+    assert '.sidebar-mobile-back { display: none; }' in styles
+    assert '.sidebar-mobile-back { position: absolute; z-index: 1; top: 0; left: 0; display: block; width: 52px; height: 42px;' in styles
+    back_rule = styles.split('.channel-page .sidebar-mobile-back { position: absolute;', 1)[1].split('}', 1)[0]
+    assert 'transition:' not in back_rule
+    assert '.app-shell:not(.sidebar-collapsed) .sidebar-mobile-back { opacity: 1; visibility: visible; pointer-events: auto; }' in styles
+    assert '.sidebar-mobile-back svg { position: absolute; top: 50%; left: 8px; width: 24px; height: 24px;' in styles
+    assert '.sidebar-logo-toggle { position: relative; z-index: 2;' in styles
+    assert '.app-shell:not(.sidebar-collapsed) .sidebar-logo-toggle { margin-left: 40px; transition: margin-left .24s ease, outline-color .16s ease; }' in styles
+    assert 'id="channel-navigation"' in layout
+    assert 'mobileToggle.disabled = !mobile;' in script
+    assert 'mobileToggle.setAttribute("aria-expanded", String(mobile && !collapsed));' in script
+    assert 'if (mobileMedia.matches) toggleNavigation();' in script
+    assert '☰' not in script
+    assert '.channel-page .sidebar .sidebar-toggle { display: none !important; }' in styles
+    assert '.channel-page .sidebar-logo-toggle:hover,' in styles
+    assert '.channel-page .sidebar .brand { position: relative; overflow: visible; }' in styles
+    assert 'transition: margin-left .24s ease, outline-color .16s ease;' in styles
+    assert '.app-shell:not(.sidebar-collapsed) .sidebar-logo-toggle { transition: none; }' in styles
+    assert '.sidebar-logo-toggle .brand-mark { transition: width .24s ease, height .24s ease, flex-basis .24s ease; }' in styles
+    assert '.sidebar-logo-toggle .brand-mark { transition: none; }' in styles
+    assert '.channel-page .sidebar-logo-toggle:focus-visible { outline-color: #fff; }' in styles
+
+
+def test_queue_names_truncate_before_centered_drag_indicator():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    script = open("web/static/js/dashboard-viewer-queue.js", encoding="utf-8").read()
+    template = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+
+    assert 'grid-template-columns: 30px minmax(0, calc(50% - 59px)) minmax(0, 1fr);' in styles
+    base_row = styles.split('\n.queue-list-item {', 1)[1].split('}', 1)[0]
+    assert 'grid-template-columns: 30px minmax(0, 1fr) auto;' in base_row
+    assert '.queue-list-item:hover, .queue-list-item:focus-within, .queue-list-item.queue-drag-ghost { grid-template-columns: 30px minmax(0, calc(50% - 59px)) minmax(0, 1fr); }' in styles
+    assert '@media (hover: none) { .queue-list-item { grid-template-columns: 30px minmax(0, calc(50% - 59px)) minmax(0, 1fr); } }' in styles
+    assert 'justify-self: end;' in styles.split('\n.queue-item-actions {', 1)[1].split('}', 1)[0]
+    assert 'text-overflow: ellipsis;' in styles.split('\n.queue-username {\n', 1)[1].split('}', 1)[0]
+    assert 'usernameLabel.title = label;' in script
+    assert 'class="queue-username" title="{{ member.label }}"' in template
+
+
+def test_dashboard_scrollbars_appear_on_panel_hover_or_keyboard_focus():
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    feeds = ':is(.dashboard-chat-feed, #viewer-queue-content, .activity-scroll, .dashboard-command-feed, #dashboard-raid)'
+
+    assert '@media (hover: hover)' in styles
+    assert f'.panel {feeds} {{ scrollbar-width: none; }}' in styles
+    assert f'.panel:is(:hover, :focus-within) {feeds} {{ scrollbar-width: thin; }}' in styles
+    assert f'.panel {feeds}::-webkit-scrollbar {{ width: 0; }}' in styles
+    assert f'.panel:is(:hover, :focus-within) {feeds}::-webkit-scrollbar {{ width: 8px; }}' in styles
+
+
+def test_activity_motion_covers_feeds_automod_commands_and_tabs_without_chat_changes():
+    dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    motion = open("web/static/js/dashboard-activity-motion.js", encoding="utf-8").read()
+    chat = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+
+    assert 'dashboardActivityMotion.reconcile(element, render)' in dashboard
+    assert 'dashboardActivityMotion.remove(automodContent, row)' in dashboard
+    assert 'if (wasHidden && !panel.hidden) window.dashboardActivityMotion?.switchTab(panel)' in dashboard
+    assert 'if (feed.newestFirst) window.dashboardActivityMotion?.enter(feed.element, row, shouldFollowNewest)' in chat
+    assert 'initialized.has(container) && visible(container) && !reduced.matches' in motion
+    assert 'new Set(previous.map(key))' in motion
+    assert '@keyframes activity-fold-in' in styles
+    assert '@keyframes activity-slide-away' in styles
+    assert 'row.inert = true;' in motion
+    queue = open("web/static/js/dashboard-viewer-queue.js", encoding="utf-8").read()
+    assert 'window.dashboardActivityMotion?.highlight(item, Math.min(index * 45, 600));' in queue
+    assert 'if (!removing) highlight(row, delay);' in motion
+    assert 'background: rgba(139,92,246,.16);' in styles
+    assert '@keyframes entry-added-highlight' in styles
+
+
 def test_dashboard_mobile_activity_panels_keep_tabs_above_scrollable_events():
     styles = open("web/static/css/style.css", encoding="utf-8").read()
 
@@ -1610,7 +1950,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.queue-toolbar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr));' in dashboard_styles
     assert '.queue-toolbar .queue-next-control > button { min-width: 0; flex: 1; width: auto; gap: 4px;' in dashboard_styles
     assert '.queue-next-picker select' in dashboard_styles
-    assert dashboard.index('data-activity-tab="raid"') < dashboard.index('include "channel/raid_summary.html"')
+    assert 'data-activity-tab="raid"' not in dashboard
+    boss_hunt = open("web/templates/channel/boss_hunt.html", encoding="utf-8").read()
+    sidebar = open("web/templates/channel/layout.html", encoding="utf-8").read()
+    assert 'include "channel/raid_summary.html"' in boss_hunt
+    assert 'href="/channel/boss-hunt"' in sidebar
     assert 'data-chat-composer' in dashboard
     assert 'data-channel-id="{{ broadcaster.id }}"' in dashboard
     assert 'data-reply-context' in dashboard
@@ -1628,7 +1972,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'class="dashboard-header-stat dashboard-points-stat"' not in dashboard
     assert '.dashboard-header-stats > .dashboard-header-stat { flex: 1 0 auto; justify-content: center; }' in dashboard_styles
     assert '.dashboard-points-stat { display: inline-flex; max-width: 65%; min-width: 0; min-height: 30px; align-items: center; gap: 6px; margin-left: auto; padding: 5px 9px; border: 0;' in dashboard_styles
-    assert 'dashboard.querySelectorAll("[data-dashboard-stat]")' in header_stats_script
+    assert 'container.querySelectorAll("[data-dashboard-stat]")' in header_stats_script
     assert 'dashboard.querySelector("[data-dashboard-points-lost]")' in header_stats_script
     assert "data-stream-status" in dashboard
     assert 'class="dashboard-ad-stat state-{{ ad_status.state }}"' in dashboard
@@ -1660,13 +2004,13 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "Open Twitch" not in dashboard
     assert "Twitch + YouTube" not in dashboard
     assert '<h3 class="chat-heading">Combined Chat' in dashboard
-    assert 'data-chat-command-toggle aria-pressed="true"' in dashboard
+    assert 'data-chat-filter-toggle aria-label="Filter chat" aria-expanded="false"' in dashboard
     assert 'data-activity-link="commands"' not in dashboard
     assert "Stream activity" not in dashboard
     assert "Viewer games" not in dashboard
     assert 'data-refresh-url="/channel/api/dashboard-stats"' in dashboard
     assert "Back to Overview" not in features
-    assert dashboard.index("data-emote-toggle") < dashboard.index("data-chat-send-status") < dashboard.index("dashboard-chat-composer-actions")
+    assert dashboard.index("dashboard-chat-composer-actions") < dashboard.index("data-chat-send-status") < dashboard.index("chat-send-button")
     assert 'fetch("/channel/api/chat/emotes")' in composer_script
     assert 'fetch("/channel/api/chat/users"' in composer_script
     assert 'const twitchCommands = [' in composer_script
@@ -1853,7 +2197,9 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "overflow-y: auto" in widget_styles
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
-    assert 'element.dataset.newestFirst === "true" ? "↑ Jump to present" : "↓ Jump to present"' in chat_script
+    assert 'const jumpPath = feed.newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";' in chat_script
+    assert 'feed.jumpButton.title = "Jump to present";' in chat_script
+    assert 'jumpButton.title = "Jump to present";' in dashboard
     assert 'makeElement("div", "live-chat-feed-shell")' in chat_script
     assert 'element.addEventListener("scroll", () => {' in chat_script
     assert "updateJumpButton(feed);" in chat_script
@@ -1885,12 +2231,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "overflow-y: auto; overscroll-behavior: contain;" in dashboard_styles
     assert "seen.has(emote.name)" in composer_script
     assert ".chat-emote-picker[hidden], .chat-emote-suggestions[hidden] { display: none; }" in dashboard_styles
-    assert ".chat-send-status { position: absolute;" in dashboard_styles
+    assert ".chat-send-status { flex: 1 1 0; min-width: 0;" in dashboard_styles
     assert "text-align: right; text-overflow: ellipsis;" in dashboard_styles
-    assert "right: 15px; bottom: 11px;" in dashboard_styles
     assert "opacity: .8;" in dashboard_styles
     assert ".chat-send-status.is-fading { opacity: 0; }" in dashboard_styles
-    assert "height: 66px;" in dashboard_styles
+    assert "height: calc(1.4em + 22px);" in dashboard_styles
     assert "resize: none;" in dashboard_styles
     assert 'status.dataset.connectionState === "disconnected"' in composer_script
     assert 'status.classList.add("is-fading")' in composer_script
@@ -1900,7 +2245,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'grid-template-areas: "stats" "player" "queue" "activities" "chat"' in dashboard_styles
     assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' in dashboard_styles
     assert '@media (min-width: 769px) and (max-width: 1100px)' in dashboard_styles
-    assert '@media (max-width: 600px) {\n    .channel-page-overview .channel-dashboard-layout.has-carousel .dashboard-header-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }' in dashboard_styles
+    assert '@media (max-width: 600px) {\n    .channel-page-overview .dashboard-header-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }' in dashboard_styles
     assert 'height: calc(200dvh - var(--dashboard-stats-height, 36px) - 52px)' in dashboard_styles
     assert 'grid-template-rows: max-content minmax(0,3fr) minmax(0,2fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 32px)' in dashboard_styles
     assert '.channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 16px; display: flex; grid-area: stats; min-width: 0; margin-bottom: -6px; padding-bottom: 6px;' in dashboard_styles
@@ -1946,9 +2291,16 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'dashboard-header-stat-break' not in dashboard
     assert 'data-stream-player' in dashboard
     assert 'dashboard-stream-player.js' in dashboard
-    assert 'url.searchParams.set("parent", window.location.hostname)' in stream_player_script
-    assert 'url.searchParams.set("autoplay", "false")' in stream_player_script
-    assert 'url.searchParams.set("muted", "true")' in stream_player_script
+    assert 'https://player.twitch.tv/js/embed/v1.js' in dashboard
+    assert dashboard.index('https://player.twitch.tv/js/embed/v1.js') < dashboard.index('dashboard-stream-player.js')
+    assert 'data-is-live="{{ \'true\' if broadcaster.is_live else \'false\' }}"' in dashboard
+    assert 'new Twitch.Player(mount.id, {' in stream_player_script
+    assert 'parent: [window.location.hostname]' in stream_player_script
+    assert 'autoplay: false' in stream_player_script
+    assert 'muted: true' in stream_player_script
+    assert 'twitchPlayer.addEventListener(Twitch.Player.PAUSE' in stream_player_script
+    assert 'twitchPlayer.addEventListener(Twitch.Player.PLAYBACK_BLOCKED' in stream_player_script
+    assert 'if (liveChanged) window.dispatchEvent(new CustomEvent("dashboard-stream-live-changed"' in header_stats_script
     assert '.dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }' in dashboard_styles
     assert '.dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9;' in dashboard_styles
     assert 'aspect-ratio: 16 / 9;' in dashboard_styles
@@ -1965,13 +2317,13 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'compactMedia.matches ? !compactExpanded : desktopCollapsed' in sidebar_script
     assert 'enableTransitionsAfterLayout()' in sidebar_script
     assert 'sidebar-hover-locked' in sidebar_script
-    assert '@media (min-width: 769px) {\n    .dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked) .sidebar:hover' in dashboard_styles
-    assert dashboard_styles.index('.dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked):has(> .sidebar:hover) { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }') < dashboard_styles.index('@media (min-width: 901px)')
-    assert 'mobile ? (collapsed ? "☰" : "×")' in sidebar_script
+    assert '@media (min-width: 769px) {\n    .dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded .sidebar' in dashboard_styles
+    assert dashboard_styles.index('.dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }') < dashboard_styles.index('@media (min-width: 901px)')
+    assert 'if (icon) icon.textContent = collapsed ? "›" : "‹";' in sidebar_script
     assert 'position: sticky;' in dashboard_styles
     assert '.navigation { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; gap: 7px; overflow-x: hidden; overflow-y: auto; }' in dashboard_styles
     assert '.channel-page-overview .sidebar { position: fixed; z-index: 50; top: 0; right: 0; left: 0; width: 100%; height: 100dvh;' in dashboard_styles
-    assert '.sidebar:hover { width: 100%; height: 74px; min-height: 0;' in dashboard_styles
+    assert '.sidebar:hover { width: 100%; height: var(--mobile-nav-height); min-height: 0;' in dashboard_styles
     assert '.navigation { width: 100%; min-height: 0; flex-direction: column; justify-content: flex-start; gap: 7px; overflow-x: hidden; overflow-y: auto; }' in dashboard_styles
     assert '.sidebar-toggle span { display: block; transition: transform .24s ease, opacity .18s ease; }' in dashboard_styles
     assert 'transition: opacity .2s ease .08s, transform .24s ease .08s, visibility 0s linear 0s;' in dashboard_styles
@@ -1980,8 +2332,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.sidebar .navigation,' in dashboard_styles
     assert ".sidebar:not(:hover) .sidebar-logout .button { gap: 10px; padding-right: 11px; padding-left: 11px; }" in dashboard_styles
     assert '.dashboard-page .sidebar-logout .button { justify-content: center; gap: 10px; overflow: hidden; padding-right: 11px; padding-left: 11px;' in dashboard_styles
-    assert '.dashboard-page .app-shell.sidebar-collapsed .sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-logout .button { gap: 0; justify-content: center; }' in dashboard_styles
-    assert '.dashboard-page .app-shell.sidebar-collapsed:not(.sidebar-hover-locked) .sidebar:hover { width: var(--sidebar-width); padding-right: 14px; padding-left: 14px;' in dashboard_styles
+    assert '.dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .sidebar-logout .button { gap: 0; justify-content: center; }' in dashboard_styles
+    assert '.dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded .sidebar { width: var(--sidebar-width); padding-right: 14px; padding-left: 14px;' in dashboard_styles
     assert 'overflow: hidden;\n    padding: 11px 12px;\n    border-radius: 9px;' in dashboard_styles
     assert "window.localStorage.setItem(storageKey" in header_stats_script
     assert "dashboard-stat-visibility" in header_stats_script
@@ -2052,14 +2404,21 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'container.querySelector("[data-stream-status]")?.addEventListener("click", () => {' in header_stats_script
     assert 'hiddenStats.has("stream_timer")' in header_stats_script
     assert 'window.dashboardLiveTest = {' in header_stats_script
+    assert 'start(channelOrMinutes = 0, minutes = 0) {' in header_stats_script
+    assert 'new CustomEvent("dashboard-stream-test-start", {detail: {channel: login}})' in header_stats_script
+    assert 'new CustomEvent("dashboard-stream-test-stop", {detail: {isLive: actualStreamStatus.isLive}})' in header_stats_script
+    assert 'twitchPlayer.setChannel(selectedChannel);' in stream_player_script
+    assert 'window.addEventListener("dashboard-stream-test-start"' in stream_player_script
+    assert 'window.addEventListener("dashboard-stream-test-stop"' in stream_player_script
     assert 'applyStreamStatus(true, new Date(Date.now() - elapsedMinutes * 60000).toISOString());' in header_stats_script
     assert 'viewerValue.textContent = (Math.floor(Math.random() * 500) + 1).toLocaleString();' in header_stats_script
     assert 'viewerValue.textContent = actualViewerCount;' in header_stats_script
-    assert 'if (value && !(previewActive && stat.key === "viewers")) value.textContent = displayValue;' in header_stats_script
+    assert 'if (value && !(previewActive && stat.key === "viewers")) {' in header_stats_script
+    assert 'applyVisibility(statContainer, hiddenStats.has(stat.key));' in header_stats_script
     assert 'if (!previewActive) applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert 'applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert ".dashboard-stream-stat.state-live .status-indicator { animation: dashboard-live-pulse" in dashboard_styles
-    assert ".sidebar:is(:not(:hover), .sidebar-hover-locked) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
+    assert ".sidebar:not(.sidebar-hover-expanded) .sidebar-toggle { top: 35px; right: -14px; }" in dashboard_styles
 
 
 @pytest.mark.asyncio
@@ -2073,3 +2432,141 @@ async def test_youtube_discovery_uses_only_one_filter(items, expected):
         "channel-1", "/liveBroadcasts",
         {"part": "id,snippet", "broadcastStatus": "active", "broadcastType": "all", "maxResults": 10}
     )
+
+@pytest.mark.asyncio
+async def test_boss_hunt_dashboard_schedules_with_channel_config(monkeypatch):
+    config = object()
+    boss_service = SimpleNamespace(
+        has_completed_tutorial=AsyncMock(return_value=False),
+        schedule_spawn=AsyncMock(return_value=True),
+        get_active_event=AsyncMock(return_value=None),
+    )
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": SimpleNamespace(id="channel-1")}),
+        features=SimpleNamespace(is_enabled=lambda *_: True),
+        raid_bosses=boss_service,
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    monkeypatch.setattr(dashboard_router, "get_active_profile", lambda _: SimpleNamespace(raid_bosses=config))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/boss-hunt/action", "headers": [],
+        "query_string": b"", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"},
+    })
+
+    response = await dashboard_router.channel_boss_hunt_action(request, "schedule", "csrf", "mini", "melee")
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("result=scheduled")
+    boss_service.schedule_spawn.assert_awaited_once_with("channel-1", config, "mini", "melee")
+
+
+@pytest.mark.asyncio
+async def test_boss_hunt_dashboard_ends_and_announces_active_encounter(monkeypatch):
+    event = SimpleNamespace(boss_name="Training Dummy", boss_tier="tutorial", max_hp=1000, current_hp=600, stream_limit=2)
+    boss_service = SimpleNamespace(
+        get_active_event=AsyncMock(return_value=event),
+        resolve=AsyncMock(return_value=200),
+    )
+    chat_identity = SimpleNamespace(send_message=AsyncMock())
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": SimpleNamespace(id="channel-1")}),
+        features=SimpleNamespace(is_enabled=lambda *_: True),
+        raid_bosses=boss_service,
+        chat_identity=chat_identity,
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(
+        services=services, create_partialuser=lambda _: SimpleNamespace(id="channel-1"),
+    ))
+    monkeypatch.setattr(dashboard_router, "get_active_profile", lambda _: SimpleNamespace(raid_bosses=object()))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/boss-hunt/action", "headers": [],
+        "query_string": b"", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"},
+    })
+
+    response = await dashboard_router.channel_boss_hunt_action(request, "end", "csrf")
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("result=ended")
+    boss_service.resolve.assert_awaited_once_with("channel-1", defeated=False)
+    chat_identity.send_message.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_boss_hunt_page_renders_for_connected_channel(monkeypatch):
+    from web.app import app
+
+    broadcaster = SimpleNamespace(id="channel-1", name="Test Channel", login="testchannel")
+    raid_bosses = SimpleNamespace(
+        get_dashboard_metrics=AsyncMock(return_value=None),
+        get_active_event=AsyncMock(return_value=None),
+        get_contributors=AsyncMock(return_value=[]),
+        spawn_tasks={},
+    )
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
+        features=SimpleNamespace(is_enabled=lambda *_: True),
+        raid_bosses=raid_bosses,
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    request = Request({
+        "type": "http", "method": "GET", "path": "/channel/boss-hunt", "headers": [],
+        "query_string": b"", "scheme": "http", "server": ("testserver", 80),
+        "root_path": "", "app": app,
+        "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"},
+    })
+
+    response = await dashboard_router.channel_boss_hunt(request)
+    assert response.status_code == 200
+    assert b"Schedule boss" in response.body
+    assert b"Boss Hunt activity" in response.body
+    assert b"Current Leaderboard" in response.body
+    assert b"No active encounter yet." in response.body
+    assert b"/channel/boss-hunt" in response.body
+
+@pytest.mark.asyncio
+async def test_boss_hunt_action_requires_matching_csrf(monkeypatch):
+    boss_service = SimpleNamespace(resolve=AsyncMock(), schedule_spawn=AsyncMock())
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=SimpleNamespace(raid_bosses=boss_service)))
+    request = Request({
+        "type": "http", "method": "POST", "path": "/channel/boss-hunt/action", "headers": [],
+        "query_string": b"", "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"},
+    })
+
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as error:
+        await dashboard_router.channel_boss_hunt_action(request, "end", "wrong-token")
+    assert error.value.status_code == 403
+    boss_service.resolve.assert_not_awaited()
+
+@pytest.mark.asyncio
+async def test_boss_hunt_leaderboard_shows_current_contributors(monkeypatch):
+    from web.app import app
+
+    broadcaster = SimpleNamespace(id="channel-1", name="Test Channel", login="testchannel")
+    event = SimpleNamespace(boss_name="Training Dummy", current_hp=7600, max_hp=10000)
+    raid_bosses = SimpleNamespace(
+        get_dashboard_metrics=AsyncMock(return_value={
+            "boss_name": "Training Dummy", "status": "active", "boss_tier": "tutorial", "boss_type": "melee",
+            "current_hp": 7600, "max_hp": 10000, "hp_percent": 76,
+            "unique_attackers": 2, "total_attacks": 2, "total_damage": 2400, "streams_used": 1,
+        }),
+        get_active_event=AsyncMock(return_value=event),
+        get_contributors=AsyncMock(return_value=[("alice", 1500), ("bob", 900)]),
+        spawn_tasks={},
+    )
+    services = SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
+        features=SimpleNamespace(is_enabled=lambda *_: True),
+        raid_bosses=raid_bosses,
+    )
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    request = Request({
+        "type": "http", "method": "GET", "path": "/channel/boss-hunt", "headers": [],
+        "query_string": b"", "scheme": "http", "server": ("testserver", 80),
+        "root_path": "", "app": app,
+        "session": {CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"},
+    })
+
+    response = await dashboard_router.channel_boss_hunt(request)
+    markup = response.body.decode()
+    assert markup.index("Boss Hunt activity") < markup.index("Current Leaderboard")
+    assert markup.index("#1") < markup.index("alice") < markup.index("#2") < markup.index("bob")
+    assert "1,500 damage" in markup and "900 damage" in markup
+    raid_bosses.get_contributors.assert_awaited_once_with("channel-1")

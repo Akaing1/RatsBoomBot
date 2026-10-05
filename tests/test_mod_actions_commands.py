@@ -27,6 +27,8 @@ async def test_kamikaze_achievement_counts_only_confirmed_target_hits(monkeypatc
         recorder.assert_awaited_once_with('channel-1', 'command-message', 'caller', 'target')
 
 
+
+
 def test_kamikaze_cooldown_notice_is_sent_once_per_window() -> None:
     command = create_commands()
     command.start_kamikaze_cooldown("channel-1", "viewer-1")

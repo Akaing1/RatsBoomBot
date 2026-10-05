@@ -674,13 +674,7 @@ class FeatureToggleService:
         return profile.globals.is_group_enabled(GlobalCommandGroup.GLOBALS)
 
     def get_channel_features(self, broadcaster_id: str) -> dict[FeatureName, FeatureState]:
-        profile = get_active_profile(str(broadcaster_id))
-        features = {feature: self.get_feature_state(broadcaster_id, feature) for feature in FeatureName}
-
-        if profile is None or not profile.raid_bosses.enabled:
-            features.pop(FeatureName.RAID_BOSSES, None)
-
-        return features
+        return {feature: self.get_feature_state(broadcaster_id, feature) for feature in FeatureName}
 
     def get_profile_features(self, broadcaster_id: str) -> dict[ProfileFeatureName, ProfileFeatureState]:
         states = {feature: self.get_profile_feature_state(broadcaster_id, feature) for feature in ProfileFeatureName}

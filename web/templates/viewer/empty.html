@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My account | RatsBoomBot</title>
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
+</head>
+<body class="chatter-profile-page">
+    <header class="public-command-navigation">
+        <a class="landing-brand" href="/">RatsBoomBot</a>
+        <form action="/me/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>
+    </header>
+    <main class="chatter-profile-content">
+        <section class="panel chatter-account-intro">
+            <p class="eyebrow">My account</p>
+            <h1>Welcome, {{ display_name }}</h1>
+            <p>Your Twitch account is connected. Your stats and channel activity will appear after you participate in a connected stream.</p>
+        </section>
+    </main>
+</body>
+</html>

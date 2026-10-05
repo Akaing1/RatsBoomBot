@@ -8,10 +8,26 @@
     const titleField = card.querySelector('[data-channel-field="title"]');
     const gameField = card.querySelector('[data-channel-field="game"]');
     const gameSuggestions = card.querySelector("[data-game-suggestions]");
+    const gameOptionsList = card.querySelector("[data-game-options]");
+    const currentCategoryArt = card.querySelector("[data-current-category-art]");
+    const categoryArtHome = currentCategoryArt?.parentElement;
+    const selectionPreview = card.querySelector("[data-game-selection-preview]");
+    categoryArtHome?.addEventListener("click", () => {
+        if (document.activeElement === gameField) {
+            searchGames(gameField.dataset.hasDraft ? gameField.textContent.trim() : "");
+        } else {
+            gameField.focus();
+        }
+    });
+    let savedCategoryArt = currentCategoryArt?.getAttribute("src") || "";
+    let savedCategoryName = gameField.textContent.trim();
+    let categoryArtAnimation = null;
+    currentCategoryArt?.addEventListener("error", () => { currentCategoryArt.hidden = true; });
     let statusFadeTimer = null;
     let gameSearchTimer = null;
     let gameSearchController = null;
     let gameOptions = [];
+    let renderedGameQuery = null;
     let selectedGame = 0;
     let statusSpaceTimer = null;
     let refreshGamePencil = () => {};
@@ -135,32 +151,110 @@
         });
     }
 
-    function renderGameOptions(games) {
-        gameOptions = Array.isArray(games) ? games : [];
+    function updateCategoryPreview(game) {
+        setCurrentCategoryArt(game?.box_art_url || "", game?.name || savedCategoryName);
+    }
+    function setCurrentCategoryArt(url, name = savedCategoryName) {
+        if (!currentCategoryArt) return;
+        categoryArtHome?.setAttribute("title", name);
+        currentCategoryArt.setAttribute("title", name);
+        currentCategoryArt.hidden = !url;
+        if (url) currentCategoryArt.src = url;
+        else currentCategoryArt.removeAttribute("src");
+    }
+
+    function setGameSuggestionsVisible(visible, restoreArtwork = true) {
+        const destination = visible ? selectionPreview : categoryArtHome;
+        if (gameSuggestions.hidden === !visible
+            && (!currentCategoryArt || currentCategoryArt.parentElement === destination)) return;
+        const oldRect = currentCategoryArt && !currentCategoryArt.hidden
+            ? currentCategoryArt.getBoundingClientRect() : null;
+        categoryArtAnimation?.cancel();
+        gameSuggestions.classList.remove("is-art-animating");
+        gameSuggestions.hidden = !visible;
+        categoryArtHome?.setAttribute("aria-expanded", String(visible));
+        card.classList.toggle("is-category-selecting", visible);
+        let moved = false;
+        if (currentCategoryArt) {
+            if (destination && currentCategoryArt.parentElement !== destination) {
+                destination.appendChild(currentCategoryArt);
+                moved = true;
+            }
+        }
+        if (!visible && restoreArtwork) setCurrentCategoryArt(savedCategoryArt);
+        if (moved && oldRect?.width && oldRect.height && !currentCategoryArt.hidden
+            && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            const newRect = currentCategoryArt.getBoundingClientRect();
+            if (!newRect.width || !newRect.height) return;
+            gameSuggestions.classList.add("is-art-animating");
+            categoryArtAnimation = currentCategoryArt.animate([
+                {transform: `translate(${oldRect.left - newRect.left}px, ${oldRect.top - newRect.top}px) scale(${oldRect.width / newRect.width}, ${oldRect.height / newRect.height})`},
+                {transform: "translate(0px, 0px) scale(1, 1)"}
+            ], {duration: 260, easing: "cubic-bezier(.22, 1, .36, 1)"});
+            categoryArtAnimation.onfinish = () => gameSuggestions.classList.remove("is-art-animating");
+        }
+    }
+    document.addEventListener("dashboard-carousel-card-changed", () => setGameSuggestionsVisible(false));
+
+    function renderGameOptions(games, query, moreGames = [], expanded = false) {
+        const normalizedQuery = query.trim().toLowerCase();
+        const previousScroll = normalizedQuery === renderedGameQuery ? gameOptionsList.scrollTop : 0;
+        renderedGameQuery = normalizedQuery;
+        const mainGames = Array.isArray(games) ? games : [];
+        const extraGames = Array.isArray(moreGames) ? moreGames : [];
+        gameOptions = expanded ? [...mainGames, ...extraGames] : mainGames;
         selectedGame = 0;
-        gameSuggestions.replaceChildren();
+        gameOptionsList.replaceChildren();
         gameOptions.forEach((game, index) => {
             const button = document.createElement("button");
             button.type = "button";
             button.className = `twitch-game-option${index === selectedGame ? " active" : ""}`;
-            button.textContent = game.name;
+            if (game.box_art_url) {
+                const image = document.createElement("img");
+                image.className = "twitch-category-art";
+                image.src = game.box_art_url;
+                image.alt = "";
+                image.loading = "lazy";
+                image.addEventListener("error", () => { image.hidden = true; });
+                button.appendChild(image);
+            }
+            const name = document.createElement("span");
+            name.textContent = game.name;
+            button.appendChild(name);
             button.setAttribute("role", "option");
+            button.setAttribute("aria-selected", String(index === selectedGame));
+            button.addEventListener("pointerenter", () => highlightGame(index, false));
             button.addEventListener("pointerdown", event => {
                 event.preventDefault();
                 chooseGame(index);
             });
-            gameSuggestions.appendChild(button);
+            gameOptionsList.appendChild(button);
         });
-        gameSuggestions.hidden = gameOptions.length === 0;
+        if (extraGames.length) {
+            const moreButton = document.createElement("button");
+            moreButton.type = "button";
+            moreButton.className = "twitch-game-more";
+            moreButton.textContent = `${expanded ? "Fewer" : "More"} results (${extraGames.length})`;
+            moreButton.setAttribute("aria-expanded", String(expanded));
+            moreButton.addEventListener("pointerdown", event => event.preventDefault());
+            moreButton.addEventListener("click", () => renderGameOptions(mainGames, query, extraGames, !expanded));
+            gameOptionsList.appendChild(moreButton);
+        }
+        if (gameOptions.length) updateCategoryPreview(gameOptions[selectedGame]);
+        else setCurrentCategoryArt(savedCategoryArt);
+        setGameSuggestionsVisible(gameOptions.length > 0 || extraGames.length > 0);
+        gameOptionsList.scrollTop = previousScroll;
     }
 
-    function highlightGame(index) {
+    function highlightGame(index, scroll = true) {
         if (!gameOptions.length) return;
         selectedGame = (index + gameOptions.length) % gameOptions.length;
         gameSuggestions.querySelectorAll(".twitch-game-option").forEach((option, optionIndex) => {
             option.classList.toggle("active", optionIndex === selectedGame);
+            option.setAttribute("aria-selected", String(optionIndex === selectedGame));
         });
-        gameSuggestions.children[selectedGame]?.scrollIntoView({block: "nearest"});
+        updateCategoryPreview(gameOptions[selectedGame]);
+        if (scroll) gameOptionsList.children[selectedGame]?.scrollIntoView({block: "nearest"});
     }
 
     function chooseGame(index) {
@@ -168,7 +262,8 @@
         if (!game) return;
         gameField.textContent = game.name;
         gameField.dataset.commitEdit = "true";
-        gameSuggestions.hidden = true;
+        updateCategoryPreview(game);
+        setGameSuggestionsVisible(false, false);
         gameField.blur();
     }
 
@@ -188,7 +283,7 @@
             const result = await response.json();
             if (controller.signal.aborted || document.activeElement !== gameField) return;
             if (!response.ok) throw new Error(result.detail || "Games could not be loaded.");
-            renderGameOptions(result.games);
+            renderGameOptions(result.games, query, result.more_games);
         } catch (error) {
             if (error.name !== "AbortError" && document.activeElement === gameField) showStatus(error.message, "error");
         }
@@ -200,7 +295,7 @@
             window.clearTimeout(gameSearchTimer);
             gameSearchController?.abort();
             gameOptions = [];
-            gameSuggestions.hidden = true;
+            setGameSuggestionsVisible(false);
             gameSearchTimer = window.setTimeout(() => searchGames(gameField.textContent), 200);
         });
         gameField.addEventListener("keydown", event => {
@@ -214,7 +309,7 @@
                 event.stopImmediatePropagation();
                 chooseGame(selectedGame);
             } else if (event.key === "Escape") {
-                gameSuggestions.hidden = true;
+                setGameSuggestionsVisible(false);
             }
         });
     }
@@ -258,7 +353,7 @@
             if (field === gameField) {
                 window.clearTimeout(gameSearchTimer);
                 gameSearchController?.abort();
-                gameSuggestions.hidden = true;
+                setGameSuggestionsVisible(false);
             }
             if (field.dataset.cancelEdit) {
                 delete field.dataset.cancelEdit;
@@ -298,12 +393,18 @@
                 }
                 field.textContent = result.value;
                 savedValue = result.value;
+                if (field === gameField && currentCategoryArt) {
+                    savedCategoryArt = result.box_art_url || "";
+                    savedCategoryName = result.value;
+                    setCurrentCategoryArt(savedCategoryArt);
+                }
                 delete field.dataset.hasDraft;
                 showStatus(
                     result.announcement_sent ? "Saved to Twitch and announced in chat." : "Saved to Twitch, but chat announcement failed.",
                     result.announcement_sent ? "success" : "warning"
                 );
             } catch (error) {
+                if (field === gameField) setCurrentCategoryArt(savedCategoryArt);
                 if (field === gameField && error.code === "category_not_found") {
                     field.textContent = savedValue;
                     delete field.dataset.hasDraft;

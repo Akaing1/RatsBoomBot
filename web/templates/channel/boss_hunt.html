@@ -1,0 +1,88 @@
+{% extends "channel/layout.html" %}
+
+{% block title %}Boss Hunt | {{ broadcaster.name or "Your Channel" }} | RatsBoomBot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Channel encounters</p>
+        <h2>Boss Hunt</h2>
+        <p class="page-description">Follow your current boss, schedule an encounter, and manage its conclusion.</p>
+    </div>
+</header>
+
+{% if not boss_hunt_enabled %}
+<section class="panel">
+    <h3>Boss Hunt is off for this channel</h3>
+    <p>Enable Boss Hunt in Features to see encounters and use these controls.</p>
+    <a class="button secondary" href="/channel/features">Open Features</a>
+</section>
+{% else %}
+{% set notices = {
+    'scheduled': 'Boss scheduled. The 10-minute warning period has started.',
+    'already-active': 'A boss is already active or approaching.',
+    'tutorial-complete': 'This channel has already completed its tutorial boss.',
+    'no-encounter': 'There is no active boss to end.',
+    'ended': 'The encounter has ended and earned rewards were distributed.',
+    'disabled': 'Enable Boss Hunt in Features first.',
+    'invalid': 'Choose a valid encounter tier and boss type.'
+} %}
+{% if action_result in notices %}<p class="boss-hunt-notice" role="status">{{ notices[action_result] }}</p>{% endif %}
+
+<div class="boss-hunt-layout">
+    <div class="boss-hunt-activity-column">
+        {% include "channel/raid_summary.html" %}
+        {% include "channel/raid_leaderboard.html" %}
+    </div>
+
+    <section class="panel boss-hunt-controls">
+        <div class="panel-header">
+            <div><p class="eyebrow">Streamer controls</p><h3>Manage encounters</h3></div>
+        </div>
+        {% if spawn_scheduled %}
+            <p>A boss is already approaching. Wait for it to spawn before scheduling another.</p>
+        {% elif active_encounter %}
+            <p>{{ active_encounter.boss_name }} is active. Ending it distributes points earned from damage dealt so far.</p>
+        {% else %}
+            <p>Schedule a boss for this channel. The encounter starts after a 10-minute warning.</p>
+        {% endif %}
+
+        <form method="post" action="/channel/boss-hunt/action" class="boss-hunt-schedule">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="action" value="schedule">
+            <label for="boss-hunt-tier">Encounter tier</label>
+            <select id="boss-hunt-tier" name="tier" {% if active_encounter or spawn_scheduled %}disabled{% endif %}>
+                <option value="tutorial">Tutorial</option>
+                <option value="mini">Mini boss</option>
+                <option value="main">Main boss</option>
+            </select>
+            <label for="boss-hunt-type">Boss type</label>
+            <select id="boss-hunt-type" name="boss_type" {% if active_encounter or spawn_scheduled %}disabled{% endif %}>
+                <option value="random">Random</option>
+                <option value="melee">Melee</option>
+                <option value="ranged">Ranged</option>
+                <option value="magic">Magic</option>
+            </select>
+            <button class="button primary" type="submit" {% if active_encounter or spawn_scheduled %}disabled{% endif %}>Schedule boss</button>
+        </form>
+
+        {% if active_encounter %}
+        <form method="post" action="/channel/boss-hunt/action" class="boss-hunt-end" data-boss-hunt-end>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="action" value="end">
+            <button class="button secondary" type="submit">End encounter</button>
+        </form>
+        {% endif %}
+    </section>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block page_scripts %}
+<script src="{{ url_for('static', path='/js/channel-raid-leaderboard.js') }}?v={{ deployment_stamp() }}" defer></script>
+<script>
+    document.querySelector("[data-boss-hunt-end]")?.addEventListener("submit", event => {
+        if (!window.confirm("End this Boss Hunt encounter and distribute earned rewards? This cannot be undone.")) event.preventDefault();
+    });
+</script>
+{% endblock %}

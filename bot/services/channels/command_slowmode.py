@@ -36,7 +36,12 @@ class CommandSlowmodeService:
             return True
         broadcaster_id = str(ctx.broadcaster.id)
         user_id = str(ctx.chatter.id)
-        if broadcaster_id not in self.enabled_channels or getattr(ctx.chatter, "moderator", False) or user_id == broadcaster_id or ctx.command.name == "kamikaze":
+        if (
+            broadcaster_id not in self.enabled_channels
+            or getattr(ctx.chatter, "moderator", False)
+            or user_id == broadcaster_id
+            or ctx.command.name == "kamikaze"
+        ):
             return True
         now = time.monotonic()
         key = (broadcaster_id, user_id)

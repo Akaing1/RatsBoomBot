@@ -49,7 +49,8 @@ def test_command_help_uses_profile_currency_and_effective_toggle_states() -> Non
 
     assert get_command(utility, "!height [username]").enabled is False
     assert get_command(utility, "!pp [username]").enabled is True
-    assert get_command(utility, "!stats [username]").enabled is True
+    assert get_command(utility, "!stats").enabled is True
+    assert get_command(utility, "!me").enabled is True
     assert get_command(points, "!shards [username]").enabled is True
     assert get_command(points, "!shards give <username> <amount>").enabled is True
     assert get_command(points, "!shards roulette <red|black|green> <amount>").enabled is True
@@ -114,7 +115,7 @@ def test_command_help_includes_raid_boss_commands_for_raid_enabled_channels() ->
     profile = ChannelProfile(channel_name="channel", features=FeatureDefaults(raid_bosses=True), raid_bosses=RaidBossConfig(enabled=True))
     activate_profile(broadcaster_id, profile)
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
-    raid_bosses = get_group(groups, "Raid Bosses")
+    raid_bosses = get_group(groups, "Boss Hunt")
 
     assert get_command(raid_bosses, "!raid attack").enabled is True
     assert get_command(raid_bosses, "!raid craft <sword|bow|tome>").enabled is True
@@ -131,13 +132,16 @@ def test_command_help_includes_stream_information_settings() -> None:
     assert get_command(settings_group, "!set title <stream title>").permission == "Broadcaster/mod"
 
 
-def test_raid_boss_toggle_is_hidden_for_unconfigured_profiles() -> None:
+def test_raid_boss_toggle_is_available_with_default_names() -> None:
     broadcaster_id = "channel-1"
     profile = ChannelProfile(channel_name="channel")
     activate_profile(broadcaster_id, profile)
     features = FeatureToggleService(db=None).get_channel_features(broadcaster_id)
 
-    assert FeatureName.RAID_BOSSES not in features
+    assert FeatureName.RAID_BOSSES in features
+    assert not features[FeatureName.RAID_BOSSES].effective_enabled
+    assert profile.raid_bosses.names.choices_for("melee") == ("Ironclad Brute",)
+    assert profile.raid_bosses.mini_names.choices_for("magic") == ("Arcane Tyrant",)
 
 
 def test_command_help_keeps_raid_boss_testing_controls_hidden() -> None:
@@ -145,7 +149,7 @@ def test_command_help_keeps_raid_boss_testing_controls_hidden() -> None:
     profile = ChannelProfile(channel_name="channel", raid_bosses=RaidBossConfig(enabled=True, offline_testing_enabled=True))
     activate_profile(broadcaster_id, profile)
     groups = build_command_help_groups(FeatureToggleService(db=None), broadcaster_id, profile)
-    raid_bosses = get_group(groups, "Raid Bosses")
+    raid_bosses = get_group(groups, "Boss Hunt")
 
     assert "!raid next" not in {command.syntax for command in raid_bosses.commands}
 

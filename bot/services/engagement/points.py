@@ -223,19 +223,14 @@ class PointsService:
                 messages = messages + 1
             """
 
-            values = (
-                broadcaster_id,
-                user_id,
-                username,
-                points_config.points_per_message
-            )
-
             try:
                 async with self.db.acquire() as connection:
+                    awarded_points = points_config.points_per_message
+                    values = (broadcaster_id, user_id, username, awarded_points)
                     await connection.execute(query, values)
 
                     if self.chatter_stats is not None:
-                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, points_config.points_per_message, connection)
+                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, awarded_points, connection)
             except Exception:
                 LOGGER.exception(
                     "[Points] Failed to award message points to %s for broadcaster %s.",
@@ -248,7 +243,7 @@ class PointsService:
 
         LOGGER.debug(
             "[Points] Awarded %d message points to %s for broadcaster %s.",
-            points_config.points_per_message,
+            awarded_points,
             username,
             broadcaster_id
         )
@@ -304,14 +299,14 @@ class PointsService:
             points = points + excluded.points
         """
 
-        values = (broadcaster_id, user_id, username, amount)
-
         try:
             async with self.db.acquire() as connection:
+                awarded_amount = amount
+                values = (broadcaster_id, user_id, username, awarded_amount)
                 await connection.execute(query, values)
 
                 if earned and self.chatter_stats is not None:
-                    await self.chatter_stats.record_points_earned(broadcaster_id, user_id, amount, connection)
+                    await self.chatter_stats.record_points_earned(broadcaster_id, user_id, awarded_amount, connection)
         except Exception:
             LOGGER.exception(
                 "[Points] Failed to add %d points to %s for broadcaster %s.",
@@ -323,7 +318,7 @@ class PointsService:
 
         LOGGER.info(
             "[Points] Added %d points to %s for broadcaster %s.",
-            amount,
+            awarded_amount,
             username,
             broadcaster_id
         )
@@ -341,6 +336,7 @@ class PointsService:
                 await connection.execute("BEGIN")
 
                 try:
+                    awarded_amount = amount
                     await connection.execute(
                         """
                         INSERT OR IGNORE INTO point_reward_events (
@@ -352,7 +348,7 @@ class PointsService:
                         )
                         VALUES (?, ?, ?, ?, ?)
                         """,
-                        (broadcaster_id, source, event_id, user_id, amount)
+                        (broadcaster_id, source, event_id, user_id, awarded_amount)
                     )
                     changed = await connection.fetchone("SELECT changes() AS count")
 
@@ -368,11 +364,11 @@ class PointsService:
                             username = excluded.username,
                             points = points + excluded.points
                         """,
-                        (broadcaster_id, user_id, username, amount)
+                        (broadcaster_id, user_id, username, awarded_amount)
                     )
 
                     if earned and self.chatter_stats is not None:
-                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, amount, connection)
+                        await self.chatter_stats.record_points_earned(broadcaster_id, user_id, awarded_amount, connection)
 
                     await connection.commit()
                 except Exception:
@@ -391,7 +387,7 @@ class PointsService:
         LOGGER.info(
             "[Points] Added a one-time %s reward of %d points to %s for broadcaster %s.",
             source,
-            amount,
+            awarded_amount,
             username,
             broadcaster_id
         )

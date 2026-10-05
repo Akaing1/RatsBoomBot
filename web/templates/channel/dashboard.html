@@ -66,27 +66,30 @@
             <h3>Category</h3>
             <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" data-channel-field="game">{{ twitch_channel_metadata.game }}</strong>
             <p class="channel-metadata-status" data-channel-metadata-status aria-live="polite">Click the title or game to edit.</p>
-            <div class="twitch-game-suggestions" data-game-suggestions role="listbox" hidden></div>
+            <div id="dashboard-category-picker" class="twitch-game-suggestions" data-game-suggestions hidden>
+                <div class="twitch-game-options" data-game-options role="listbox"></div>
+                <div class="twitch-game-selection-preview" data-game-selection-preview></div>
+            </div>
         </div>
+        <button type="button" class="twitch-current-category-art" aria-label="Select category" title="{{ twitch_channel_metadata.game }}" aria-controls="dashboard-category-picker" aria-expanded="false">
+            <img data-current-category-art alt="" {% if twitch_channel_metadata.box_art_url %}src="{{ twitch_channel_metadata.box_art_url }}"{% else %}hidden{% endif %}>
+        </button>
     </div>
     <div class="dashboard-video-frame">
         {% if broadcaster.login %}
-            <iframe
+            <div
+                id="dashboard-twitch-player"
                 class="dashboard-video-player"
                 data-stream-player
                 data-channel="{{ broadcaster.login }}"
-                title="{{ broadcaster.name or broadcaster.login }} live stream preview"
-                width="640"
-                height="360"
-                loading="lazy"
-                allow="autoplay; fullscreen; picture-in-picture"
-                allowfullscreen
-                referrerpolicy="strict-origin-when-cross-origin"
-            ></iframe>
+                data-is-live="{{ 'true' if broadcaster.is_live else 'false' }}"
+                aria-label="{{ broadcaster.name or broadcaster.login }} live stream preview"
+            ></div>
         {% else %}
             <p class="dashboard-video-unavailable">A Twitch channel login is needed to show the stream preview.</p>
         {% endif %}
     </div>
+    {% if broadcaster.login %}<p class="dashboard-video-playback-status" data-stream-playback-status role="status" hidden></p>{% endif %}
 </section>
 
 <div class="channel-live-layout">
@@ -139,7 +142,55 @@
             <div>
                 <h3 class="chat-heading">Combined Chat <span class="chat-platform-dot twitch active" title="Twitch connected" aria-label="Twitch connected"></span><span class="chat-platform-dot youtube {% if youtube_chat.connected %}active{% endif %}" title="YouTube {% if youtube_chat.connected %}connected{% else %}off{% endif %}" aria-label="YouTube {% if youtube_chat.connected %}connected{% else %}off{% endif %}"></span></h3>
             </div>
-            <button type="button" class="channel-state live chat-command-toggle" data-chat-command-toggle aria-pressed="true">Commands on</button>
+            <div class="dashboard-chat-header-actions">
+                <div class="chat-filter" data-chat-filter data-channel-id="{{ broadcaster.id }}">
+                    <button type="button" class="chat-filter-toggle" data-chat-filter-toggle aria-label="Filter chat" aria-expanded="false" aria-controls="chat-filter-options" title="Filter chat">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="chat-filter-button-label">Filter</span><span data-chat-filter-count aria-hidden="true"></span>
+                    </button>
+                    <div id="chat-filter-options" class="chat-filter-options" data-chat-filter-options popover="manual" role="group" aria-label="Chat filters" hidden>
+                        {% for group, group_key, entries in [('Users', 'users', [('vips', 'VIPs'), ('mods', 'Mods'), ('subs', 'Subs'), ('non_subs', 'Non-subs'), ('bots', 'Bots')]), ('Message types', 'types', [('messages', 'Messages'), ('commands', 'Commands'), ('redeems', 'Redeems')])] %}
+                        <div class="chat-filter-group" role="group" aria-label="{{ group }}">
+                            <div class="chat-filter-options-header chat-filter-section-header">
+                                <span class="chat-filter-group-title">{{ group }}</span>
+                                <button type="button" class="chat-filter-clear" data-chat-filter-clear="{{ group_key }}" aria-label="Reset {{ group | lower }} filters to show everything">Clear</button>
+                                {% if group_key == 'users' %}
+                                <button type="button" class="chat-filter-clear" data-chat-filter-clear="all" aria-label="Reset all filters to show everything">Clear all</button>
+                                {% endif %}
+                            </div>
+                            {% if group_key == 'users' %}
+                            {% for platform_key, platform_label, platform_entries in [('twitch', 'Twitch', entries), ('youtube', 'YouTube', [('youtube_mods', 'Mods'), ('youtube_members', 'Members'), ('youtube_non_members', 'Non-members'), ('youtube_bots', 'Bots')])] %}
+                            {% set connected = twitch_connected if platform_key == 'twitch' else youtube_chat.connected %}
+                            <div class="chat-filter-platform-section" role="group" aria-label="{{ platform_label }} users">
+                                <div class="chat-filter-platform-heading">
+                                    <label class="chat-filter-row chat-filter-platform-title" title="{{ platform_label }}"><input type="checkbox" data-chat-filter-platform="{{ platform_key }}" {% if not connected %}disabled{% endif %} {% if not (twitch_connected and youtube_chat.connected) %}hidden{% endif %}> <span>{{ platform_label }}</span></label>
+                                    <a class="chat-filter-connection{% if connected %} is-connected{% endif %}" data-chat-filter-connection data-connected="{{ 'true' if connected else 'false' }}" href="{{ '/connect' if platform_key == 'twitch' else '/channel/customization?social_tab=youtube#youtube-integration' }}" title="{{ 'Edit' if connected else 'Connect' }} {{ platform_label }} connection" aria-label="{{ platform_label }} {{ 'connected' if connected else 'not connected' }}. Open channel connection settings.">{{ 'Connected' if connected else 'Not connected' }}</a>
+                                </div>
+                                <div {% if not connected %}hidden{% endif %}>
+                                {% for key, label in platform_entries %}
+                                <label class="chat-filter-row chat-filter-suboption" title="{{ label }}"><input type="checkbox" data-chat-filter-axis="users" data-chat-filter-option="{{ key }}"> <span>{{ label }}</span></label>
+                                {% endfor %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% else %}
+                            {% for key, label in entries %}
+                            <label class="chat-filter-row chat-filter-suboption" title="{{ label }}"><input type="checkbox" data-chat-filter-axis="{{ group_key }}" data-chat-filter-option="{{ key }}"> <span>{{ label }}</span></label>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        <p class="chat-filter-hint">Left-click to toggle. Right-click to solo.</p>
+                    </div>
+                </div>
+                <button type="button" class="dashboard-chat-control dashboard-chat-lock" data-chat-lock aria-pressed="false" aria-label="Lock automatic chat resizing" title="Lock automatic chat resizing">
+                    <svg class="chat-unlocked-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0M12 14v3"/></svg>
+                    <svg class="chat-locked-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3"/></svg>
+                </button>
+                <button type="button" class="dashboard-chat-control dashboard-chat-expand" data-chat-expand aria-pressed="false" aria-label="Expand chat to full height" title="Expand chat to full height">
+                    <svg class="chat-expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M3 3l6 6m7 12h5v-5m0 5-6-6"/></svg>
+                    <svg class="chat-collapse-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h6V3M9 9 3 3m18 12h-6v6m0-6 6 6"/></svg>
+                </button>
+            </div>
         </div>
 
         <div
@@ -165,17 +216,16 @@
             </div>
             <label class="sr-only" for="dashboard-chat-message">Send a chat message</label>
             <div class="chat-message-entry">
-                <textarea id="dashboard-chat-message" name="message" rows="2" maxlength="200" placeholder="Send a message to chat... (supports autocomplete)" required autocomplete="off"></textarea>
+                <textarea id="dashboard-chat-message" name="message" rows="1" maxlength="500" placeholder="Send a message... (supports autocomplete)" required autocomplete="off"></textarea>
                 <button class="chat-emote-toggle" type="button" data-emote-toggle aria-expanded="false" aria-label="Open emote picker" title="Emotes">
                     <span aria-hidden="true">☺</span>
                 </button>
-                <p id="chat-send-status" class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
                 <div class="chat-emote-suggestions" data-emote-suggestions role="listbox" hidden></div>
                 <div class="chat-emote-picker" data-emote-picker hidden>
                     <div class="chat-emote-picker-header">
                         <label class="sr-only" for="dashboard-emote-search">Search emotes</label>
                         <input id="dashboard-emote-search" type="search" placeholder="Search emotes…" data-emote-search autocomplete="off">
-                        <span data-emote-count></span>
+                        <span class="chat-emote-count"><strong data-emote-count></strong><span>emotes</span></span>
                     </div>
                     <div class="chat-emote-picker-body">
                         <div class="chat-emote-grid" data-emote-grid></div>
@@ -193,6 +243,7 @@
                     <button class="chat-target" type="button" data-chat-target="youtube" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>YouTube</button>
                     <button class="chat-target" type="button" data-chat-target="both" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>Both</button>
                 </div>
+                <p id="chat-send-status" class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
                 <button class="button primary chat-send-button" type="submit">Send</button>
             </div>
         </form>
@@ -218,7 +269,7 @@
         </div>
     </section>
 
-    <section class="panel activity-panel dashboard-activity-panel dashboard-community-panel {% if raid_enabled %}has-raid{% endif %}" data-activity-group>
+    <section class="panel activity-panel dashboard-activity-panel dashboard-community-panel" data-activity-group>
         <div class="panel-header">
             <div>
                 <h3>Activity</h3>
@@ -236,9 +287,6 @@
         <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Activity feed">
             <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-activity-tab="redeems">Redeems</button>
             <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="commands">Commands</button>
-            {% if raid_enabled %}
-                <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="raid">Raid</button>
-            {% endif %}
         </div>
 
         <div data-activity-panel="redeems">
@@ -295,11 +343,6 @@
             </div>
         </div>
 
-        {% if raid_enabled %}
-            <div class="dashboard-raid-tab" data-activity-panel="raid" hidden>
-                {% include "channel/raid_summary.html" %}
-            </div>
-        {% endif %}
     </section>
     </div>
 
@@ -376,7 +419,7 @@
                     {% for member in queue_members %}
                         <li class="queue-list-item" data-username="{{ member.username }}">
                             <span class="queue-position">{{ loop.index }}</span>
-                            <strong class="queue-username">{{ member.label }}</strong>
+                            <strong class="queue-username" title="{{ member.label }}">{{ member.label }}</strong>
                             <span class="queue-grab-indicator" aria-hidden="true"></span>
 
                             <div class="queue-item-actions">
@@ -425,6 +468,7 @@
 </div>
 </div>
 
+<script src="{{ url_for('static', path='/js/dashboard-activity-motion.js') }}?v={{ deployment_stamp() }}"></script>
 <script>
     (() => {
         const tabs = Array.from(document.querySelectorAll("[data-activity-tab]"));
@@ -437,7 +481,9 @@
                 candidate.setAttribute("aria-selected", String(active));
             });
             group.querySelectorAll("[data-activity-panel]").forEach(panel => {
+                const wasHidden = panel.hidden;
                 panel.hidden = panel.dataset.activityPanel !== selected;
+                if (wasHidden && !panel.hidden) window.dashboardActivityMotion?.switchTab(panel);
             });
         }
 
@@ -616,7 +662,9 @@
             const jumpButton = document.createElement("button");
             jumpButton.type = "button";
             jumpButton.className = "live-chat-jump";
-            jumpButton.textContent = "↑ Jump to present";
+            jumpButton.title = "Jump to present";
+            jumpButton.setAttribute("aria-label", "Jump to present");
+            jumpButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>';
             jumpButton.hidden = true;
             shell.appendChild(jumpButton);
             const scroller = {element, jumpButton, hasUnseen: false};
@@ -646,7 +694,8 @@
                 .find(item => item.getBoundingClientRect().bottom > viewportTop);
             const anchorKey = anchor?.dataset.activityKey;
             const anchorTop = anchor?.getBoundingClientRect().top;
-            render();
+            const motionDuration = window.dashboardActivityMotion
+                ? window.dashboardActivityMotion.reconcile(element, render) : (render(), 0);
             if (atTop) {
                 element.scrollTop = 0;
             } else {
@@ -659,6 +708,7 @@
             }
             if (hasNewActivity && !atTop) scroller.hasUnseen = true;
             scroller.update();
+            if (motionDuration) window.dashboardActivityMotion.preserveScroll(element, atTop, motionDuration);
         }
 
         const feedScroller = createTopScroller(feedContent);
@@ -797,7 +847,9 @@
             const response = await fetch(automodActionUrl, {method: "POST", body: data});
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || "The AutoMod message could not be updated.");
-            document.querySelector(`[data-automod-message="${CSS.escape(messageId)}"]`)?.remove();
+            const row = document.querySelector(`[data-automod-message="${CSS.escape(messageId)}"]`);
+            if (row && window.dashboardActivityMotion) window.dashboardActivityMotion.remove(automodContent, row);
+            else row?.remove();
         }
 
         function renderAutomod(messages) {
@@ -916,9 +968,11 @@
 {% block page_scripts %}
     <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-carousel.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="https://player.twitch.tv/js/embed/v1.js" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-stream-player.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-channel-metadata.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-viewer-queue.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-chat-filters.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-chat-send.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-ad-status.js') }}?v={{ deployment_stamp() }}" defer></script>

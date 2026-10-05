@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import asqlite
 import pytest
 
-from bot.profiles import RaidBossConfig, RaidBossNames
+from bot.profiles import ChannelProfile, RaidBossConfig, RaidBossNames, activate_profile, clear_profiles, get_active_profile
 from bot.services.engagement.points import PointsService
 from bot.services.engagement.raid_boss import RaidBossEvent, RaidBossService
 from storage.migration_runner import run_migrations
@@ -141,7 +141,7 @@ async def test_scheduled_tutorial_warns_then_spawns_and_starts_reminders(tmp_pat
         assert scheduled is True
         assert event is not None
         assert event.boss_tier == "tutorial"
-        assert bot.messages[0] == "A dangerous presence is approaching... Prepare yourselves for the raid in 10 minutes!"
+        assert bot.messages[0] == "A dangerous presence is approaching... Prepare for Boss Hunt in 10 minutes!"
         assert bot.announcements[0]["moderator"] == "bot-1"
         assert bot.announcements[0]["color"] == "orange"
         assert "has appeared" in bot.announcements[0]["message"]
@@ -200,6 +200,32 @@ async def test_reminder_deadline_and_chat_count_restore_after_restart(tmp_path) 
         assert restarted_service.reminder_message_counts["channel-1"] == 7
         assert str(restored_schedule["next_reminder_at"]) == str(original_schedule["next_reminder_at"])
         await restarted_service.stop()
+
+
+@pytest.mark.asyncio
+async def test_scheduled_boss_uses_names_changed_before_spawn(tmp_path, monkeypatch) -> None:
+    original = build_config(names=RaidBossNames(melee="Old Name"))
+    updated = build_config(names=RaidBossNames(melee="New Name"))
+    activate_profile("channel-1", ChannelProfile(channel_name="test", raid_bosses=original))
+    try:
+        async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+            await run_migrations(database)
+            service = RaidBossService(
+                bot=FakeRaidBot(), db=database,
+                config_provider=lambda broadcaster_id: get_active_profile(broadcaster_id).raid_bosses,
+            )
+            await service.setup()
+
+            async def change_name_before_spawn(target):
+                activate_profile("channel-1", ChannelProfile(channel_name="test", raid_bosses=updated))
+
+            monkeypatch.setattr(service, "_sleep_until", change_name_before_spawn)
+            await service.schedule_spawn("channel-1", original, "main", "melee")
+            await service.spawn_tasks["channel-1"]
+            assert (await service.get_active_event("channel-1")).boss_name == "New Name"
+            await service.stop()
+    finally:
+        clear_profiles()
 
 
 @pytest.mark.asyncio
@@ -262,7 +288,7 @@ async def test_active_raid_reminds_after_45_minutes_then_waits_60_minutes(tmp_pa
         assert bot.messages == []
         assert len(bot.announcements) == 1
         assert bot.announcements[0]["color"] == "purple"
-        assert bot.announcements[0]["message"].startswith("Raid reminder:")
+        assert bot.announcements[0]["message"].startswith("Boss Hunt reminder:")
 
 
 @pytest.mark.asyncio
@@ -383,6 +409,7 @@ async def test_critical_hit_adds_fifty_percent_damage(tmp_path, monkeypatch) -> 
 
 @pytest.mark.asyncio
 async def test_mini_boss_uses_tier_specific_name_balance_and_persisted_tier(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("rpg_minigame.service.random.choices", lambda population, **kwargs: [population[0]])
 
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         service = RaidBossService(bot=None, db=database)
@@ -1595,3 +1622,144 @@ async def test_mythical_and_blessed_unique_weapons_cannot_be_sold(tmp_path) -> N
 
         assert await service.sell("channel-1", "user-1", "alice", "mythical_blade", config) == "unsellable"
         assert await service.sell("channel-1", "user-1", "alice", "heavens_judgement", config) == "unsellable"
+
+
+@pytest.mark.asyncio
+async def test_disabled_raids_block_background_work_and_preserve_active_boss(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        await run_migrations(database)
+        bot = FakeRaidBot()
+        enabled = {"channel-1": True, "channel-2": True}
+        service = RaidBossService(bot, database, enabled_provider=lambda channel: enabled[channel])
+        config = build_config(duration_streams=1)
+        event = await service.spawn("channel-1", "melee", config)
+        await service.register_stream("channel-1", "stream-1")
+        enabled["channel-1"] = False
+
+        assert not await service.schedule_spawn("channel-1", config)
+        assert await service.spawn("channel-1", "magic", config) is None
+        assert await service.spawn_automatic("channel-1", config) is None
+        await service.start_reminders("channel-1", "stream-2")
+        await service.restore_session("channel-1", "stream-2", config)
+        await service._send_message("channel-1", "warning")
+        await service.send_announcement("channel-1", "reminder", "purple")
+        paused, reward = await service.register_stream("channel-1", "stream-2")
+        assert paused.id == event.id
+        assert paused.status == "active"
+        assert paused.streams_used == 1
+        assert reward == 0
+        assert not service.spawn_tasks
+        assert not service.reminder_tasks
+        assert not bot.messages
+        assert not bot.announcements
+
+        assert await service.spawn("channel-2", "magic", config) is not None
+        await service.send_announcement("channel-2", "enabled channel", "orange")
+        assert bot.announcements[0]["message"] == "enabled channel"
+        enabled["channel-1"] = True
+        await service.start_reminders("channel-1", "stream-1")
+        assert "channel-1" in service.reminder_tasks
+        await service.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("disable_at", ["warning", "spawn"])
+async def test_scheduled_spawn_rechecks_toggle_after_each_wait(tmp_path, monkeypatch, disable_at) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        await run_migrations(database)
+        bot = FakeRaidBot()
+        enabled = True
+        service = RaidBossService(bot, database, enabled_provider=lambda channel: enabled)
+        config = build_config(tutorial_enabled=True)
+        waits = 0
+
+        async def disable_during_wait(target):
+            nonlocal enabled, waits
+            waits += 1
+            if waits == (1 if disable_at == "warning" else 2):
+                enabled = False
+
+        monkeypatch.setattr(service, "_sleep_until", disable_during_wait)
+        # Automatic scheduling waits both before its warning and before spawning.
+        assert await service.schedule_spawn("channel-1", config)
+        await service.spawn_tasks["channel-1"]
+        assert await service.get_active_event("channel-1") is None
+        assert len(bot.messages) == (0 if disable_at == "warning" else 1)
+        assert not bot.announcements
+        assert not service.spawn_tasks
+        assert not service.reminder_tasks
+        await service.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("disable_at", ["deadline", "activity"])
+async def test_reminders_recheck_toggle_after_deadline_and_activity(tmp_path, monkeypatch, disable_at) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        await run_migrations(database)
+        bot = FakeRaidBot()
+        enabled = True
+        service = RaidBossService(bot, database, enabled_provider=lambda channel: enabled)
+        await service.spawn("channel-1", "melee", build_config())
+
+        async def deadline(target):
+            nonlocal enabled
+            if disable_at == "deadline":
+                enabled = False
+
+        async def activity(channel):
+            nonlocal enabled
+            enabled = False
+
+        monkeypatch.setattr(service, "_sleep_until", deadline)
+        monkeypatch.setattr(service, "_wait_for_reminder_activity", activity)
+        await service.start_reminders("channel-1", "stream-1")
+        await service.reminder_tasks["channel-1"]
+        assert not bot.announcements
+        assert not bot.messages
+        assert not service.reminder_tasks
+        assert not service.reminder_message_counts
+        assert (await service.get_active_event("channel-1")).status == "active"
+        await service.stop()
+
+
+@pytest.mark.asyncio
+async def test_chat_activity_cancels_existing_tasks_when_raids_disabled(tmp_path) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        await run_migrations(database)
+        enabled = True
+        service = RaidBossService(FakeRaidBot(), database, enabled_provider=lambda channel: enabled)
+        await service.schedule_spawn("channel-1", build_config())
+        task = service.spawn_tasks["channel-1"]
+        enabled = False
+        await service.track_message(SimpleNamespace(broadcaster=SimpleNamespace(id="channel-1")))
+        await asyncio.gather(task, return_exceptions=True)
+        assert task.cancelled()
+        assert not service.spawn_tasks
+        assert await service._get_schedule("channel-1") is None
+        await service.stop()
+
+
+@pytest.mark.asyncio
+async def test_disabled_stream_online_skips_raid_progress_and_announcements(monkeypatch) -> None:
+    from unittest.mock import AsyncMock, Mock
+    from bot.shared.events.streams import StreamEvents
+
+    monkeypatch.setattr("bot.shared.events.streams.get_active_profile", lambda channel: ChannelProfile(channel_name="test"))
+    raids = SimpleNamespace(
+        cancel_announcements=AsyncMock(), get_active_event=AsyncMock(),
+        register_stream=AsyncMock(), start_reminders=AsyncMock(),
+        schedule_spawn=AsyncMock(), send_announcement=AsyncMock(),
+    )
+    services = SimpleNamespace(
+        raid_bosses=raids, features=SimpleNamespace(is_enabled=lambda *args: False),
+        stream_logs=SimpleNamespace(start_session=AsyncMock()),
+        live_chat=SimpleNamespace(start_youtube_for_twitch_stream=Mock()),
+        passive_points=SimpleNamespace(start_for_stream=AsyncMock()),
+    )
+    component = StreamEvents(SimpleNamespace(services=services))
+    await component.event_stream_online(SimpleNamespace(broadcaster=SimpleNamespace(id="channel-1", name="test"), id="stream-2"))
+    raids.cancel_announcements.assert_awaited_once_with("channel-1")
+    for method in (raids.get_active_event, raids.register_stream, raids.start_reminders, raids.schedule_spawn, raids.send_announcement):
+        method.assert_not_awaited()
+    services.stream_logs.start_session.assert_awaited_once()
+    services.passive_points.start_for_stream.assert_awaited_once_with("channel-1", "stream-2")

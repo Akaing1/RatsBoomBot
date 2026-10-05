@@ -14,6 +14,7 @@
             <p class="eyebrow">Chatter profiles</p>
             <h2>{% if unavailable %}Profiles are temporarily unavailable{% else %}Chatter not found{% endif %}</h2>
             <p>{% if unavailable %}RatsBoomBot is restarting or offline. Try again shortly.{% elif channel_name %}@{{ query }} has no recorded activity in {{ channel_name }}.{% else %}No public profile exists for “{{ query }}” yet. Profiles appear after someone chats in a connected channel.{% endif %}</p>
+            {% if not unavailable %}<p><a class="button secondary" href="/me">Sign in with Twitch to view your account</a></p>{% endif %}
             <form class="chatter-search centered" method="get" action="/chatters">
                 <input type="search" name="q" placeholder="Find another chatter" aria-label="Find another chatter" required>
                 <button class="button primary" type="submit">Search</button>

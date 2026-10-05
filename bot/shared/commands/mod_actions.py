@@ -334,6 +334,7 @@ class ModActionCommands(commands.Component):
         self.start_kamikaze_cooldown(broadcaster_id, caller_id)
 
         bomb_roll = random.randint(1, 100)
+        success_threshold = self.KAMIKAZE_SUCCESS_THRESHOLD
 
         LOGGER.debug(
             "[Commands] !kamikaze rolled %d for user %s against %s.",
@@ -342,7 +343,7 @@ class ModActionCommands(commands.Component):
             target.name
         )
 
-        if bomb_roll > self.KAMIKAZE_SUCCESS_THRESHOLD:
+        if bomb_roll > success_threshold:
             timed_out = await self.timeout_with_moderator_restore(channel, broadcaster_id, target_id, target.name)
 
             if not timed_out:
