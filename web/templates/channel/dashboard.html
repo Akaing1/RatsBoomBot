@@ -151,12 +151,29 @@
                                 <button type="button" class="chat-filter-clear" data-chat-filter-clear="all" aria-label="Reset all filters to show everything">Clear all</button>
                                 {% endif %}
                             </div>
+                            {% if group_key == 'users' %}
+                            {% for platform_key, platform_label, platform_entries in [('twitch', 'Twitch', entries), ('youtube', 'YouTube', [('youtube_mods', 'Mods'), ('youtube_members', 'Members'), ('youtube_non_members', 'Non-members'), ('youtube_bots', 'Bots')])] %}
+                            {% set connected = twitch_connected if platform_key == 'twitch' else youtube_chat.connected %}
+                            <div class="chat-filter-platform-section" role="group" aria-label="{{ platform_label }} users">
+                                <div class="chat-filter-platform-heading">
+                                    <label class="chat-filter-row chat-filter-platform-title" title="{{ platform_label }}"><input type="checkbox" data-chat-filter-platform="{{ platform_key }}" {% if not connected %}disabled{% endif %} {% if not (twitch_connected and youtube_chat.connected) %}hidden{% endif %}> <span>{{ platform_label }}</span></label>
+                                    <a class="chat-filter-connection{% if connected %} is-connected{% endif %}" data-chat-filter-connection data-connected="{{ 'true' if connected else 'false' }}" href="{{ '/connect' if platform_key == 'twitch' else '/channel/customization?social_tab=youtube#youtube-integration' }}" title="{{ 'Edit' if connected else 'Connect' }} {{ platform_label }} connection" aria-label="{{ platform_label }} {{ 'connected' if connected else 'not connected' }}. Open channel connection settings.">{{ 'Connected' if connected else 'Not connected' }}</a>
+                                </div>
+                                <div {% if not connected %}hidden{% endif %}>
+                                {% for key, label in platform_entries %}
+                                <label class="chat-filter-row chat-filter-suboption" title="{{ label }}"><input type="checkbox" data-chat-filter-axis="users" data-chat-filter-option="{{ key }}"> <span>{{ label }}</span></label>
+                                {% endfor %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% else %}
                             {% for key, label in entries %}
                             <label class="chat-filter-row chat-filter-suboption" title="{{ label }}"><input type="checkbox" data-chat-filter-axis="{{ group_key }}" data-chat-filter-option="{{ key }}"> <span>{{ label }}</span></label>
                             {% endfor %}
+                            {% endif %}
                         </div>
                         {% endfor %}
-                        <p class="chat-filter-hint">Right-click to solo.</p>
+                        <p class="chat-filter-hint">Left-click to toggle. Right-click to solo.</p>
                     </div>
                 </div>
                 <button type="button" class="dashboard-chat-control dashboard-chat-lock" data-chat-lock aria-pressed="false" aria-label="Lock automatic chat resizing" title="Lock automatic chat resizing">
@@ -193,17 +210,16 @@
             </div>
             <label class="sr-only" for="dashboard-chat-message">Send a chat message</label>
             <div class="chat-message-entry">
-                <textarea id="dashboard-chat-message" name="message" rows="2" maxlength="200" placeholder="Send a message to chat... (supports autocomplete)" required autocomplete="off"></textarea>
+                <textarea id="dashboard-chat-message" name="message" rows="1" maxlength="500" placeholder="Send a message... (supports autocomplete)" required autocomplete="off"></textarea>
                 <button class="chat-emote-toggle" type="button" data-emote-toggle aria-expanded="false" aria-label="Open emote picker" title="Emotes">
                     <span aria-hidden="true">☺</span>
                 </button>
-                <p id="chat-send-status" class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
                 <div class="chat-emote-suggestions" data-emote-suggestions role="listbox" hidden></div>
                 <div class="chat-emote-picker" data-emote-picker hidden>
                     <div class="chat-emote-picker-header">
                         <label class="sr-only" for="dashboard-emote-search">Search emotes</label>
                         <input id="dashboard-emote-search" type="search" placeholder="Search emotes…" data-emote-search autocomplete="off">
-                        <span data-emote-count></span>
+                        <span class="chat-emote-count"><strong data-emote-count></strong><span>emotes</span></span>
                     </div>
                     <div class="chat-emote-picker-body">
                         <div class="chat-emote-grid" data-emote-grid></div>
@@ -221,6 +237,7 @@
                     <button class="chat-target" type="button" data-chat-target="youtube" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>YouTube</button>
                     <button class="chat-target" type="button" data-chat-target="both" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>Both</button>
                 </div>
+                <p id="chat-send-status" class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
                 <button class="button primary chat-send-button" type="submit">Send</button>
             </div>
         </form>

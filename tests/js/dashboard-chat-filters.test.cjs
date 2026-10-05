@@ -2,15 +2,23 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots'], types: ['commands', 'redeems', 'messages']};
+const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages']};
 
-function setup(storage = new Map()) {
+function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube']) {
     const handlers = {}, documentHandlers = {}, buttonHandlers = {}, changes = [];
+    const timers = [];
+    const connectionBadges = ['twitch', 'youtube'].map(platform => {
+        const classes = new Set();
+        return {dataset: {connected: String(connectedPlatforms.includes(platform))},
+            classes, classList: {add(name) { classes.add(name); }}};
+    });
     function input(dataset) {
         return {dataset, handlers: {}, addEventListener(event, handler) { this.handlers[event] = handler; }};
     }
     const inputs = Object.entries(axes).flatMap(([axis, keys]) => keys.map(key => input({chatFilterAxis: axis, chatFilterOption: key})));
     const groups = Object.keys(axes).map(axis => input({chatFilterGroupToggle: axis}));
+    const platformInputs = ['twitch', 'youtube'].map(platform => input({chatFilterPlatform: platform}));
+    platformInputs.forEach(item => { item.disabled = !connectedPlatforms.includes(item.dataset.chatFilterPlatform); });
     const clears = ['all', 'users', 'types'].map(axis => input({chatFilterClear: axis}));
     const options = {hidden: true, scrollTop: 0, contains: () => false, style: {}, getBoundingClientRect: () => ({width: 200, height: 330})};
     const countLabel = {textContent: ''};
@@ -20,10 +28,10 @@ function setup(storage = new Map()) {
         addEventListener: (event, handler) => { buttonHandlers[event] = handler; }};
     const control = {dataset: {channelId: 'test'},
         querySelector: selector => selector.includes('toggle') ? button : selector.includes('count') ? countLabel : options,
-        querySelectorAll: selector => selector.includes('group-toggle') ? groups : selector.includes('clear') ? clears : inputs,
+        querySelectorAll: selector => selector.includes('connection') ? connectionBadges : selector.includes('group-toggle') ? groups : selector.includes('platform') ? platformInputs : selector.includes('clear') ? clears : inputs,
         addEventListener: (event, handler) => { handlers[event] = handler; },
-        contains: target => [button, ...inputs, ...groups, ...clears].includes(target)};
-    const context = {window: {innerWidth: 500, innerHeight: 600, addEventListener() {}, localStorage: {getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value)}},
+        contains: target => [button, ...inputs, ...groups, ...platformInputs, ...clears].includes(target)};
+    const context = {window: {innerWidth: 500, innerHeight: 600, addEventListener() {}, setTimeout(fn, delay) { timers.push({fn, delay}); }, localStorage: {getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value)}},
         document: Object.assign(documentState, {addEventListener: (event, handler) => { documentHandlers[event] = handler; }})};
     vm.runInNewContext(fs.readFileSync('web/static/js/dashboard-chat-filters.js', 'utf8'), context);
     const api = context.window.dashboardChatFilters;
@@ -32,9 +40,56 @@ function setup(storage = new Map()) {
     const change = (key, checked) => { const item = option(key); item.checked = checked; item.handlers.change(); };
     const clear = axis => clears.find(item => item.dataset.chatFilterClear === axis).handlers.click();
     const solo = item => handlers.contextmenu({target: {closest: () => ({querySelector: selector =>
-        selector.includes('group-toggle') ? (groups.includes(item) ? item : null) : (inputs.includes(item) ? item : null)})}, preventDefault() {}});
-    return {api, filter, inputs, groups, clears, countLabel, option, change, clear, solo, handlers, documentHandlers, buttonHandlers, options, button, changes};
+        selector.includes('platform') ? (platformInputs.includes(item) ? item : null) : (inputs.includes(item) ? item : null)})}, preventDefault() {}});
+    const platform = (key, checked) => {
+        const item = platformInputs.find(item => item.dataset.chatFilterPlatform === key);
+        item.checked = checked; item.handlers.change();
+    };
+    return {api, filter, inputs, groups, platformInputs, platform, connectionBadges, timers, clears, countLabel, option, change, clear, solo, handlers, documentHandlers, buttonHandlers, options, button, changes};
 }
+
+test('connected badges fade after 1.5 seconds on first open only; disconnected badges remain visible', () => {
+    const ui = setup(new Map(), ['twitch']);
+    assert.equal(ui.timers.length, 0);
+    ui.buttonHandlers.click();
+    assert.equal(ui.timers[0].delay, 1500);
+    ui.timers[0].fn();
+    assert.equal(ui.connectionBadges[0].classes.has('is-fading'), true);
+    assert.equal(ui.connectionBadges[1].classes.has('is-fading'), false);
+    ui.buttonHandlers.click(); ui.buttonHandlers.click();
+    assert.equal(ui.timers.length, 1);
+});
+
+test('disconnected platforms cannot be toggled and do not prevent the empty-selection reset', () => {
+    const ui = setup(new Map(), ['twitch']);
+    assert.ok(ui.inputs.filter(item => item.dataset.chatFilterOption.startsWith('youtube_')).every(item => item.disabled && !item.checked));
+    ui.platform('youtube', true);
+    assert.equal(ui.filter.allows({user: 'youtube_mods', type: 'messages'}), false);
+    for (const key of ['vips', 'mods', 'subs', 'non_subs', 'bots']) ui.change(key, false);
+    assert.ok(ui.inputs.filter(item => !item.disabled).every(item => item.checked));
+    ui.clear('all');
+    assert.equal(ui.option('youtube_mods').checked, false);
+    assert.equal(ui.button.classList.contains('has-filter-count'), false);
+});
+
+test('platform checkboxes are hidden with fewer than two connected platforms', () => {
+    for (const connected of [[], ['twitch'], ['youtube']]) {
+        const ui = setup(new Map(), connected);
+        assert.ok(ui.platformInputs.every(item => item.hidden));
+    }
+    const ui = setup();
+    assert.ok(ui.platformInputs.every(item => !item.hidden));
+});
+
+test('newly connected platforms enable all their roles while preserving existing selections', () => {
+    const storage = new Map();
+    const ui = setup(storage, ['twitch']);
+    ui.solo(ui.option('mods'));
+    const connected = setup(storage, ['twitch', 'youtube']);
+    assert.equal(connected.option('mods').checked, true);
+    assert.equal(connected.option('subs').checked, false);
+    assert.ok(connected.inputs.filter(item => item.dataset.chatFilterOption.startsWith('youtube_')).every(item => item.checked));
+});
 
 test('messages have independent user and type classifications', () => {
     const {category} = setup().api;
@@ -46,6 +101,49 @@ test('messages have independent user and type classifications', () => {
     assert.equal(category({badges: ['founder']}).user, 'subs');
     assert.equal(category({}).user, 'non_subs');
     assert.equal(category({kind: 'system'}).type, 'messages');
+    assert.equal(category({platform: 'youtube', badges: ['Mod']}).user, 'youtube_mods');
+    assert.equal(category({platform: 'youtube', badges: ['Member']}).user, 'youtube_members');
+    assert.equal(category({platform: 'youtube'}).user, 'youtube_non_members');
+    assert.equal(category({platform: 'youtube', is_bot: true}).user, 'youtube_bots');
+});
+
+test('each platform can be disabled, and only disabling both resets all users', () => {
+    const storage = new Map();
+    const ui = setup(storage);
+    ui.platform('twitch', false);
+    assert.equal(ui.filter.allows({user: 'mods', type: 'messages'}), false);
+    assert.equal(ui.filter.allows({user: 'youtube_mods', type: 'messages'}), true);
+    const restored = setup(storage);
+    assert.equal(restored.option('mods').checked, false);
+    assert.equal(restored.option('youtube_mods').checked, true);
+    ui.platform('youtube', false);
+    assert.ok(ui.inputs.every(item => item.checked));
+    ui.platform('youtube', false);
+    assert.equal(ui.filter.allows({user: 'youtube_mods', type: 'messages'}), false);
+    assert.equal(ui.filter.allows({user: 'mods', type: 'messages'}), true);
+    ui.platform('twitch', false);
+    assert.ok(ui.inputs.every(item => item.checked));
+});
+
+test('unchecking individual roles leaves an empty platform disabled until all users are disabled', () => {
+    const ui = setup();
+    for (const role of ['vips', 'mods', 'subs', 'non_subs', 'bots']) ui.change(role, false);
+    assert.equal(ui.option('mods').checked, false);
+    assert.equal(ui.option('youtube_mods').checked, true);
+    for (const role of ['youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots']) ui.change(role, false);
+    assert.ok(ui.inputs.every(item => item.checked));
+});
+
+test('right-click platform solo affects users but preserves the message-type selection', () => {
+    const ui = setup();
+    ui.solo(ui.option('commands'));
+    const youtube = ui.platformInputs.find(item => item.dataset.chatFilterPlatform === 'youtube');
+    ui.solo(youtube);
+    assert.equal(ui.filter.allows({user: 'youtube_mods', type: 'commands'}), true);
+    assert.equal(ui.filter.allows({user: 'mods', type: 'commands'}), false);
+    assert.equal(ui.filter.allows({user: 'youtube_mods', type: 'messages'}), false);
+    ui.solo(youtube);
+    assert.equal(ui.filter.allows({user: 'mods', type: 'commands'}), true);
 });
 
 test('defaults are checked and selections require both axes to match', () => {
@@ -150,15 +248,15 @@ test('Clear buttons are visible only for sections with disabled options', () => 
 
 test('button count tracks enabled options across both independent sections', () => {
     const ui = setup();
-    assert.equal(ui.countLabel.textContent, '| 8');
+    assert.equal(ui.countLabel.textContent, '| 12');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
     ui.change('bots', false);
-    assert.equal(ui.countLabel.textContent, '| 7');
+    assert.equal(ui.countLabel.textContent, '| 11');
     assert.equal(ui.button.classList.contains('has-filter-count'), true);
     ui.solo(ui.option('messages'));
-    assert.equal(ui.countLabel.textContent, '| 5');
+    assert.equal(ui.countLabel.textContent, '| 9');
     ui.clear('all');
-    assert.equal(ui.countLabel.textContent, '| 8');
+    assert.equal(ui.countLabel.textContent, '| 12');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
 });
 

@@ -496,7 +496,7 @@ def test_tagged_bot_response_is_kept_with_commands_without_classifying_all_bot_m
 
 
 @pytest.mark.asyncio
-async def test_deleted_chat_messages_remain_in_history_as_deleted_updates():
+async def test_deleted_chat_messages_update_live_but_are_omitted_on_refresh():
     service = LiveChatService(None)
     message = service.publish_twitch(twitch_payload("This will be deleted", "deleted-message"))
     subscriber = service.subscribe("channel-1")
@@ -505,10 +505,88 @@ async def test_deleted_chat_messages_remain_in_history_as_deleted_updates():
 
     history = service.history("channel-1")
     update = subscriber.get_nowait()
-    assert history[0]["message"] == "This will be deleted"
-    assert history[0]["deleted"] is True
+    assert history == []
     assert update.id == message.id
     assert update.deleted is True
+
+
+def test_clear_chat_removes_twitch_history_and_notifies_subscribers():
+    service = LiveChatService(None)
+    twitch = service.publish_twitch(twitch_payload("hello"))
+    youtube = UnifiedChatMessage(id="youtube:1", platform="youtube", kind="chat", username="viewer",
+                                 display_name="Viewer", message="keep me", timestamp=twitch.timestamp)
+    service.publish("channel-1", youtube)
+    queue = service.subscribe("channel-1")
+    other = service.subscribe("other-channel")
+    service.clear_chat("channel-1")
+    assert [item["id"] for item in service.history("channel-1")] == [youtube.id]
+    assert queue.get_nowait() == {"event": "chat-clear", "platform": "twitch"}
+    assert other.empty()
+
+
+@pytest.mark.parametrize("platform,connected,url", [
+    ("twitch", False, "/connect"), ("youtube", False, "/channel/customization?social_tab=youtube#youtube-integration"),
+    ("twitch", True, None), ("youtube", True, None)])
+def test_platform_filter_connection_links(platform, connected, url):
+    from pathlib import Path
+    from jinja2 import Template
+    source = Path("web/templates/channel/dashboard.html").read_text(encoding="utf-8")
+    heading = source.split('<div class="chat-filter-platform-heading">', 1)[1].split('</div>', 1)[0]
+    html = Template(heading).render(platform_key=platform, platform_label=platform.title(), connected=connected,
+                                   twitch_connected=connected, youtube_chat=SimpleNamespace(connected=connected))
+    if url:
+        assert "Not connected" in html
+        assert "disabled" in html
+        assert f'href="{url}"' in html
+    else:
+        assert "Not connected" not in html
+        assert ">Connected</a>" in html
+        assert 'data-connected="true"' in html
+        assert 'href="' in html
+
+
+@pytest.mark.asyncio
+async def test_slash_clear_only_clears_local_chat_after_twitch_accepts():
+    channel = SimpleNamespace(delete_chat_messages=AsyncMock())
+    live_chat = SimpleNamespace(clear_chat=Mock())
+    bot = SimpleNamespace(create_partialuser=lambda _: channel, services=SimpleNamespace(live_chat=live_chat))
+    await dashboard_router.execute_twitch_slash_command(bot, "channel-1", "/clear")
+    live_chat.clear_chat.assert_called_once_with("channel-1")
+    live_chat.clear_chat.reset_mock()
+    channel.delete_chat_messages.side_effect = RuntimeError("Rejected")
+    with pytest.raises(RuntimeError):
+        await dashboard_router.execute_twitch_slash_command(bot, "channel-1", "/clear")
+    live_chat.clear_chat.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_clear_event_is_streamed_even_in_commands_view():
+    from web.shared.live_chat import stream_chat_events
+    service = LiveChatService(None)
+    events = stream_chat_events(SimpleNamespace(is_disconnected=AsyncMock(return_value=False)),
+                                service, "channel-1", "commands")
+    try:
+        assert (await anext(events)).startswith("retry:")
+        assert (await anext(events)).startswith("event: history-complete")
+        service.clear_chat("channel-1")
+        assert (await anext(events)).startswith("event: chat-clear")
+    finally:
+        await events.aclose()
+    assert "channel-1" not in service.subscribers
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("length,status", [(500, 200), (501, 400)])
+async def test_dashboard_enforces_500_character_message_limit(monkeypatch, length, status):
+    channel = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True)))
+    bot = SimpleNamespace(create_partialuser=lambda _: channel, services=SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": SimpleNamespace(id="channel-1")})))
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: bot)
+    request = Request({"type": "http", "session": {
+        CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}})
+    response = await dashboard_router.channel_send_chat_message(request, "x" * length, "twitch", "csrf", "")
+    assert response.status_code == status
+    assert channel.send_message.await_count == (1 if status == 200 else 0)
 
 
 @pytest.mark.asyncio
@@ -1860,7 +1938,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "Viewer games" not in dashboard
     assert 'data-refresh-url="/channel/api/dashboard-stats"' in dashboard
     assert "Back to Overview" not in features
-    assert dashboard.index("data-emote-toggle") < dashboard.index("data-chat-send-status") < dashboard.index("dashboard-chat-composer-actions")
+    assert dashboard.index("dashboard-chat-composer-actions") < dashboard.index("data-chat-send-status") < dashboard.index("chat-send-button")
     assert 'fetch("/channel/api/chat/emotes")' in composer_script
     assert 'fetch("/channel/api/chat/users"' in composer_script
     assert 'const twitchCommands = [' in composer_script
@@ -2081,12 +2159,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "overflow-y: auto; overscroll-behavior: contain;" in dashboard_styles
     assert "seen.has(emote.name)" in composer_script
     assert ".chat-emote-picker[hidden], .chat-emote-suggestions[hidden] { display: none; }" in dashboard_styles
-    assert ".chat-send-status { position: absolute;" in dashboard_styles
+    assert ".chat-send-status { flex: 1 1 0; min-width: 0;" in dashboard_styles
     assert "text-align: right; text-overflow: ellipsis;" in dashboard_styles
-    assert "right: 15px; bottom: 11px;" in dashboard_styles
     assert "opacity: .8;" in dashboard_styles
     assert ".chat-send-status.is-fading { opacity: 0; }" in dashboard_styles
-    assert "height: 66px;" in dashboard_styles
+    assert "height: calc(1.4em + 22px);" in dashboard_styles
     assert "resize: none;" in dashboard_styles
     assert 'status.dataset.connectionState === "disconnected"' in composer_script
     assert 'status.classList.add("is-fading")' in composer_script

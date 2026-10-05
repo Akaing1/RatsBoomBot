@@ -34,7 +34,7 @@ from web.state import get_bot
 router = APIRouter()
 LOGGER = logging.getLogger("RatBoomBot")
 CHAT_SEND_TARGETS = {"twitch", "youtube", "both"}
-CHAT_MESSAGE_MAX_LENGTH = 200
+CHAT_MESSAGE_MAX_LENGTH = 500
 TOP_GAMES_CACHE_SECONDS = 300
 
 
@@ -89,6 +89,7 @@ async def execute_twitch_slash_command(runtime_bot, broadcaster_id: str, message
         await broadcaster.unban_user(moderator=moderator_id, user_id=str(user.id))
     elif command == "clear":
         await broadcaster.delete_chat_messages(moderator=moderator_id)
+        runtime_bot.services.live_chat.clear_chat(broadcaster_id)
     elif command == "commercial":
         await broadcaster.start_commercial(length=int(require_argument("a duration in seconds")))
     elif command == "marker":
@@ -1118,6 +1119,7 @@ async def channel_dashboard(request: Request):
             "raid_enabled": raid_enabled,
             "raid_metrics": raid_metrics,
             "youtube_chat": services.live_chat.get_youtube_state(broadcaster_id),
+            "twitch_connected": bool((getattr(runtime_bot, "tokens", {}).get(str(broadcaster_id)) or {}).get("token")),
             "ad_status": ad_status,
             "dashboard_header_stats": dashboard_header_stats,
             "twitch_channel_metadata": twitch_channel_metadata,
