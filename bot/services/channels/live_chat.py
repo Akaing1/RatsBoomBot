@@ -1246,7 +1246,24 @@ class LiveChatService:
                     raise
                 except httpx.HTTPStatusError as error:
                     if error.response.status_code != 403:
-                        raise
+                        token_error = str(error.request.url).split("?")[0] == YOUTUBE_TOKEN_URL
+                        detail = (
+                            "YouTube authorization could not be refreshed. Reconnect YouTube in channel Customization."
+                            if token_error and error.response.status_code in {400, 401}
+                            else "YouTube chat is temporarily unavailable; retrying automatically."
+                        )
+                        status = ("unavailable" if token_error else "error", detail)
+                        if self.youtube_statuses.get(broadcaster_id) != status:
+                            LOGGER.warning(
+                                "[Live Chat] YouTube %s failed for broadcaster %s (HTTP %d): %s",
+                                "token refresh" if token_error else phase,
+                                broadcaster_id, error.response.status_code, detail,
+                                extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
+                            )
+                        self.active_youtube_chat_ids.pop(broadcaster_id, None)
+                        self.youtube_statuses[broadcaster_id] = status
+                        await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
+                        continue
 
                     reason, api_message = self._youtube_error_details(error.response)
                     detail = {
