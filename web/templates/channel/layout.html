@@ -119,6 +119,7 @@
         </main>
     </div>
     <script src="{{ url_for('static', path='/js/channel-sidebar.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/hover-labels.js') }}?v={{ deployment_stamp() }}" defer></script>
     {% block page_scripts %}{% endblock %}
 </body>
 </html>

@@ -3,6 +3,7 @@
     if (!form) return;
 
     const messageInput = form.querySelector('[name="message"]');
+    const defaultMessagePlaceholder = messageInput.placeholder;
     const sendButton = form.querySelector(".chat-send-button");
     const status = form.querySelector("[data-chat-send-status]");
     const targets = Array.from(form.querySelectorAll("[data-chat-target]"));
@@ -147,6 +148,7 @@
         }
         const caret = direction < 0 ? 0 : messageInput.value.length;
         messageInput.setSelectionRange(caret, caret);
+        resizeMessageInput();
         updateSuggestions();
         return true;
     }
@@ -204,6 +206,10 @@
         const prefix = before && !/\s$/.test(before) ? " " : "";
         const suffix = after && !/^\s/.test(after) ? " " : "";
         const replacement = `${prefix}${value}${suffix || " "}`;
+        if (before.length + replacement.length + after.length > messageInput.maxLength) {
+            showStatus("Messages can contain up to 500 characters.", "warning", true);
+            return;
+        }
         messageInput.setRangeText(replacement, start, end, "end");
         emotePicker.hidden = true;
         emoteToggle.setAttribute("aria-expanded", "false");
@@ -228,7 +234,7 @@
         ).sort((left, right) => left.name.localeCompare(right.name, undefined, {sensitivity: "variant"}));
         emoteGrid.replaceChildren();
         emoteGrid.scrollTop = 0;
-        emoteCount.textContent = `${matches.length} emote${matches.length === 1 ? "" : "s"}`;
+        emoteCount.textContent = String(matches.length);
 
         orderedGroups().forEach(group => {
             const items = matches.filter(emote => groupKey(emote) === group.key);
@@ -477,15 +483,21 @@
 
     function clearReply() {
         replyMessageId.value = "";
+        messageInput.placeholder = defaultMessagePlaceholder;
         replyName.textContent = "";
         replyPreview.textContent = "";
         replyContext.hidden = true;
     }
 
-    function beginReply({messageId = "", name = "", message = ""} = {}) {
+    function beginReply({messageId = "", username = "", displayName = "", name = "", message = ""} = {}) {
         if (!messageId.startsWith("twitch:")) return;
         replyMessageId.value = messageId;
-        replyName.textContent = `Replying to ${name || "message"}`;
+        const label = username
+            ? (displayName && displayName.toLocaleLowerCase() !== username.toLocaleLowerCase()
+                ? `${displayName} (${username})` : username)
+            : name || displayName || "message";
+        replyName.textContent = `Replying to ${label}`;
+        messageInput.placeholder = `Replying to ${label}...`;
         replyPreview.textContent = message;
         replyContext.hidden = false;
         if (selectedTarget === "youtube") selectTarget("twitch");
@@ -521,12 +533,35 @@
         loadEmotes();
         loadUsers();
     });
+    function resizeMessageInput() {
+        const styles = getComputedStyle(messageInput);
+        const borders = parseFloat(styles.borderTopWidth) + parseFloat(styles.borderBottomWidth);
+        const singleRowHeight = parseFloat(styles.lineHeight) + parseFloat(styles.paddingTop)
+            + parseFloat(styles.paddingBottom) + borders;
+        messageInput.style.height = `${singleRowHeight}px`;
+        // A wrapped placeholder must not grow an otherwise empty input.
+        if (messageInput.value) {
+            messageInput.style.height = `${Math.max(singleRowHeight, messageInput.scrollHeight + borders)}px`;
+        }
+    }
+
     messageInput.addEventListener("input", () => {
+        resizeMessageInput();
         browsingHistory = false;
         historyIndex = messageHistory.length;
         updateSuggestions();
     });
     messageInput.addEventListener("click", updateSuggestions);
+    let composerWidth = 0;
+    if ("ResizeObserver" in window) {
+        new ResizeObserver(entries => {
+            const width = entries[0].contentRect.width;
+            if (width === composerWidth) return;
+            composerWidth = width;
+            resizeMessageInput();
+        }).observe(messageInput);
+    }
+    resizeMessageInput();
 
     messageInput.addEventListener("keydown", event => {
         if (event.key === "Escape" && replyMessageId.value) {
@@ -584,6 +619,10 @@
     form.addEventListener("submit", async event => {
         event.preventDefault();
         if (sending || !messageInput.value.trim()) return;
+        if (messageInput.value.length > messageInput.maxLength) {
+            showStatus("Messages can contain up to 500 characters.", "warning", true);
+            return;
+        }
 
         sending = true;
         sendButton.disabled = true;
@@ -606,6 +645,7 @@
             const failures = Object.values(result.errors || {});
             rememberMessage(outgoingMessage);
             messageInput.value = "";
+            resizeMessageInput();
             historyDraft = "";
             clearReply();
             hideSuggestions();

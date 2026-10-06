@@ -295,6 +295,8 @@
                 document.dispatchEvent(new CustomEvent("dashboard-chat-reply", {detail: {
                     messageId: message.id,
                     name: visibleMessageName(message),
+                    username: message.username || "",
+                    displayName: message.display_name || "",
                     message: message.message || ""
                 }}));
             });
@@ -384,7 +386,7 @@
             pinExpiryTimer: null,
             pinnedContainer: element.dataset.pinnedUrl ? makeElement("aside", "live-chat-pinned") : null,
             connectionStatus,
-            jumpButton: makeElement("button", "live-chat-jump", element.dataset.newestFirst === "true" ? "↑ Jump to present" : "↓ Jump to present")
+            jumpButton: makeElement("button", "live-chat-jump")
         };
         function showConnectionStatus(connected) {
             if (!connectionStatus) return;
@@ -411,6 +413,10 @@
             updateJumpButton(feed);
         });
         feed.jumpButton.type = "button";
+        feed.jumpButton.title = "Jump to present";
+        feed.jumpButton.setAttribute("aria-label", "Jump to present");
+        const jumpPath = feed.newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";
+        feed.jumpButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${jumpPath}"/></svg>`;
         feed.jumpButton.hidden = true;
         feed.jumpButton.addEventListener("click", () => {
             feed.hasUnseenMessages = false;
@@ -434,11 +440,27 @@
             window.setInterval(() => refreshPinned(feed), 2000);
         }
         shell.appendChild(feed.jumpButton);
+        if ("ResizeObserver" in window) {
+            new ResizeObserver(() => {
+                if (feed.followNewest) scrollToNewest(feed);
+            }).observe(element);
+        }
 
         const source = new EventSource(element.dataset.streamUrl);
         source.onopen = () => showConnectionStatus(true);
         source.onerror = () => showConnectionStatus(false);
         source.addEventListener("history-complete", () => { feed.historyComplete = true; });
+        source.addEventListener("chat-clear", event => {
+            const {platform} = JSON.parse(event.data);
+            if (platform !== "twitch") return;
+            element.querySelectorAll(".live-chat-message.platform-twitch").forEach(row => {
+                feed.seen.delete(row.dataset.messageId);
+                row.remove();
+            });
+            feed.followRowObserver?.disconnect();
+            feed.followRowObserver = null;
+            updateJumpButton(feed);
+        });
         source.onmessage = event => {
             try {
                 renderMessage(feed, JSON.parse(event.data));

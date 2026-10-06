@@ -59,6 +59,19 @@ def test_twitch_messages_are_split_between_chat_and_commands():
     assert chat.accent == "moderator"
 
 
+def test_sidebar_hover_labels_use_existing_names_for_channel_and_admin_navigation():
+    script = open("web/static/js/channel-sidebar.js", encoding="utf-8").read()
+    assert 'querySelectorAll(".nav-link, .sidebar-logout button")' in script
+    assert 'querySelector(".nav-link-label, .sidebar-button-label")?.textContent.trim()' in script
+    assert 'if (label) control.title = label;' in script
+    for path in ("web/templates/channel/layout.html", "web/templates/admin/layout.html"):
+        layout = open(path, encoding="utf-8").read()
+        assert "channel-sidebar.js" in layout
+        assert "hover-labels.js" in layout
+        assert 'class="nav-link-label"' in layout
+        assert 'class="sidebar-button-label"' in layout
+
+
 def test_reward_related_chat_messages_expose_redemption_metadata():
     service = LiveChatService(None)
     custom = twitch_payload("reward input", "custom")
@@ -483,7 +496,7 @@ def test_tagged_bot_response_is_kept_with_commands_without_classifying_all_bot_m
 
 
 @pytest.mark.asyncio
-async def test_deleted_chat_messages_remain_in_history_as_deleted_updates():
+async def test_deleted_chat_messages_update_live_but_are_omitted_on_refresh():
     service = LiveChatService(None)
     message = service.publish_twitch(twitch_payload("This will be deleted", "deleted-message"))
     subscriber = service.subscribe("channel-1")
@@ -492,10 +505,88 @@ async def test_deleted_chat_messages_remain_in_history_as_deleted_updates():
 
     history = service.history("channel-1")
     update = subscriber.get_nowait()
-    assert history[0]["message"] == "This will be deleted"
-    assert history[0]["deleted"] is True
+    assert history == []
     assert update.id == message.id
     assert update.deleted is True
+
+
+def test_clear_chat_removes_twitch_history_and_notifies_subscribers():
+    service = LiveChatService(None)
+    twitch = service.publish_twitch(twitch_payload("hello"))
+    youtube = UnifiedChatMessage(id="youtube:1", platform="youtube", kind="chat", username="viewer",
+                                 display_name="Viewer", message="keep me", timestamp=twitch.timestamp)
+    service.publish("channel-1", youtube)
+    queue = service.subscribe("channel-1")
+    other = service.subscribe("other-channel")
+    service.clear_chat("channel-1")
+    assert [item["id"] for item in service.history("channel-1")] == [youtube.id]
+    assert queue.get_nowait() == {"event": "chat-clear", "platform": "twitch"}
+    assert other.empty()
+
+
+@pytest.mark.parametrize("platform,connected,url", [
+    ("twitch", False, "/connect"), ("youtube", False, "/channel/customization?social_tab=youtube#youtube-integration"),
+    ("twitch", True, None), ("youtube", True, None)])
+def test_platform_filter_connection_links(platform, connected, url):
+    from pathlib import Path
+    from jinja2 import Template
+    source = Path("web/templates/channel/dashboard.html").read_text(encoding="utf-8")
+    heading = source.split('<div class="chat-filter-platform-heading">', 1)[1].split('</div>', 1)[0]
+    html = Template(heading).render(platform_key=platform, platform_label=platform.title(), connected=connected,
+                                   twitch_connected=connected, youtube_chat=SimpleNamespace(connected=connected))
+    if url:
+        assert "Not connected" in html
+        assert "disabled" in html
+        assert f'href="{url}"' in html
+    else:
+        assert "Not connected" not in html
+        assert ">Connected</a>" in html
+        assert 'data-connected="true"' in html
+        assert 'href="' in html
+
+
+@pytest.mark.asyncio
+async def test_slash_clear_only_clears_local_chat_after_twitch_accepts():
+    channel = SimpleNamespace(delete_chat_messages=AsyncMock())
+    live_chat = SimpleNamespace(clear_chat=Mock())
+    bot = SimpleNamespace(create_partialuser=lambda _: channel, services=SimpleNamespace(live_chat=live_chat))
+    await dashboard_router.execute_twitch_slash_command(bot, "channel-1", "/clear")
+    live_chat.clear_chat.assert_called_once_with("channel-1")
+    live_chat.clear_chat.reset_mock()
+    channel.delete_chat_messages.side_effect = RuntimeError("Rejected")
+    with pytest.raises(RuntimeError):
+        await dashboard_router.execute_twitch_slash_command(bot, "channel-1", "/clear")
+    live_chat.clear_chat.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_clear_event_is_streamed_even_in_commands_view():
+    from web.shared.live_chat import stream_chat_events
+    service = LiveChatService(None)
+    events = stream_chat_events(SimpleNamespace(is_disconnected=AsyncMock(return_value=False)),
+                                service, "channel-1", "commands")
+    try:
+        assert (await anext(events)).startswith("retry:")
+        assert (await anext(events)).startswith("event: history-complete")
+        service.clear_chat("channel-1")
+        assert (await anext(events)).startswith("event: chat-clear")
+    finally:
+        await events.aclose()
+    assert "channel-1" not in service.subscribers
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("length,status", [(500, 200), (501, 400)])
+async def test_dashboard_enforces_500_character_message_limit(monkeypatch, length, status):
+    channel = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True)))
+    bot = SimpleNamespace(create_partialuser=lambda _: channel, services=SimpleNamespace(
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": SimpleNamespace(id="channel-1")})))
+    monkeypatch.setattr(dashboard_router, "get_bot", lambda: bot)
+    request = Request({"type": "http", "session": {
+        CHANNEL_USER_ID_KEY: "channel-1", CSRF_SESSION_KEY: "csrf"}})
+    response = await dashboard_router.channel_send_chat_message(request, "x" * length, "twitch", "csrf", "")
+    assert response.status_code == status
+    assert channel.send_message.await_count == (1 if status == 200 else 0)
 
 
 @pytest.mark.asyncio
@@ -1104,7 +1195,10 @@ async def test_dashboard_metadata_edits_announce_changes_in_chat(
     response = await dashboard_router.update_twitch_channel_metadata(request, field, value, "csrf")
 
     assert response.status_code == 200
-    assert json.loads(response.body) == {"field": field, "value": expected_value, "announcement_sent": True}
+    expected = {"field": field, "value": expected_value, "announcement_sent": True}
+    if field == "game":
+        expected["box_art_url"] = ""
+    assert json.loads(response.body) == expected
     twitch_channel.modify_channel.assert_awaited_once_with(**expected_update)
     chat_identity.send_message.assert_awaited_once_with(twitch_channel, expected_announcement)
     live_chat.tag_command_response.assert_called_once_with("channel-1", "metadata-response")
@@ -1375,7 +1469,7 @@ async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
     async def games():
         yield SimpleNamespace(id="123", name="Retro")
         yield SimpleNamespace(id="509658", name="Just Chatting")
-        yield SimpleNamespace(id="456", name="Chat")
+        yield SimpleNamespace(id="456", name="Chat", box_art=SimpleNamespace(url_for=lambda w, h: f"https://example.com/chat-{w}x{h}.jpg"))
 
     def search_categories(query, **kwargs):
         calls.append((query, kwargs))
@@ -1395,11 +1489,80 @@ async def test_dashboard_game_search_returns_twitch_categories(monkeypatch):
     response = await dashboard_router.search_twitch_games(request, "chat")
 
     assert json.loads(response.body) == {"games": [
-        {"id": "456", "name": "Chat"},
+        {"id": "456", "name": "Chat", "box_art_url": "https://example.com/chat-96x128.jpg"},
         {"id": "509658", "name": "Just Chatting"},
         {"id": "123", "name": "Retro"}
     ]}
     assert calls == [("chat", {"token_for": "channel-1", "first": 50, "max_results": 50})]
+
+
+@pytest.mark.asyncio
+async def test_current_category_artwork_uses_channel_category_id():
+    artwork = SimpleNamespace(url_for=Mock(return_value="https://example.com/category.jpg"))
+    runtime_bot = SimpleNamespace(
+        create_partialuser=lambda _: SimpleNamespace(fetch_channel_info=AsyncMock(return_value=SimpleNamespace(
+            title="Title", game_name="Retro", game_id="123"
+        ))),
+        fetch_game=AsyncMock(return_value=SimpleNamespace(id="123", name="Retro", box_art=artwork))
+    )
+    metadata = await dashboard_router.get_twitch_channel_metadata(runtime_bot, "channel-1")
+    assert metadata == {"title": "Title", "game": "Retro", "box_art_url": "https://example.com/category.jpg"}
+    runtime_bot.fetch_game.assert_awaited_once_with(id="123", token_for="channel-1")
+    artwork.url_for.assert_called_once_with(96, 128)
+
+
+@pytest.mark.asyncio
+async def test_category_artwork_failure_keeps_channel_metadata_available():
+    runtime_bot = SimpleNamespace(
+        create_partialuser=lambda _: SimpleNamespace(fetch_channel_info=AsyncMock(return_value=SimpleNamespace(
+            title="Title", game_name="Retro", game_id="123"
+        ))),
+        fetch_game=AsyncMock(side_effect=RuntimeError("Artwork unavailable"))
+    )
+    assert await dashboard_router.get_twitch_channel_metadata(runtime_bot, "channel-1") == {
+        "title": "Title", "game": "Retro", "box_art_url": ""
+    }
+    assert await dashboard_router.get_category_artwork(runtime_bot, "channel-1", "0") == ""
+    assert runtime_bot.fetch_game.await_count == 1
+
+
+def test_category_artwork_spans_metadata_rows_and_previews_picker_selection():
+    dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    script = open("web/static/js/dashboard-channel-metadata.js", encoding="utf-8").read()
+    styles = open("web/static/css/style.css", encoding="utf-8").read()
+    assert 'data-current-category-art' in dashboard
+    assert 'aria-label="Select category"' in dashboard
+    assert 'categoryArtHome?.addEventListener("click"' in script
+    assert 'categoryArtHome?.setAttribute("aria-expanded", String(visible))' in script
+    assert 'data-category-preview' not in dashboard
+    assert 'data-game-options role="listbox"' in dashboard
+    assert 'grid-row: 1 / span 2' in styles
+    assert 'image.className = "twitch-category-art"' in script
+    assert 'button.appendChild(image)' in script
+    assert 'data-game-suggestions popover="manual"' not in dashboard
+    assert 'gameSuggestions.showPopover()' not in script
+    assert 'setCurrentCategoryArt(game?.box_art_url || "", game?.name || savedCategoryName)' in script
+    assert 'categoryArtHome?.setAttribute("title", name)' in script
+    assert styles.count('.dashboard-hover-tooltip {') == 1
+    assert 'if (!visible && restoreArtwork) setCurrentCategoryArt(savedCategoryArt)' in script
+    assert 'updateCategoryPreview(game);\n        setGameSuggestionsVisible(false, false)' in script
+    assert 'savedCategoryArt = result.box_art_url || ""' in script
+    assert 'card.classList.toggle("is-category-selecting", visible)' in script
+    assert 'data-game-selection-preview' in dashboard
+    assert 'visible ? selectionPreview : categoryArtHome' in script
+    assert 'categoryArtAnimation = currentCategoryArt.animate([' in script
+    assert 'if (gameSuggestions.hidden === !visible' in script
+    assert 'oldRect.left - newRect.left' in script
+    assert 'oldRect.width / newRect.width' in script
+    assert 'grid-template-columns: minmax(0,1fr) minmax(0,min(30%,120px))' in styles
+    assert 'dashboard-carousel-card-changed' in script
+    assert 'gameOptionsList.replaceChildren()' in script
+    assert 'updateCategoryPreview(gameOptions[selectedGame])' in script
+    assert 'pointerenter", () => highlightGame(index, false)' in script
+    assert 'gameOptionsList.children[selectedGame]?.scrollIntoView' in script
+    assert 'normalizedQuery === renderedGameQuery ? gameOptionsList.scrollTop : 0' in script
+    assert 'gameOptionsList.scrollTop = previousScroll' in script
+    assert 'renderGameOptions(result.games, query, result.more_games)' in script
 
 
 def test_dashboard_game_search_ranks_name_matches_and_preserves_top_games_order():
@@ -1847,7 +2010,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "Viewer games" not in dashboard
     assert 'data-refresh-url="/channel/api/dashboard-stats"' in dashboard
     assert "Back to Overview" not in features
-    assert dashboard.index("data-emote-toggle") < dashboard.index("data-chat-send-status") < dashboard.index("dashboard-chat-composer-actions")
+    assert dashboard.index("dashboard-chat-composer-actions") < dashboard.index("data-chat-send-status") < dashboard.index("chat-send-button")
     assert 'fetch("/channel/api/chat/emotes")' in composer_script
     assert 'fetch("/channel/api/chat/users"' in composer_script
     assert 'const twitchCommands = [' in composer_script
@@ -2034,7 +2197,9 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "overflow-y: auto" in widget_styles
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
-    assert 'element.dataset.newestFirst === "true" ? "↑ Jump to present" : "↓ Jump to present"' in chat_script
+    assert 'const jumpPath = feed.newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";' in chat_script
+    assert 'feed.jumpButton.title = "Jump to present";' in chat_script
+    assert 'jumpButton.title = "Jump to present";' in dashboard
     assert 'makeElement("div", "live-chat-feed-shell")' in chat_script
     assert 'element.addEventListener("scroll", () => {' in chat_script
     assert "updateJumpButton(feed);" in chat_script
@@ -2066,12 +2231,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "overflow-y: auto; overscroll-behavior: contain;" in dashboard_styles
     assert "seen.has(emote.name)" in composer_script
     assert ".chat-emote-picker[hidden], .chat-emote-suggestions[hidden] { display: none; }" in dashboard_styles
-    assert ".chat-send-status { position: absolute;" in dashboard_styles
+    assert ".chat-send-status { flex: 1 1 0; min-width: 0;" in dashboard_styles
     assert "text-align: right; text-overflow: ellipsis;" in dashboard_styles
-    assert "right: 15px; bottom: 11px;" in dashboard_styles
     assert "opacity: .8;" in dashboard_styles
     assert ".chat-send-status.is-fading { opacity: 0; }" in dashboard_styles
-    assert "height: 66px;" in dashboard_styles
+    assert "height: calc(1.4em + 22px);" in dashboard_styles
     assert "resize: none;" in dashboard_styles
     assert 'status.dataset.connectionState === "disconnected"' in composer_script
     assert 'status.classList.add("is-fading")' in composer_script
@@ -2249,7 +2413,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'applyStreamStatus(true, new Date(Date.now() - elapsedMinutes * 60000).toISOString());' in header_stats_script
     assert 'viewerValue.textContent = (Math.floor(Math.random() * 500) + 1).toLocaleString();' in header_stats_script
     assert 'viewerValue.textContent = actualViewerCount;' in header_stats_script
-    assert 'if (value && !(previewActive && stat.key === "viewers")) value.textContent = displayValue;' in header_stats_script
+    assert 'if (value && !(previewActive && stat.key === "viewers")) {' in header_stats_script
+    assert 'applyVisibility(statContainer, hiddenStats.has(stat.key));' in header_stats_script
     assert 'if (!previewActive) applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert 'applyStreamStatus(actualStreamStatus.isLive, actualStreamStatus.startedAt);' in header_stats_script
     assert ".dashboard-stream-stat.state-live .status-indicator { animation: dashboard-live-pulse" in dashboard_styles
