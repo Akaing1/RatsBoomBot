@@ -1,5 +1,6 @@
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import asqlite
 import pytest
@@ -828,7 +829,7 @@ async def test_concluded_encounter_pays_for_damage_with_raid_rank(tmp_path) -> N
 async def test_final_hit_uses_rank_multiplier_and_finisher_reward(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)
-        service = RaidBossService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database, points=points)
         await points.setup()
         await run_migrations(database)
         await service.setup()
@@ -978,7 +979,7 @@ async def test_latest_loot_includes_tutorial_collection_points(tmp_path) -> None
 async def test_tutorial_rewards_five_thousand_points_when_all_starter_weapons_are_owned(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)
-        service = RaidBossService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database, points=points)
         await points.setup()
         await run_migrations(database)
         await service.setup()
@@ -1199,7 +1200,8 @@ async def test_fools_card_applies_point_roll_on_next_successful_attack(tmp_path,
 
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)
-        service = RaidBossService(bot=None, db=database)
+        stats = SimpleNamespace(record_points_earned=AsyncMock())
+        service = RaidBossService(bot=None, db=database, points=points, chatter_stats=stats)
         await points.setup()
         await run_migrations(database)
         config = build_config(max_hp=5000, fools_card_cost=100)
@@ -1213,6 +1215,10 @@ async def test_fools_card_applies_point_roll_on_next_successful_attack(tmp_path,
         assert result.fools_card_points == 1500
         assert await points.get_points("channel-1", "user-1") == 2400
         assert consumables["fools_card"] == 0
+        assert result.damage == 100
+        assert result.current_hp == 4900
+        stats.record_points_earned.assert_awaited_once()
+        assert stats.record_points_earned.await_args.args[:3] == ("channel-1", "user-1", 1500)
 
 
 @pytest.mark.asyncio
@@ -1405,7 +1411,7 @@ async def test_heavens_judgement_uses_all_bonus_and_slayer_above_half_hp(tmp_pat
 async def test_fools_dagger_adds_crit_chance_and_damage_based_points(tmp_path, monkeypatch) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)
-        service = RaidBossService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database, points=points)
         await points.setup()
         await run_migrations(database)
         config = build_config(max_hp=1000)
