@@ -47,13 +47,15 @@ Sleepy Fox is Common. Administrator grants use the fixed mappings below by defau
 
 | Pet | Rarity | Chance | Fixed summon passive | Duplicate refund |
 | --- | --- | --- | --- | --- |
-| Silly Bat | Common | 20% | Gamble Luck: +5 percentage points win chance | 12,500 points |
-| Little Rat | Common | 20% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
-| Sleepy Fox | Common | 20% | Boss Hunt Damage: +10% damage | 12,500 points |
-| Horned Wolf | Common | 20% | Boss Hunt Damage: +10% damage | 12,500 points |
-| Royal Raven | Common | 20% | Boss Hunt Profit: +10% point rewards | 12,500 points |
+| Silly Bat | Common | ~16.67% | Gamble Luck: +5 percentage points win chance | 12,500 points |
+| Little Rat | Common | ~16.67% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
+| Sleepy Fox | Common | ~16.67% | Boss Hunt Damage: +10% damage | 12,500 points |
+| Horned Wolf | Common | ~16.67% | Boss Hunt Damage: +10% damage | 12,500 points |
+| Royal Raven | Common | ~16.67% | Boss Hunt Profit: +10% point rewards | 12,500 points |
 
-Summons first roll rarity with 70% Common / 20% Rare / 10% UR weights, excluding empty tiers and normalizing the remaining weights. They then choose uniformly within that rarity. All five pets are Common, so currently Common is 100% and each pet has a 20% chance. The Pets tab has an expandable Rates popup anchored to the Rates control, showing the standard rarity rates and the available pets in each tier. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
+| Witch's Cat | Common | ~16.67% | Gamble Luck: +5 percentage points win chance | 12,500 points |
+
+Summons first roll rarity with 70% Common / 20% Rare / 10% UR weights, excluding empty tiers and normalizing the remaining weights. They then choose uniformly within that rarity. All six pets are Common, so currently Common is 100% and each pet has approximately a 16.67% chance. The Pets tab has an expandable Rates popup anchored to the Rates control, showing the standard rarity rates and the available pets in each tier. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
 
 Duplicates return points to the ticket's original purchase channel, without loyalty bonuses or earned-point XP. Purchases and summons are atomic to prevent double spending. Existing pets are aligned with the selected mappings on migration. No leveling, feeding, essence purchases, or passive rerolls are added here.
 
@@ -78,3 +80,9 @@ Grant and equip it for UAT preview: `sudo -u rats-bot .venv/bin/python -m script
 Migration 60 adds Common Royal Raven with the fixed Boss Hunt Profit passive: +10% contribution and final-hit point rewards at level 1, scaling to +20% at level 50. The approved crownless gold-highlight artwork uses four equal 112 × 149 frames in `assets/Royal Raven.png`. Its 1.29-second idle keeps the feet planted and includes a short blink, using the same frame timing as the approved preview. Reduced-motion preferences disable the animation.
 
 Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet <tester_login> --pet raven`. Owners can use `!pets equip Royal Raven`.
+
+### Witch's Cat
+
+Migration 62 adds Common Witch's Cat with Gamble Luck: +5 percentage points to gamble win chance at level 1, scaling to +10 at level 50. The approved upright black cat and wide-brimmed white witch hat use four equal 112 × 149 frames in `assets/Witch's Cat.png`. The 1.2-second breathing, blink, and tail-wave loop is anchored to the front paws to avoid horizontal drift. Reduced-motion preferences disable animation.
+
+Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet cat`. Owners can use `!pets equip Witch's Cat`.
