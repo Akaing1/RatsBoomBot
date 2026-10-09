@@ -1253,7 +1253,7 @@ class LiveChatService:
                 except httpx.HTTPStatusError as error:
                     status_code = error.response.status_code
                     reason, _ = self._youtube_error_details(error.response)
-                    if reason in {"invalid_grant", "invalid_client", "unauthorized_client"}:
+                    if status_code in {400, 401} and reason in {"invalid_grant", "invalid_client", "unauthorized_client"}:
                         self.youtube_statuses[broadcaster_id] = ("unavailable", "Reconnect YouTube: Google authorization expired or was revoked.")
                         return
                     if reason in {"quotaExceeded", "dailyLimitExceeded"}:
