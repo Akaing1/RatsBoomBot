@@ -7,13 +7,12 @@ from fastapi.responses import RedirectResponse
 
 from config.settings import settings
 from web.admin.auth import validate_csrf_token
-from web.channel.auth import CHANNEL_USER_ID_KEY
+from web.channel.auth import CHANNEL_USER_ID_KEY, YOUTUBE_OAUTH_STATE_KEY, YOUTUBE_OAUTH_OWNER_KEY
 from web.shared.youtube_oauth import build_youtube_oauth_url, exchange_youtube_code, fetch_youtube_channel
 from web.state import get_bot
 
 router = APIRouter()
 LOGGER = logging.getLogger("RatBoomBot")
-YOUTUBE_OAUTH_STATE_KEY = "youtube_oauth_state"
 
 
 def youtube_redirect(result: str, message: str) -> RedirectResponse:
@@ -33,6 +32,7 @@ async def connect_youtube(request: Request):
 
     state = secrets.token_urlsafe(32)
     request.session[YOUTUBE_OAUTH_STATE_KEY] = state
+    request.session[YOUTUBE_OAUTH_OWNER_KEY] = str(broadcaster_id)
     return RedirectResponse(build_youtube_oauth_url(state))
 
 
@@ -40,9 +40,13 @@ async def connect_youtube(request: Request):
 async def youtube_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
     expected_state = request.session.pop(YOUTUBE_OAUTH_STATE_KEY, None)
+    expected_owner = request.session.pop(YOUTUBE_OAUTH_OWNER_KEY, None)
 
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
+
+    if expected_owner != str(broadcaster_id):
+        return youtube_redirect("error", "Your signed-in account changed. Start YouTube authorization again.")
 
     if not state or not expected_state or not secrets.compare_digest(state, expected_state):
         return youtube_redirect("error", "The YouTube authorization request could not be verified.")
