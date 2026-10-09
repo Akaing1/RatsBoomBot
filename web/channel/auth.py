@@ -4,6 +4,8 @@ from fastapi import Request
 
 
 CHANNEL_OAUTH_STATE_KEY = "channel_oauth_state"
+YOUTUBE_OAUTH_STATE_KEY = "youtube_oauth_state"
+YOUTUBE_OAUTH_OWNER_KEY = "youtube_oauth_owner"
 CHANNEL_USER_ID_KEY = "channel_user_id"
 CHANNEL_USER_LOGIN_KEY = "channel_user_login"
 CHANNEL_USER_DISPLAY_NAME_KEY = "channel_user_display_name"
@@ -25,12 +27,17 @@ def validate_channel_oauth_state(request: Request, submitted_state: str | None) 
 
 
 def login_channel_user(request: Request, user_id: str, login: str, display_name: str) -> None:
+    if str(request.session.get(CHANNEL_USER_ID_KEY, "")) != str(user_id):
+        request.session.pop(YOUTUBE_OAUTH_STATE_KEY, None)
+        request.session.pop(YOUTUBE_OAUTH_OWNER_KEY, None)
     request.session[CHANNEL_USER_ID_KEY] = user_id
     request.session[CHANNEL_USER_LOGIN_KEY] = login
     request.session[CHANNEL_USER_DISPLAY_NAME_KEY] = display_name
 
 
 def logout_channel_user(request: Request) -> None:
+    request.session.pop(YOUTUBE_OAUTH_STATE_KEY, None)
+    request.session.pop(YOUTUBE_OAUTH_OWNER_KEY, None)
     request.session.pop(CHANNEL_USER_ID_KEY, None)
     request.session.pop(CHANNEL_USER_LOGIN_KEY, None)
     request.session.pop(CHANNEL_USER_DISPLAY_NAME_KEY, None)
