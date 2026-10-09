@@ -14,6 +14,7 @@ from starlette.requests import Request
 import web.channel.routers.dashboard as dashboard_router
 from bot.services.channels.live_chat import ChatBadge, ChatSegment, LiveChatService, UnifiedChatMessage, message_matches_view, normalize_chat_view
 from bot.services.channels import youtube_live_chat_pb2
+from config.settings import settings
 from storage.migration_runner import run_migrations
 from web.channel.routers.dashboard import get_ad_status
 from web.admin.auth import CSRF_SESSION_KEY
@@ -2623,3 +2624,84 @@ async def test_youtube_stream_renews_credentials_and_resumes_without_polling(mon
     assert requests[1][1] == (("authorization", "Bearer new-token"),)
     service._poll_live_chat.assert_not_awaited()
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [400, 429, 500, 503])
+async def test_youtube_watcher_retries_http_failures(monkeypatch, status):
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    request = httpx.Request("GET", "https://www.googleapis.com/youtube/v3/liveBroadcasts")
+    response = httpx.Response(status, request=request, json={})
+    service._find_active_live_chat = AsyncMock(side_effect=[
+        httpx.HTTPStatusError("failed", request=request, response=response),
+        asyncio.CancelledError(),
+    ])
+    sleep = AsyncMock()
+    monkeypatch.setattr("bot.services.channels.live_chat.asyncio.sleep", sleep)
+    with pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube("channel-1")
+    assert service._find_active_live_chat.await_count == 2
+    sleep.assert_awaited_once_with(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
+
+
+@pytest.mark.asyncio
+async def test_youtube_revoked_authorization_requires_reconnect():
+    from bot.services.channels.live_chat import YouTubeReconnectRequired
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._find_active_live_chat = AsyncMock(side_effect=YouTubeReconnectRequired("Reconnect YouTube"))
+    await service._watch_youtube("channel-1")
+    assert service.youtube_statuses["channel-1"] == ("unavailable", "Reconnect YouTube")
+    assert service._find_active_live_chat.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_youtube_polling_returns_to_stream_with_saved_cursor(monkeypatch):
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._youtube_get = AsyncMock(return_value={
+        "items": [], "nextPageToken": "saved-cursor", "pollingIntervalMillis": 5000
+    })
+    monkeypatch.setattr("bot.services.channels.live_chat.time.monotonic", Mock(side_effect=[0, 121]))
+    sleep = AsyncMock()
+    monkeypatch.setattr("bot.services.channels.live_chat.asyncio.sleep", sleep)
+    assert await service._poll_live_chat("channel-1", "chat-1") is False
+    assert service.youtube_page_tokens["channel-1"] == ("chat-1", "saved-cursor")
+    sleep.assert_awaited_once_with(5.0)
+
+
+@pytest.mark.asyncio
+async def test_youtube_invalid_grant_reports_reconnect():
+    from bot.services.channels.live_chat import YouTubeReconnectRequired
+    service = LiveChatService(None)
+    service.connections["channel-1"] = SimpleNamespace(
+        access_token="old", refresh_token="revoked", expires_at=datetime.now(UTC).isoformat()
+    )
+    service.client = SimpleNamespace(post=AsyncMock(return_value=httpx.Response(
+        400, json={"error": "invalid_grant"}
+    )))
+    with pytest.raises(YouTubeReconnectRequired, match="Reconnect YouTube"):
+        await service._ensure_access_token("channel-1")
+
+
+@pytest.mark.asyncio
+async def test_youtube_refreshes_are_serialized():
+    service = LiveChatService(None)
+    active = 0
+    peak = 0
+
+    async def refresh(_):
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        await asyncio.sleep(0)
+        active -= 1
+        return "token"
+
+    service._refresh_access_token_if_needed = refresh
+    assert await asyncio.gather(service._ensure_access_token("channel-1"),
+                                service._ensure_access_token("channel-1")) == ["token", "token"]
+    assert peak == 1
