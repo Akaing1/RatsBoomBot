@@ -2665,7 +2665,7 @@ async def test_youtube_polling_returns_to_stream_with_saved_cursor(monkeypatch):
     service._youtube_get = AsyncMock(return_value={
         "items": [], "nextPageToken": "saved-cursor", "pollingIntervalMillis": 5000
     })
-    monkeypatch.setattr("bot.services.channels.live_chat.time.monotonic", Mock(side_effect=[0, 121]))
+    monkeypatch.setattr("bot.services.channels.live_chat.time", SimpleNamespace(monotonic=Mock(side_effect=[0, 121])))
     sleep = AsyncMock()
     monkeypatch.setattr("bot.services.channels.live_chat.asyncio.sleep", sleep)
     assert await service._poll_live_chat("channel-1", "chat-1") is False
@@ -2716,7 +2716,7 @@ async def test_youtube_watcher_recovers_after_http_failure(monkeypatch, caplog, 
     service.connections["channel-1"] = SimpleNamespace()
     service.active_youtube_chat_ids["channel-1"] = "old-chat"
     request = httpx.Request("POST" if code == 400 else "GET", url)
-    response = httpx.Response(code, request=request, json={"error": "invalid_grant"})
+    response = httpx.Response(code, request=request, json={"error": {"message": "YouTube is temporarily unavailable."}})
     service._find_active_live_chat = AsyncMock(side_effect=[
         httpx.HTTPStatusError("Rejected", request=request, response=response), "new-chat"
     ])
