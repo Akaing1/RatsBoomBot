@@ -2,6 +2,8 @@ import asyncio
 import logging
 import re
 import time
+
+import httpx
 from datetime import UTC, datetime, timedelta
 from difflib import SequenceMatcher
 from urllib.parse import quote_plus
@@ -1072,17 +1074,29 @@ async def channel_send_chat_message(
         except ValueError as error:
             youtube_error = str(error)
 
-            if target == "youtube" or not sent:
+            if target == "youtube" or not sent or "No active YouTube live chat" not in youtube_error:
                 errors["youtube"] = (
                     "YouTube is offline. Start a YouTube livestream with live chat enabled before sending a message."
                     if "No active YouTube live chat" in youtube_error
                     else youtube_error
                 )
+        except httpx.HTTPStatusError as error:
+            reason, _ = services.live_chat._youtube_error_details(error.response)
+            errors["youtube"] = {
+                "quotaExceeded": "YouTube API quota is exhausted; try after the daily reset.",
+                "dailyLimitExceeded": "YouTube API quota is exhausted; try after the daily reset.",
+                "rateLimitExceeded": "YouTube is rate limiting messages; wait before sending again.",
+                "liveChatEnded": "The YouTube livestream has ended.",
+                "liveChatDisabled": "Live chat is disabled for this YouTube stream.",
+                "forbidden": "YouTube denied permission to send this message.",
+            }.get(reason, "YouTube rejected the message; try again later.")
+            if error.response.status_code == 401:
+                errors["youtube"] = "Reconnect YouTube to restore authorization."
+        except httpx.RequestError:
+            errors["youtube"] = "YouTube connection failed; delivery could not be confirmed."
         except Exception:
             LOGGER.exception("[Dashboard] Failed to send YouTube message for broadcaster %s.", broadcaster_id)
-
-            if target == "youtube" or not sent:
-                errors["youtube"] = "Reconnect YouTube to enable dashboard replies."
+            errors["youtube"] = "YouTube could not send the message; try again later."
 
     if not sent:
         detail = " ".join(errors.values()) or "The message could not be sent."
