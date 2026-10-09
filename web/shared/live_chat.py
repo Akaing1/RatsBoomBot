@@ -1,7 +1,19 @@
 import asyncio
 import json
+from datetime import UTC, datetime, timedelta
 
 from bot.services.channels.live_chat import message_matches_view, normalize_chat_view
+
+
+def clear_stale_chat_on_refresh(service, broadcaster, *, now=None):
+    """Only a page load, after a confirmed hour offline, clears combined history."""
+    offline_since = getattr(broadcaster, "offline_since", None)
+    if getattr(broadcaster, "is_live", False) or offline_since is None:
+        return False
+    if (now or datetime.now(UTC)) - offline_since < timedelta(hours=1):
+        return False
+    service.clear_chat(str(broadcaster.id), platform="both")
+    return True
 
 
 async def stream_chat_events(request, service, broadcaster_id: str, view: str):

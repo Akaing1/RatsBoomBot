@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function setup() {
+function setup({mobile = false, textRects = null} = {}) {
     const handlers = {};
     const timers = [];
     const observers = [];
@@ -35,9 +35,17 @@ function setup() {
         querySelector() { return null; }
     }
     let tooltip;
+    const document = {createElement() { const element = new Element('div'); element.style = {}; return element; }, body: {appendChild(element) { tooltip = element; }}, addEventListener: (event, handler) => { handlers[event] = handler; }, getElementById: () => ({textContent: 'Number of viewers'})};
+    if (textRects) {
+        document.createTreeWalker = () => {
+            let visited = false;
+            return {nextNode() { if (visited) return null; visited = true; return {textContent: 'Label', parentElement: {closest: () => null}}; }};
+        };
+        document.createRange = () => ({selectNodeContents() {}, getClientRects: () => textRects});
+    }
     vm.runInNewContext(fs.readFileSync('web/static/js/hover-labels.js', 'utf8'), {
-        Element, MutationObserver, window: {MutationObserver, innerWidth: 800, innerHeight: 600, addEventListener() {}, setTimeout(callback, delay) { timers.push({callback, delay}); return timers.length; }, clearTimeout(id) { if (id) timers[id - 1].cancelled = true; }},
-        document: {createElement() { const element = new Element('div'); element.style = {}; return element; }, body: {appendChild(element) { tooltip = element; }}, addEventListener: (event, handler) => { handlers[event] = handler; }, getElementById: () => ({textContent: 'Number of viewers'})}
+        Element, MutationObserver, NodeFilter: {SHOW_TEXT: 4}, window: {MutationObserver, innerWidth: 800, innerHeight: 600, matchMedia: () => ({matches: mobile}), addEventListener() {}, setTimeout(callback, delay) { timers.push({callback, delay}); return timers.length; }, clearTimeout(id) { if (id) timers[id - 1].cancelled = true; }},
+        document
     });
     return {Element, timers, observers, tooltip, handlers, hover: target => handlers.pointerover({target, type: 'pointerover'}), focus: target => handlers.focusin({target, type: 'focusin'})};
 }
@@ -181,4 +189,59 @@ test('navigation hover labels omit decorative icons even after title suppression
     assert.equal(ui.tooltip.textContent, 'Overview');
     ui.hover(link);
     assert.equal(ui.tooltip.textContent, 'Overview');
+});
+
+test('tooltip centers on visible text rather than the full control width', () => {
+    const ui = setup({textRects: [{left: 120, right: 180, top: 105, bottom: 125}]});
+    ui.tooltip.getBoundingClientRect = () => ({width: 100, height: 30});
+    const button = new ui.Element('button', {}, 'Label');
+    ui.hover(button); ui.timers.at(-1).callback();
+    assert.equal(ui.tooltip.style.left, '100px');
+});
+
+test('video preview and its controls never receive dashboard tooltip labels', () => {
+    const ui = setup();
+    const button = new ui.Element('button', {'aria-label': 'Play video'});
+    const closest = button.closest.bind(button);
+    button.closest = selector => selector.includes('.dashboard-video-frame') ? button : closest(selector);
+    ui.hover(button);
+    assert.equal(ui.timers.length, 0);
+    assert.equal(button.getAttribute('title'), null);
+});
+
+test('mobile labels require a long press; regular taps and focus do not show them', () => {
+    const ui = setup({mobile: true});
+    const button = new ui.Element('button', {title: 'Filter chat'});
+    ui.hover(button); ui.focus(button);
+    assert.equal(ui.timers.length, 0);
+    assert.equal(button.getAttribute('title'), null);
+    const touch = {target: button, pointerType: 'touch', pointerId: 1, clientX: 150, clientY: 110};
+    ui.handlers.pointerdown(touch);
+    assert.equal(ui.timers.at(-1).delay, 550);
+    ui.handlers.pointerup(touch);
+    assert.equal(ui.timers.at(-1).cancelled, true);
+    assert.equal(ui.tooltip.hidden, true);
+    ui.handlers.pointerdown(touch);
+    ui.timers.at(-1).callback();
+    assert.equal(ui.tooltip.hidden, false);
+    assert.equal(ui.tooltip.textContent, 'Filter chat');
+    ui.handlers.pointerup(touch);
+    let prevented = false;
+    ui.handlers.click({preventDefault() { prevented = true; }, stopImmediatePropagation() {}});
+    assert.equal(prevented, true);
+    ui.timers.at(-1).callback();
+    assert.equal(ui.tooltip.hidden, true);
+});
+
+test('moving or cancelling a touch cancels its pending tooltip', () => {
+    const ui = setup({mobile: true});
+    const button = new ui.Element('button', {}, 'Next');
+    const touch = {target: button, pointerType: 'touch', pointerId: 1, clientX: 150, clientY: 110};
+    ui.handlers.pointerdown(touch);
+    ui.handlers.pointermove({...touch, clientX: 170});
+    assert.equal(ui.timers.at(-1).cancelled, true);
+    assert.equal(ui.tooltip.hidden, true);
+    ui.handlers.pointerdown(touch);
+    ui.handlers.pointercancel();
+    assert.equal(ui.timers.at(-1).cancelled, true);
 });
