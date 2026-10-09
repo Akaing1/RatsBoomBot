@@ -26,9 +26,10 @@ async def balance(database):
     (2, 'royal_raven', RAID_PROFIT, 'common', 12_500),
     (3, 'dungeon_bat', GAMBLE_ODDS, 'common', 12_500),
     (4, 'sleepy_fox', RAID_DAMAGE, 'common', 12_500),
+    (5, 'witch_cat', GAMBLE_ODDS, 'common', 12_500),
 ])
 async def test_summon_boundaries_fixed_passives_and_duplicate_refund(tmp_path, monkeypatch, roll, pet_id, passive, rarity, refund):
-    monkeypatch.setattr('pets.service.randbelow', lambda bound: roll if bound == 5 else 69)
+    monkeypatch.setattr('pets.service.randbelow', lambda bound: roll if bound == 6 else 69)
     async with asqlite.create_pool(str(tmp_path / 'pets.db')) as database:
         await run_migrations(database)
         await fund(database)
@@ -69,7 +70,7 @@ async def test_purchase_is_channel_local_and_atomic(tmp_path):
 
 @pytest.mark.asyncio
 async def test_global_collection_equip_and_concurrent_summons(tmp_path, monkeypatch):
-    monkeypatch.setattr('pets.service.randbelow', lambda bound: 1 if bound == 5 else 0)
+    monkeypatch.setattr('pets.service.randbelow', lambda bound: 1 if bound == 6 else 0)
     async with asqlite.create_pool(str(tmp_path / 'pets.db')) as database:
         await run_migrations(database)
         await fund(database)
@@ -177,7 +178,7 @@ async def test_rarity_roll_boundaries_before_pet_selection(tmp_path, monkeypatch
         await run_migrations(database)
         await fund(database)
         async with database.acquire() as connection:
-            await connection.execute("DELETE FROM pet_definitions WHERE id IN ('horned_wolf', 'royal_raven')")
+            await connection.execute("DELETE FROM pet_definitions WHERE id IN ('horned_wolf', 'royal_raven', 'witch_cat')")
             await connection.execute("UPDATE pet_definitions SET rarity = 'rare' WHERE id = 'explosive_rat'")
             await connection.execute("UPDATE pet_definitions SET rarity = 'ultra_rare' WHERE id = 'sleepy_fox'")
             await connection.commit()
@@ -197,8 +198,8 @@ async def test_common_only_rates_are_uniform_and_empty_tiers_disabled(tmp_path):
         rates = await pets.get_summon_rates()
         assert [tier['base_percent'] for tier in rates] == [70, 20, 10]
         assert [tier['effective_percent'] for tier in rates] == [100, 0, 0]
-        assert {pet['display_name'] for pet in rates[0]['pets']} == {'Silly Bat', 'Little Rat', 'Sleepy Fox', 'Horned Wolf', 'Royal Raven'}
-        assert [pet['percent'] for pet in rates[0]['pets']] == pytest.approx([20] * 5)
+        assert {pet['display_name'] for pet in rates[0]['pets']} == {'Silly Bat', 'Little Rat', 'Sleepy Fox', 'Horned Wolf', 'Royal Raven', "Witch's Cat"}
+        assert [pet['percent'] for pet in rates[0]['pets']] == pytest.approx([100 / 6] * 6)
         assert rates[1]['pets'] == rates[2]['pets'] == []
 
 
