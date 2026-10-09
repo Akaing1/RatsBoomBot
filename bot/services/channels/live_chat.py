@@ -1134,6 +1134,12 @@ class LiveChatService:
 
     async def connect_youtube(self, broadcaster_id: str, channel: YouTubeChannel, token: YouTubeTokenResponse) -> YouTubeChatState:
         broadcaster_id = str(broadcaster_id)
+        lock = self.youtube_refresh_locks.setdefault(broadcaster_id, asyncio.Lock())
+        async with lock:
+            return await self._connect_youtube_locked(broadcaster_id, channel, token)
+
+    async def _connect_youtube_locked(self, broadcaster_id: str, channel: YouTubeChannel, token: YouTubeTokenResponse) -> YouTubeChatState:
+        broadcaster_id = str(broadcaster_id)
         connection = YouTubeConnection(broadcaster_id, channel.channel_id, channel.title, token.access_token, token.refresh_token, token.expires_at)
 
         async with self.db.acquire() as database_connection:
@@ -1174,6 +1180,12 @@ class LiveChatService:
         return self.get_youtube_state(broadcaster_id)
 
     async def disconnect_youtube(self, broadcaster_id: str) -> None:
+        broadcaster_id = str(broadcaster_id)
+        lock = self.youtube_refresh_locks.setdefault(broadcaster_id, asyncio.Lock())
+        async with lock:
+            await self._disconnect_youtube_locked(broadcaster_id)
+
+    async def _disconnect_youtube_locked(self, broadcaster_id: str) -> None:
         broadcaster_id = str(broadcaster_id)
         task = self.tasks.pop(broadcaster_id, None)
 
@@ -1481,6 +1493,12 @@ class LiveChatService:
 
     async def send_youtube_message(self, broadcaster_id: str, message: str) -> dict:
         broadcaster_id = str(broadcaster_id)
+        lock = self.youtube_refresh_locks.setdefault(broadcaster_id, asyncio.Lock())
+        async with lock:
+            return await self._send_youtube_message_locked(broadcaster_id, message)
+
+    async def _send_youtube_message_locked(self, broadcaster_id: str, message: str) -> dict:
+        broadcaster_id = str(broadcaster_id)
         live_chat_id = self.active_youtube_chat_ids.get(broadcaster_id)
 
         if broadcaster_id not in self.connections:
@@ -1492,7 +1510,7 @@ class LiveChatService:
         if self.client is None:
             raise RuntimeError("YouTube chat is not running.")
 
-        connection = await self._ensure_access_token(broadcaster_id)
+        connection = await self._refresh_access_token_if_needed(broadcaster_id)
         request = {
             "params": {"part": "snippet"},
             "json": {
@@ -1511,7 +1529,7 @@ class LiveChatService:
 
         if response.status_code == 401:
             connection.expires_at = datetime.now(UTC).isoformat()
-            connection = await self._ensure_access_token(broadcaster_id)
+            connection = await self._refresh_access_token_if_needed(broadcaster_id)
             response = await self.client.post(
                 f"{YOUTUBE_API_URL}/liveChat/messages",
                 headers={"Authorization": f"Bearer {connection.access_token}"},
