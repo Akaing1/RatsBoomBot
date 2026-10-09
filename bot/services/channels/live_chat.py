@@ -103,6 +103,10 @@ def message_matches_view(message: UnifiedChatMessage, view: str) -> bool:
     return view == "both" or (view == "chat" and message.kind == "chat") or (view == "commands" and message.kind == "command")
 
 
+class YouTubeReconnectRequired(ValueError):
+    """Google authorization must be renewed by the channel owner."""
+
+
 class LiveChatService:
 
     def __init__(self, db, *, bot=None):
@@ -122,6 +126,8 @@ class LiveChatService:
         self.command_response_ids: dict[str, set[str]] = defaultdict(set)
         self.command_response_id_order: dict[str, deque[str]] = defaultdict(deque)
         self.subscribers: dict[str, set[asyncio.Queue]] = defaultdict(set)
+        self.youtube_page_tokens: dict[str, tuple[str, str]] = {}
+        self.youtube_refresh_locks: dict[str, asyncio.Lock] = {}
         self.tasks: dict[str, asyncio.Task] = {}
         self.seventv_tasks: dict[str, asyncio.Task] = {}
         self.seventv_global_task: asyncio.Task | None = None
@@ -203,6 +209,7 @@ class LiveChatService:
         self.twitch_badge_tasks.clear()
         self.seventv_global_task = None
         self.active_youtube_chat_ids.clear()
+        self.youtube_page_tokens.clear()
 
         if self.client is not None:
             await self.client.aclose()
@@ -1148,6 +1155,12 @@ class LiveChatService:
                 (broadcaster_id, channel.channel_id, channel.title, token.access_token, token.refresh_token, token.expires_at)
             )
 
+        task = self.tasks.pop(broadcaster_id, None)
+        if task:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        self.active_youtube_chat_ids.pop(broadcaster_id, None)
+        self.youtube_page_tokens.pop(broadcaster_id, None)
         self.connections[broadcaster_id] = connection
         self.youtube_statuses[broadcaster_id] = (
             "waiting", "Waiting for an active YouTube livestream." if self._twitch_stream_is_live(broadcaster_id)
@@ -1172,6 +1185,7 @@ class LiveChatService:
             await connection.execute("DELETE FROM youtube_chat_connections WHERE broadcaster_id = ?", (broadcaster_id,))
 
         self.connections.pop(broadcaster_id, None)
+        self.youtube_page_tokens.pop(broadcaster_id, None)
         self.youtube_statuses.pop(broadcaster_id, None)
         self.active_youtube_chat_ids.pop(broadcaster_id, None)
         LOGGER.info("[Live Chat] Disconnected YouTube from broadcaster %s.", broadcaster_id)
@@ -1205,109 +1219,77 @@ class LiveChatService:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
         self.active_youtube_chat_ids.pop(broadcaster_id, None)
+        self.youtube_page_tokens.pop(broadcaster_id, None)
         if broadcaster_id in self.connections:
             self.youtube_statuses[broadcaster_id] = ("waiting", "Waiting for the Twitch stream to go live.")
 
     async def _watch_youtube(self, broadcaster_id: str) -> None:
-        connection_failed = False
         known_chat_id: str | None = None
+        retry_delay = settings.YOUTUBE_CHAT_DISCOVERY_SECONDS
         try:
             while self.started and broadcaster_id in self.connections:
-                phase = "discovery"
+                delay = settings.YOUTUBE_CHAT_DISCOVERY_SECONDS
                 try:
                     live_chat_id = known_chat_id or await self._find_active_live_chat(broadcaster_id)
-                    connection_failed = False
-
                     if live_chat_id is None:
-                        self.active_youtube_chat_ids.pop(broadcaster_id, None)
                         self.youtube_statuses[broadcaster_id] = ("waiting", "Waiting for an active YouTube livestream.")
-                        await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
-                        continue
-
-                    known_chat_id = live_chat_id
-                    phase = "chat"
-                    self.active_youtube_chat_ids[broadcaster_id] = live_chat_id
-                    self.youtube_statuses[broadcaster_id] = ("live", "Receiving YouTube live-chat messages.")
-                    LOGGER.info(
-                        "[Live Chat] Attached to YouTube live chat for broadcaster %s.", broadcaster_id,
-                        extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
-                    )
-                    connection_failed = False
-                    try:
-                        await self._stream_live_chat(broadcaster_id, live_chat_id)
-                        known_chat_id = None
-                    finally:
-                        self.active_youtube_chat_ids.pop(broadcaster_id, None)
-                        LOGGER.info(
-                            "[Live Chat] YouTube message stream ended for broadcaster %s; resuming discovery.",
-                            broadcaster_id, extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
-                        )
+                    else:
+                        known_chat_id = live_chat_id
+                        self.active_youtube_chat_ids[broadcaster_id] = live_chat_id
+                        self.youtube_statuses[broadcaster_id] = ("live", "Receiving YouTube live-chat messages.")
+                        LOGGER.info("[Live Chat] Attached to YouTube live chat for broadcaster %s.", broadcaster_id,
+                                    extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"})
+                        ended = await self._stream_live_chat(broadcaster_id, live_chat_id)
+                        if ended is not False:
+                            known_chat_id = None
+                            self.youtube_page_tokens.pop(broadcaster_id, None)
+                        retry_delay = settings.YOUTUBE_CHAT_DISCOVERY_SECONDS
                 except asyncio.CancelledError:
                     raise
+                except YouTubeReconnectRequired as error:
+                    self.youtube_statuses[broadcaster_id] = ("unavailable", str(error))
+                    LOGGER.warning("[Live Chat] YouTube authorization requires reconnect for broadcaster %s.", broadcaster_id)
+                    return
                 except httpx.HTTPStatusError as error:
-                    if error.response.status_code != 403:
-                        token_error = str(error.request.url).split("?")[0] == YOUTUBE_TOKEN_URL
-                        detail = (
-                            "YouTube authorization could not be refreshed. Reconnect YouTube in channel Customization."
-                            if token_error and error.response.status_code in {400, 401}
-                            else "YouTube chat is temporarily unavailable; retrying automatically."
-                        )
-                        status = ("unavailable" if token_error else "error", detail)
-                        if self.youtube_statuses.get(broadcaster_id) != status:
-                            LOGGER.warning(
-                                "[Live Chat] YouTube %s failed for broadcaster %s (HTTP %d): %s",
-                                "token refresh" if token_error else phase,
-                                broadcaster_id, error.response.status_code, detail,
-                                extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
-                            )
-                        self.active_youtube_chat_ids.pop(broadcaster_id, None)
-                        self.youtube_statuses[broadcaster_id] = status
-                        await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
-                        continue
-
-                    reason, api_message = self._youtube_error_details(error.response)
-                    detail = {
-                        "liveStreamingNotEnabled": "YouTube live streaming is not enabled for the connected channel.",
-                        "insufficientLivePermissions": "Reconnect YouTube to grant live-stream access.",
-                        "quotaExceeded": "YouTube API quota is exhausted. Chat discovery will resume after the daily reset.",
-                        "dailyLimitExceeded": "YouTube API quota is exhausted. Chat discovery will resume after the daily reset."
-                    }.get(reason, "YouTube live-chat discovery is unavailable; retrying automatically.")
-                    status = ("unavailable", detail)
-
-                    if self.youtube_statuses.get(broadcaster_id) != status:
-                        LOGGER.warning(
-                            "[Live Chat] YouTube %s unavailable for broadcaster %s (%s): %s",
-                            phase,
-                            broadcaster_id,
-                            reason or "forbidden",
-                            api_message or "The YouTube API returned HTTP 403.",
-                            extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
-                        )
-
-                    self.active_youtube_chat_ids.pop(broadcaster_id, None)
-                    self.youtube_statuses[broadcaster_id] = status
-                    delay = self._seconds_until_youtube_quota_reset() if reason in {"quotaExceeded", "dailyLimitExceeded"} else settings.YOUTUBE_CHAT_DISCOVERY_SECONDS
-                    await asyncio.sleep(delay)
-                except httpx.RequestError as error:
-                    self.youtube_statuses[broadcaster_id] = ("error", "YouTube connection is temporarily unavailable; retrying automatically.")
-                    if not connection_failed:
-                        LOGGER.warning(
-                            "[Live Chat] YouTube connection failed for broadcaster %s: %s; retrying.",
-                            broadcaster_id, error, extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
-                        )
-                    connection_failed = True
-                    await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
-                except Exception:
+                    status_code = error.response.status_code
+                    reason, _ = self._youtube_error_details(error.response)
+                    if status_code in {400, 401} and reason in {"invalid_grant", "invalid_client", "unauthorized_client"}:
+                        self.youtube_statuses[broadcaster_id] = ("unavailable", "Reconnect YouTube: Google authorization expired or was revoked.")
+                        return
+                    if reason in {"quotaExceeded", "dailyLimitExceeded"}:
+                        detail = "YouTube API quota is exhausted. Chat discovery will resume after the daily reset."
+                        delay = self._seconds_until_youtube_quota_reset()
+                    elif status_code == 401 or reason in {"insufficientPermissions", "insufficientLivePermissions"}:
+                        self.youtube_statuses[broadcaster_id] = ("unavailable", "Reconnect YouTube to restore chat permissions.")
+                        return
+                    elif reason in {"liveChatEnded", "liveChatDisabled", "liveChatNotFound"} or status_code == 404:
+                        known_chat_id = None
+                        self.youtube_page_tokens.pop(broadcaster_id, None)
+                        detail = "YouTube chat ended or is unavailable; checking for a new livestream."
+                    elif status_code == 400 and known_chat_id:
+                        # A saved cursor may no longer be accepted after an outage.
+                        self.youtube_page_tokens.pop(broadcaster_id, None)
+                        detail = "YouTube rejected the chat request; retrying with a fresh cursor."
+                    else:
+                        detail = {
+                            "liveStreamingNotEnabled": "YouTube live streaming is not enabled for the connected channel."
+                        }.get(reason, "YouTube is temporarily unavailable; retrying automatically.")
+                        delay = retry_delay
+                        retry_delay = min(300, retry_delay * 2)
+                    self.youtube_statuses[broadcaster_id] = ("error" if status_code >= 500 else "unavailable", detail)
+                    LOGGER.warning("[Live Chat] YouTube chat unavailable for broadcaster %s (HTTP %s, %s).",
+                                   broadcaster_id, status_code, reason or "unknown")
+                except Exception as error:
                     self.youtube_statuses[broadcaster_id] = ("error", "YouTube chat is temporarily unavailable; retrying automatically.")
-                    LOGGER.exception(
-                        "[Live Chat] YouTube watcher failed for broadcaster %s.", broadcaster_id,
-                        extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
-                    )
-                    await asyncio.sleep(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
+                    LOGGER.warning("[Live Chat] YouTube watcher failed for broadcaster %s (%s); retrying.",
+                                   broadcaster_id, type(error).__name__)
+                    delay = retry_delay
+                    retry_delay = min(300, retry_delay * 2)
+                finally:
+                    self.active_youtube_chat_ids.pop(broadcaster_id, None)
+                await asyncio.sleep(delay)
         finally:
-            current = self.tasks.get(broadcaster_id)
-
-            if current is asyncio.current_task():
+            if self.tasks.get(broadcaster_id) is asyncio.current_task():
                 self.tasks.pop(broadcaster_id, None)
 
     @staticmethod
@@ -1331,9 +1313,11 @@ class LiveChatService:
 
         return None
 
-    async def _stream_live_chat(self, broadcaster_id: str, live_chat_id: str) -> None:
+    async def _stream_live_chat(self, broadcaster_id: str, live_chat_id: str) -> bool:
         """Receive new messages as YouTube publishes them, with REST polling as a fallback."""
-        page_token = None
+        saved_chat, saved_token = self.youtube_page_tokens.get(broadcaster_id, (None, None))
+        page_token = saved_token if saved_chat == live_chat_id else None
+        authentication_retried = False
 
         try:
             async with grpc.aio.secure_channel("youtube.googleapis.com:443", grpc.ssl_channel_credentials()) as channel:
@@ -1350,14 +1334,31 @@ class LiveChatService:
                         part=["id", "snippet", "authorDetails"],
                         page_token=page_token,
                     )
-                    stream = stream_list(request, metadata=(("authorization", f"Bearer {connection.access_token}"),))
+                    expires_at = datetime.fromisoformat(connection.expires_at.replace("Z", "+00:00"))
+                    # End even a quiet stream before its credentials expire, then refresh and resume.
+                    lifetime = max(1.0, (expires_at - datetime.now(UTC)).total_seconds() - 60)
+                    stream = stream_list(
+                        request, metadata=(("authorization", f"Bearer {connection.access_token}"),),
+                        timeout=lifetime,
+                    )
 
-                    async for response in stream:
-                        self._publish_youtube_items(broadcaster_id, [self._stream_message_item(item) for item in response.items])
-                        if response.next_page_token:
-                            page_token = response.next_page_token
-                        if response.offline_at:
-                            return
+                    try:
+                        async for response in stream:
+                            authentication_retried = False
+                            self._publish_youtube_items(broadcaster_id, [self._stream_message_item(item) for item in response.items])
+                            if response.next_page_token:
+                                page_token = response.next_page_token
+                                self.youtube_page_tokens[broadcaster_id] = (live_chat_id, page_token)
+                            if response.offline_at:
+                                return True
+                    except grpc.aio.AioRpcError as error:
+                        if error.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                            continue
+                        if error.code() == grpc.StatusCode.UNAUTHENTICATED and not authentication_retried:
+                            connection.expires_at = datetime.now(UTC).isoformat()
+                            authentication_retried = True
+                            continue
+                        raise
 
                     # YouTube may close an otherwise healthy stream. Resume at its last token.
                     await asyncio.sleep(1)
@@ -1368,7 +1369,7 @@ class LiveChatService:
                     broadcaster_id, error.code().name,
                     extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
                 )
-                return
+                return True
             LOGGER.warning(
                 "[Live Chat] YouTube streaming failed for broadcaster %s (%s); falling back to polling.",
                 broadcaster_id, error.code().name,
@@ -1376,7 +1377,8 @@ class LiveChatService:
             )
             if error.code() == grpc.StatusCode.UNAUTHENTICATED:
                 self.connections[broadcaster_id].expires_at = datetime.now(UTC).isoformat()
-            await self._poll_live_chat(broadcaster_id, live_chat_id, page_token=page_token)
+            return await self._poll_live_chat(broadcaster_id, live_chat_id, page_token=page_token)
+        return True
 
     @staticmethod
     def _stream_message_item(item) -> dict:
@@ -1400,37 +1402,25 @@ class LiveChatService:
             },
         }
 
-    async def _poll_live_chat(self, broadcaster_id: str, live_chat_id: str, *, page_token: str | None = None) -> None:
-
+    async def _poll_live_chat(self, broadcaster_id: str, live_chat_id: str, *, page_token: str | None = None) -> bool:
+        """Use polling temporarily, then retry the streaming transport."""
+        resume_stream_at = time.monotonic() + 120
         while self.started and broadcaster_id in self.connections:
             params = {"part": "id,snippet,authorDetails", "liveChatId": live_chat_id, "maxResults": 200}
-
             if page_token:
                 params["pageToken"] = page_token
-
-            try:
-                payload = await self._youtube_get(broadcaster_id, "/liveChat/messages", params)
-            except httpx.HTTPStatusError as error:
-                if error.response.status_code in {403, 404}:
-                    reason, _ = self._youtube_error_details(error.response)
-                    if reason in {"quotaExceeded", "dailyLimitExceeded"}:
-                        raise
-                    LOGGER.warning(
-                        "[Live Chat] YouTube chat polling stopped for broadcaster %s (HTTP %d, %s).",
-                        broadcaster_id, error.response.status_code, reason or "unknown",
-                        extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"}
-                    )
-                    return
-                raise
-
+            payload = await self._youtube_get(broadcaster_id, "/liveChat/messages", params)
             self._publish_youtube_items(broadcaster_id, payload.get("items", []))
             page_token = payload.get("nextPageToken")
-
+            if page_token:
+                self.youtube_page_tokens[broadcaster_id] = (live_chat_id, page_token)
             if payload.get("offlineAt"):
-                return
-
+                return True
             interval = max(1.0, int(payload.get("pollingIntervalMillis", 5000)) / 1000)
             await asyncio.sleep(interval)
+            if time.monotonic() >= resume_stream_at:
+                return False
+        return True
 
     def _publish_youtube_items(self, broadcaster_id: str, items: list[dict]) -> None:
         for item in items:
@@ -1532,6 +1522,11 @@ class LiveChatService:
         return response.json()
 
     async def _ensure_access_token(self, broadcaster_id: str) -> YouTubeConnection:
+        lock = self.youtube_refresh_locks.setdefault(broadcaster_id, asyncio.Lock())
+        async with lock:
+            return await self._refresh_access_token_if_needed(broadcaster_id)
+
+    async def _refresh_access_token_if_needed(self, broadcaster_id: str) -> YouTubeConnection:
         connection = self.connections[broadcaster_id]
         expires_at = datetime.fromisoformat(connection.expires_at.replace("Z", "+00:00"))
 
@@ -1550,6 +1545,13 @@ class LiveChatService:
                 "grant_type": "refresh_token"
             }
         )
+        if response.status_code in {400, 401}:
+            try:
+                reason = response.json().get("error")
+            except (ValueError, AttributeError):
+                reason = None
+            if reason in {"invalid_grant", "invalid_client", "unauthorized_client"}:
+                raise YouTubeReconnectRequired("Reconnect YouTube: Google authorization expired or was revoked.")
         response.raise_for_status()
         payload = response.json()
         connection.access_token = str(payload["access_token"])
@@ -1571,6 +1573,10 @@ class LiveChatService:
         except (TypeError, ValueError):
             return None, None
 
+        if isinstance(error, str):
+            return error, None
+        if not isinstance(error, dict):
+            return None, None
         reasons = error.get("errors") or []
         reason = reasons[0].get("reason") if reasons and isinstance(reasons[0], dict) else None
         message = error.get("message")
@@ -1597,3 +1603,4 @@ class LiveChatService:
             return "command"
 
         return "chat"
+

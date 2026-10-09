@@ -14,6 +14,7 @@ from starlette.requests import Request
 import web.channel.routers.dashboard as dashboard_router
 from bot.services.channels.live_chat import ChatBadge, ChatSegment, LiveChatService, UnifiedChatMessage, message_matches_view, normalize_chat_view
 from bot.services.channels import youtube_live_chat_pb2
+from config.settings import settings
 from storage.migration_runner import run_migrations
 from web.channel.routers.dashboard import get_ad_status
 from web.admin.auth import CSRF_SESSION_KEY
@@ -593,7 +594,7 @@ async def test_dashboard_enforces_500_character_message_limit(monkeypatch, lengt
 async def test_youtube_stream_publishes_immediately_and_uses_existing_token(monkeypatch):
     service = LiveChatService(None)
     service.started = True
-    service.connections["channel-1"] = SimpleNamespace(access_token="access")
+    service.connections["channel-1"] = SimpleNamespace(access_token="access", expires_at=(datetime.now(UTC) + timedelta(hours=1)).isoformat())
     service._ensure_access_token = AsyncMock(return_value=service.connections["channel-1"])
     service._poll_live_chat = AsyncMock()
     requests = []
@@ -608,7 +609,7 @@ async def test_youtube_stream_publishes_immediately_and_uses_existing_token(monk
         def unary_stream(self, method, **kwargs):
             assert method == "/youtube.api.v3.V3DataLiveChatMessageService/StreamList"
 
-            def call(request, *, metadata):
+            def call(request, *, metadata, timeout):
                 requests.append((request, metadata))
 
                 async def events():
@@ -639,7 +640,7 @@ async def test_youtube_stream_publishes_immediately_and_uses_existing_token(monk
 async def test_youtube_stream_falls_back_to_polling_after_disconnect(monkeypatch):
     service = LiveChatService(None)
     service.started = True
-    service.connections["channel-1"] = SimpleNamespace(access_token="access")
+    service.connections["channel-1"] = SimpleNamespace(access_token="access", expires_at=(datetime.now(UTC) + timedelta(hours=1)).isoformat())
     service._ensure_access_token = AsyncMock(return_value=service.connections["channel-1"])
     service._poll_live_chat = AsyncMock()
 
@@ -651,7 +652,7 @@ async def test_youtube_stream_falls_back_to_polling_after_disconnect(monkeypatch
             return None
 
         def unary_stream(self, method, **kwargs):
-            def call(request, *, metadata):
+            def call(request, *, metadata, timeout):
                 async def events():
                     yield youtube_live_chat_pb2.LiveChatMessageListResponse(next_page_token="last-token")
                     raise grpc.aio.AioRpcError(grpc.StatusCode.UNAVAILABLE)
@@ -2571,10 +2572,142 @@ async def test_boss_hunt_leaderboard_shows_current_contributors(monkeypatch):
     assert "1,500 damage" in markup and "900 damage" in markup
     raid_bosses.get_contributors.assert_awaited_once_with("channel-1")
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [grpc.StatusCode.DEADLINE_EXCEEDED, grpc.StatusCode.UNAUTHENTICATED])
+async def test_youtube_stream_renews_credentials_and_resumes_without_polling(monkeypatch, status):
+    service = LiveChatService(None)
+    service.started = True
+    connection = SimpleNamespace(
+        access_token="old-token", expires_at=(datetime.now(UTC) + timedelta(seconds=120)).isoformat()
+    )
+    service.connections["channel-1"] = connection
+    requests = []
+
+    async def ensure_token(_):
+        if datetime.fromisoformat(connection.expires_at) <= datetime.now(UTC) + timedelta(seconds=60):
+            connection.access_token = "new-token"
+            connection.expires_at = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+        return connection
+
+    service._ensure_access_token = AsyncMock(side_effect=ensure_token)
+    service._poll_live_chat = AsyncMock()
+
+    class FakeChannel:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def unary_stream(self, *args, **kwargs):
+            def call(request, *, metadata, timeout):
+                requests.append((request.page_token, metadata, timeout))
+                attempt = len(requests)
+
+                async def events():
+                    if attempt == 1:
+                        yield youtube_live_chat_pb2.LiveChatMessageListResponse(next_page_token="resume-token")
+                        if status == grpc.StatusCode.DEADLINE_EXCEEDED:
+                            connection.expires_at = datetime.now(UTC).isoformat()
+                        raise grpc.aio.AioRpcError(status)
+                    yield youtube_live_chat_pb2.LiveChatMessageListResponse(offline_at="ended")
+
+                return events()
+            return call
+
+    monkeypatch.setattr("bot.services.channels.live_chat.grpc.aio.secure_channel", lambda *args: FakeChannel())
+    await service._stream_live_chat("channel-1", "live-chat-1")
+
+    assert len(requests) == 2
+    assert 0 < requests[0][2] <= 60
+    assert requests[1][0] == "resume-token"
+    assert requests[1][1] == (("authorization", "Bearer new-token"),)
+    service._poll_live_chat.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [400, 429, 500, 503])
+async def test_youtube_watcher_retries_http_failures(monkeypatch, status):
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    request = httpx.Request("GET", "https://www.googleapis.com/youtube/v3/liveBroadcasts")
+    response = httpx.Response(status, request=request, json={})
+    service._find_active_live_chat = AsyncMock(side_effect=[
+        httpx.HTTPStatusError("failed", request=request, response=response),
+        asyncio.CancelledError(),
+    ])
+    sleep = AsyncMock()
+    monkeypatch.setattr("bot.services.channels.live_chat.asyncio.sleep", sleep)
+    with pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube("channel-1")
+    assert service._find_active_live_chat.await_count == 2
+    sleep.assert_awaited_once_with(settings.YOUTUBE_CHAT_DISCOVERY_SECONDS)
+
+
+@pytest.mark.asyncio
+async def test_youtube_revoked_authorization_requires_reconnect():
+    from bot.services.channels.live_chat import YouTubeReconnectRequired
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._find_active_live_chat = AsyncMock(side_effect=YouTubeReconnectRequired("Reconnect YouTube"))
+    await service._watch_youtube("channel-1")
+    assert service.youtube_statuses["channel-1"] == ("unavailable", "Reconnect YouTube")
+    assert service._find_active_live_chat.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_youtube_polling_returns_to_stream_with_saved_cursor(monkeypatch):
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service._youtube_get = AsyncMock(return_value={
+        "items": [], "nextPageToken": "saved-cursor", "pollingIntervalMillis": 5000
+    })
+    monkeypatch.setattr("bot.services.channels.live_chat.time", SimpleNamespace(monotonic=Mock(side_effect=[0, 121])))
+    sleep = AsyncMock()
+    monkeypatch.setattr("bot.services.channels.live_chat.asyncio.sleep", sleep)
+    assert await service._poll_live_chat("channel-1", "chat-1") is False
+    assert service.youtube_page_tokens["channel-1"] == ("chat-1", "saved-cursor")
+    sleep.assert_awaited_once_with(5.0)
+
+
+@pytest.mark.asyncio
+async def test_youtube_invalid_grant_reports_reconnect():
+    from bot.services.channels.live_chat import YouTubeReconnectRequired
+    service = LiveChatService(None)
+    service.connections["channel-1"] = SimpleNamespace(
+        access_token="old", refresh_token="revoked", expires_at=datetime.now(UTC).isoformat()
+    )
+    service.client = SimpleNamespace(post=AsyncMock(return_value=httpx.Response(
+        400, json={"error": "invalid_grant"}
+    )))
+    with pytest.raises(YouTubeReconnectRequired, match="Reconnect YouTube"):
+        await service._ensure_access_token("channel-1")
+
+
+@pytest.mark.asyncio
+async def test_youtube_refreshes_are_serialized():
+    service = LiveChatService(None)
+    active = 0
+    peak = 0
+
+    async def refresh(_):
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        await asyncio.sleep(0)
+        active -= 1
+        return "token"
+
+    service._refresh_access_token_if_needed = refresh
+    assert await asyncio.gather(service._ensure_access_token("channel-1"),
+                                service._ensure_access_token("channel-1")) == ["token", "token"]
+    assert peak == 1
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url, code, expected_status", [
-    ("https://oauth2.googleapis.com/token", 400, "unavailable"),
     ("https://www.googleapis.com/youtube/v3/liveBroadcasts", 500, "error"),
 ])
 async def test_youtube_watcher_recovers_after_http_failure(monkeypatch, caplog, url, code, expected_status):
@@ -2583,7 +2716,7 @@ async def test_youtube_watcher_recovers_after_http_failure(monkeypatch, caplog, 
     service.connections["channel-1"] = SimpleNamespace()
     service.active_youtube_chat_ids["channel-1"] = "old-chat"
     request = httpx.Request("POST" if code == 400 else "GET", url)
-    response = httpx.Response(code, request=request, json={"error": "invalid_grant"})
+    response = httpx.Response(code, request=request, json={"error": {"message": "YouTube is temporarily unavailable."}})
     service._find_active_live_chat = AsyncMock(side_effect=[
         httpx.HTTPStatusError("Rejected", request=request, response=response), "new-chat"
     ])
@@ -2601,3 +2734,4 @@ async def test_youtube_watcher_recovers_after_http_failure(monkeypatch, caplog, 
     assert service._find_active_live_chat.await_count == 2
     service._stream_live_chat.assert_awaited_once_with("channel-1", "new-chat")
     assert f"HTTP {code}" in caplog.text
+
