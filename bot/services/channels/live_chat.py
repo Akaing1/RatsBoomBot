@@ -1317,6 +1317,7 @@ class LiveChatService:
     async def _stream_live_chat(self, broadcaster_id: str, live_chat_id: str) -> None:
         """Receive new messages as YouTube publishes them, with REST polling as a fallback."""
         page_token = None
+        authentication_retried = False
 
         try:
             async with grpc.aio.secure_channel("youtube.googleapis.com:443", grpc.ssl_channel_credentials()) as channel:
@@ -1333,14 +1334,30 @@ class LiveChatService:
                         part=["id", "snippet", "authorDetails"],
                         page_token=page_token,
                     )
-                    stream = stream_list(request, metadata=(("authorization", f"Bearer {connection.access_token}"),))
+                    expires_at = datetime.fromisoformat(connection.expires_at.replace("Z", "+00:00"))
+                    # End even a quiet stream before its credentials expire, then refresh and resume.
+                    lifetime = max(1.0, (expires_at - datetime.now(UTC)).total_seconds() - 60)
+                    stream = stream_list(
+                        request, metadata=(("authorization", f"Bearer {connection.access_token}"),),
+                        timeout=lifetime,
+                    )
 
-                    async for response in stream:
-                        self._publish_youtube_items(broadcaster_id, [self._stream_message_item(item) for item in response.items])
-                        if response.next_page_token:
-                            page_token = response.next_page_token
-                        if response.offline_at:
-                            return
+                    try:
+                        async for response in stream:
+                            authentication_retried = False
+                            self._publish_youtube_items(broadcaster_id, [self._stream_message_item(item) for item in response.items])
+                            if response.next_page_token:
+                                page_token = response.next_page_token
+                            if response.offline_at:
+                                return
+                    except grpc.aio.AioRpcError as error:
+                        if error.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                            continue
+                        if error.code() == grpc.StatusCode.UNAUTHENTICATED and not authentication_retried:
+                            connection.expires_at = datetime.now(UTC).isoformat()
+                            authentication_retried = True
+                            continue
+                        raise
 
                     # YouTube may close an otherwise healthy stream. Resume at its last token.
                     await asyncio.sleep(1)
