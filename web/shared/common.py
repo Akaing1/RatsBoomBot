@@ -5,7 +5,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from config.version import get_deployment_stamp
+from config.version import APP_VERSION, get_deployment_stamp
 from web.shared.markdown import render_markdown
 from web.admin.auth import get_csrf_token, is_admin_authenticated
 
@@ -14,6 +14,7 @@ TEMPLATES_DIRECTORY = WEB_DIRECTORY / "templates"
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIRECTORY))
 templates.env.globals["deployment_stamp"] = get_deployment_stamp
+templates.env.globals["app_version"] = APP_VERSION
 templates.env.filters["markdown"] = render_markdown
 
 

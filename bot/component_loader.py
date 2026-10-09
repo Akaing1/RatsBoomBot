@@ -11,6 +11,7 @@ from bot.shared.commands.clips import ClipCommands
 from bot.shared.commands.mod_actions import ModActionCommands
 from bot.shared.commands.overwatch import OverwatchCommands
 from bot.shared.commands.points import PointsCommands
+from bot.shared.commands.pets import PetsCommands
 from bot.shared.commands.raid_boss import RaidBossCommands
 from bot.shared.commands.raids import RaidCommands
 from bot.shared.commands.settings import SettingsCommands
@@ -36,6 +37,7 @@ GLOBAL_COMPONENTS: tuple[type[commands.Component], ...] = (
     SocialCommands,
     StatsCommands,
     PointsCommands,
+    PetsCommands,
     RaidBossCommands,
     RaidCommands,
     ModActionCommands,

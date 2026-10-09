@@ -26,10 +26,11 @@ class PointsService:
     LEGACY_BROADCASTER_ID = "shared"
     BOT_USERNAME = "RatsBoomBot"
 
-    def __init__(self, bot, db, chatter_stats=None):
+    def __init__(self, bot, db, chatter_stats=None, pets=None):
         self.bot = bot
         self.db = db
         self.chatter_stats = chatter_stats
+        self.pets = pets
         self.cooldowns: dict[str, float] = {}
         self.message_locks: dict[str, asyncio.Lock] = {}
         self.pending_duels: dict[str, PendingDuel] = {}
@@ -225,7 +226,11 @@ class PointsService:
 
             try:
                 async with self.db.acquire() as connection:
-                    awarded_points = points_config.points_per_message
+                    awarded_points = await self.apply_earned_bonus(
+                        user_id,
+                        points_config.points_per_message,
+                        connection
+                    )
                     values = (broadcaster_id, user_id, username, awarded_points)
                     await connection.execute(query, values)
 
@@ -247,6 +252,15 @@ class PointsService:
             username,
             broadcaster_id
         )
+
+    async def apply_earned_bonus(self, user_id: str, base_amount: int, connection=None) -> int:
+        base_amount = int(base_amount)
+
+        if base_amount <= 0 or self.pets is None:
+            return base_amount
+
+        bonus = await self.pets.loyalty_bonus(str(user_id), base_amount, connection)
+        return base_amount + bonus
 
     async def get_points(self, broadcaster_id: str, user_id: str) -> int:
         broadcaster_id = str(broadcaster_id)
@@ -301,7 +315,7 @@ class PointsService:
 
         try:
             async with self.db.acquire() as connection:
-                awarded_amount = amount
+                awarded_amount = await self.apply_earned_bonus(user_id, amount, connection) if earned else amount
                 values = (broadcaster_id, user_id, username, awarded_amount)
                 await connection.execute(query, values)
 
@@ -336,7 +350,7 @@ class PointsService:
                 await connection.execute("BEGIN")
 
                 try:
-                    awarded_amount = amount
+                    awarded_amount = await self.apply_earned_bonus(user_id, amount, connection) if earned else amount
                     await connection.execute(
                         """
                         INSERT OR IGNORE INTO point_reward_events (
@@ -492,7 +506,14 @@ class PointsService:
                             (username, payout, broadcaster_id, user_id)
                         )
 
-                    loss = max(bet - payout, 0)
+                    refund = await self.pets.gamble_loss_refund(user_id, bet, connection) if game == "gamble" and payout == 0 and self.pets is not None else 0
+                    if refund:
+                        await connection.execute(
+                            "UPDATE viewers SET points = points + ? WHERE broadcaster_id = ? AND user_id = ?",
+                            (refund, broadcaster_id, user_id)
+                        )
+
+                    loss = max(bet - payout - refund, 0)
 
                     if loss:
                         await connection.execute(

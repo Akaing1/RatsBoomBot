@@ -99,7 +99,7 @@
                 </button>
             </form>
 
-            <p class="deployment-stamp">{{ deployment_stamp() }}</p>
+            <p class="deployment-stamp sidebar-version">v{{ app_version }}</p>
         </aside>
 
         <main class="main-content admin-main-content">
@@ -108,6 +108,7 @@
     </div>
     <script src="{{ url_for('static', path='/js/channel-sidebar.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/hover-labels.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/overlay-scrollbars.js') }}?v={{ deployment_stamp() }}" defer></script>
     {% block page_scripts %}{% endblock %}
 </body>
 </html>

@@ -87,6 +87,22 @@ class FakeChatterStats:
         }
 
 
+class FakePets:
+
+    async def get_equipped_pet(self, user_id: str):
+        assert user_id == "user-1"
+        return SimpleNamespace(
+            pet_id="dungeon_bat",
+            display_name="Silly Bat",
+            rarity="common",
+            level=1,
+            passive_name="Loyalty Gain",
+            passive_rarity="common",
+            passive_description="bonus loyalty points earned",
+            passive_percent_label="10",
+            sprite_path="/assets/Silly%20Bat.png",
+            frame_count=4
+        )
 
 
 def test_public_global_chatter_profile_renders(monkeypatch) -> None:
@@ -114,13 +130,40 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert "750 / 2,500 XP" in response.text
     assert 'src="https://example.com/alice.png"' in response.text
     assert "View on Twitch" not in response.text
-    assert 'data-chatter-tab="pets"' not in response.text
-    assert "chatter-pet-sprite" not in response.text
-    assert "!pets" not in response.text
 
 
+def test_public_global_chatter_profile_renders_equipped_pet(monkeypatch) -> None:
+    services = SimpleNamespace(chatter_stats=FakeChatterStats(), pets=FakePets())
+    monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=services))
+
+    with TestClient(app) as client:
+        response = client.get("/chatters/alice")
+
+    assert response.status_code == 200
+    assert "Silly Bat" in response.text
+    assert "10% bonus loyalty points earned" in response.text
+    assert "/assets/Silly%20Bat.png?v=" in response.text
+    assert "--pet-frames: 4" in response.text
 
 
+def test_public_profile_uses_rat_idle_animation(monkeypatch) -> None:
+    class FakeRat(FakePets):
+        async def get_equipped_pet(self, user_id: str):
+            pet = await super().get_equipped_pet(user_id)
+            pet.pet_id = "explosive_rat"
+            pet.display_name = "Little Rat"
+            pet.sprite_path = "/assets/Explosive%20Rat.png"
+            return pet
+
+    services = SimpleNamespace(chatter_stats=FakeChatterStats(), pets=FakeRat())
+    monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=services))
+
+    with TestClient(app) as client:
+        response = client.get("/chatters/alice")
+
+    assert response.status_code == 200
+    assert 'class="chatter-pet-sprite chatter-pet-sprite--rat"' in response.text
+    assert "/assets/Explosive%20Rat.png?v=" in response.text
 
 
 def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
@@ -225,3 +268,52 @@ def test_another_chatter_profile_stays_public_after_sign_in(monkeypatch) -> None
     assert "Your activity in" not in channel_profile.text
     assert "Sign out" not in channel_profile.text
     assert "My account" not in channel_profile.text
+
+
+def test_public_profile_renders_full_pet_collection(monkeypatch):
+    class CollectionPets(FakePets):
+        async def get_summon_rates(self):
+            return [
+                {"rarity": "common", "base_percent": 70, "effective_percent": 100,
+                 "pets": [{"display_name": "Silly Bat", "percent": 100 / 3},
+                          {"display_name": "Little Rat", "percent": 100 / 3},
+                          {"display_name": "Sleepy Fox", "percent": 100 / 3}]},
+                {"rarity": "rare", "base_percent": 20, "effective_percent": 0, "pets": []},
+                {"rarity": "ultra_rare", "base_percent": 10, "effective_percent": 0, "pets": []},
+            ]
+
+        async def get_collection(self, user_id):
+            bat = await self.get_equipped_pet(user_id)
+            bat.user_pet_id = 1
+            return [bat, SimpleNamespace(
+                user_pet_id=2, pet_id="sleepy_fox", display_name="Sleepy Fox",
+                rarity="ultra_rare", sprite_path="/assets/Sleepy%20Fox.png",
+                frame_count=4, passive_percent_label="10", passive_description="gamble loss refunded",
+            )]
+
+        async def get_equipped_pet(self, user_id):
+            bat = await super().get_equipped_pet(user_id)
+            bat.user_pet_id = 1
+            return bat
+
+    services = SimpleNamespace(chatter_stats=FakeChatterStats(), pets=CollectionPets())
+    monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=services))
+    with TestClient(app) as client:
+        response = client.get("/chatters/alice")
+    assert response.status_code == 200
+    assert 'data-chatter-tab="pets"' in response.text
+    assert 'data-chatter-panel="pets" aria-label="Pet collection" hidden' in response.text
+    assert 'class="pet-rates"' in response.text
+    assert "100.0%" not in response.text
+    assert "Little Rat (33.3%)" not in response.text
+    assert "Roll a rarity" not in response.text
+    assert "<th>Currently</th>" not in response.text
+    assert "<th>Rate</th>" in response.text
+    assert "Silly Bat, Little Rat, Sleepy Fox" in response.text
+    assert "No pets available" in response.text
+    assert "70% Silly Bat" not in response.text
+    assert 'id="pets"' in response.text
+    assert "Common · Equipped" in response.text
+    assert "UR" in response.text
+    assert "!pets equip Sleepy Fox" in response.text
+    assert "/assets/Sleepy%20Fox.png" in response.text

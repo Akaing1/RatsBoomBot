@@ -334,7 +334,10 @@ class ModActionCommands(commands.Component):
         self.start_kamikaze_cooldown(broadcaster_id, caller_id)
 
         bomb_roll = random.randint(1, 100)
-        success_threshold = self.KAMIKAZE_SUCCESS_THRESHOLD
+        pets = getattr(services, "pets", None)
+        from pets.passives import KAMIKAZE_ODDS
+        bonus_bps = await pets.bonus_bps(caller_id, KAMIKAZE_ODDS) if pets is not None else 0
+        success_threshold = max(0, self.KAMIKAZE_SUCCESS_THRESHOLD - bonus_bps // 100)
 
         LOGGER.debug(
             "[Commands] !kamikaze rolled %d for user %s against %s.",

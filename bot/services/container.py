@@ -3,6 +3,7 @@ import logging
 from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatIdentityService, ChatterIdentityService, ChatterStatsService, FeatureToggleService, LiveChatService, ProfileSettingsService
 from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PassivePointsService, PointsService, RedeemService, ViewerQueueService
+from pets import PetService
 from rpg_minigame import RaidBossService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService
 from bot.services.support import HelpService, ModerationService
@@ -36,10 +37,12 @@ class ServiceContainer:
         self.stream_logs = StreamLogService(bot, self.broadcasters, settings.STREAM_LOGS_PATH)
         self.help = HelpService(bot)
         self.timers = TimerService(bot, self.broadcasters, self.broadcaster_settings)
-        self.points = PointsService(bot, db, self.chatter_stats)
+        self.pets = PetService(db)
+        self.points = PointsService(bot, db, self.chatter_stats, self.pets)
         self.passive_points = PassivePointsService(bot, db, self.points, self.chat_identity, self.features)
         self.raid_bosses = RaidBossService(
             bot, db, self.chatter_stats, self.points,
+            pets=self.pets,
             enabled_provider=lambda broadcaster_id: self.features.is_enabled(broadcaster_id, FeatureName.RAID_BOSSES),
             config_provider=lambda broadcaster_id: (
                 profile.raid_bosses if (profile := get_active_profile(broadcaster_id)) is not None else None
@@ -71,6 +74,7 @@ class ServiceContainer:
             ("ProfileSettingsService", self.profile_settings),
             ("FeatureToggleService", self.features),
             ("LiveChatService", self.live_chat),
+            ("PetService", self.pets),
             ("PointsService", self.points),
             ("PassivePointsService", self.passive_points),
             ("RaidBossService", self.raid_bosses),

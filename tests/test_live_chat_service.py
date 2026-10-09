@@ -2705,3 +2705,33 @@ async def test_youtube_refreshes_are_serialized():
     assert await asyncio.gather(service._ensure_access_token("channel-1"),
                                 service._ensure_access_token("channel-1")) == ["token", "token"]
     assert peak == 1
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url, code, expected_status", [
+    ("https://www.googleapis.com/youtube/v3/liveBroadcasts", 500, "error"),
+])
+async def test_youtube_watcher_recovers_after_http_failure(monkeypatch, caplog, url, code, expected_status):
+    service = LiveChatService(None)
+    service.started = True
+    service.connections["channel-1"] = SimpleNamespace()
+    service.active_youtube_chat_ids["channel-1"] = "old-chat"
+    request = httpx.Request("POST" if code == 400 else "GET", url)
+    response = httpx.Response(code, request=request, json={"error": "invalid_grant"})
+    service._find_active_live_chat = AsyncMock(side_effect=[
+        httpx.HTTPStatusError("Rejected", request=request, response=response), "new-chat"
+    ])
+    service._stream_live_chat = AsyncMock(side_effect=asyncio.CancelledError)
+
+    async def retry(_):
+        assert service.youtube_statuses["channel-1"][0] == expected_status
+        assert "channel-1" not in service.active_youtube_chat_ids
+        if code == 400:
+            assert "Reconnect YouTube" in service.youtube_statuses["channel-1"][1]
+
+    monkeypatch.setattr("bot.services.channels.live_chat.asyncio.sleep", retry)
+    with pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube("channel-1")
+    assert service._find_active_live_chat.await_count == 2
+    service._stream_live_chat.assert_awaited_once_with("channel-1", "new-chat")
+    assert f"HTTP {code}" in caplog.text
+

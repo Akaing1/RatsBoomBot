@@ -55,6 +55,7 @@ RatsBoomBot
 ├── config/                 Environment settings and application version
 ├── deploy/                 Linux, systemd, backup, and Windows deployment tools
 ├── docs/                   Project documentation and style guide
+├── pets/                   Pet ownership and passive bonuses
 ├── rpg_minigame/           Boss encounters, inventory, loot, and RPG settings
 ├── scripts/                Administration and data-import utilities
 ├── storage/                Database access and versioned migrations
