@@ -1241,6 +1241,7 @@ class LiveChatService:
         try:
             while self.started and broadcaster_id in self.connections:
                 delay = settings.YOUTUBE_CHAT_DISCOVERY_SECONDS
+                resume_stream = False
                 try:
                     live_chat_id = known_chat_id or await self._find_active_live_chat(broadcaster_id)
                     if live_chat_id is None:
@@ -1252,6 +1253,11 @@ class LiveChatService:
                         LOGGER.info("[Live Chat] Attached to YouTube live chat for broadcaster %s.", broadcaster_id,
                                     extra={"broadcaster_id": broadcaster_id, "category": "LIVE_CHAT"})
                         ended = await self._stream_live_chat(broadcaster_id, live_chat_id)
+                        if ended is False:
+                            # Polling already respected YouTube\'s interval. Keep sending available
+                            # and resume streaming at the saved cursor without rediscovery.
+                            resume_stream = True
+                            continue
                         if ended is not False:
                             known_chat_id = None
                             self.youtube_page_tokens.pop(broadcaster_id, None)
@@ -1298,9 +1304,11 @@ class LiveChatService:
                     delay = retry_delay
                     retry_delay = min(300, retry_delay * 2)
                 finally:
-                    self.active_youtube_chat_ids.pop(broadcaster_id, None)
+                    if not resume_stream:
+                        self.active_youtube_chat_ids.pop(broadcaster_id, None)
                 await asyncio.sleep(delay)
         finally:
+            self.active_youtube_chat_ids.pop(broadcaster_id, None)
             if self.tasks.get(broadcaster_id) is asyncio.current_task():
                 self.tasks.pop(broadcaster_id, None)
 
@@ -1330,6 +1338,7 @@ class LiveChatService:
         saved_chat, saved_token = self.youtube_page_tokens.get(broadcaster_id, (None, None))
         page_token = saved_token if saved_chat == live_chat_id else None
         authentication_retried = False
+        deadline_retry_delay = 1.0
 
         try:
             async with grpc.aio.secure_channel("youtube.googleapis.com:443", grpc.ssl_channel_credentials()) as channel:
@@ -1357,6 +1366,7 @@ class LiveChatService:
                     try:
                         async for response in stream:
                             authentication_retried = False
+                            deadline_retry_delay = 1.0
                             self._publish_youtube_items(broadcaster_id, [self._stream_message_item(item) for item in response.items])
                             if response.next_page_token:
                                 page_token = response.next_page_token
@@ -1365,6 +1375,8 @@ class LiveChatService:
                                 return True
                     except grpc.aio.AioRpcError as error:
                         if error.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                            await asyncio.sleep(deadline_retry_delay)
+                            deadline_retry_delay = min(30.0, deadline_retry_delay * 2)
                             continue
                         if error.code() == grpc.StatusCode.UNAUTHENTICATED and not authentication_retried:
                             connection.expires_at = datetime.now(UTC).isoformat()
@@ -1607,10 +1619,10 @@ class LiveChatService:
         if not stripped.startswith(prefix):
             return "chat"
 
-        invoked_with = stripped[len(prefix):].split(maxsplit=1)[0].casefold()
-
-        if not invoked_with:
+        command_parts = stripped[len(prefix):].split(maxsplit=1)
+        if not command_parts:
             return "chat"
+        invoked_with = command_parts[0].casefold()
 
         if self.bot is not None and self.bot.get_command(invoked_with) is not None:
             return "command"
