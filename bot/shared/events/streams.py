@@ -43,6 +43,9 @@ class StreamEvents(commands.Component):
 
         broadcaster_id = str(broadcaster_id)
         stream_id = str(stream_id)
+        update_live_state = getattr(getattr(services, "broadcasters", None), "update_live_state", None)
+        if callable(update_live_state):
+            update_live_state(broadcaster_id, True)
         channel_name = getattr(broadcaster, "name", None)
 
         LOGGER.info(
@@ -103,6 +106,9 @@ class StreamEvents(commands.Component):
             return
 
         broadcaster_id = str(broadcaster_id)
+        update_live_state = getattr(getattr(services, "broadcasters", None), "update_live_state", None)
+        if callable(update_live_state):
+            update_live_state(broadcaster_id, False)
         channel_name = getattr(broadcaster, "name", None)
 
         LOGGER.info(

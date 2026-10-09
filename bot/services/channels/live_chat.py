@@ -878,16 +878,16 @@ class LiveChatService:
         return [message.as_dict() for message in self.messages.get(str(broadcaster_id), ())
                 if not message.deleted and message_matches_view(message, view)]
 
-    def clear_chat(self, broadcaster_id: str) -> None:
-        """Clear Twitch history and notify open dashboards without touching YouTube."""
+    def clear_chat(self, broadcaster_id: str, *, platform: str = "twitch") -> None:
+        """Clear selected chat history and notify open dashboards."""
         broadcaster_id = str(broadcaster_id)
         messages = self.messages[broadcaster_id]
         self.messages[broadcaster_id] = deque(
-            (message for message in messages if message.platform != "twitch"), maxlen=messages.maxlen)
+            (message for message in messages if platform != "both" and message.platform != platform), maxlen=messages.maxlen)
         for queue in tuple(self.subscribers.get(broadcaster_id, ())):
             if queue.full():
                 queue.get_nowait()
-            queue.put_nowait({"event": "chat-clear", "platform": "twitch"})
+            queue.put_nowait({"event": "chat-clear", "platform": platform})
 
     def find_message(self, broadcaster_id: str, message_id: str) -> dict[str, object] | None:
         message_id = str(message_id)

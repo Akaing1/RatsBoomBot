@@ -22,7 +22,7 @@ from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.shared.common import templates
 from web.shared.category_relevance import low_relevance_category_ids
-from web.shared.live_chat import stream_chat_events
+from web.shared.live_chat import clear_stale_chat_on_refresh, stream_chat_events
 from web.shared.protected_users import (
     ProtectedUserError,
     add_protected_user,
@@ -1126,6 +1126,7 @@ async def channel_dashboard(request: Request):
         return RedirectResponse(url="/connect", status_code=303)
 
     await broadcaster_service.refresh_live_statuses()
+    clear_stale_chat_on_refresh(services.live_chat, broadcaster)
 
     channel_settings = await services.broadcaster_settings.get_settings(broadcaster_id)
     viewer_queue = services.viewer_queue
