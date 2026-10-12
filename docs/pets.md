@@ -47,15 +47,16 @@ Sleepy Fox is Common. Administrator grants use the fixed mappings below by defau
 
 | Pet | Rarity | Chance | Fixed summon passive | Duplicate refund |
 | --- | --- | --- | --- | --- |
-| Silly Bat | Common | ~16.67% | Gamble Luck: +5 percentage points win chance | 12,500 points |
-| Little Rat | Common | ~16.67% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
-| Sleepy Fox | Common | ~16.67% | Boss Hunt Damage: +10% damage | 12,500 points |
-| Horned Wolf | Common | ~16.67% | Boss Hunt Damage: +10% damage | 12,500 points |
-| Royal Raven | Common | ~16.67% | Boss Hunt Profit: +10% point rewards | 12,500 points |
+| Silly Bat | Common | ~14.29% | Gamble Luck: +5 percentage points win chance | 12,500 points |
+| Little Rat | Common | ~14.29% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
+| Sleepy Fox | Common | ~14.29% | Boss Hunt Damage: +10% damage | 12,500 points |
+| Horned Wolf | Common | ~14.29% | Boss Hunt Damage: +10% damage | 12,500 points |
+| Royal Raven | Common | ~14.29% | Boss Hunt Profit: +10% point rewards | 12,500 points |
 
-| Witch's Cat | Common | ~16.67% | Gamble Luck: +5 percentage points win chance | 12,500 points |
+| Dog of the Sun | Common | ~14.29% | Boss Hunt Profit: +10% point rewards | 12,500 points |
+| Witch's Cat | Common | ~14.29% | Gamble Luck: +5 percentage points win chance | 12,500 points |
 
-Summons first roll rarity with 70% Common / 20% Rare / 10% UR weights, excluding empty tiers and normalizing the remaining weights. They then choose uniformly within that rarity. All six pets are Common, so currently Common is 100% and each pet has approximately a 16.67% chance. The Pets tab has an expandable Rates popup anchored to the Rates control, showing the standard rarity rates and the available pets in each tier. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
+Summons first roll rarity with 70% Common / 20% Rare / 10% UR weights, excluding empty tiers and normalizing the remaining weights. They then choose uniformly within that rarity. All seven pets are Common, so currently Common is 100% and each pet has approximately a 14.29% chance. The Pets tab has an expandable Rates popup anchored to the Rates control, showing the standard rarity rates and the available pets in each tier. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
 
 Duplicates return points to the ticket's original purchase channel, without loyalty bonuses or earned-point XP. Purchases and summons are atomic to prevent double spending. Existing pets are aligned with the selected mappings on migration. No leveling, feeding, essence purchases, or passive rerolls are added here.
 
@@ -86,3 +87,11 @@ Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc
 Migration 62 adds Common Witch's Cat with Gamble Luck: +5 percentage points to gamble win chance at level 1, scaling to +10 at level 50. The approved upright black cat and wide-brimmed white witch hat use four equal 112 × 149 frames in `assets/Witch's Cat.png`. The 1.2-second breathing, blink, and tail-wave loop is anchored to the front paws to avoid horizontal drift. Reduced-motion preferences disable animation.
 
 Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet cat`. Owners can use `!pets equip Witch's Cat`.
+
+### Dog of the Sun
+
+A regal companion of the solar court, sharing the spoils of victory with its keeper.
+
+Migration 63 adds Common Dog of the Sun with fixed Boss Hunt Profit (Raid Profit): +10% raid point rewards at level 1, scaling to +20% at level 50. Its golden and ivory fur, amber eyes, tennis ball held in its jaws, and rotating solar halo use the approved four-frame sheet in `assets/Dog of the Sun.png`. Vertical breathing, tail wagging, and the halo play at 250 ms per frame (one-second loop) in both the equipped profile and collection. Reduced-motion preferences disable animation.
+
+Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet dog`. Owners can use `!pets equip Dog of the Sun`.
