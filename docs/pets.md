@@ -47,16 +47,16 @@ Sleepy Fox is Common. Administrator grants use the fixed mappings below by defau
 
 | Pet | Rarity | Chance | Fixed summon passive | Duplicate refund |
 | --- | --- | --- | --- | --- |
-| Silly Bat | Common | ~14.29% | Gamble Luck: +5 percentage points win chance | 12,500 points |
-| Little Rat | Common | ~14.29% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
-| Sleepy Fox | Common | ~14.29% | Boss Hunt Damage: +10% damage | 12,500 points |
-| Horned Wolf | Common | ~14.29% | Boss Hunt Damage: +10% damage | 12,500 points |
-| Royal Raven | Common | ~14.29% | Boss Hunt Profit: +10% point rewards | 12,500 points |
+| Silly Bat | Common | 12.5% | Gamble Luck: +5 percentage points win chance | 12,500 points |
+| Little Rat | Common | 12.5% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
+| Sleepy Fox | Common | 12.5% | Boss Hunt Damage: +10% damage | 12,500 points |
+| Horned Wolf | Common | 12.5% | Boss Hunt Damage: +10% damage | 12,500 points |
+| Royal Raven | Common | 12.5% | Boss Hunt Profit: +10% point rewards | 12,500 points |
+| Honey Hen | Common | 12.5% | Loyalty Gain: +10% earned loyalty points | 12,500 points |
+| Dog of the Sun | Common | 12.5% | Boss Hunt Profit: +10% point rewards | 12,500 points |
+| Witch's Cat | Common | 12.5% | Gamble Luck: +5 percentage points win chance | 12,500 points |
 
-| Dog of the Sun | Common | ~14.29% | Boss Hunt Profit: +10% point rewards | 12,500 points |
-| Witch's Cat | Common | ~14.29% | Gamble Luck: +5 percentage points win chance | 12,500 points |
-
-Summons first roll rarity with 70% Common / 20% Rare / 10% UR weights, excluding empty tiers and normalizing the remaining weights. They then choose uniformly within that rarity. All seven pets are Common, so currently Common is 100% and each pet has approximately a 14.29% chance. The Pets tab has an expandable Rates popup anchored to the Rates control, showing the standard rarity rates and the available pets in each tier. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
+Summons first roll rarity with 70% Common / 20% Rare / 10% UR weights, excluding empty tiers and normalizing the remaining weights. They then choose uniformly within that rarity. All eight pets are Common, so currently Common is 100% and each pet has a 12.5% chance. The Pets tab has an expandable Rates popup anchored to the Rates control, showing the standard rarity rates and the available pets in each tier. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
 
 Duplicates return points to the ticket's original purchase channel, without loyalty bonuses or earned-point XP. Purchases and summons are atomic to prevent double spending. Existing pets are aligned with the selected mappings on migration. No leveling, feeding, essence purchases, or passive rerolls are added here.
 
@@ -95,3 +95,9 @@ A regal companion of the solar court, sharing the spoils of victory with its kee
 Migration 63 adds Common Dog of the Sun with fixed Boss Hunt Profit (Raid Profit): +10% raid point rewards at level 1, scaling to +20% at level 50. Its golden and ivory fur, amber eyes, tennis ball held in its jaws, and rotating solar halo use the approved four-frame sheet in `assets/Dog of the Sun.png`. Vertical breathing, tail wagging, and the halo play at 250 ms per frame (one-second loop) in both the equipped profile and collection. Reduced-motion preferences disable animation.
 
 Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet dog`. Owners can use `!pets equip Dog of the Sun`.
+
+### Honey Hen
+
+Migration 64 adds Common Honey Hen with fixed Loyalty Gain: +10% earned loyalty points. This completes two Common pets for each of the four Common passives. The approved honey-and-cream chicken, heart-shaped comb, cheek freckles, and open honey jar with an amber spill use `assets/Honey Hen.png`, a 448 × 149 strip of four 112 × 149 frames. Both profile and collection play at 300 ms per frame (1.2-second loop), with reduced-motion support.
+
+Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet hen`. Owners can use `!pets equip Honey Hen`.

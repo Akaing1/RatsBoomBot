@@ -71,6 +71,8 @@ from storage.migrations.v061_adaptive_mini_bosses import migrate as migrate_adap
 
 from storage.migrations.v063_dog_of_the_sun import migrate as migrate_dog_of_the_sun
 
+from storage.migrations.v064_honey_hen import migrate as migrate_honey_hen
+
 MigrationFunction = Callable[[Any], Awaitable[None]]
 
 
@@ -145,4 +147,5 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=61, name="adaptive_mini_bosses", run=migrate_adaptive_mini_bosses)
     , Migration(version=62, name="witch_cat", run=migrate_witch_cat)
     , Migration(version=63, name="dog_of_the_sun", run=migrate_dog_of_the_sun)
+    , Migration(version=64, name="honey_hen", run=migrate_honey_hen)
 )
