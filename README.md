@@ -386,6 +386,8 @@ New behavior should include tests for the affected service and, when relevant, a
 
 ## Versioning
 
+Version **14.1.1** rolls up the expanded eight-pet Common collection (two pets per Common passive) and the follow-up UAT deployment and collection sprite fixes. The major version identifies the pets system, the minor increment groups the additive pet work, and the patch increment records the display/deployment corrections. Development remains on `release/14.0.0`.
+
 RatsBoomBot uses a practical three-part version number:
 
 - Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes
