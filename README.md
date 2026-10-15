@@ -386,6 +386,8 @@ New behavior should include tests for the affected service and, when relevant, a
 
 ## Versioning
 
+Version **14.2.1** covers the pets system and eight-pet Common collection, dashboard enhancements (visible version, improved labels and metadata editing, overlay scrollbars, and offline chat cleanup), YouTube streaming/token/reconnect recovery and account-safety fixes, and pet display/UAT deployment corrections. The major identifies the pets milestone; two grouped minor increments account for the pet collection expansion and dashboard enhancements; the patch increment groups the accumulated corrections. Development remains on `release/14.0.0`.
+
 RatsBoomBot uses a practical three-part version number:
 
 - Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes
