@@ -2223,7 +2223,8 @@ html.has-overlay-scrollbars, .has-overlay-scrollbars body, .has-overlay-scrollba
 img.chatter-profile-avatar { display: block; }
 .chatter-pet { display: grid; min-width: 122px; justify-items: center; align-self: center; color: var(--text); text-align: center; }
 .chatter-pet-sprite { width: 112px; height: 120px; background-image: var(--pet-sprite); background-position: 0 center; background-repeat: no-repeat; background-size: calc(112px * var(--pet-frames)) auto; image-rendering: pixelated; animation: chatter-pet-idle .72s steps(var(--pet-frames)) infinite; }
-[data-chatter-panel="pets"] .chatter-pet-sprite { margin-inline: auto; }
+.pet-collection-sprite-slot { height: 149px; display: flex; align-items: center; justify-content: center; }
+.pet-collection-sprite-slot .chatter-pet-sprite { flex: 0 0 112px; }
 .chatter-pet-sprite--hen { height: 149px; animation-duration: 1.2s; }
 .chatter-pet-sprite--sun-dog { height: 149px; animation-duration: 1s; }
 .chatter-pet-sprite--wolf { animation-duration: 1.2s; }
