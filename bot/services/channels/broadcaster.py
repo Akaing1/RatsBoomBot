@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -14,6 +14,7 @@ class Broadcaster:
     is_live: bool = False
     viewer_count: int = 0
     stream_started_at: datetime | None = None
+    offline_since: datetime | None = None
 
     @property
     def name(self) -> str | None:
@@ -202,9 +203,11 @@ class BroadcasterService:
                 broadcaster.is_live = False
                 broadcaster.viewer_count = 0
                 broadcaster.stream_started_at = None
+                # A failed lookup is not proof of a continuous offline period.
+                broadcaster.offline_since = None
                 continue
 
-            broadcaster.is_live = stream is not None
+            self.update_live_state(broadcaster_id, stream is not None)
             broadcaster.viewer_count = int(getattr(stream, "viewer_count", 0) or 0) if stream is not None else 0
             broadcaster.stream_started_at = getattr(stream, "started_at", None) if stream is not None else None
 
@@ -222,6 +225,19 @@ class BroadcasterService:
             live_count,
             len(self.broadcasters)
         )
+
+    def update_live_state(self, broadcaster_id: str, is_live: bool) -> None:
+        broadcaster = self.broadcasters.get(str(broadcaster_id))
+        if broadcaster is None:
+            return
+        broadcaster.is_live = is_live
+        if is_live:
+            broadcaster.offline_since = None
+        else:
+            if broadcaster.offline_since is None:
+                broadcaster.offline_since = datetime.now(UTC)
+            broadcaster.viewer_count = 0
+            broadcaster.stream_started_at = None
 
     def get_broadcasters(self) -> dict[str, Broadcaster]:
         return self.broadcasters.copy()

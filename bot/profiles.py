@@ -55,6 +55,7 @@ class GlobalCommandName(Enum):
     HELP = "help"
     STATS = "stats"
     ME = "me"
+    PETS = "pets"
     QUOTE = "quote"
 
     KAMIKAZE = "kamikaze"
@@ -104,6 +105,7 @@ class GlobalCommandDefaults:
     help: bool = True
     stats: bool = True
     me: bool = True
+    pets: bool = True
     quote: bool = True
 
     kamikaze: bool = True

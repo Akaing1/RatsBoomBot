@@ -452,8 +452,8 @@
         source.addEventListener("history-complete", () => { feed.historyComplete = true; });
         source.addEventListener("chat-clear", event => {
             const {platform} = JSON.parse(event.data);
-            if (platform !== "twitch") return;
-            element.querySelectorAll(".live-chat-message.platform-twitch").forEach(row => {
+            if (!["twitch", "both"].includes(platform)) return;
+            element.querySelectorAll(platform === "both" ? ".live-chat-message" : ".live-chat-message.platform-twitch").forEach(row => {
                 feed.seen.delete(row.dataset.messageId);
                 row.remove();
             });

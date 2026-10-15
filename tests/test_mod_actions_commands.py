@@ -27,6 +27,21 @@ async def test_kamikaze_achievement_counts_only_confirmed_target_hits(monkeypatc
         recorder.assert_awaited_once_with('channel-1', 'command-message', 'caller', 'target')
 
 
+@pytest.mark.asyncio
+async def test_kamikaze_pet_adds_five_percentage_points_to_hit_chance(monkeypatch):
+    bot = FakeKamikazeBot()
+    bot.services.pets = SimpleNamespace(bonus_bps=AsyncMock(return_value=500))
+    command = ModActionCommands(bot)
+    context = FakeContext('caller')
+    target = SimpleNamespace(id='target', name='target')
+    monkeypatch.setattr(command, 'is_protected_target', lambda *_: False)
+    monkeypatch.setattr(command, 'timeout_with_moderator_restore', AsyncMock(return_value=True))
+    monkeypatch.setattr('bot.shared.commands.mod_actions.random.randint', lambda *_: command.KAMIKAZE_SUCCESS_THRESHOLD - 4)
+
+    await command.kamikaze.callback(command, context, target)
+
+    bot.services.pets.bonus_bps.assert_awaited_once_with('caller', 'kamikaze_odds')
+    bot.services.achievements.record_kamikaze_success.assert_awaited_once_with('channel-1', 'command-message', 'caller', 'target')
 
 
 def test_kamikaze_cooldown_notice_is_sent_once_per_window() -> None:

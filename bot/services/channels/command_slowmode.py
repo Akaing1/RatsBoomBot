@@ -41,6 +41,7 @@ class CommandSlowmodeService:
             or getattr(ctx.chatter, "moderator", False)
             or user_id == broadcaster_id
             or ctx.command.name == "kamikaze"
+            or getattr(ctx.command, "qualified_name", "") == "pets equip"
         ):
             return True
         now = time.monotonic()

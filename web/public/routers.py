@@ -128,6 +128,12 @@ async def public_chatter_profile(request: Request, chatter_name: str):
     if profile is None:
         return templates.TemplateResponse(request=request, name="public/chatter_not_found.html", context={"query": chatter_name}, status_code=404)
 
+    pets = getattr(runtime_bot.services, "pets", None)
+    profile["pet"] = await pets.get_equipped_pet(profile["identity"]["user_id"]) if pets is not None else None
+    collection = getattr(pets, "get_collection", None)
+    profile["pets"] = await collection(profile["identity"]["user_id"]) if callable(collection) else []
+    rates = getattr(pets, "get_summon_rates", None)
+    profile["pet_rates"] = await rates() if callable(rates) else []
     signed_in_user_id = viewer_user_id(request)
     is_owner = signed_in_user_id == str(profile["identity"]["user_id"])
     return templates.TemplateResponse(
@@ -189,7 +195,11 @@ async def public_chatter_channel_profile(request: Request, chatter_name: str, ch
             "shop_available": shop_available,
             "gamble_available": gamble_available,
             "gamble_signed_in": actions_signed_in,
-            "gamble_chance": channel_profile.points.gamble_win_chance if gamble_available else None,
+            "gamble_chance": (
+                await runtime_bot.services.pets.gamble_win_chance(signed_in_user_id, channel_profile.points.gamble_win_chance)
+                if actions_signed_in and getattr(runtime_bot.services, "pets", None) is not None
+                else channel_profile.points.gamble_win_chance if gamble_available else None
+            ),
             "gamble_result": gamble_result,
             "shop_signed_in": shop_signed_in,
             "shop_weapons": [(item, raid_config.weapon_names.display(item), raid_config.overclocked_weapon_cost if item in OVERCLOCKED_WEAPON_TYPES else raid_config.weapon_cost) for item in SHOP_WEAPONS] if shop_signed_in else [],
