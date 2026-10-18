@@ -2267,11 +2267,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "resize: none;" in dashboard_styles
     assert 'status.dataset.connectionState === "disconnected"' in shared_composer_script
     assert 'status.classList.add("is-fading")' in shared_composer_script
-    assert 'grid-template-areas: "player queue chat" "activities activities chat"' in dashboard_styles
+    assert 'grid-template-areas: "player queue chat" "lower lower chat"' in dashboard_styles
     assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
     assert '.channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }' in dashboard_styles
-    assert 'grid-template-areas: "stats" "player" "queue" "activities" "chat"' in dashboard_styles
-    assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' in dashboard_styles
+    assert 'grid-template-areas: "stats" "player" "queue" "activities" "actions" "chat"' in dashboard_styles
+    assert 'grid-template-areas: "stats stats" "player queue" "lower lower" "chat chat"' in dashboard_styles
     assert '@media (min-width: 769px) and (max-width: 1100px)' in dashboard_styles
     assert '@media (max-width: 600px) {\n    .channel-page-overview .dashboard-header-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }' in dashboard_styles
     assert 'height: calc(200dvh - var(--dashboard-stats-height, 36px) - 52px)' in dashboard_styles
@@ -2408,7 +2408,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert ".dashboard-channel-copy .page-description { margin-top: 1px; line-height: 1.15; }" in dashboard_styles
     assert ".channel-page-overview { height: 100dvh; overflow: hidden; }" in dashboard_styles
     assert ".channel-page-overview .dashboard-chat-column { grid-row: 1 / -1; }" in dashboard_styles
-    assert 'grid-template-areas: "player queue chat" "activities activities chat";' in dashboard_styles
+    assert 'grid-template-areas: "player queue chat" "lower lower chat";' in dashboard_styles
     assert '.dashboard-chat-column > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }' in dashboard_styles
     assert 'grid-template-rows: max-content max-content minmax(0,1fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 16px)' not in dashboard_styles
     assert '.channel-page-overview .dashboard-video-frame { flex: 0 0 auto; aspect-ratio: 16 / 9; container-type: normal; }' in dashboard_styles
