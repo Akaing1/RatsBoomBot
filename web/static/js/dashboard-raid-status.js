@@ -12,7 +12,7 @@
     const progress = banner.querySelector("[data-pending-raid-progress]");
     const ring = banner.querySelector("[data-pending-raid-ring]");
     const followDefault = follow?.checked !== false;
-    let poll = null, polling = false, followed = false, navigationArmed = false;
+    let polling = false, followed = false, navigationArmed = false;
     avatar?.addEventListener("error", () => { avatar.hidden = true; });
     let pending = null, clock = null, revision = 0;
     let progressAnimations = [];
@@ -78,30 +78,32 @@
         if (!seconds) followRaid();
         if (!seconds) stopClock(); // A countdown is not proof that a raid completed.
     }
+    function updateAvatar(raid) {
+        if (!avatar) return;
+        const url = raid.profile_image_url || "";
+        const valid = /^https:\/\/static-cdn\.jtvnw\.net\//.test(url);
+        avatar.hidden = !valid;
+        if (valid) { if (avatar.src !== url) avatar.src = url; }
+        else avatar.removeAttribute("src");
+    }
     function showRaid(raid) {
         cancelDismissal();
         pending = raid;
         stopClock();
         banner.classList.remove("is-error");
         banner.hidden = !raid;
-        if (!raid) { clearInterval(poll); poll = null; return; }
+        if (!raid) return;
         const display = raid.display_name || raid.login;
         channel.textContent = display.toLowerCase() === raid.login.toLowerCase() ? display : `${display} (${raid.login})`;
         channel.href = `https://www.twitch.tv/${encodeURIComponent(raid.login)}`;
-        if (avatar) {
-            const valid = /^https:\/\/static-cdn\.jtvnw\.net\//.test(raid.profile_image_url || "");
-            avatar.hidden = !valid;
-            if (valid) avatar.src = raid.profile_image_url;
-            else avatar.removeAttribute("src");
-        }
+        updateAvatar(raid);
         cancel.disabled = false;
         updateTime();
         if (!cancel.hidden) { clock = setInterval(updateTime, 1000); animateProgress(); }
-        if (!raid.completed && !poll) poll = setInterval(checkRaid, 3000);
     }
     function dismissRaid() {
         pending = null; navigationArmed = false;
-        stopClock(); clearInterval(poll); poll = null;
+        stopClock();
         cancel.disabled = true;
         if (banner.hidden || !banner.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
             showRaid(null); return;
@@ -122,23 +124,32 @@
         animation.finished.then(finish, finish);
     }
     async function checkRaid() {
-        if (polling || !pending) return;
+        if (polling) return;
         const snapshot = pending, currentRevision = revision;
-        if (Date.now() / 1000 > Number(snapshot.expires_at) + 120) { clearInterval(poll); poll = null; return; }
         polling = true;
         try {
             const response = await fetch(banner.dataset.pendingUrl, {headers: {Accept: "application/json"}, cache: "no-store"});
             if (!response.ok) return;
             const payload = await response.json();
             if (currentRevision !== revision || pending !== snapshot) return;
-            if (!payload.raid) { dismissRaid(); return; }
-            if (payload.raid.created_at !== snapshot.created_at || payload.raid.target_id !== snapshot.target_id) return;
+            if (!payload.raid) { if (pending) dismissRaid(); return; }
+            if (!snapshot || payload.raid.created_at !== snapshot.created_at || payload.raid.target_id !== snapshot.target_id) {
+                if (payload.raid.completed || Number(payload.raid.expires_at) <= Date.now() / 1000) return;
+                revision++; followed = false; navigationArmed = true;
+                if (follow) follow.checked = followDefault;
+                showRaid(payload.raid);
+                return;
+            }
             if (Object.hasOwn(payload.raid, "viewer_count")) {
                 pending.viewer_count = payload.raid.viewer_count;
                 updateTime();
             }
+            if (Object.hasOwn(payload.raid, "profile_image_url")) {
+                pending.profile_image_url = payload.raid.profile_image_url;
+                updateAvatar(pending);
+            }
             if (payload.raid.completed) {
-                pending = payload.raid; updateTime(); clearInterval(poll); poll = null;
+                pending = payload.raid; updateTime();
             }
         } catch (_) { /* A transient status failure never means the raid completed. */ }
         finally { polling = false; }
@@ -221,7 +232,6 @@
     }
     document.addEventListener("dashboard-raid-started", event => {
         revision++; followed = false; navigationArmed = true; if (follow) follow.checked = followDefault;
-        clearInterval(poll); poll = null;
         showRaid(event.detail.raid); animateIntoChat(event.detail); animateAvatar(event.detail);
     });
     document.addEventListener("dashboard-raid-error", event => { revision++; showError(event.detail.message); });
@@ -250,4 +260,6 @@
             showRaid(payload.raid);
         }
     }).catch(() => {});
+    // Keep discovering raids started by commands or Twitch chat even when no pin is visible.
+    setInterval(checkRaid, 3000);
 })();

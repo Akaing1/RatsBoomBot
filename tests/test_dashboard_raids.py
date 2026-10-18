@@ -128,3 +128,31 @@ def test_raid_viewer_count_does_not_guess_unknown_counts(runtime, count, expecte
     bot, _ = runtime
     bot.services.broadcasters.get_broadcasters = lambda: {"1": SimpleNamespace(id="1", viewer_count=count)}
     assert dashboard.raid_viewer_count(bot, "1") == expected
+
+
+@pytest.mark.asyncio
+async def test_slash_raid_and_unraid_share_dashboard_state(runtime):
+    bot, broadcaster = runtime
+    target = bot.fetch_user.return_value
+    bot.services.chatters = SimpleNamespace(resolve=AsyncMock(return_value=target))
+    await dashboard.execute_twitch_slash_command(bot, "1", "/raid target")
+    assert bot._dashboard_pending_raids["1"]["login"] == "target"
+    response = await dashboard.channel_pending_raid(request())
+    assert json.loads(response.body)["raid"]["target_id"] == "2"
+    broadcaster.cancel_raid.side_effect = RuntimeError("failed")
+    with pytest.raises(RuntimeError):
+        await dashboard.execute_twitch_slash_command(bot, "1", "/unraid")
+    assert "1" in bot._dashboard_pending_raids
+    broadcaster.cancel_raid.side_effect = None
+    await dashboard.execute_twitch_slash_command(bot, "1", "/unraid")
+    assert not bot._dashboard_pending_raids
+
+
+@pytest.mark.asyncio
+async def test_slash_raid_failure_does_not_show_popup(runtime):
+    bot, broadcaster = runtime
+    bot.services.chatters = SimpleNamespace(resolve=AsyncMock(return_value=bot.fetch_user.return_value))
+    broadcaster.start_raid.side_effect = RuntimeError("failed")
+    with pytest.raises(RuntimeError):
+        await dashboard.execute_twitch_slash_command(bot, "1", "/raid target")
+    assert not bot._dashboard_pending_raids

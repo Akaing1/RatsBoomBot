@@ -78,6 +78,8 @@ async def test_start_raid_sends_both_profile_messages() -> None:
     assert bot.raid_broadcaster.targets == [bot.target]
     assert context.messages == ["Raid @targetchannel!", "Subscriber raid @targetchannel!"]
     assert context.replies == []
+    assert bot._dashboard_pending_raids["channel-1"]["login"] == "targetchannel"
+    assert bot._dashboard_pending_raids["channel-1"]["target_id"] == "target-1"
 
 
 @pytest.mark.asyncio

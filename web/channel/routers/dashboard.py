@@ -15,6 +15,7 @@ from twitchio import HTTPException
 from twitchio.http import Route
 
 from bot.command_registry import build_command_help_groups
+from bot.shared.pending_raids import raid_lock, raid_state, raid_viewer_count, remember_raid
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
 from bot.services.channels.profile_settings import LOYALTY_GROUP
 from bot.services.channels.stream_metadata import (
@@ -192,11 +193,15 @@ async def execute_twitch_slash_command(runtime_bot, broadcaster_id: str, message
     elif command in {"raid", "shoutout"}:
         user = await resolve_user(require_argument("a channel username"))
         if command == "raid":
-            await broadcaster.start_raid(str(user.id))
+            async with raid_lock(runtime_bot, broadcaster_id):
+                result = await broadcaster.start_raid(str(user.id))
+                remember_raid(runtime_bot, broadcaster_id, user, getattr(result, "created_at", None))
         else:
             await broadcaster.send_shoutout(to_broadcaster=str(user.id), moderator=moderator_id)
     elif command == "unraid":
-        await broadcaster.cancel_raid()
+        async with raid_lock(runtime_bot, broadcaster_id):
+            await broadcaster.cancel_raid()
+            raid_state(runtime_bot).pop(str(broadcaster_id), None)
     elif command == "warn":
         username, _, reason = require_argument("a username and reason").partition(" ")
         if not reason:
@@ -618,12 +623,6 @@ async def channel_viewer_queue_action(
     })
 
 
-def raid_viewer_count(runtime_bot, broadcaster_id):
-    broadcaster = runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id))
-    count = getattr(broadcaster, "viewer_count", None)
-    return count if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else None
-
-
 @router.get("/channel/api/raid-browser/pending", response_class=JSONResponse)
 async def channel_pending_raid(request: Request):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
@@ -657,10 +656,7 @@ async def channel_raid_action(request: Request, action: str = Form(...),
         return JSONResponse({"detail": "Unknown raid action."}, status_code=400)
     if action == "start" and (not re.fullmatch(r"\d{1,25}", target_id) or target_id == broadcaster_id):
         return JSONResponse({"detail": "Select another channel to raid."}, status_code=400)
-    if not hasattr(runtime_bot, "_dashboard_pending_raids"):
-        runtime_bot._dashboard_pending_raids = {}
-        runtime_bot._dashboard_raid_locks = {}
-    lock = runtime_bot._dashboard_raid_locks.setdefault(broadcaster_id, asyncio.Lock())
+    lock = raid_lock(runtime_bot, broadcaster_id)
     async with lock:
         pending = runtime_bot._dashboard_pending_raids.get(broadcaster_id)
         if action == "start" and pending and pending["expires_at"] > time.time():
@@ -677,18 +673,7 @@ async def channel_raid_action(request: Request, action: str = Form(...),
             if target is None:
                 return JSONResponse({"detail": "Twitch could not find that channel."}, status_code=404)
             result = await broadcaster.start_raid(target_id)
-            created = getattr(result, "created_at", None)
-            if not isinstance(created, datetime):
-                created = datetime.now(UTC)
-            elif created.tzinfo is None:
-                created = created.replace(tzinfo=UTC)
-            login = str(getattr(target, "name", None) or getattr(target, "login", ""))
-            raid = {"target_id": target_id, "login": login,
-                    "display_name": str(getattr(target, "display_name", None) or login),
-                    "profile_image_url": str(getattr(getattr(target, "profile_image", None), "url", "") or getattr(target, "profile_image_url", "") or ""),
-                    "created_at": created.isoformat(), "expires_at": created.timestamp() + 90,
-                    "viewer_count": raid_viewer_count(runtime_bot, broadcaster_id)}
-            runtime_bot._dashboard_pending_raids[broadcaster_id] = raid
+            raid = remember_raid(runtime_bot, broadcaster_id, target, getattr(result, "created_at", None))
             return JSONResponse({"raid": raid})
         except Exception as error:
             status = getattr(error, "status", None)

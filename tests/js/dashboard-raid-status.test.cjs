@@ -55,6 +55,20 @@ function setup(reduced = false, followDefault = true) {
 const raid = {login: 'target', display_name: 'Target', target_id: '2', expires_at: 190};
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
+test('a profile picture loaded later appears without restarting raid progress', async () => {
+    const app = setup();
+    app.events['dashboard-raid-started']({detail: {raid}});
+    assert.equal(app.avatar.hidden, true);
+    const animation = app.progress.animation;
+    app.advance(3);
+    const image = 'https://static-cdn.jtvnw.net/jtv_user_pictures/target.png';
+    app.requests[1].respond({raid: {...raid, profile_image_url: image}}); await flush();
+    assert.equal(app.avatar.hidden, false);
+    assert.equal(app.avatar.src, image);
+    assert.equal(app.progress.animation, animation);
+    assert.equal(app.secondsLabel.textContent, '87');
+});
+
 test('raiding description refreshes current viewers during the countdown', async () => {
     const app = setup(); app.events['dashboard-raid-started']({detail: {raid: {...raid, viewer_count: 42}}});
     assert.equal(app.description.textContent, 'Raiding with 43 viewers');
@@ -190,9 +204,40 @@ test('cancel hides pending raid only after accepted response', async () => {
     assert.equal(app.banner.animation.frames[1].transform, 'translateY(-80px)');
     assert.equal(app.banner.animation.frames[1].height, '0px');
     assert.equal(app.banner.animation.options.duration, 240);
-    assert.equal(app.intervals.size, 0);
+    assert.equal(app.intervals.size, 1); // Continue discovering raids started outside the browser.
     app.banner.finish(); await flush();
     assert.equal(app.banner.hidden, true);
+});
+
+test('discovers externally started raids without refreshing and observes external cancellation', async () => {
+    const app = setup(true, false);
+    app.requests[0].respond({raid: null}); await flush();
+    app.advance(3);
+    app.requests[1].respond({raid: {...raid, viewer_count: 8}}); await flush();
+    assert.equal(app.banner.hidden, false);
+    assert.equal(app.channel.textContent, 'Target');
+    assert.equal(app.description.textContent, 'Raiding with 8 viewers');
+    assert.equal(app.follow.checked, false);
+    app.advance(3);
+    app.requests[2].respond({raid: null}); await flush();
+    assert.equal(app.banner.hidden, true);
+    app.advance(3);
+    app.requests[3].respond({raid: {...raid, target_id: '3', login: 'next', display_name: 'Next'}}); await flush();
+    assert.equal(app.channel.textContent, 'Next');
+    assert.equal(app.banner.hidden, false);
+});
+
+test('discovery ignores completed old raids and follows a newly discovered raid once', async () => {
+    const app = setup();
+    app.requests[0].respond({raid: null}); await flush();
+    app.advance(3);
+    app.requests[1].respond({raid: {...raid, completed: true}}); await flush();
+    assert.equal(app.banner.hidden, true);
+    assert.deepEqual(app.visits, []);
+    app.advance(3);
+    app.requests[2].respond({raid}); await flush();
+    app.advance(90);
+    assert.deepEqual(app.visits, ['https://www.twitch.tv/target']);
 });
 
 test('new raid interrupts an old cancellation slide without hiding the new banner', async () => {
