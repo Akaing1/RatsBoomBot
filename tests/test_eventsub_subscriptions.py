@@ -10,3 +10,4 @@ def test_broadcaster_subscriptions_include_aggregate_subscription_gifts() -> Non
     assert any(isinstance(subscription, eventsub.AutomodMessageHoldV2Subscription) for subscription in subscriptions)
     assert any(isinstance(subscription, eventsub.AutomodMessageUpdateV2Subscription) for subscription in subscriptions)
     assert any(isinstance(subscription, eventsub.ChatMessageDeleteSubscription) for subscription in subscriptions)
+    assert any(isinstance(subscription, eventsub.ChatNotificationSubscription) for subscription in subscriptions)

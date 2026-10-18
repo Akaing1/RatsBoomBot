@@ -52,6 +52,7 @@ def create_broadcaster_subscriptions(broadcaster_user_id: str) -> list[Any]:
 
     subscriptions: list[Any] = [
         eventsub.ChatMessageSubscription(broadcaster_user_id=broadcaster_user_id, user_id=settings.BOT_ID),
+        eventsub.ChatNotificationSubscription(broadcaster_user_id=broadcaster_user_id, user_id=settings.BOT_ID),
         eventsub.ChannelFollowSubscription(broadcaster_user_id=broadcaster_user_id, moderator_user_id=broadcaster_user_id),
         eventsub.ChannelSubscribeSubscription(broadcaster_user_id=broadcaster_user_id),
         eventsub.ChannelSubscribeMessageSubscription(broadcaster_user_id=broadcaster_user_id),

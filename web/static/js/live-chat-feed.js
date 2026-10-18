@@ -1,9 +1,21 @@
 (() => {
+    const messageAccents = new Set(["first-time", "broadcaster", "staff", "moderator", "vip", "artist", "subscriber"]);
     function makeElement(tag, className, text) {
         const element = document.createElement(tag);
         if (className) element.className = className;
         if (text !== undefined) element.textContent = text;
         return element;
+    }
+
+    function createJumpButton(newestFirst = false) {
+        const button = makeElement("button", "live-chat-jump");
+        const path = newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";
+        button.type = "button";
+        button.title = "Jump to present";
+        button.setAttribute("aria-label", "Jump to present");
+        button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
+        button.hidden = true;
+        return button;
     }
 
     function emoteSrcset(url) {
@@ -37,11 +49,15 @@
         };
 
         finishScroll();
+        if (feed.scrollFrame) return;
         // Wrapped text and decoded emotes can change the row height after it is inserted.
         // Re-check after layout and paint so the complete final message remains visible.
-        window.requestAnimationFrame(() => {
+        feed.scrollFrame = window.requestAnimationFrame(() => {
             finishScroll();
-            window.requestAnimationFrame(finishScroll);
+            feed.scrollFrame = window.requestAnimationFrame(() => {
+                feed.scrollFrame = null;
+                finishScroll();
+            });
         });
     }
 
@@ -71,6 +87,7 @@
             row.setAttribute("aria-label", "Deleted message");
             row.querySelector(".live-chat-message-actions")?.remove();
         });
+        feed.merger?.refresh(messageId);
     }
 
     function renderPinned(feed, message, durationMinutes = undefined, endsAt = undefined) {
@@ -176,7 +193,8 @@
     }
 
     async function refreshPinned(feed) {
-        if (!feed.pinnedUrl || document.hidden) return;
+        if (!feed.pinnedUrl || document.hidden || feed.refreshingPinned) return;
+        feed.refreshingPinned = true;
         try {
             const response = await fetch(feed.pinnedUrl, {headers: {Accept: "application/json"}, cache: "no-store"});
             if (!response.ok) return;
@@ -191,6 +209,8 @@
             renderPinned(feed, message, durationMinutes, endsAt);
         } catch (_error) {
             // Keep the last synchronized pin visible during a temporary Twitch failure.
+        } finally {
+            feed.refreshingPinned = false;
         }
     }
 
@@ -208,22 +228,28 @@
         feed.element.querySelector(".compact-empty-state")?.remove();
 
         const row = makeElement("article", `live-chat-message platform-${message.platform} kind-${message.kind}`);
+        if (message.local_only) row.setAttribute("role", "alert");
         const category = window.dashboardChatFilters?.category(message) || {user: "non_subs", type: "messages"};
         row.dataset.chatUser = category.user;
         row.dataset.chatType = category.type;
         row.hidden = feed.filters ? !feed.filters.allows(category) : false;
         if (message.deleted) row.classList.add("is-deleted");
         if (message.mentioned) row.classList.add("is-mentioned");
-        if (message.is_bot) row.classList.add("is-bot");
-        const accents = new Set(["first-time", "broadcaster", "staff", "moderator", "vip", "artist", "subscriber"]);
-        if (accents.has(message.accent)) row.classList.add(`accent-${message.accent}`);
+        if (message.is_bot || message.notice_type) row.classList.add("is-bot");
+        if (messageAccents.has(message.accent)) row.classList.add(`accent-${message.accent}`);
         row.dataset.messageId = message.id;
+        row.dataset.chatUserId = message.user_id || "";
 
         const content = makeElement("div", "live-chat-message-content");
         const heading = makeElement("div", "live-chat-message-heading");
         const platform = makeElement("span", `live-chat-platform ${message.platform}`, message.platform === "youtube" ? "YT" : "TW");
         const name = makeElement("strong", "live-chat-name", visibleMessageName(message));
-        if (message.color && /^#[0-9a-f]{6}$/i.test(message.color)) name.style.color = message.color;
+        // Older dashboard history used TwitchIO's 0x-prefixed string format.
+        const nameColor = typeof message.color === "string" ? message.color.replace(/^0x/i, "#") : "";
+        if (/^#[0-9a-f]{6}$/i.test(nameColor)) {
+            name.style.color = nameColor;
+            name.dataset.chatNameColor = nameColor;
+        }
         heading.appendChild(platform);
 
         (Array.isArray(message.badges) ? message.badges : []).forEach(badge => {
@@ -282,10 +308,18 @@
             body.textContent = message.message || "";
         }
 
-        content.append(heading, body);
+        content.appendChild(heading);
+        if (message.notice) {
+            if (message.notice_type) row.dataset.noticeType = message.notice_type;
+            const notice = makeElement("div", "live-chat-notice");
+            if (message.notice_label) notice.appendChild(makeElement("strong", "live-chat-notice-label", message.notice_label));
+            notice.appendChild(makeElement("span", "live-chat-notice-text", message.notice));
+            content.appendChild(notice);
+        }
+        if (message.message || segments.length) content.appendChild(body);
         if (timestamp) content.appendChild(timestamp);
         row.appendChild(content);
-        if (!message.deleted && message.platform === "twitch" && feed.moderationUrl) {
+        if (!message.deleted && !message.test_mode && !message.local_only && !message.notice && message.platform === "twitch" && feed.moderationUrl) {
             const actions = makeElement("div", "live-chat-message-actions");
             const reply = makeElement("button", "live-chat-message-action reply", "↩");
             reply.type = "button";
@@ -315,16 +349,16 @@
         }
         if (feed.newestFirst) feed.element.prepend(row);
         else feed.element.appendChild(row);
+        feed.merger?.track(row);
+        window.dashboardNameColors?.apply(name);
 
-        if (feed.followRowObserver) {
-            feed.followRowObserver.disconnect();
-            feed.followRowObserver = null;
-        }
+        feed.followRowObserver?.disconnect();
 
-        while (feed.element.querySelectorAll(".live-chat-message:not(.is-activity-removing)").length > feed.maxMessages) {
-            const messages = feed.element.querySelectorAll(".live-chat-message:not(.is-activity-removing)");
-            const oldest = feed.newestFirst ? messages[messages.length - 1] : messages[0];
+        const messages = [...feed.element.querySelectorAll(".live-chat-message:not(.is-activity-removing)")];
+        while (messages.length > feed.maxMessages) {
+            const oldest = feed.newestFirst ? messages.pop() : messages.shift();
             if (!oldest) break;
+            feed.merger?.forget(oldest);
             feed.seen.delete(oldest.dataset.messageId);
             if (feed.newestFirst && window.dashboardActivityMotion) window.dashboardActivityMotion.remove(feed.element, oldest);
             else oldest.remove();
@@ -334,9 +368,11 @@
             feed.followNewest = true;
             scrollToNewest(feed);
             if ("ResizeObserver" in window) {
-                feed.followRowObserver = new ResizeObserver(() => {
-                    if (feed.followNewest) scrollToNewest(feed);
-                });
+                if (!feed.followRowObserver) {
+                    feed.followRowObserver = new ResizeObserver(() => {
+                        if (feed.followNewest) scrollToNewest(feed);
+                    });
+                }
                 feed.followRowObserver.observe(row);
             }
             row.querySelectorAll("img").forEach(image => {
@@ -359,6 +395,56 @@
             }));
         }
     }
+
+    function attachTestNotices(feed) {
+        if (!window.dashboardChatDebug) return () => {};
+        const handler = event => {
+            if (event.detail?.test_mode && event.detail.platform === "twitch") renderMessage(feed, event.detail);
+        };
+        document.addEventListener("dashboard-chat-test-notice", handler);
+        return () => document.removeEventListener("dashboard-chat-test-notice", handler);
+    }
+
+    // A small independent feed for preview chats: no global filters, moderation,
+    // platform selection, polling, or dashboard message history.
+    window.createTwitchPreviewFeed = element => {
+        let closed = false;
+        const jumpButton = createJumpButton();
+        element.parentNode.appendChild(jumpButton);
+        const feed = {element, jumpButton, seen: new Set(), maxMessages: 150,
+            newestFirst: false, followNewest: true, hasUnseenMessages: false};
+        const removeTestNotices = attachTestNotices(feed);
+        const jump = () => { feed.followNewest = true; scrollToNewest(feed); };
+        const scroll = () => { feed.followNewest = atNewest(feed); updateJumpButton(feed); };
+        jumpButton.addEventListener("click", jump);
+        element.addEventListener("scroll", scroll, {passive: true});
+        return {
+            receive(payload) {
+                if (closed) return;
+                if (payload.type === "message") renderMessage(feed, payload.message);
+                else {
+                    element.querySelectorAll(".live-chat-message").forEach(row => {
+                        if (payload.type === "clear" || (payload.type === "message_delete" && row.dataset.messageId === payload.id)
+                            || (payload.type === "clear_user_messages" && row.dataset.chatUserId === payload.user_id)) {
+                            feed.seen.delete(row.dataset.messageId); row.remove();
+                        }
+                    });
+                    updateJumpButton(feed);
+                }
+            },
+            destroy() {
+                if (closed) return;
+                closed = true;
+                removeTestNotices();
+                feed.followNewest = false;
+                feed.followRowObserver?.disconnect();
+                window.cancelAnimationFrame(feed.scrollFrame);
+                element.removeEventListener("scroll", scroll);
+                jumpButton.removeEventListener("click", jump);
+                feed.seen.clear(); jumpButton.remove();
+            }
+        };
+    };
 
     document.querySelectorAll("[data-live-chat-feed]").forEach(element => {
         const shell = makeElement("div", "live-chat-feed-shell");
@@ -386,7 +472,7 @@
             pinExpiryTimer: null,
             pinnedContainer: element.dataset.pinnedUrl ? makeElement("aside", "live-chat-pinned") : null,
             connectionStatus,
-            jumpButton: makeElement("button", "live-chat-jump")
+            jumpButton: createJumpButton(element.dataset.newestFirst === "true")
         };
         function showConnectionStatus(connected) {
             if (!connectionStatus) return;
@@ -402,22 +488,29 @@
         }
         feed.filters = window.dashboardChatFilters?.attach(element, () => {
             const followNewest = feed.followNewest;
-            const anchor = [...element.querySelectorAll(".live-chat-message")].find(row =>
-                !row.hidden && row.getBoundingClientRect().bottom > element.getBoundingClientRect().top);
+            const rows = [...element.querySelectorAll(".live-chat-message")];
+            const viewportTop = followNewest ? null : element.getBoundingClientRect().top;
+            const anchor = followNewest ? null : rows.find(row => !row.hidden && row.getBoundingClientRect().bottom > viewportTop);
             const anchorTop = anchor?.getBoundingClientRect().top;
-            element.querySelectorAll(".live-chat-message").forEach(row => {
+            rows.forEach(row => {
                 row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType});
             });
+            feed.merger?.refresh();
             if (followNewest) scrollToNewest(feed);
             else if (anchor && !anchor.hidden) element.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
             updateJumpButton(feed);
         });
-        feed.jumpButton.type = "button";
-        feed.jumpButton.title = "Jump to present";
-        feed.jumpButton.setAttribute("aria-label", "Jump to present");
-        const jumpPath = feed.newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";
-        feed.jumpButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${jumpPath}"/></svg>`;
-        feed.jumpButton.hidden = true;
+        feed.merger = element.classList.contains("dashboard-chat-feed") ? window.createChatMessageMerger?.({
+            allows: row => !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType}),
+            onChange: () => { if (feed.followNewest) scrollToNewest(feed); }
+        }) : null;
+        if (feed.merger) {
+            const onConfirmedSend = event => feed.merger.register(event.detail);
+            document.addEventListener("dashboard-chat-send-confirmed", onConfirmedSend);
+            window.addEventListener("beforeunload", () => {
+                document.removeEventListener("dashboard-chat-send-confirmed", onConfirmedSend); feed.merger.destroy();
+            }, {once: true});
+        }
         feed.jumpButton.addEventListener("click", () => {
             feed.hasUnseenMessages = false;
             feed.followNewest = true;
@@ -447,6 +540,18 @@
         }
 
         const source = new EventSource(element.dataset.streamUrl);
+        if (element.classList.contains("dashboard-chat-feed")) {
+            const removeTestNotices = attachTestNotices(feed);
+            window.addEventListener("beforeunload", removeTestNotices, {once: true});
+            let localErrorSequence = 0;
+            const onSendError = event => renderMessage(feed, {
+                id: `local-error:${++localErrorSequence}`, platform: event.detail.platform, kind: "send-error",
+                local_only: true, is_bot: true, display_name: `${event.detail.platform === "youtube" ? "YouTube" : "Twitch"} send error · Only you`, message: event.detail.message,
+                timestamp: new Date().toISOString()
+            });
+            document.addEventListener("dashboard-chat-send-error", onSendError);
+            window.addEventListener("beforeunload", () => document.removeEventListener("dashboard-chat-send-error", onSendError), {once: true});
+        }
         source.onopen = () => showConnectionStatus(true);
         source.onerror = () => showConnectionStatus(false);
         source.addEventListener("history-complete", () => { feed.historyComplete = true; });
@@ -454,6 +559,7 @@
             const {platform} = JSON.parse(event.data);
             if (!["twitch", "both"].includes(platform)) return;
             element.querySelectorAll(platform === "both" ? ".live-chat-message" : ".live-chat-message.platform-twitch").forEach(row => {
+                feed.merger?.forget(row);
                 feed.seen.delete(row.dataset.messageId);
                 row.remove();
             });
@@ -468,6 +574,11 @@
                 console.error("Unable to render live-chat message", error);
             }
         };
+        if (window.dashboardChatDebug && element.classList.contains("dashboard-chat-feed")) {
+            const onTestMessage = event => renderMessage(feed, event.detail);
+            document.addEventListener("dashboard-chat-test-message", onTestMessage);
+            window.addEventListener("beforeunload", () => document.removeEventListener("dashboard-chat-test-message", onTestMessage), {once: true});
+        }
         window.addEventListener("beforeunload", () => source.close(), {once: true});
     });
 })();

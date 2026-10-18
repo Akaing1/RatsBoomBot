@@ -1031,6 +1031,7 @@ async def channel_send_chat_message(
     sent = []
     errors = {}
     command_status = None
+    message_ids = {}
     is_twitch_command = message.startswith("/")
 
     if is_twitch_command and target == "youtube":
@@ -1056,6 +1057,8 @@ async def channel_send_chat_message(
                 result = await twitch_channel.send_message(**send_options)
                 if getattr(result, "sent", False):
                     sent.append("twitch")
+                    if isinstance(getattr(result, "id", None), str) and result.id:
+                        message_ids["twitch"] = f"twitch:{result.id}"
                 else:
                     errors["twitch"] = getattr(result, "dropped_message", None) or "Twitch did not send the message."
         except ValueError as error:
@@ -1069,8 +1072,10 @@ async def channel_send_chat_message(
 
     if target in {"youtube", "both"} and not is_twitch_command:
         try:
-            await services.live_chat.send_youtube_message(str(broadcaster_id), message)
+            youtube_result = await services.live_chat.send_youtube_message(str(broadcaster_id), message)
             sent.append("youtube")
+            if isinstance(youtube_result, dict) and isinstance(youtube_result.get("id"), str) and youtube_result["id"]:
+                message_ids["youtube"] = f"youtube:{youtube_result['id']}"
         except ValueError as error:
             youtube_error = str(error)
 
@@ -1104,6 +1109,8 @@ async def channel_send_chat_message(
 
     status_code = 207 if errors else 200
     payload = {"sent": sent, "errors": errors}
+    if message_ids:
+        payload["message_ids"] = message_ids
     if command_status is not None:
         payload["message"] = command_status
     return JSONResponse(payload, status_code=status_code)

@@ -14,6 +14,15 @@ class ChatEvents(commands.Component):
         self.bot = bot
 
     @commands.Component.listener()
+    async def event_chat_notification(self, payload) -> None:
+        if self.bot.services is None:
+            return
+        try:
+            self.bot.services.live_chat.publish_twitch_notification(payload)
+        except Exception:
+            LOGGER.exception("[Live Chat] Failed to publish Twitch chat notification.")
+
+    @commands.Component.listener()
     async def event_message(self, payload) -> None:
         broadcaster_id = str(payload.broadcaster.id)
         broadcaster_name = payload.broadcaster.name

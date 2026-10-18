@@ -73,6 +73,15 @@ class RedeemEvents(commands.Component):
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
 
+        try:
+            services.live_chat.publish_redemption(
+                broadcaster_id=broadcaster_id, redemption_id=redemption_id, user_id=user_id,
+                username=username, reward_title=reward_title, user_input=user_input,
+                redeemed_at=redeemed_at, cost=get_nested_attr(payload, "reward", "cost")
+            )
+        except Exception:
+            LOGGER.exception("[Live Chat] Failed to publish channel-point redemption.")
+
         LOGGER.info(
             "[Events] %s redeemed '%s' in %s (%s).",
             username,

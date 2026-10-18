@@ -204,7 +204,7 @@
             data-max-messages="150"
         ></div>
 
-        <form class="dashboard-chat-composer" data-chat-composer data-channel-id="{{ broadcaster.id }}">
+        <form class="dashboard-chat-composer" data-chat-composer data-channel-id="{{ broadcaster.id }}" data-youtube-connected="{{ 'true' if youtube_chat.connected else 'false' }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="reply_parent_message_id" value="" data-reply-message-id>
             <div class="chat-reply-context" data-reply-context hidden>
@@ -215,12 +215,19 @@
                 <button type="button" data-reply-cancel aria-label="Cancel reply" title="Cancel reply">×</button>
             </div>
             <label class="sr-only" for="dashboard-chat-message">Send a chat message</label>
+            <div class="dashboard-chat-compose-row">
             <div class="chat-message-entry">
-                <textarea id="dashboard-chat-message" name="message" rows="1" maxlength="500" placeholder="Send a message... (supports autocomplete)" required autocomplete="off"></textarea>
+                <button class="chat-target-cycle" type="button" data-chat-target-cycle aria-label="Send to Twitch. Click or press Tab to change." title="Twitch">[Twitch]</button>
+                <textarea id="dashboard-chat-message" name="message" rows="1" maxlength="500" placeholder="Send a message…" aria-describedby="dashboard-chat-send-hint" aria-keyshortcuts="Shift+Enter" required autocomplete="off"></textarea>
                 <button class="chat-emote-toggle" type="button" data-emote-toggle aria-expanded="false" aria-label="Open emote picker" title="Emotes">
                     <span aria-hidden="true">☺</span>
                 </button>
+                <p id="chat-send-status" class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
                 <div class="chat-emote-suggestions" data-emote-suggestions role="listbox" hidden></div>
+            </div>
+            <button class="button primary chat-send-button" type="submit" aria-label="Send message" title="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3 21 12 4 21 8 12Z"/></svg></button>
+            </div>
+            <p id="dashboard-chat-send-hint" class="chat-send-hint"><kbd>Shift</kbd> + <kbd>Enter</kbd> sends to all connected platforms</p>
                 <div class="chat-emote-picker" data-emote-picker hidden>
                     <div class="chat-emote-picker-header">
                         <label class="sr-only" for="dashboard-emote-search">Search emotes</label>
@@ -236,16 +243,6 @@
                     </div>
                     <p class="chat-emote-picker-note" data-emote-note></p>
                 </div>
-            </div>
-            <div class="dashboard-chat-composer-actions">
-                <div class="chat-target-selector" role="group" aria-label="Send message to">
-                    <button class="chat-target active" type="button" data-chat-target="twitch" aria-pressed="true">Twitch</button>
-                    <button class="chat-target" type="button" data-chat-target="youtube" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>YouTube</button>
-                    <button class="chat-target" type="button" data-chat-target="both" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>Both</button>
-                </div>
-                <p id="chat-send-status" class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
-                <button class="button primary chat-send-button" type="submit">Send</button>
-            </div>
         </form>
     </section>
     </div>
@@ -966,12 +963,20 @@
 {% endblock %}
 
 {% block page_scripts %}
+    <script src="{{ url_for('static', path='/js/chat-name-colors.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-autocomplete.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-emote-input.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-composer.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-target-selector.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-emote-picker.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-carousel.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="https://player.twitch.tv/js/embed/v1.js" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-stream-player.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-channel-metadata.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-viewer-queue.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-chat-test-mode.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-message-merge.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-chat-filters.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-chat-send.js') }}?v={{ deployment_stamp() }}" defer></script>

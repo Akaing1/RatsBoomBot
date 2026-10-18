@@ -13,14 +13,17 @@
     }
 
     function category(message) {
-        const type = message.is_redeem || ['redeem', 'redemption'].includes(message.kind)
+        const isNotice = Boolean(message.notice_type);
+        const type = message.is_redeem || isNotice || message.kind === 'redeem' || message.kind === 'redemption'
             ? 'redeems' : message.kind === 'command' ? 'commands' : 'messages';
+        if (message.is_bot || isNotice) {
+            return {user: message.platform === 'youtube' ? 'youtube_bots' : 'bots', type};
+        }
         const badges = new Set((message.badges || []).map(badge =>
             String(typeof badge === 'string' ? badge : badge.name || '').toLowerCase()));
         const user = message.platform === 'youtube'
-            ? (message.is_bot ? 'youtube_bots' : badges.has('mod') || badges.has('moderator') ? 'youtube_mods'
+            ? (badges.has('mod') || badges.has('moderator') ? 'youtube_mods'
                 : badges.has('member') ? 'youtube_members' : 'youtube_non_members')
-            : message.is_bot ? 'bots'
             : badges.has('moderator') || message.accent === 'moderator' ? 'mods'
             : badges.has('vip') || message.accent === 'vip' ? 'vips'
             : badges.has('subscriber') || badges.has('founder') || message.accent === 'subscriber' ? 'subs'
@@ -42,7 +45,7 @@
         const axes = {users: connectedPlatforms.flatMap(platform => platforms[platform]), types: messageTypes};
         let connectionBadgesShown = false;
         const clearButtons = [...control.querySelectorAll('[data-chat-filter-clear]')];
-        const storageKey = `ratsboombot:chat-filters:${control.dataset.channelId}`;
+        const storageKey = `ratsboombot:chat-filters:${control.dataset.channelId}${window.dashboardChatDebug?.active ? ':test' : ''}`;
         const enabled = {users: new Set(axes.users), types: new Set(axes.types)};
         try {
             let saved = JSON.parse(window.localStorage.getItem(storageKey) || 'null');
