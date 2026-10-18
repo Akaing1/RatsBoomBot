@@ -77,6 +77,7 @@ def create_broadcaster_subscriptions(broadcaster_user_id: str) -> list[Any]:
 
     if raid_subscription is not None:
         subscriptions.append(raid_subscription)
+        subscriptions.append(eventsub.ChannelRaidSubscription(from_broadcaster_user_id=broadcaster_user_id))
 
     LOGGER.info(
         "[EventSub] Prepared %d subscriptions for broadcaster %s.",
