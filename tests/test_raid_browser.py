@@ -51,12 +51,40 @@ def stream(user="2", viewers=42):
             "thumbnail_url": "https://static-cdn.jtvnw.net/previews/test-{width}x{height}.jpg"}
 
 
+@pytest.mark.asyncio
+async def test_preview_fetches_only_cached_follower_total_not_follower_identities(monkeypatch):
+    api = runtime(monkeypatch, [{'total': 1234, 'data': [{'user_id': 'private-follower'}]}])
+    for _ in range(2):
+        result = await dashboard.channel_raid_preview(request(), target_id='2')
+        assert json.loads(result.body) == {'follower_count': 1234}
+    assert api.await_count == 1
+    assert api.call_args.args[0].path == 'channels/followers'
+    assert api.call_args.args[0].params == {'broadcaster_id': '2', 'first': 1}
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize('total, expected', [(0, 0), (None, None), (-1, None), ('12', None), (True, None)])
+async def test_preview_follower_count_preserves_zero_and_rejects_invalid_totals(monkeypatch, total, expected):
+    runtime(monkeypatch, [{'total': total}])
+    result = await dashboard.channel_raid_preview(request(), target_id='2')
+    assert json.loads(result.body) == {'follower_count': expected}
 
 
+@pytest.mark.asyncio
+async def test_preview_follower_errors_do_not_break_stream_preview(monkeypatch):
+    runtime(monkeypatch, [RuntimeError('Unavailable')])
+    result = await dashboard.channel_raid_preview(request(), target_id='2')
+    assert result.status_code == 200
+    assert json.loads(result.body) == {'follower_count': None}
 
 
+@pytest.mark.asyncio
+async def test_preview_follower_endpoint_requires_auth_and_a_valid_channel(monkeypatch):
+    api = runtime(monkeypatch, [])
+    assert (await dashboard.channel_raid_preview(request(None), target_id='2')).status_code == 401
+    assert (await dashboard.channel_raid_preview(request('unknown'), target_id='2')).status_code == 401
+    assert (await dashboard.channel_raid_preview(request(), target_id='bad')).status_code == 400
+    assert api.await_count == 0
 
 
 @pytest.mark.asyncio

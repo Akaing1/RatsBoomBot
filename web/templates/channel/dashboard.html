@@ -1058,6 +1058,52 @@
             <p>Starting a raid queues Twitch’s countdown. Use Twitch chat for Raid Now.</p>
         </div>
     </dialog>
+    <dialog id="dashboard-raid-preview" class="raid-preview-dialog" data-raid-preview data-details-url="/channel/api/raid-browser/preview" aria-labelledby="raid-preview-title">
+        <header class="raid-preview-header">
+            <button class="button secondary" type="button" data-raid-preview-back aria-label="Back to raid browser" title="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+            <h3 id="raid-preview-title">Stream preview</h3>
+            <div class="raid-preview-header-labels" tabindex="0" role="region" aria-label="Events and stream teams">
+                <div class="raid-preview-events" data-raid-preview-events></div>
+                <div class="raid-preview-teams" data-raid-preview-teams></div>
+            </div>
+            <div class="raid-preview-header-actions">
+                <button class="button secondary" type="button" data-raid-preview-favorite aria-pressed="false" aria-label="Favorite" title="Favorite"></button>
+                <details class="raid-preview-menu" data-raid-preview-menu>
+                    <summary aria-label="Options" title="Options">⋮</summary>
+                    <button type="button" data-raid-preview-block>Don’t recommend</button>
+                </details>
+            </div>
+            <button class="raid-browser-close" type="button" data-raid-preview-close aria-label="Close preview" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        </header>
+        <div class="raid-preview-body" data-raid-preview-body>
+            <section class="raid-preview-main" data-raid-preview-main aria-label="Stream and channel details">
+                <div class="raid-preview-video" data-raid-preview-video></div>
+                <div class="raid-preview-details" data-raid-preview-details>
+                    <div class="raid-preview-details-upper">
+                    <div class="raid-preview-details-header">
+                        <div class="raid-preview-identity" data-raid-preview-identity></div>
+                        <div class="raid-preview-details-actions">
+                            <div class="raid-preview-badges" data-raid-preview-badges></div>
+                        </div>
+                    </div>
+                    <div class="raid-preview-details-copy">
+                    <h4 data-raid-preview-stream-title></h4>
+                    <p class="raid-preview-meta" data-raid-preview-meta></p>
+                    <div class="raid-preview-tags" data-raid-preview-tags></div>
+                    </div>
+                    </div>
+                <footer class="raid-preview-footer" data-raid-preview-footer>
+                    <div class="raid-preview-footer-copy">
+                        <p class="raid-preview-description" data-raid-preview-description></p>
+                        <p data-raid-preview-status role="status" aria-live="polite"></p>
+                    </div>
+                    <button class="button primary" type="button" data-raid-preview-raid>Raid</button>
+                </footer>
+                </div>
+            </section>
+            <section class="raid-preview-chat" data-raid-preview-chat aria-label="Channel chat"></section>
+        </div>
+    </dialog>
     <dialog class="raid-lists-dialog" data-raid-lists aria-labelledby="raid-lists-title">
         <div class="raid-browser-header"><h3 id="raid-lists-title">Favorites and blacklist</h3><button type="button" class="raid-browser-close" data-raid-lists-close aria-label="Close list manager"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
         <p data-raid-lists-status role="status"></p>
@@ -1075,6 +1121,8 @@
     <script src="{{ url_for('static', path='/js/chat-composer.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/chat-target-selector.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/chat-emote-picker.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/raid-preview-chat.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/raid-preview-player.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-raid-browser.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-raid-status.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>

@@ -28,6 +28,7 @@ from web.shared.category_relevance import low_relevance_category_ids
 from web.shared.raid_suggestions import get_suggested_streamers
 from web.shared.raid_directory import get_sorted_directory
 from web.shared.live_chat import clear_stale_chat_on_refresh, stream_chat_events
+from web.shared.raid_chat import preview_chat_events, preview_emotes
 from web.shared.protected_users import (
     ProtectedUserError,
     add_protected_user,
@@ -697,6 +698,30 @@ async def channel_raid_action(request: Request, action: str = Form(...),
                 detail = "Could not confirm the raid action. Check Twitch chat before trying again."
             LOGGER.warning("[Dashboard] Raid action %s failed for %s (status %s).", action, broadcaster_id, status)
             return JSONResponse({"detail": detail}, status_code=status if status in {400, 401, 403, 409, 429} else 502)
+
+
+@router.get("/channel/api/raid-browser/preview", response_class=JSONResponse)
+async def channel_raid_preview(request: Request, target_id: str = ""):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster_id = str(broadcaster_id)
+    if broadcaster_id not in runtime_bot.services.broadcasters.get_broadcasters():
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    if not re.fullmatch(r"\d{1,25}", target_id):
+        return JSONResponse({"detail": "Invalid channel."}, status_code=400)
+    try:
+        followers = await raid_browser_cached_request(runtime_bot, broadcaster_id, "channels/followers",
+            {"broadcaster_id": target_id, "first": 1})
+        total = followers.get("total")
+        count = total if isinstance(total, int) and not isinstance(total, bool) and total >= 0 else None
+        return JSONResponse({"follower_count": count})
+    except Exception:
+        LOGGER.warning("[Dashboard] Raid preview follower count unavailable for %s.", target_id)
+        return JSONResponse({"follower_count": None})
 
 
 @router.get("/channel/api/raid-browser", response_class=JSONResponse)
@@ -1639,6 +1664,67 @@ async def channel_chat_stream(request: Request, view: str = "both"):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
     )
+
+
+def preview_chat_runtime(request, target_id):
+    reader = request.session.get(CHANNEL_USER_ID_KEY)
+    if not reader:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    if not re.fullmatch(r"\d{1,25}", target_id):
+        return JSONResponse({"detail": "Invalid channel."}, status_code=400)
+    bot = get_bot()
+    if bot is None or bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    if str(reader) not in bot.services.broadcasters.get_broadcasters():
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    return bot, str(reader)
+
+
+@router.get("/channel/api/raid-browser/chat/stream")
+async def channel_raid_chat_stream(request: Request, target_id: str = ""):
+    runtime = preview_chat_runtime(request, target_id)
+    if isinstance(runtime, JSONResponse):
+        return runtime
+    bot, reader = runtime
+    return StreamingResponse(preview_chat_events(request, bot, reader, target_id), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+
+
+@router.post("/channel/api/raid-browser/chat/send")
+async def channel_raid_chat_send(request: Request, target_id: str = Form(""), message: str = Form(""),
+                                 csrf_token: str = Form("")):
+    runtime = preview_chat_runtime(request, target_id)
+    if isinstance(runtime, JSONResponse):
+        return runtime
+    validate_csrf_token(request, csrf_token)
+    bot, reader = runtime
+    message = message.strip()
+    if not message or len(message) > CHAT_MESSAGE_MAX_LENGTH or message.startswith(("/", ".")):
+        return JSONResponse({"detail": "Enter a message up to 500 characters. Commands aren't supported here."}, status_code=400)
+    try:
+        result = await bot.create_partialuser(target_id).send_message(sender=reader, token_for=reader, message=message)
+        if not result.sent:
+            return JSONResponse({"detail": "Twitch didn't send this message. Check the channel's chat restrictions."}, status_code=409)
+        return JSONResponse({"sent": True})
+    except HTTPException as error:
+        return JSONResponse({"detail": "Twitch couldn't send this message. Check your connection and chat permissions."},
+                            status_code=429 if error.status == 429 else 502)
+
+
+@router.get("/channel/api/raid-browser/chat/emotes")
+async def channel_raid_chat_emotes(request: Request, target_id: str = ""):
+    runtime = preview_chat_runtime(request, target_id)
+    if isinstance(runtime, JSONResponse):
+        return runtime
+    bot, reader = runtime
+    catalog, channel_emotes = await asyncio.gather(bot.services.live_chat.get_emote_catalog(reader), preview_emotes(bot, target_id))
+    # The user's available Twitch emotes apply everywhere. 7TV names must come
+    # from the channel being previewed, not the user's own channel catalog.
+    emotes = [emote for emote in catalog.get("emotes", []) if emote.get("provider") != "7tv"]
+    emotes.extend({"name": name, "url": segment.url, "provider": "7tv", "group": "7TV", "group_key": "7tv"}
+                  for name, segment in channel_emotes.items())
+    return JSONResponse({"emotes": emotes, "personal_group_key": catalog.get("personal_group_key", "")},
+                        headers={"Cache-Control": "no-store"})
 
 
 @router.get("/channel/api/chat/emotes", response_class=JSONResponse)

@@ -475,6 +475,242 @@ test('console match toggle shows per-card score breakdowns without fetching or c
     assert.equal(app.requests.length, 1);
 });
 
+test('channel preview layers over browsing and Back restores the same cards and scroll', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: [{...channel(), title: '<full stream title>', description: 'Channel bio',
+        tags: ['VTuber', 'Art'], language: 'en'}], cursor: ''}); await flush();
+    const card = app.grid().children[0];
+    const thumbnail = card.querySelector('.raid-browser-thumbnail'); thumbnail.isConnected = true;
+    app.results.scrollTop = 120;
+    thumbnail.handlers.click();
+    assert.equal(app.previewDialog.open, true);
+    assert.equal(app.location.hash, '#raidbrowser?channel=viewer2');
+    assert.equal(app.dialog.open, true);
+    assert.equal(app.results.scrollTop, 120);
+    assert.equal(app.grid().children[0], card);
+    const control = name => app.previewControls[`[data-raid-preview-${name}]`];
+    const player = new URL(control('video').children[0].src);
+    assert.equal(player.origin, 'https://player.twitch.tv');
+    assert.equal(player.searchParams.get('channel'), 'viewer2');
+    assert.equal(player.searchParams.get('parent'), 'localhost');
+    assert.equal(player.searchParams.get('autoplay'), 'true');
+    assert.equal(player.searchParams.get('muted'), 'true');
+    assert.equal(control('video').children[0].allow, 'autoplay; fullscreen');
+    const chat = control('chat').children[0];
+    assert.equal(chat.channel.login, 'viewer2');
+    assert.equal(chat.src, undefined);
+    assert.equal(control('stream-title').textContent, '<full stream title>');
+    assert.equal(control('description').textContent, 'Channel bio');
+    assert.equal(control('tags').children.length, 2);
+    control('back').handlers.click();
+    assert.equal(app.previewDialog.open, false);
+    assert.equal(app.location.hash, '#raidbrowser');
+    assert.equal(app.dialog.open, true);
+    assert.equal(control('video').children.length, 0);
+    assert.equal(control('chat').children.length, 0);
+    assert.equal(chat.destroyed, true);
+    assert.equal(thumbnail.focused, true);
+    assert.equal(app.requests.length, 1);
+});
+
+test('compact preview stacks video, details and chat without a stretched video row or pane tabs', async () => {
+    const app = setup(new Map(), '1', '', 390); app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    const thumbnail = app.grid().children[0].querySelector('.raid-browser-thumbnail');
+    thumbnail.handlers.click();
+    const body = app.previewControls['[data-raid-preview-body]'];
+    const player = app.previewControls['[data-raid-preview-video]'].children[0];
+    assert.equal(body.dataset.pane, undefined);
+    assert.equal(app.previewControls['[data-raid-preview-video]'].children[0], player);
+    assert.equal(app.requests.length, 1);
+    app.previewDialog.close(); thumbnail.handlers.click();
+    assert.equal(body.dataset.pane, undefined);
+    const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
+    assert.match(styles, /\.raid-preview-main \{ display: flex; flex-direction: column;[^}]*overflow: auto/);
+    assert.match(styles, /\.raid-preview-body \{[^}]*overflow: hidden/);
+    assert.ok(!styles.includes('.raid-preview-body { display: block; overflow: auto; }'));
+    assert.match(styles, /\.raid-preview-body \{ grid-template-columns: minmax\(0,1fr\); grid-template-rows: minmax\(440px,3fr\) minmax\(160px,1\.75fr\); gap: 8px; overflow: auto;/);
+    assert.match(styles, /\.raid-preview-video \{ width: min\(100%, max\(400px, calc\(300px \* 16 \/ 9\)\)\); align-self: start;/);
+    assert.match(styles, /\.raid-preview-video \{[^}]*min-width: 400px; min-height: 300px;/);
+    assert.ok(!styles.includes('.raid-preview-video-stats'));
+    assert.match(styles, /\.raid-preview-details-upper \{ display: block; flex: 1; min-height: 0; overflow-y: auto;/);
+    assert.match(styles, /\.raid-preview-chat \{ height: auto; min-height: 0; margin-top: 0;/);
+    assert.match(styles, /\.raid-preview-chat \{ display: flex; flex-direction: column; align-self: stretch; height: auto;/);
+    assert.match(styles, /\.raid-preview-chat \{ height: auto;[^}]*align-self: stretch;/);
+    assert.ok(!fs.readFileSync('web/templates/channel/dashboard.html', 'utf8').includes('data-raid-preview-pane='));
+});
+
+test('preview width follows available 16:9 video height without recreating the player', async () => {
+    const app = setup(new Map(), '1', '', 2000);
+    app.previewDialog.getBoundingClientRect = () => ({left: 100, right: 1500, top: 20, bottom: 900});
+    app.previewControls['[data-raid-preview-main]'].clientWidth = 1000;
+    app.previewControls['[data-raid-preview-main]'].clientHeight = 700;
+    app.previewControls['[data-raid-preview-details]'].getBoundingClientRect = () => ({top: 0, bottom: 250});
+    app.previewControls['[data-raid-preview-footer]'].getBoundingClientRect = () => ({top: 0, bottom: 50});
+    app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    app.grid().children[0].querySelector('.raid-browser-thumbnail').handlers.click();
+    assert.equal(app.previewDialog.style['--raid-preview-width'], '1200px');
+    const player = app.previewControls['[data-raid-preview-video]'].children[0];
+    app.previewControls['[data-raid-preview-main]'].clientHeight = 600;
+    app.resizePreview(); await flush();
+    assert.equal(app.previewDialog.style['--raid-preview-width'], '1022px');
+    assert.equal(app.previewControls['[data-raid-preview-video]'].children[0], player);
+    const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
+    assert.match(styles, /\.raid-preview-video \{[^}]*height: auto;[^}]*aspect-ratio: 16 \/ 9; align-self: start/);
+    const template = fs.readFileSync('web/templates/channel/dashboard.html', 'utf8');
+    assert.match(template, /class="raid-preview-video" data-raid-preview-video/);
+    assert.ok(!template.includes('raid-preview-video dashboard-video-frame'));
+    assert.match(styles, /\.raid-preview-tags \{[^}]*flex-wrap: wrap;/);
+    assert.match(styles, /\.raid-preview-tags span \{[^}]*max-width: 100%; white-space: normal;/);
+    assert.match(styles, /\.raid-preview-details-copy \{[^}]*overflow-y: auto;/);
+    assert.match(styles, /\.raid-preview-description \{ display: block; white-space: pre-wrap; overflow-wrap: anywhere; \}/);
+    assert.ok(!styles.includes('.raid-preview-description { display: none; }'));
+});
+
+test('widening the window recalculates a constrained preview even when its observed dimensions have not changed', async () => {
+    const app = setup(new Map(), '1', '', 1000);
+    app.previewDialog.getBoundingClientRect = () => ({left: 0, right: 800, top: 20, bottom: 900});
+    app.previewControls['[data-raid-preview-main]'].clientWidth = 400;
+    app.previewControls['[data-raid-preview-main]'].clientHeight = 700;
+    app.previewControls['[data-raid-preview-details]'].getBoundingClientRect = () => ({top: 0, bottom: 250});
+    app.opener.handlers.click(); app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    app.grid().children[0].querySelector('.raid-browser-thumbnail').handlers.click();
+    const player = app.previewControls['[data-raid-preview-video]'].children[0];
+    assert.equal(app.previewDialog.style['--raid-preview-width'], '952px');
+    app.viewport.innerWidth = 390; app.windowHandlers.resize(); await flush();
+    app.viewport.innerWidth = 2000; app.windowHandlers.resize(); await flush();
+    assert.equal(app.previewDialog.style['--raid-preview-width'], '1200px');
+    assert.equal(app.previewControls['[data-raid-preview-video]'].children[0], player);
+    assert.equal(app.requests.length, 1);
+});
+
+test('expanded cards include badges, special tags, viewers, follower count and live uptime', async () => {
+    const app = setup(); app.previewDialog.dataset.detailsUrl = '/channel/api/raid-browser/preview';
+    app.opener.handlers.click();
+    app.requests[0].respond({channels: [{...channel(), verified: true, language: 'ja', followed: true, mutual: true,
+        tags: ['VTuber'], suggested: true, dev_priority: true, recent_raider: true,
+        events: ['Drops Enabled'], teams: ['Team name'], started_at: new Date(Date.now() - 3_600_000).toISOString()}], cursor: ''});
+    await flush();
+    app.grid().children[0].querySelector('.raid-browser-thumbnail').handlers.click();
+    const identity = app.previewControls['[data-raid-preview-identity]'];
+    assert.ok(identity.querySelector('.raid-browser-verified'));
+    assert.ok(identity.querySelector('.raid-browser-language'));
+    assert.ok(identity.querySelector('.raid-browser-follow-badge'));
+    assert.equal(identity.querySelector('.raid-preview-marker'), undefined);
+    const nameIndex = identity.children.findIndex(child => child.tagName === 'a');
+    assert.ok(identity.children.indexOf(identity.querySelector('.raid-browser-language')) < nameIndex);
+    assert.ok(identity.children.indexOf(identity.querySelector('.raid-browser-follow-badge')) < nameIndex);
+    assert.ok(identity.children.indexOf(identity.querySelector('.raid-preview-followers')) > nameIndex);
+    const badges = app.previewControls['[data-raid-preview-badges]'];
+    const video = app.previewControls['[data-raid-preview-video]'];
+    assert.equal(badges.querySelector('.raid-preview-viewers').textContent, '42 viewers');
+    assert.match(badges.querySelector('.raid-preview-live-time').textContent, /^1:00:/);
+    assert.equal(video.querySelector('.raid-preview-live-time'), undefined);
+    assert.equal(video.querySelector('.raid-preview-viewers'), undefined);
+    const events = app.previewControls['[data-raid-preview-events]'];
+    assert.ok(events.children.some(badge => badge.textContent === 'Drops Enabled'));
+    assert.ok(!badges.children.some(badge => badge.textContent === 'Drops Enabled'));
+    assert.ok(app.previewControls['[data-raid-preview-teams]'].children.some(badge => badge.textContent === 'Team name'));
+    assert.ok(!badges.children.some(badge => badge.textContent === 'Team name'));
+    assert.equal(app.requests[1].url.pathname, '/channel/api/raid-browser/preview');
+    assert.equal(app.requests[1].url.searchParams.get('target_id'), '2');
+    app.requests[1].respond({follower_count: 1234}); await flush();
+    assert.equal(identity.querySelector('.raid-preview-followers').textContent, '1,234 followers');
+    const tags = app.previewControls['[data-raid-preview-tags]'].children.map(tag => tag.textContent);
+    assert.ok(tags.includes('Developer') && tags.includes('Suggested') && tags.includes('Raided you recently'));
+    assert.equal(app.previewControls['[data-raid-preview-status]'].textContent, '');
+    const template = fs.readFileSync('web/templates/channel/dashboard.html', 'utf8');
+    const left = template.split('<section class="raid-preview-main"')[1].split('</section>')[0];
+    assert.ok(left.includes('data-raid-preview-raid'));
+    assert.ok(left.indexOf('data-raid-preview-raid') > left.indexOf('data-raid-preview-description'));
+    const actions = left.split('<div class="raid-preview-details-actions">')[1].split('<div class="raid-preview-details-copy">')[0];
+    assert.ok(!actions.includes('data-raid-preview-events'));
+    assert.ok(!actions.includes('data-raid-preview-teams'));
+    assert.ok(actions.includes('data-raid-preview-badges'));
+    assert.ok(!actions.includes('data-raid-preview-favorite') && !actions.includes('data-raid-preview-menu'));
+    const header = template.split('<header class="raid-preview-header">')[1].split('</header>')[0];
+    assert.match(header, /data-raid-preview-back[^>]*><svg[^>]*aria-hidden="true"[^>]*><path d="M19 12H5m6-6-6 6 6 6"/);
+    assert.ok(header.indexOf('data-raid-preview-events') < header.indexOf('data-raid-preview-teams'));
+    assert.ok(header.indexOf('data-raid-preview-teams') < header.indexOf('data-raid-preview-favorite'));
+    assert.ok(header.indexOf('data-raid-preview-favorite') < header.indexOf('data-raid-preview-menu'));
+    assert.ok(header.indexOf('data-raid-preview-menu') < header.indexOf('data-raid-preview-close'));
+    assert.ok(!header.includes('data-raid-preview-badges'));
+    assert.ok(left.includes('data-raid-preview-badges'));
+    const footer = left.split('<footer class="raid-preview-footer"')[1].split('</footer>')[0];
+    assert.ok(footer.includes('data-raid-preview-raid'));
+    assert.ok(footer.includes('data-raid-preview-description'));
+    assert.ok(footer.includes('class="raid-preview-footer-copy"'));
+    const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
+    assert.match(header, /class="raid-preview-header-labels" tabindex="0" role="region"/);
+    assert.match(styles, /\.raid-preview-header-labels \{[^}]*min-width: 0;[^}]*max-width: 45%;[^}]*overflow-x: auto; overflow-y: hidden;/);
+    assert.match(styles, /\.raid-preview-header-labels :is\(\.raid-preview-events, \.raid-preview-teams\) \{ flex: 0 0 auto; flex-wrap: nowrap; \}/);
+    assert.match(styles, /@media \(min-width: 751px\) \{\s*\.raid-preview-main \{ position: relative; \}\s*\.raid-preview-footer \{ min-height: 44px; padding-right: 84px; \}\s*\.raid-preview-footer > \[data-raid-preview-raid\] \{ position: absolute; right: 12px; bottom: 12px;/);
+    assert.ok(!footer.includes('data-raid-preview-favorite'));
+    assert.match(left, /<\/footer>\s*<\/div>\s*$/);
+});
+
+test('preview favorite and blacklist controls share the original card actions', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    const card = app.grid().children[0]; card.querySelector('.raid-browser-thumbnail').handlers.click();
+    card.querySelector('.raid-browser-channel-menu').querySelector('button').click = () => {
+        throw new Error('Preview must not click controls behind the active dialog');
+    };
+    app.previewControls['[data-raid-preview-favorite]'].handlers.click();
+    assert.equal(card.querySelector('.raid-browser-pin').attributes['aria-pressed'], 'true');
+    const favorite = app.previewControls['[data-raid-preview-favorite]'];
+    assert.equal(favorite.title, 'Unfavorite');
+    assert.equal(favorite.attributes['aria-label'], 'Unfavorite');
+    assert.equal(favorite.attributes['aria-pressed'], 'true');
+    assert.equal(favorite.innerHTML, card.querySelector('.raid-browser-pin').innerHTML);
+    assert.match(favorite.innerHTML, /<svg/);
+    app.confirm(false); app.previewControls['[data-raid-preview-block]'].handlers.click();
+    assert.equal(app.previewDialog.open, true);
+    app.confirm(true); app.previewControls['[data-raid-preview-block]'].handlers.click();
+    assert.equal(app.previewDialog.open, false);
+    assert.equal(app.grid().children.length, 0);
+    assert.deepEqual(JSON.parse(app.storage.get('ratsboombot:raid-blacklist:1')), ['2']);
+});
+
+test('preview follower lookups abort on close and stale counts cannot replace a newer channel', async () => {
+    const app = setup(); app.previewDialog.dataset.detailsUrl = '/channel/api/raid-browser/preview';
+    app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel('2'), channel('3')], cursor: ''}); await flush();
+    app.grid().children[0].querySelector('.raid-browser-thumbnail').handlers.click();
+    app.previewDialog.close(); assert.equal(app.requests[1].options.signal.aborted, true);
+    app.grid().children[1].querySelector('.raid-browser-thumbnail').handlers.click();
+    app.requests[2].respond({follower_count: 0}); await flush();
+    app.requests[1].respond({follower_count: 999}); await flush();
+    assert.equal(app.previewControls['[data-raid-preview-identity]'].querySelector('.raid-preview-followers').textContent, '0 followers');
+});
+
+test('preview backdrop needs both press and release outside and parent close unloads frames', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    const open = () => app.grid().children[0].querySelector('.raid-browser-thumbnail').handlers.click();
+    open();
+    app.previewDialog.handlers.pointerdown({target: new Element(), clientX: 10, clientY: 10});
+    app.previewDialog.handlers.click({target: app.previewDialog, clientX: 10, clientY: 10});
+    assert.equal(app.previewDialog.open, true);
+    app.previewDialog.handlers.pointerdown({target: app.previewDialog, clientX: 10, clientY: 10});
+    app.previewDialog.handlers.click({target: app.previewDialog, clientX: 10, clientY: 10});
+    assert.equal(app.previewDialog.open, false);
+    assert.equal(app.dialog.open, true);
+    open(); app.close.handlers.click();
+    assert.equal(app.previewDialog.open, false);
+    assert.equal(app.previewControls['[data-raid-preview-video]'].children.length, 0);
+});
+
+test('preview helper path does not create an unused fallback iframe', async () => {
+    const app = setup(); let starts = 0;
+    app.viewport.createRaidPreviewPlayer = () => { starts++; return {destroy() {}}; };
+    app.opener.handlers.click(); app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    app.grid().children[0].querySelector('.raid-browser-thumbnail').handlers.click();
+    assert.equal(starts, 1);
+    assert.equal(app.createdElements.filter(element => element.tagName === 'iframe').length, 0);
+});
+
 test('uptime refresh skips unchanged DOM writes while still updating elapsed time', async () => {
     const app = setup(); app.opener.handlers.click();
     app.requests[0].respond({channels: [{...channel(), started_at: new Date(Date.now() + 600000).toISOString()}], cursor: ''}); await flush();
@@ -487,12 +723,52 @@ test('uptime refresh skips unchanged DOM writes while still updating elapsed tim
     assert.equal(timer.attributes['aria-label'], 'Live for 0:00:03');
 });
 
+test('preview counters stay outside the video instead of overlaying the Twitch iframe', () => {
+    const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
+    assert.ok(!styles.includes('.raid-preview-video-stats'));
+    assert.ok(!source.includes('videoStats'));
+    assert.match(source, /viewers\.textContent[^\n]*badges\.append\(viewers\)/);
+    assert.match(source, /timer\.dataset\.startedAt[^\n]*badges\.append\(timer\)/);
+    assert.match(styles, /\.raid-preview-badges \{ display: flex; flex-wrap: wrap;/);
+});
+
+test('preview raid reuses the confirmed action and closes both overlays only on success', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    app.grid().children[0].querySelector('.raid-browser-thumbnail').handlers.click();
+    const raid = app.previewControls['[data-raid-preview-raid]'];
+    app.confirm(false); raid.handlers.click();
+    assert.equal(app.requests.length, 1);
+    app.confirm(true); raid.handlers.click();
+    assert.equal(raid.disabled, true);
+    app.requests[1].respond({detail: 'Not allowed'}, false); await flush();
+    assert.equal(app.previewDialog.open, true);
+    assert.equal(app.previewControls['[data-raid-preview-status]'].textContent, 'Not allowed');
+    assert.equal(raid.disabled, false);
+    raid.handlers.click();
+    app.requests[2].respond({raid: {target_id: '2', target_login: 'viewer2'}}); await flush();
+    assert.equal(app.previewDialog.open, false);
+    assert.equal(app.dialog.open, false);
+    assert.equal(app.events.filter(event => event.type === 'dashboard-raid-started').length, 1);
+});
+
 test('thumbnail subtly expands on hover and focus without changing layout, respecting reduced motion', () => {
     const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
     assert.match(styles, /\.raid-browser-thumbnail \{ transition: transform \.18s ease; transform-origin: center; \}/);
     assert.match(styles, /\.raid-browser-thumbnail:hover \{ transform: scale\(1\.02\); \}/);
     assert.match(styles, /\.raid-browser-thumbnail:focus-visible \{ transform: scale\(1\.02\); \}/);
     assert.match(styles, /\.raid-browser-thumbnail:is\(:hover, :focus-visible\) \{ transform: none; \}/);
+});
+
+test('only the thumbnail opens preview, not the surrounding card', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    const card = app.grid().children[0];
+    assert.equal(card.handlers.click, undefined);
+    assert.ok(!app.previewDialog.open);
+    assert.equal(card.querySelector('.raid-browser-thumbnail').title, undefined);
+    card.querySelector('.raid-browser-thumbnail').handlers.click();
+    assert.equal(app.previewDialog.open, true);
 });
 
 test('reduced motion skips shared-card movement and rapid tab changes ignore stale results', async () => {
@@ -638,6 +914,55 @@ test('hash changes and browser history open or close the browser without duplica
     app.opener.handlers.click();
     assert.equal(app.location.hash, '#raidbrowser');
     assert.equal(app.dialog.open, true);
+});
+
+test('channel URL restores a preview after refresh without replacing the browse filters', async () => {
+    const app = setup(new Map(), '1', '#raidbrowser?channel=Viewer2');
+    assert.equal(app.dialog.open, true); assert.equal(app.requests.length, 2);
+    assert.equal(app.requests[1].url.searchParams.get('query'), 'viewer2');
+    assert.equal(app.input.value, '');
+    app.windowHandlers.popstate(); app.windowHandlers.hashchange();
+    assert.equal(app.requests.length, 2, 'History events share the pending lookup');
+    app.requests[0].respond({channels: [], cursor: ''});
+    app.requests[1].respond({channels: [channel()], cursor: ''}); await flush();
+    assert.equal(app.previewDialog.open, true);
+    assert.equal(app.previewControls['[data-raid-preview-chat]'].children[0].channel.login, 'viewer2');
+    assert.equal(app.location.hash, '#raidbrowser?channel=viewer2');
+    app.close.handlers.click();
+    assert.equal(app.previewDialog.open, false); assert.equal(app.location.hash, '');
+    assert.equal(app.location.search, '?test=1');
+});
+
+test('Back and Forward switch between the browser and cached preview without extra requests', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    app.grid().children[0].querySelector('.raid-browser-thumbnail').handlers.click();
+    app.location.hash = '#raidbrowser'; app.windowHandlers.popstate();
+    assert.equal(app.previewDialog.open, false); assert.equal(app.dialog.open, true);
+    app.location.hash = '#raidbrowser?channel=viewer2'; app.windowHandlers.popstate();
+    assert.equal(app.previewDialog.open, true); assert.equal(app.requests.length, 1);
+    app.windowHandlers.hashchange(); assert.equal(app.requests.length, 1);
+});
+
+test('channel URL ignores stale lookups and preserves unrelated navigation', async () => {
+    const app = setup(new Map(), '1', '#raidbrowser?channel=viewer2');
+    app.requests[0].respond({channels: [], cursor: ''}); await flush();
+    app.location.hash = '#raidbrowser?channel=viewer3'; app.windowHandlers.hashchange();
+    assert.equal(app.requests[1].options.signal.aborted, true);
+    app.requests[2].respond({channels: [channel('3')], cursor: ''}); await flush();
+    app.requests[1].respond({channels: [channel()], cursor: ''}); await flush();
+    assert.equal(app.previewControls['[data-raid-preview-chat]'].children[0].channel.login, 'viewer3');
+    app.location.hash = '#other'; app.windowHandlers.hashchange();
+    assert.equal(app.previewDialog.open, false); assert.equal(app.dialog.open, false);
+    assert.equal(app.location.hash, '#other');
+});
+
+test('offline channel URL stays in the browser and malformed names never trigger a channel lookup', async () => {
+    const app = setup(new Map(), '1', '#raidbrowser?channel=viewer2');
+    app.requests[0].respond({channels: [], cursor: ''});
+    app.requests[1].respond({channels: [], cursor: ''}); await flush();
+    assert.ok(!app.previewDialog.open); assert.match(app.status.textContent, /offline or unavailable/);
+    assert.equal(setup(new Map(), '1', '#raidbrowser?channel=bad%2Fname').requests.length, 1);
 });
 
 test('matching selected tags come first and get purple emphasis in cards and rows', async () => {
