@@ -601,15 +601,20 @@
     let currentQuery = "";
     let currentFilters = {};
     let rankedFavorites = new Set();
-    const filterNames = ["sort", "category_id", "tags", "tag_match", "following", "mutual", "language", "event"];
+    const filterNames = ["sort", "category_id", "tags", "tag_match", "follow_status", "language", "event"];
     function readFilters() {
         const values = {};
         for (const name of filterNames) {
             if (name === "tag_match" && !search.querySelector('[name="tags"]')?.value.trim()) continue;
-            if (activeTab === "favorites" && ["following", "mutual"].includes(name)) continue;
+            if (activeTab === "favorites" && name === "follow_status") continue;
             const field = search.querySelector(`[name="${name}"]`);
             if (!field) continue;
             const value = field.type === "checkbox" ? (field.checked ? "true" : "") : field.value.trim();
+            if (name === "follow_status") {
+                if (["following", "not_following", "mutual"].includes(value)) values[value] = "true";
+                if (value === "mutual") values.following = "true";
+                continue;
+            }
             if (value) values[name] = value;
         }
         if (activeTab !== "favorites") values.recommended = "true";
@@ -684,6 +689,7 @@
         }
     }
     function clearLoadedCards() {
+        scrollAnchor = null;
         seen.clear();
         channels.length = 0;
         rendered.clear();
@@ -694,6 +700,7 @@
     let loading = false;
     let loadError = false;
     let renderFrame = 0;
+    let scrollAnchor = null;
     let columns = 1;
     let rowStride = 1;
     let totalHeight = 0;
@@ -806,10 +813,8 @@
         activeTab = button.dataset.raidBrowserTab;
         collectionButtons.forEach(item => item.setAttribute("aria-pressed", String(item === button)));
         syncTabIndicator();
-        for (const name of ["following", "mutual"]) {
-            const field = search.querySelector(`[name="${name}"]`);
-            if (field) field.disabled = activeTab === "favorites";
-        }
+        const followStatus = search.querySelector('[name="follow_status"]');
+        if (followStatus) followStatus.disabled = activeTab === "favorites";
         load(false, origins);
     }));
     function applyView() {
@@ -858,6 +863,7 @@
         const previousColumns = columns;
         const previousStride = rowStride;
         const anchor = Math.floor(results.scrollTop / rowStride) * previousColumns;
+        const anchorOffset = results.scrollTop % rowStride;
         const minimumCardWidth = [180, 300, 320][size];
         columns = mobileLayout() || view === "list" ? 1 : Math.max(1, Math.floor((width + 12) / (minimumCardWidth + 12)));
         if (view !== "list" && size === 1) columns = Math.min(4, columns);
@@ -867,7 +873,13 @@
         const rows = Math.ceil(channels.length / columns);
         totalHeight = Math.max(0, rows * rowStride - 12);
         spacer.style.height = `${totalHeight}px`;
-        if ((previousColumns !== columns || previousStride !== rowStride) && rendered.size) results.scrollTop = Math.floor(anchor / columns) * rowStride;
+        if (scrollAnchor) {
+            const index = channels.findIndex(channel => channel.id === scrollAnchor.id);
+            if (index >= 0) results.scrollTop = Math.floor(index / columns) * rowStride + scrollAnchor.offset;
+            scrollAnchor = null;
+        } else if ((previousColumns !== columns || previousStride !== rowStride) && rendered.size) {
+            results.scrollTop = Math.floor(anchor / columns) * rowStride + anchorOffset;
+        }
         const firstRow = Math.max(0, Math.floor(results.scrollTop / rowStride) - 2);
         const lastRow = Math.min(rows, Math.ceil((results.scrollTop + results.clientHeight) / rowStride) + 2);
         const start = Math.min(channels.length, firstRow * columns);
@@ -931,10 +943,26 @@
             && totalHeight - results.scrollTop - results.clientHeight < rowStride * 2) load(true);
     }
 
-    function showStatus(message, error = false) {
+    let statusTimer = null, statusRevision = 0, raidHintShown = false;
+    function showStatus(message, error = false, fadeAfter = 0) {
+        clearTimeout(statusTimer); statusTimer = null;
+        const revision = ++statusRevision;
+        status.classList.remove("is-fading");
         status.textContent = message;
         status.classList.toggle("error", error);
-        if (channelPreview?.open) {
+        if (message && fadeAfter && !error) {
+            statusTimer = setTimeout(() => {
+                if (revision !== statusRevision || !dialog.open) return;
+                status.classList.add("is-fading");
+                statusTimer = setTimeout(() => {
+                    if (revision !== statusRevision || !dialog.open) return;
+                    status.textContent = "";
+                    status.classList.remove("is-fading");
+                    statusTimer = null;
+                }, 350);
+            }, fadeAfter);
+        }
+        if (channelPreview?.open && !fadeAfter) {
             previewStatus.textContent = message;
             previewStatus.classList.toggle("error", error);
         }
@@ -942,6 +970,8 @@
     function channelCard(channel) {
         const card = document.createElement("article");
         card.className = "raid-browser-channel";
+        card.classList.toggle("is-following", Boolean(channel.followed || channel.mutual));
+        card.classList.toggle("is-mutual", Boolean(channel.mutual));
         const pin = document.createElement("button");
         pin.type = "button";
         pin.className = "raid-browser-pin";
@@ -1107,7 +1137,9 @@
         raid.title = channel.is_self ? "Your channel" : "Raid";
         raid.addEventListener("click", async () => {
             if (startingRaid || channel.is_self || !window.confirm(`Start a Twitch raid to ${channel.display_name || channel.login}?`)) return;
-            const sourceRect = card.getBoundingClientRect();
+            const animationSource = channelPreview?.open
+                ? channelPreview.querySelector("[data-raid-preview-main]") || card : card;
+            const sourceRect = animationSource.getBoundingClientRect();
             const sourceAvatar = channelPreview?.open
                 ? channelPreview.querySelector("[data-raid-preview-identity]")?.querySelector("img")
                 : card.querySelector(".raid-browser-avatar");
@@ -1121,11 +1153,11 @@
                     method: "POST", body, headers: {Accept: "application/json"}});
                 const payload = await response.json();
                 if (!response.ok || !payload.raid) throw new Error(payload.detail || "Twitch could not start the raid.");
-                const flyer = card.cloneNode?.(true);
+                const flyer = animationSource.cloneNode?.(true);
                 if (flyer) {
                     // Keep row/grid and size-specific styling after the clone
                     // leaves the dialog and its ancestor-dependent selectors.
-                    const originals = [card, ...card.querySelectorAll("*")];
+                    const originals = [animationSource, ...animationSource.querySelectorAll("*")];
                     const copies = [flyer, ...flyer.querySelectorAll("*")];
                     const properties = ["display", "position", "grid-template-columns", "grid-template-rows", "grid-column", "grid-row",
                         "flex", "gap", "align-items", "align-self", "padding", "font-size", "font-weight", "line-height",
@@ -1134,6 +1166,16 @@
                         const computed = getComputedStyle(element);
                         properties.forEach(property => copies[index].style.setProperty(property, computed.getPropertyValue(property)));
                     });
+                    // Cloning a cross-origin player cannot preserve its frame.
+                    // Use the channel thumbnail without starting another embed.
+                    const video = flyer.querySelector(".raid-preview-video");
+                    if (video) {
+                        const image = document.createElement("img");
+                        image.src = channel.thumbnail_url_large || channel.thumbnail_url || "";
+                        image.alt = "";
+                        Object.assign(image.style, {width: "100%", height: "100%", objectFit: "cover"});
+                        video.replaceChildren(image);
+                    }
                 }
                 if (dialog.open) dialog.close();
                 document.dispatchEvent(new CustomEvent("dashboard-raid-started", {detail: {raid: payload.raid, sourceRect, flyer, avatarRect, avatarFlyer}}));
@@ -1273,10 +1315,8 @@
             if (activeCollectionEmpty) {
                 activeTab = "browse";
                 collectionButtons.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.raidBrowserTab === "browse")));
-                for (const name of ["following", "mutual"]) {
-                    const field = search.querySelector(`[name="${name}"]`);
-                    if (field) field.disabled = false;
-                }
+                const followStatus = search.querySelector('[name="follow_status"]');
+                if (followStatus) followStatus.disabled = false;
                 load();
                 return;
             }
@@ -1285,7 +1325,10 @@
                 tabSwapWaiting = false;
                 tabCardOrigins = origins;
             }
-            const anchorId = append ? channels[Math.floor(results.scrollTop / rowStride) * columns]?.id : null;
+            const anchor = append ? {
+                id: channels[Math.floor(results.scrollTop / rowStride) * columns]?.id,
+                offset: results.scrollTop % rowStride,
+            } : null;
             if (Array.isArray(payload.channel_tags)) {
                 channelTags = new Set();
                 for (const tag of payload.channel_tags) {
@@ -1304,10 +1347,7 @@
             }
             syncTabIndicator();
             sortChannels();
-            if (anchorId) {
-                const anchorIndex = channels.findIndex(channel => channel.id === anchorId);
-                if (anchorIndex >= 0) results.scrollTop = Math.floor(anchorIndex / columns) * rowStride + results.scrollTop % rowStride;
-            }
+            if (anchor?.id) scrollAnchor = anchor;
             cursor = payload.cursor && payload.cursor !== previousCursor ? payload.cursor : "";
             for (const channel of payload.channels || []) {
                 for (const tag of channel.tags || []) {
@@ -1325,6 +1365,10 @@
             if (payload.suggested_status === "unavailable") status.textContent += " Suggested streamers are temporarily unavailable.";
             if (payload.sort_scope === "fetched") status.textContent += " Using Twitch's official fallback. Sorting applies to fetched channels, not the entire directory.";
             if (payload.search_limited) status.textContent += " Checked up to 500 streams. Narrow your filters to find more relevant matches.";
+            if (!append && !status.textContent && !raidHintShown) {
+                raidHintShown = true;
+                showStatus("Starting a raid queues Twitch’s countdown. Use Twitch chat for Raid Now.", false, 4000);
+            }
         } catch (error) {
             if (error.name !== "AbortError" && !request.signal.aborted && dialog.open) {
                 loadError = true;
@@ -1382,6 +1426,7 @@
     function openRaidBrowser() {
         if (dialog.open) return;
         dialog.showModal();
+        raidHintShown = false;
         syncTabIndicator();
         liveTimer = setInterval(updateLiveTimes, 1000);
         document.documentElement.classList.add("raid-browser-open");
@@ -1397,6 +1442,8 @@
     dialog.addEventListener("click", event => dismissOnBackdropClick(dialog, event));
     dialog.addEventListener("pointercancel", () => backdropPresses.delete(dialog));
     dialog.addEventListener("close", () => {
+        clearTimeout(statusTimer); statusTimer = null; statusRevision++;
+        status.classList.remove("is-fading");
         previewLinkController?.abort(); previewLinkController = null; previewLinkLogin = "";
         if (channelPreview?.open) channelPreview.close();
         cancelCardMoves();
@@ -1412,6 +1459,7 @@
         clearTimeout(searchTimer);
         cancelAnimationFrame(renderFrame);
         renderFrame = 0;
+        scrollAnchor = null;
         rendered.clear();
         windowGrid.replaceChildren();
         document.documentElement.classList.remove("raid-browser-open");
@@ -1450,10 +1498,6 @@
     });
     search.addEventListener("change", event => {
         if (event.target === input || event.target === tagSearch || event.target === categorySearch || event.target === search.querySelector('[name="tags"]')) return;
-        const following = search.querySelector('[name="following"]');
-        const mutual = search.querySelector('[name="mutual"]');
-        if (event.target === mutual && mutual.checked) following.checked = true;
-        if (event.target === following && !following.checked) mutual.checked = false;
         updateFilters();
     });
     search.addEventListener("reset", event => {
@@ -1470,7 +1514,8 @@
         for (const name of filterNames) {
             const field = search.querySelector(`[name="${name}"]`);
             if (!field) continue;
-            if (field.type === "checkbox") { field.checked = false; field.disabled = false; }
+            field.disabled = false;
+            if (field.type === "checkbox") field.checked = false;
             else field.value = name === "sort" ? "for_you" : name === "tag_match" ? "all" : "";
             field.setCustomValidity?.("");
         }

@@ -743,6 +743,70 @@ async def test_following_search_uses_authenticated_accounts_followed_streams(mon
 
 
 @pytest.mark.asyncio
+async def test_not_following_excludes_all_followed_pages_and_keeps_discovery_cursor(monkeypatch):
+    api = runtime(monkeypatch, [
+        {"data": [stream("2")], "pagination": {"cursor": "follow-page-2"}},
+        {"data": [stream("3")], "pagination": {}},
+        {"data": [stream("2"), stream("3"), stream("4")], "pagination": {"cursor": "discovery-next"}},
+    ])
+    response = await dashboard.channel_raid_browser(request(), not_following=True)
+    assert response.status_code == 200
+    payload = json.loads(response.body)
+    assert [item["id"] for item in payload["channels"]] == ["4"]
+    assert payload["cursor"] == "discovery-next"
+    assert api.await_args_list[0].args[0].path == "streams/followed"
+    assert api.await_args_list[1].args[0].params["after"] == "follow-page-2"
+
+
+@pytest.mark.asyncio
+async def test_not_following_excludes_followed_favorites_and_developer_candidates(monkeypatch):
+    runtime(monkeypatch, [
+        {"data": [stream("2")], "pagination": {}},
+        {"data": [stream("3")], "pagination": {}},
+        {"data": [stream("2")], "pagination": {}},
+    ])
+    monkeypatch.setattr(dashboard, "raid_browser_dev_streams", AsyncMock(return_value=[stream("2")]))
+    response = await dashboard.channel_raid_browser(request(), not_following=True, favorites="2")
+    assert response.status_code == 200
+    assert [item["id"] for item in json.loads(response.body)["channels"]] == ["3"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("filters", [{"following": True}, {"mutual": True}])
+async def test_not_following_rejects_conflicting_follow_filters(monkeypatch, filters):
+    api = runtime(monkeypatch, [])
+    response = await dashboard.channel_raid_browser(request(), not_following=True, **filters)
+    assert response.status_code == 400
+    api.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_not_following_does_not_hide_channels_when_no_live_channels_are_followed(monkeypatch):
+    runtime(monkeypatch, [{"data": [], "pagination": {}}, {"data": [stream("4")], "pagination": {}}])
+    response = await dashboard.channel_raid_browser(request(), not_following=True)
+    assert response.status_code == 200
+    assert [item["id"] for item in json.loads(response.body)["channels"]] == ["4"]
+
+
+@pytest.mark.asyncio
+async def test_not_following_also_filters_for_you_recommendations(monkeypatch):
+    followed = dict(stream("2"), game_id="game", language="en", tags=[])
+    other = dict(stream("3"), game_id="game", language="en", tags=[])
+    runtime(monkeypatch, [
+        {"data": [{"game_id": "game", "broadcaster_language": "en", "tags": []}]},
+        {"data": [followed, other], "pagination": {"cursor": "next"}},
+    ])
+    monkeypatch.setattr(dashboard, "raid_browser_followed_streams", AsyncMock(return_value=[followed]))
+    monkeypatch.setattr(dashboard, "get_suggested_streamers", AsyncMock(return_value=([], None)))
+    monkeypatch.setattr(dashboard, "raid_browser_team_streams", AsyncMock(return_value=([], {})))
+    response = await dashboard.channel_raid_browser(request(), recommended=True, not_following=True)
+    assert response.status_code == 200
+    payload = json.loads(response.body)
+    assert [item["id"] for item in payload["channels"]] == ["3"]
+    assert payload["cursor"] == "next"
+
+
+@pytest.mark.asyncio
 async def test_mutual_filter_checks_whether_followed_streamer_follows_our_channel(monkeypatch):
     api = runtime(monkeypatch, [{"scopes": ["user:read:follows", "moderator:read:followers"]},
                                 {"data": [stream("2"), stream("3")], "pagination": {}},
@@ -986,9 +1050,70 @@ async def test_failed_partner_lookup_keeps_results_without_guessing_verification
 @pytest.mark.asyncio
 async def test_favorites_tab_uses_only_saved_ids_without_follow_permissions(monkeypatch):
     api = runtime(monkeypatch, [{"data": [stream("2")]}])
-    response = await dashboard.channel_raid_browser(request(), favorites="2", favorites_only=True, recommended=True)
+    response = await dashboard.channel_raid_browser(request(), favorites="2", favorites_only=True, recommended=True, sort="viewers_desc")
     assert [item["id"] for item in json.loads(response.body)["channels"]] == ["2"]
     assert all(call.args[0].path in {"streams", "users"} for call in api.await_args_list)
+
+
+@pytest.mark.asyncio
+async def test_favorites_and_browse_share_for_you_order_and_score_breakdowns(monkeypatch):
+    runtime(monkeypatch, [])
+    bot = dashboard.get_bot()
+    own = bot.services.broadcasters.get_broadcasters()["1"]
+    own.viewer_count = 42
+    bot.services.broadcasters.get_broadcasters = lambda: {"1": own}
+    favorites = [dict(stream("2", 500), game_id="other", language="en", tags=[]),
+                 dict(stream("3", 42), game_id="game", language="en", tags=["VTuber", "Art"])]
+    other = dict(stream("4", 100), game_id="game", language="en", tags=[])
+
+    async def respond(route):
+        if route.path == "channels":
+            return {"data": [{"game_id": "game", "broadcaster_language": "en", "tags": ["VTuber", "Art"]}]}
+        if route.path == "streams":
+            ids = route.params.get("user_id")
+            return {"data": [item for item in [*favorites, other] if not ids or item["user_id"] in ids],
+                    "pagination": {} if ids else {"cursor": "next"}}
+        if route.path == "users":
+            return {"data": []}
+        raise AssertionError(route.path)
+
+    bot._http.request_json = AsyncMock(side_effect=respond)
+    monkeypatch.setattr(dashboard, "raid_browser_followed_streams", AsyncMock(return_value=favorites))
+    monkeypatch.setattr(dashboard, "get_suggested_streamers", AsyncMock(return_value=([{"id": "3"}], None)))
+    monkeypatch.setattr(dashboard, "raid_browser_team_streams", AsyncMock(return_value=([favorites[1]], {"3": ["Team"]})))
+    monkeypatch.setattr(dashboard, "recent_incoming_raids", AsyncMock(return_value={"3": .5}))
+    monkeypatch.setattr(dashboard, "raid_browser_channel_sizes", AsyncMock(return_value={"1": 1000, "2": 10000, "3": 1000}))
+    monkeypatch.setattr(dashboard, "raid_browser_relationships", AsyncMock(return_value={
+        "2": {"followed": True, "mutual": False}, "3": {"followed": True, "mutual": True}}))
+    browse_response = await dashboard.channel_raid_browser(request(), favorites="2,3", sort="for_you")
+    favorites_response = await dashboard.channel_raid_browser(request(), favorites="2,3", favorites_only=True, sort="for_you")
+    assert browse_response.status_code == favorites_response.status_code == 200
+    browse = [item for item in json.loads(browse_response.body)["channels"] if item["id"] in {"2", "3"}]
+    saved = json.loads(favorites_response.body)["channels"]
+    assert [item["id"] for item in browse] == [item["id"] for item in saved] == ["3", "2"]
+    for first, second in zip(browse, saved):
+        assert first["relevance"] == second["relevance"] == sum(second["match_breakdown"].values())
+        assert first["match_breakdown"] == second["match_breakdown"]
+    assert all(saved[0]["match_breakdown"][label] > 0 for label in (
+        "Same category", "Same team", "Both VTubers", "Shared tags", "Following", "Mutual following",
+        "Suggested", "Same language", "Recent raid", "Similar viewer count", "Similar channel size"))
+
+
+@pytest.mark.asyncio
+async def test_favorites_for_you_keeps_compatibility_ranking_when_follow_scopes_are_missing(monkeypatch):
+    runtime(monkeypatch, [
+        {"data": [{"game_id": "game", "broadcaster_language": "en", "tags": []}]},
+        {"data": [dict(stream("2", 500), game_id="other"), dict(stream("3", 10), game_id="game")]},
+    ])
+    monkeypatch.setattr(dashboard, "get_suggested_streamers", AsyncMock(return_value=([], None)))
+    monkeypatch.setattr(dashboard, "raid_browser_team_streams", AsyncMock(return_value=([], {})))
+    monkeypatch.setattr(dashboard, "raid_browser_followed_streams", AsyncMock(
+        side_effect=dashboard.HTTPException("Forbidden", status=403, extra="")))
+    response = await dashboard.channel_raid_browser(request(), favorites="2,3", favorites_only=True, sort="for_you")
+    assert response.status_code == 200
+    channels = json.loads(response.body)["channels"]
+    assert [item["id"] for item in channels] == ["3", "2"]
+    assert channels[0]["match_breakdown"]["Same category"] == 400
 
 
 @pytest.mark.asyncio

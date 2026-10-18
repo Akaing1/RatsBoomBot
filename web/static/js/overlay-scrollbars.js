@@ -24,6 +24,13 @@
     function schedule() {
         if (!frame) frame = requestAnimationFrame(render);
     }
+    function keepVisible(element) {
+        const entry = entries.get(element);
+        if (!entry) return;
+        entry.activeUntil = performance.now() + 300;
+        setTimeout(schedule, 350);
+        schedule();
+    }
     function register(element) {
         if (!(element instanceof Element) || element.closest(".overlay-scrollbars")) return;
         const style = getComputedStyle(element);
@@ -79,13 +86,19 @@
                 element[dragging.property] = dragging.position + (coordinate - dragging.coordinate)
                     * bar.geometry.range / (bar.geometry.travel || 1);
             });
-            const endDrag = () => { dragging = null; schedule(); };
+            const endDrag = () => {
+                if (dragging?.bar !== bar) return;
+                dragging = null;
+                keepVisible(element);
+            };
+            track.addEventListener("pointerleave", () => keepVisible(element));
             track.addEventListener("pointerup", endDrag);
             track.addEventListener("pointercancel", endDrag);
             track.addEventListener("lostpointercapture", endDrag);
             return bar;
         });
         entries.set(element, {bars, activeUntil: 0});
+        element.addEventListener("pointerleave", () => keepVisible(element));
         resizeObserver.observe(element);
     }
     function scan(node) {
@@ -125,6 +138,7 @@
             }
             const rect = visibleRect(element);
             const visible = element === root || element.contains(pointerTarget) || element.contains(document.activeElement)
+                || entry.bars.some(bar => bar.track.contains(pointerTarget))
                 || entry.activeUntil > now || dragging?.element === element;
             entry.bars.forEach(bar => {
                 const vertical = bar.axis === "y";
@@ -159,11 +173,11 @@
     }).observe(document.body, {subtree: true, childList: true, attributes: true,
         attributeFilter: ["class", "style", "hidden", "open"]});
     document.addEventListener("pointerover", event => {
-        if (!event.target.closest?.(".overlay-scrollbars")) pointerTarget = event.target;
+        pointerTarget = event.target;
         schedule();
     });
     document.addEventListener("pointerout", event => {
-        if (!event.relatedTarget?.closest?.(".overlay-scrollbars")) pointerTarget = event.relatedTarget;
+        pointerTarget = event.relatedTarget;
         schedule();
     });
     document.addEventListener("focusin", schedule);

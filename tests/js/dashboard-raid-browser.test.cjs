@@ -106,9 +106,9 @@ function setup(storage = new Map(), account = '1', hash = '', viewportWidth = 12
     dialog.querySelector = selector => controls[selector];
     dialog.querySelectorAll = selector => selector === '[data-raid-browser-view]' ? [cardView, listView] : [browseTab, favoritesTab, teamTab, developerTab];
     const fields = {};
-    for (const name of ['sort', 'category_id', 'tags', 'tag_match', 'following', 'mutual', 'language', 'same_team', 'event']) {
+    for (const name of ['sort', 'category_id', 'tags', 'tag_match', 'follow_status', 'language', 'same_team', 'event']) {
         fields[name] = new Element();
-        fields[name].type = ['tags', 'tag_match', 'language', 'category_id', 'sort', 'event'].includes(name) ? 'text' : 'checkbox';
+        fields[name].type = ['tags', 'tag_match', 'language', 'category_id', 'sort', 'event', 'follow_status'].includes(name) ? 'text' : 'checkbox';
         if (name === 'tag_match') fields[name].value = 'all';
         fields[name].checked = false;
         if (name === 'sort') fields[name].value = 'for_you';
@@ -182,6 +182,7 @@ test('raid browser uses dashboard surfaces and primary action colors', () => {
     assert.match(styles, /\.raid-browser-dialog \{ --raid-collection-background: var\(--background\)/);
     const card = styles.split('\n.raid-browser-channel {')[1].split('}')[0];
     assert.match(card, /background: var\(--surface\)/);
+    assert.match(styles, /\.raid-browser-channel\.is-favorite \{ border-color: rgb\(250 204 21 \/ \.5\); \}/);
     const raid = styles.split('\n.raid-browser-start-raid {')[1].split('}')[0];
     assert.match(raid, /background: var\(--accent\)/);
     assert.match(styles, /\.raid-browser-start-raid:not\(:disabled\):is\(:hover,:focus-visible\) \{ background: var\(--accent-hover\)/);
@@ -200,6 +201,8 @@ test('mobile filters open on demand and apply edits only on Submit', async () =>
     app.search.handlers.input({target: app.input});
     app.fields.language.value = 'ja';
     app.search.handlers.change({target: app.fields.language});
+    app.fields.follow_status.value = 'not_following';
+    app.search.handlers.change({target: app.fields.follow_status});
     app.tagSearch.value = 'Artist';
     app.tagSearch.handlers.keydown({key: 'Enter', preventDefault() {}});
     assert.equal(app.requests.length, 1);
@@ -208,6 +211,7 @@ test('mobile filters open on demand and apply edits only on Submit', async () =>
     assert.equal(app.requests[1].url.searchParams.get('query'), 'new search');
     assert.equal(app.requests[1].url.searchParams.get('language'), 'ja');
     assert.equal(app.requests[1].url.searchParams.get('tags'), 'Artist');
+    assert.equal(app.requests[1].url.searchParams.get('not_following'), 'true');
     assert.equal(app.filtersToggle.attributes['aria-expanded'], 'false');
     const template = fs.readFileSync('web/templates/channel/dashboard.html', 'utf8');
     assert.match(template, /raid-browser-filter-submit"><button[^>]*type="submit">Submit/);
@@ -315,13 +319,51 @@ test('mobile Reset stays inside the filter panel and mobile-only controls share 
     assert.ok(!template.includes('data-raid-size-toggle'));
 });
 
-test('loading and error status lives outside card layout flow in the fixed footer space', () => {
+test('status and countdown help live in the search side without reserving a card footer', () => {
     const template = fs.readFileSync('web/templates/channel/dashboard.html', 'utf8');
     const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
-    assert.match(template, /class="raid-browser-footer">\s*<p class="raid-browser-status"/);
-    assert.match(styles, /\.raid-browser-footer \.raid-browser-status \{ position: absolute/);
-    assert.match(styles, /\.raid-browser-footer:has\(\.raid-browser-status:not\(:empty\)\) > p:not\(\.raid-browser-status\) \{ visibility: hidden/);
+    assert.ok(!template.includes('raid-browser-footer'));
+    assert.ok(!styles.includes('raid-browser-footer'));
+    const filters = template.split('<form id="raid-browser-filters"')[1].split('</form>')[0];
+    assert.match(filters, /class="raid-browser-feedback">\s*<p class="raid-browser-status" data-raid-browser-status/);
+    assert.ok(!template.includes('raid-browser-raid-note'));
+    assert.match(source, /showStatus\("Starting a raid queues Twitch’s countdown\. Use Twitch chat for Raid Now\.", false, 4000\)/);
     assert.ok(!styles.includes('.raid-browser-dialog > .raid-browser-status:not(:empty)'));
+});
+
+test('countdown guidance uses the status, fades after four seconds, and does not repeat on tab changes', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    assert.match(app.status.textContent, /Starting a raid queues Twitch’s countdown/);
+    const fade = [...app.timers.keys()].find(id => app.delays.get(id) === 4000);
+    app.timers.get(fade)();
+    assert.equal(app.status.classes.has('is-fading'), true);
+    const clear = [...app.timers.keys()].find(id => app.delays.get(id) === 350);
+    app.timers.get(clear)();
+    assert.equal(app.status.textContent, '');
+    assert.equal(app.status.classes.has('is-fading'), false);
+    app.teamTab.handlers.click();
+    app.requests[1].respond({channels: [channel()], cursor: ''}); await flush();
+    assert.equal(app.status.textContent, '');
+});
+
+test('an old guidance fade cannot hide a newer error, and closing cancels its timer', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
+    const fade = [...app.timers.keys()].find(id => app.delays.get(id) === 4000);
+    const staleFade = app.timers.get(fade);
+    app.search.handlers.submit({preventDefault() {}});
+    app.requests[1].respond({detail: 'Reconnect Twitch.'}, false); await flush();
+    staleFade();
+    assert.equal(app.status.textContent, 'Reconnect Twitch.');
+    assert.equal(app.status.classes.has('is-fading'), false);
+    assert.equal(app.timers.has(fade), false);
+    app.dialog.close(); app.opener.handlers.click();
+    app.requests[2].respond({channels: [channel()], cursor: ''}); await flush();
+    const reopened = [...app.timers.keys()].find(id => app.delays.get(id) === 4000);
+    assert.ok(reopened);
+    app.dialog.close();
+    assert.equal(app.timers.has(reopened), false);
 });
 
 test('results header stays on one line, compresses spacing and scrolls tabs without shrinking them', () => {
@@ -365,7 +407,7 @@ test('mobile title and actions share the same grid row and the full title never 
     const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
     const mobile = styles.split(/@media \(max-width: 750px\) \{\r?\n    \.raid-browser-search-heading/)[1].split(/\r?\n\}/)[0];
     assert.match(styles, /\.raid-browser-heading-group h3 \{ flex: 0 0 auto;[^}]*white-space: nowrap/);
-    assert.match(mobile, /\.raid-browser-dialog\[open\] \{ display: grid;[^}]*grid-template-rows: max-content minmax\(0,1fr\) max-content/);
+    assert.match(mobile, /\.raid-browser-dialog\[open\] \{ display: grid;[^}]*grid-template-rows: max-content minmax\(0,1fr\);/);
     assert.match(mobile, /\.raid-browser-dialog > \.raid-browser-header \{ grid-column: 2; grid-row: 1; flex-wrap: nowrap/);
     assert.match(mobile, /\.raid-browser-dialog \.raid-browser-results-toolbar \{ grid-column: 1; grid-row: 1/);
     assert.match(mobile, /\.raid-browser-tab-scroll, \.raid-browser-results-toolbar \.raid-browser-result-controls \{ display: none/);
@@ -375,7 +417,7 @@ test('mobile title and actions share the same grid row and the full title never 
 test('wide toolbar shares a header row with Reset and results sit directly below', () => {
     const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
     const layout = styles.slice(styles.indexOf('@media (min-width: 751px) {', styles.indexOf('.raid-browser-body {'))).split('\n}')[0];
-    assert.match(layout, /grid-template-rows: max-content minmax\(0,1fr\) max-content/);
+    assert.match(layout, /grid-template-rows: max-content minmax\(0,1fr\);/);
     assert.match(layout, /grid-template-columns: minmax\(0,1fr\) min\(320px, 28vw\)/);
     assert.match(layout, /column-gap: 16px/);
     assert.match(styles, /\.raid-browser-body \{[^}]*grid-template-columns: minmax\(0,1fr\) min\(320px, 28vw\)/);
@@ -414,7 +456,7 @@ test('solid selected tab connects to the results background without a gradient o
     assert.ok(!styles.includes('mask-image: linear-gradient(to bottom, black 35%, transparent)'));
     assert.match(styles, /\.raid-browser-results-toolbar \{[^}]*margin-bottom: 0/);
     assert.match(styles, /\.raid-browser-results-shell \{[^}]*margin-top: var\(--raid-tab-gap\); padding: 10px/);
-    assert.match(styles, /\.raid-browser-filters \{[^}]*padding: 10px 0 10px 20px;/);
+    assert.match(styles, /\.raid-browser-filters \{[^}]*padding: 10px 4px 10px 20px;/);
     assert.match(styles, /height: calc\(var\(--raid-tab-height\) \+ var\(--raid-tab-gap\)\)/);
     assert.match(styles, /top: calc\(var\(--raid-tab-height\) \+ var\(--raid-tab-gap\) - 12px\)/);
     assert.match(styles, /\[data-raid-collection-tabs\] \{ --raid-tab-gap: 4px;[^}]*transform: translateY\(6px\)/);
@@ -737,6 +779,7 @@ test('preview raid reuses the confirmed action and closes both overlays only on 
     app.requests[0].respond({channels: [channel()], cursor: ''}); await flush();
     app.grid().children[0].querySelector('.raid-browser-thumbnail').handlers.click();
     const raid = app.previewControls['[data-raid-preview-raid]'];
+    app.previewControls['[data-raid-preview-main]'].getBoundingClientRect = () => ({left: 40, top: 60, width: 900, height: 700});
     app.confirm(false); raid.handlers.click();
     assert.equal(app.requests.length, 1);
     app.confirm(true); raid.handlers.click();
@@ -750,6 +793,7 @@ test('preview raid reuses the confirmed action and closes both overlays only on 
     assert.equal(app.previewDialog.open, false);
     assert.equal(app.dialog.open, false);
     assert.equal(app.events.filter(event => event.type === 'dashboard-raid-started').length, 1);
+    assert.equal(app.events.find(event => event.type === 'dashboard-raid-started').detail.sourceRect.width, 900);
 });
 
 test('thumbnail subtly expands on hover and focus without changing layout, respecting reduced motion', () => {
@@ -819,8 +863,8 @@ test('reset explicitly clears every filter and collection without deleting saved
     app.teamTab.handlers.click();
     app.input.value = 'streamer'; app.categorySearch.value = 'Retro'; app.tagSearch.value = 'x'.repeat(25);
     for (const name of ['category_id','tags','language','event','sort','tag_match']) app.fields[name].value = 'selected';
-    app.fields.following.checked = app.fields.mutual.checked = true;
-    app.fields.following.disabled = app.fields.mutual.disabled = true;
+    app.fields.follow_status.value = 'mutual';
+    app.fields.follow_status.disabled = true;
     let prevented = false;
     app.search.handlers.reset({preventDefault() { prevented = true; }});
     assert.equal(prevented, true);
@@ -829,8 +873,8 @@ test('reset explicitly clears every filter and collection without deleting saved
     assert.equal(app.fields.sort.value, 'for_you'); assert.equal(app.fields.tag_match.value, 'all');
     assert.equal(app.tagMatchToggle.querySelector('.queue-state-current').textContent, 'All');
     assert.equal(app.tagMatchToggle.attributes['aria-pressed'], 'true');
-    assert.equal(app.fields.following.checked, false); assert.equal(app.fields.mutual.checked, false);
-    assert.equal(app.fields.following.disabled, false); assert.equal(app.fields.mutual.disabled, false);
+    assert.equal(app.fields.follow_status.value, '');
+    assert.equal(app.fields.follow_status.disabled, false);
     assert.equal(app.browseTab.attributes['aria-pressed'], 'true');
     assert.equal(app.teamTab.attributes['aria-pressed'], 'false');
     assert.equal(app.tagLimit.hidden, true); assert.equal(app.selectedTags.children.length, 0);
@@ -1030,6 +1074,34 @@ test('lazy loading appends channels without duplicates or resetting scroll', asy
     assert.equal(app.results.scrollTop, previousScroll);
 });
 
+for (const mobile of [false, true]) test(`lazy loading restores the visible channel after expanding the scroll range (${mobile ? 'mobile' : 'desktop'})`, async () => {
+    const app = setup(new Map(), '1', '', mobile ? 390 : 1280); app.opener.handlers.click();
+    app.requests[0].respond({channels: Array.from({length: 20}, (_, index) => channel(String(index + 2))), cursor: 'next'});
+    await flush();
+    const spacer = app.results.children[0];
+    let position = 0;
+    // A real scroll container clamps writes to its current content height.
+    Object.defineProperty(app.results, 'scrollTop', {
+        get: () => position,
+        set: value => { position = Math.max(0, Math.min(value, parseFloat(spacer.style.height) - app.results.clientHeight)); },
+    });
+    const stride = parseFloat(app.grid().style.gridAutoRows) + 12;
+    const columns = mobile ? 1 : 2;
+    app.results.scrollTop = parseFloat(spacer.style.height) - app.results.clientHeight - 31;
+    const before = app.results.scrollTop;
+    const anchorIndex = Math.floor(before / stride) * columns;
+    app.results.handlers.scroll(); await flush();
+    const anchor = app.grid().children.find(card => Number(card.dataset.channelIndex) === anchorIndex).dataset.channelId;
+    // The user can keep scrolling while a request is in flight.
+    app.results.scrollTop = before + 7;
+    app.requests[1].respond({channels: Array.from({length: 20}, (_, index) => ({...channel(String(index + 100)), relevance: 1000})), cursor: ''});
+    await flush();
+    assert.equal(app.results.scrollTop, before + 7 + (20 / columns) * stride);
+    const sameChannel = app.grid().children.find(card => card.dataset.channelId === anchor);
+    assert.equal(Number(sameChannel.dataset.channelIndex), anchorIndex + 20);
+    assert.equal(app.results.scrollTop % stride, (before + 7) % stride);
+});
+
 test('closing aborts requests and late results cannot repopulate the popup', async () => {
     const app = setup(); app.opener.handlers.click();
     app.dialog.close();
@@ -1112,8 +1184,8 @@ test('a failed lazy load stops automatic retries and a filter update starts a fr
     assert.equal(app.grid().children.length, 1);
     app.results.handlers.scroll(); await flush();
     assert.equal(app.requests.length, 2);
-    app.fields.following.checked = true;
-    app.search.handlers.change({target: app.fields.following});
+    app.fields.follow_status.value = 'following';
+    app.search.handlers.change({target: app.fields.follow_status});
     assert.equal(app.requests[2].url.searchParams.get('after'), null);
 });
 
@@ -1133,16 +1205,59 @@ test('filters reset the window and are included in subsequent lazy-load requests
     assert.equal(app.requests[2].url.searchParams.get('after'), 'next');
 });
 
-test('mutual following implies following and disabling following clears mutual', () => {
+test('following dropdown defaults to Any and maps each choice to exclusive API filters', () => {
     const app = setup(); app.opener.handlers.click();
-    app.fields.mutual.checked = true;
-    app.search.handlers.change({target: app.fields.mutual});
-    assert.equal(app.fields.following.checked, true);
-    assert.equal(app.requests[1].url.searchParams.get('mutual'), 'true');
-    app.fields.following.checked = false;
-    app.search.handlers.change({target: app.fields.following});
-    assert.equal(app.fields.mutual.checked, false);
-    assert.equal(app.requests[2].url.searchParams.has('mutual'), false);
+    assert.equal(app.fields.follow_status.value, '');
+    for (const choice of ['', 'not_following', 'following', 'mutual', '']) {
+        app.fields.follow_status.value = choice;
+        app.search.handlers.change({target: app.fields.follow_status});
+        const params = app.requests.at(-1).url.searchParams;
+        assert.equal(params.has('not_following'), choice === 'not_following');
+        assert.equal(params.has('following'), choice === 'following' || choice === 'mutual');
+        assert.equal(params.has('mutual'), choice === 'mutual');
+        assert.equal(params.has('follow_status'), false);
+    }
+    const template = fs.readFileSync('web/templates/channel/dashboard.html', 'utf8');
+    assert.match(template, /Following<select name="follow_status" data-hover-current-value><option value="">Any<\/option>/);
+    assert.ok(!template.includes('raid-browser-follow-buttons'));
+});
+
+test('not following excludes incompatible filters and persists through pagination and reset', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.fields.follow_status.value = 'not_following';
+    app.search.handlers.change({target: app.fields.follow_status});
+    assert.equal(app.requests[1].url.searchParams.get('not_following'), 'true');
+    assert.equal(app.requests[1].url.searchParams.has('following'), false);
+    app.requests[1].respond({channels: [channel()], cursor: 'next'}); await flush();
+    assert.equal(app.requests[2].url.searchParams.get('not_following'), 'true');
+    assert.equal(app.requests[2].url.searchParams.get('after'), 'next');
+    app.search.handlers.reset({preventDefault() {}});
+    assert.equal(app.fields.follow_status.value, '');
+    assert.equal(app.requests.at(-1).url.searchParams.has('not_following'), false);
+});
+
+test('changing from not following to following or mutual replaces the previous filter', () => {
+    for (const name of ['following', 'mutual']) {
+        const app = setup(); app.opener.handlers.click();
+        app.fields.follow_status.value = 'not_following';
+        app.search.handlers.change({target: app.fields.follow_status});
+        app.fields.follow_status.value = name;
+        app.search.handlers.change({target: app.fields.follow_status});
+        assert.equal(app.requests[2].url.searchParams.has('not_following'), false);
+        assert.equal(app.requests[2].url.searchParams.get(name), 'true');
+    }
+});
+
+test('not following follows the existing favorites-tab filter behavior', async () => {
+    const app = setup(new Map([['ratsboombot:raid-favorites:1', '["2"]']]));
+    app.opener.handlers.click();
+    app.fields.follow_status.value = 'not_following';
+    app.favoritesTab.handlers.click();
+    assert.equal(app.fields.follow_status.disabled, true);
+    assert.equal(app.requests.at(-1).url.searchParams.has('not_following'), false);
+    app.browseTab.handlers.click();
+    assert.equal(app.fields.follow_status.disabled, false);
+    assert.equal(app.requests.at(-1).url.searchParams.get('not_following'), 'true');
 });
 
 test('pinning saves immediately but preserves order and scroll until refresh', async () => {
@@ -1231,6 +1346,11 @@ test('follow badges distinguish following from confirmed mutual following', asyn
     assert.equal(headings[0].children[1].attributes.role, 'img');
     assert.equal(tags[0].children.length, 0);
     assert.equal(tags[2].children.length, 0);
+    assert.deepEqual(app.grid().children.map(card => card.classes.has('is-following')), [true, true, false]);
+    assert.deepEqual(app.grid().children.map(card => card.classes.has('is-mutual')), [true, false, false]);
+    const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
+    assert.match(styles, /\.raid-browser-channel\.is-mutual \{ background: linear-gradient\(rgb\(236 72 153 \/ \.13\), rgb\(236 72 153 \/ \.13\)\), var\(--surface\); \}/);
+    assert.match(styles, /\.raid-browser-channel\.is-following \{ background: linear-gradient\(rgb\(236 72 153 \/ \.07\), rgb\(236 72 153 \/ \.07\)\), var\(--surface\); \}/);
 });
 
 test('thumbnails offer native responsive sources without scripted resolution switching', async () => {
@@ -1315,7 +1435,7 @@ test('tag searching only filters suggestions and prioritizes current channel tag
     assert.deepEqual(app.tagOptions.children.map(button => button.textContent), ['VTuber', 'Art', 'Party']);
     assert.equal(app.fields.tags.value, '');
     assert.equal(app.requests.length, 1);
-    assert.equal(app.timers.size, 0);
+    assert.ok([...app.timers.keys()].every(id => app.delays.get(id) === 4000), 'Tag searches must not schedule a results reload');
 });
 
 test('arrow keys navigate all tag suggestions and Enter selects the focused result', async () => {
@@ -1628,7 +1748,7 @@ for (const [tab, property] of [['favoritesTab', 'favorites_live'], ['teamTab', '
         app.requests[1].respond({channels: [], cursor: '', [property]: false}); await flush();
         assert.equal(app[tab].hidden, true);
         assert.equal(app.browseTab.attributes['aria-pressed'], 'true');
-        assert.equal(app.fields.following.disabled, false);
+        assert.equal(app.fields.follow_status.disabled, false);
         assert.equal(app.requests[2].url.searchParams.has('same_team'), false);
         assert.equal(app.requests[2].url.searchParams.has('favorites_only'), false);
     });

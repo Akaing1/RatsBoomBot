@@ -41,7 +41,8 @@ async def test_raid_records_even_when_raid_responses_are_disabled(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_outgoing_confirmation_updates_only_matching_pending_raid(monkeypatch):
+@pytest.mark.parametrize("count, expected", [(0, 0), (1, 1), (5, 5), (None, None), (-1, None), (True, None), ("5", None)])
+async def test_outgoing_confirmation_updates_only_matching_pending_raid(monkeypatch, count, expected):
     record = AsyncMock()
     monkeypatch.setattr("bot.shared.events.raids.record_incoming_raid", record)
     raid = {"target_id": "2", "expires_at": 10**12}
@@ -49,10 +50,12 @@ async def test_outgoing_confirmation_updates_only_matching_pending_raid(monkeypa
         broadcasters=SimpleNamespace(get_broadcasters=lambda: {"1": object()})))
     events = RaidEvents(bot)
     payload = SimpleNamespace(from_broadcaster=SimpleNamespace(id="1", name="sender"),
-                              to_broadcaster=SimpleNamespace(id="3", name="other"), viewer_count=5)
+                              to_broadcaster=SimpleNamespace(id="3", name="other"), viewer_count=count)
     await events.handle_raid(payload)
     assert "completed" not in raid
+    assert "viewer_count" not in raid
     payload.to_broadcaster.id = "2"
     await events.handle_raid(payload)
     assert raid["completed"] is True
+    assert raid["viewer_count"] == expected
     record.assert_not_awaited()

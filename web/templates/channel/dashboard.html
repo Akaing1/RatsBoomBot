@@ -195,9 +195,14 @@
 
         <div class="dashboard-pending-raid" data-pending-raid data-pending-url="/channel/api/raid-browser/pending" data-action-url="/channel/api/raid-browser/action" data-csrf-token="{{ csrf_token }}" hidden role="status" aria-live="polite" tabindex="-1">
             <img class="dashboard-pending-raid-avatar" data-pending-raid-avatar alt="" width="32" height="32" hidden>
-            <div class="dashboard-pending-raid-info"><a data-pending-raid-channel target="_blank" rel="noopener noreferrer"></a><span data-pending-raid-text></span></div>
+            <div class="dashboard-pending-raid-info"><a data-pending-raid-channel target="_blank" rel="noopener noreferrer"></a><span data-pending-raid-description></span><span data-pending-raid-text></span></div>
             <label class="dashboard-follow-raid"><input type="checkbox" data-pending-raid-follow {% if channel_settings.follow_raid | default(true) %}checked{% endif %}> Follow raid</label>
             <button type="button" data-pending-raid-cancel>Cancel raid</button>
+            <div class="dashboard-raid-countdown" data-pending-raid-countdown role="timer" aria-live="off">
+                <svg viewBox="0 0 40 40" aria-hidden="true"><circle class="dashboard-raid-countdown-track" cx="20" cy="20" r="17"/><circle class="dashboard-raid-countdown-ring" data-pending-raid-ring cx="20" cy="20" r="17" pathLength="1"/></svg>
+                <span data-pending-raid-seconds></span>
+            </div>
+            <div class="dashboard-raid-progress" data-pending-raid-progress aria-hidden="true"></div>
         </div>
         <div
                 class="live-chat-feed dashboard-chat-feed"
@@ -1031,10 +1036,7 @@
                     <option value="uptime_asc">Uptime (low to high)</option>
                     <option value="uptime_desc">Uptime (high to low)</option>
                 </select></label>
-                <div class="raid-browser-follow-buttons">
-                    <label><input type="checkbox" name="following"><span>Following</span></label>
-                    <label><input type="checkbox" name="mutual"><span>Mutual following</span></label>
-                </div>
+                <label>Following<select name="follow_status" data-hover-current-value><option value="">Any</option><option value="not_following">Not following</option><option value="following">Following</option><option value="mutual">Mutual following</option></select></label>
                 <label>Category<input type="search" data-raid-category-search placeholder="Search categories..." autocomplete="off" maxlength="100" aria-controls="raid-browser-category-options" aria-expanded="false"></label>
                 <input type="hidden" name="category_id" value="">
                 <div id="raid-browser-category-options" class="raid-browser-tag-dropdown raid-browser-category-options" popover="manual" role="group" aria-label="Category suggestions" hidden></div>
@@ -1049,13 +1051,12 @@
                 <input type="hidden" name="tags" value="">
                 <div class="raid-browser-tag-options" data-raid-selected-tags role="group" aria-label="Selected tags"></div>
                 <div id="raid-browser-tag-options" class="raid-browser-tag-dropdown" popover="manual" role="group" aria-label="Available stream tags" hidden></div>
+                <div class="raid-browser-feedback">
+                    <p class="raid-browser-status" data-raid-browser-status role="status" aria-live="polite"></p>
+                </div>
                 </div>
                 <div class="raid-browser-filter-submit"><button class="button primary" type="submit">Submit</button><button class="button raid-browser-reset" type="reset">Reset</button></div>
             </form>
-        </div>
-        <div class="raid-browser-footer">
-            <p class="raid-browser-status" data-raid-browser-status role="status" aria-live="polite"></p>
-            <p>Starting a raid queues Twitch’s countdown. Use Twitch chat for Raid Now.</p>
         </div>
     </dialog>
     <dialog id="dashboard-raid-preview" class="raid-preview-dialog" data-raid-preview data-details-url="/channel/api/raid-browser/preview" aria-labelledby="raid-preview-title">

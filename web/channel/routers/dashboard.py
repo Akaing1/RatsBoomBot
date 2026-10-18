@@ -618,6 +618,12 @@ async def channel_viewer_queue_action(
     })
 
 
+def raid_viewer_count(runtime_bot, broadcaster_id):
+    broadcaster = runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+    count = getattr(broadcaster, "viewer_count", None)
+    return count if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else None
+
+
 @router.get("/channel/api/raid-browser/pending", response_class=JSONResponse)
 async def channel_pending_raid(request: Request):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
@@ -629,6 +635,8 @@ async def channel_pending_raid(request: Request):
     if str(broadcaster_id) not in runtime_bot.services.broadcasters.get_broadcasters():
         return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
     raid = getattr(runtime_bot, "_dashboard_pending_raids", {}).get(str(broadcaster_id))
+    if raid and not raid.get("completed"):
+        raid["viewer_count"] = raid_viewer_count(runtime_bot, broadcaster_id)
     return JSONResponse({"raid": raid})
 
 
@@ -678,7 +686,8 @@ async def channel_raid_action(request: Request, action: str = Form(...),
             raid = {"target_id": target_id, "login": login,
                     "display_name": str(getattr(target, "display_name", None) or login),
                     "profile_image_url": str(getattr(getattr(target, "profile_image", None), "url", "") or getattr(target, "profile_image_url", "") or ""),
-                    "created_at": created.isoformat(), "expires_at": created.timestamp() + 90}
+                    "created_at": created.isoformat(), "expires_at": created.timestamp() + 90,
+                    "viewer_count": raid_viewer_count(runtime_bot, broadcaster_id)}
             runtime_bot._dashboard_pending_raids[broadcaster_id] = raid
             return JSONResponse({"raid": raid})
         except Exception as error:
@@ -727,7 +736,7 @@ async def channel_raid_preview(request: Request, target_id: str = ""):
 @router.get("/channel/api/raid-browser", response_class=JSONResponse)
 async def channel_raid_browser(
     request: Request, query: str = "", after: str = "", same_category: bool = False,
-    same_tags: bool = False, tags: str = "", tag_match: str = "all", language: str = "", following: bool = False,
+    same_tags: bool = False, tags: str = "", tag_match: str = "all", language: str = "", following: bool = False, not_following: bool = False,
     mutual: bool = False, recommended: bool = False, same_team: bool = False, favorites: str = "",
     favorites_only: bool = False, blocked: str = "", category_id: str = "", suggested: bool = False, sort: str = "", event: str = "", developer_only: bool = False,
 ):
@@ -766,7 +775,10 @@ async def channel_raid_browser(
     if sort == "for_you":
         recommended = True
     if favorites_only:
-        recommended = following = mutual = suggested = False
+        recommended = sort == "for_you"
+        following = not_following = mutual = suggested = False
+    if not_following and (following or mutual):
+        return JSONResponse({"detail": "Select either Following or Not following."}, status_code=400)
     params = {"first": 20}
     if after:
         params["after"] = after
@@ -799,14 +811,21 @@ async def channel_raid_browser(
             broadcaster = runtime_bot.services.broadcasters.get_broadcasters()[broadcaster_id]
             shelf, suggested_status = await get_suggested_streamers(runtime_bot, broadcaster_id, getattr(broadcaster, "login", None))
             suggested_ids = {channel["id"] for channel in shelf}
-            if (suggested or not after) and suggested_ids:
+            if (suggested or not after) and suggested_ids and not favorites_only:
                 ids = sorted(suggested_ids)
                 for offset in range(0, len(ids), 100):
                     live = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": ids[offset:offset + 100], "first": 100})
                     suggested_streams.extend(live.get("data", []))
         team_streams, team_members = await raid_browser_team_streams(runtime_bot, broadcaster_id) if recommended or same_team else ([], {})
-        if recommended and not (following or mutual):
-            followed_streams = await raid_browser_followed_streams(runtime_bot, broadcaster_id)
+        if (recommended or not_following) and not (following or mutual):
+            try:
+                followed_streams = await raid_browser_followed_streams(runtime_bot, broadcaster_id)
+            except HTTPException as error:
+                # Favorites remain usable without follow scopes; compatibility
+                # scores still apply even when following bonuses are unknown.
+                if not favorites_only or error.status not in {401, 403}:
+                    raise
+                LOGGER.warning("[Dashboard] Following bonuses unavailable for favorites in %s.", broadcaster_id)
         recent_raiders = {}
         if recommended:
             try:
@@ -940,12 +959,14 @@ async def channel_raid_browser(
         if following or mutual:
             followed_ids.update(str(stream.get("user_id", "")) for stream in streams.get("data", []))
         favorite_streams = []
-        if favorite_ids and not after and (recommended or sort not in {"viewers_asc", "uptime_asc"}):
+        if favorite_ids and not after and not favorites_only and (recommended or sort not in {"viewers_asc", "uptime_asc"}):
             favorite_page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100})
             favorite_streams = favorite_page.get("data", [])
         candidates = [*dev_streams, *favorite_streams, *recent_raid_streams, *(followed_streams if not after else []),
                       *(suggested_streams if recommended and not after else []),
                       *(team_streams if recommended and not after and not (following or mutual) else []), *streams.get("data", [])]
+        if favorites_only:
+            candidates = streams.get("data", [])
         channels = []
         emitted = set()
         for stream in candidates:
@@ -962,6 +983,8 @@ async def channel_raid_browser(
             if event == "drops_enabled" and "dropsenabled" not in stream_tags:
                 continue
             if (following or mutual) and user_id not in followed_ids:
+                continue
+            if not_following and user_id in followed_ids:
                 continue
             if suggested and user_id not in suggested_ids:
                 continue
@@ -1024,7 +1047,7 @@ async def channel_raid_browser(
                 "thumbnail_url_large": str(stream.get("thumbnail_url") or "").replace("{width}", "1280").replace("{height}", "720"),
             })
         relationships = await raid_browser_relationships(runtime_bot, broadcaster_id, channels,
-            followed_ids if recommended or following or mutual else None)
+            followed_ids if recommended or following or mutual or not_following else None)
         sizes = await raid_browser_channel_sizes(runtime_bot, broadcaster_id, [channel["id"] for channel in channels]) if sort == "for_you" and channels else {}
         own_viewers = getattr(runtime_bot.services.broadcasters.get_broadcasters()[broadcaster_id], "viewer_count", None)
         for channel in channels:
@@ -1075,7 +1098,7 @@ async def channel_raid_browser(
                              **({"channel_tags": channel_tags} if channel_tags is not None else {})})
     except HTTPException as error:
         detail = ("Reconnect Twitch to enable following and mutual-following filters."
-                  if error.status in (401, 403) and (following or mutual or recommended) else
+                  if error.status in (401, 403) and (following or not_following or mutual or recommended) else
                   "Reconnect Twitch to browse live channels." if error.status == 401 else
                   "Twitch could not load live channels. Try again shortly.")
         return JSONResponse({"detail": detail}, status_code=error.status if error.status in (401, 403, 429) else 502)

@@ -96,3 +96,35 @@ async def test_cancel_failure_retains_pending_status(runtime):
     response = await dashboard.channel_raid_action(request(), action="cancel", csrf_token="valid")
     assert response.status_code == 502
     assert bot._dashboard_pending_raids["1"]["target_id"] == "2"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream_count", [0, 42, None])
+async def test_raid_count_refreshes_stream_viewers_then_uses_confirmation(runtime, stream_count):
+    from bot.shared.events.raids import RaidEvents
+
+    bot, broadcaster = runtime
+    own = SimpleNamespace(id="1", viewer_count=stream_count)
+    bot.services.broadcasters.get_broadcasters = lambda: {"1": own}
+    response = await dashboard.channel_raid_action(request(), action="start", target_id="2", csrf_token="valid")
+    assert json.loads(response.body)["raid"]["viewer_count"] == stream_count
+    own.viewer_count = 51
+    response = await dashboard.channel_pending_raid(request())
+    assert json.loads(response.body)["raid"]["viewer_count"] == 51
+    await RaidEvents(bot).handle_raid(SimpleNamespace(
+        from_broadcaster=SimpleNamespace(id="1", name="sender"),
+        to_broadcaster=SimpleNamespace(id="2", name="target"), viewer_count=5))
+    own.viewer_count = 999
+    response = await dashboard.channel_pending_raid(request())
+    raid = json.loads(response.body)["raid"]
+    assert raid["completed"] is True
+    assert raid["viewer_count"] == 5
+    broadcaster.start_raid.assert_awaited_once()
+    bot.fetch_user.assert_awaited_once()
+
+
+@pytest.mark.parametrize("count, expected", [(0, 0), (1, 1), (42, 42), (None, None), (-1, None), (True, None), ("42", None)])
+def test_raid_viewer_count_does_not_guess_unknown_counts(runtime, count, expected):
+    bot, _ = runtime
+    bot.services.broadcasters.get_broadcasters = lambda: {"1": SimpleNamespace(id="1", viewer_count=count)}
+    assert dashboard.raid_viewer_count(bot, "1") == expected

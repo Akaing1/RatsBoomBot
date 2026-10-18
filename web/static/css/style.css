@@ -341,8 +341,7 @@ html.raid-browser-open { overflow: hidden; }
 .raid-browser-dialog .raid-browser-heading-group { align-items: center; }
 .raid-browser-dialog .raid-browser-heading-group h3 { align-self: center; margin-inline: clamp(0px, calc((100cqi - 560px) / 20), 8px); }
 .raid-browser-dialog > .raid-browser-header > :is(.raid-browser-reset, .raid-browser-manage-lists, .raid-browser-close) { align-self: center; }
-.raid-browser-dialog > .raid-browser-footer { margin-top: 12px; }
-.raid-browser-tab-scroll { min-width: min(72px, 40%); flex: 0 1 auto; padding-bottom: 10px; margin-bottom: -10px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; }
+.raid-browser-tab-scroll { min-width: min(72px, 40%); flex: 1 1 auto; padding-inline: 12px; margin-inline: -12px; padding-bottom: 10px; margin-bottom: -10px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; }
 .raid-browser-tab-scroll::-webkit-scrollbar { display: none; }
 .raid-browser-collection-select { display: none; }
 .raid-browser-heading-group .raid-browser-tabs { min-width: max-content; width: max-content; flex: 0 0 auto; flex-wrap: nowrap; padding: 0; }
@@ -378,7 +377,7 @@ html.raid-browser-open { overflow: hidden; }
 .raid-browser-manage-lists:hover { background: rgba(139,92,246,.2); }
 .raid-browser-body { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(0,1fr) min(320px, 28vw); gap: 16px; }
 @media (min-width: 751px) {
-    .raid-browser-dialog[open] { display: grid; grid-template-columns: minmax(0,1fr) min(320px, 28vw); grid-template-rows: max-content minmax(0,1fr) max-content; column-gap: 16px; }
+    .raid-browser-dialog[open] { display: grid; grid-template-columns: minmax(0,1fr) min(320px, 28vw); grid-template-rows: max-content minmax(0,1fr); column-gap: 16px; }
     .raid-browser-dialog > .raid-browser-header { grid-column: 2; grid-row: 1; align-self: start; margin-bottom: 0; }
     .raid-browser-dialog > .raid-browser-body { display: contents; }
     .raid-browser-dialog .raid-browser-collection { display: contents; }
@@ -387,9 +386,8 @@ html.raid-browser-open { overflow: hidden; }
     .raid-browser-dialog .raid-browser-results-toolbar .raid-browser-tabs { align-self: stretch; align-items: stretch; }
     .raid-browser-dialog .raid-browser-results-shell { grid-column: 1; grid-row: 2; }
     .raid-browser-dialog .raid-browser-filters { grid-column: 2; grid-row: 2; margin-top: 10px; }
-    .raid-browser-dialog > .raid-browser-footer { grid-column: 1 / -1; grid-row: 3; }
 }
-.raid-browser-filters { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 16px; padding: 10px 0 10px 20px; border-left: 1px solid var(--border); overflow-y: auto; font-size: 14px; }
+.raid-browser-filters { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 16px; padding: 10px 4px 10px 20px; border-left: 1px solid var(--border); overflow-y: auto; font-size: 14px; }
 .raid-browser-filter-fields { display: contents; }
 .raid-browser-mobile-filter-button, .raid-browser-filter-submit { display: none; }
 .raid-browser-search-heading { flex: 1; min-width: 0; align-self: center; margin-right: auto; padding-left: 21px; font-size: 18px; font-weight: 700; text-align: left; white-space: nowrap; }
@@ -426,23 +424,15 @@ html.raid-browser-open { overflow: hidden; }
 .raid-browser-tag-dropdown[hidden] { display: none; }
 .raid-browser-tag-dropdown button { display: block; width: 100%; padding: 7px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--text); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
 .raid-browser-tag-dropdown button:is(:hover,:focus-visible) { background: rgba(139,92,246,.18); }
-.raid-browser-follow-buttons { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
-.raid-browser-follow-buttons label { position: relative; display: block; }
-.raid-browser-follow-buttons input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.raid-browser-follow-buttons span { display: block; padding: 8px 5px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-raised); text-align: center; font-size: 12px; cursor: pointer; }
-.raid-browser-follow-buttons label:has(input:checked) span { border-color: var(--accent); background: rgba(139,92,246,.18); }
-.raid-browser-follow-buttons label:has(input:focus-visible) span { outline: 2px solid var(--accent); outline-offset: 2px; }
-.raid-browser-follow-buttons label:has(input:disabled) span { opacity: .5; cursor: default; }
 .raid-browser-category-options button { display: flex; align-items: center; gap: 8px; }
 .raid-browser-category-options img { width: 24px; height: 32px; flex: 0 0 24px; object-fit: cover; border-radius: 3px; }
 @media (max-width: 750px) {
     .raid-browser-search-heading { display: none; }
-    .raid-browser-dialog[open] { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: max-content minmax(0,1fr) max-content; gap: 0 8px; }
+    .raid-browser-dialog[open] { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: max-content minmax(0,1fr); gap: 0 8px; }
     .raid-browser-dialog > .raid-browser-header { grid-column: 2; grid-row: 1; flex-wrap: nowrap; align-items: center; align-self: center; gap: 4px; margin: 0; }
     .raid-browser-dialog > .raid-browser-body, .raid-browser-dialog .raid-browser-collection { display: contents; }
     .raid-browser-dialog .raid-browser-results-toolbar { grid-column: 1; grid-row: 1; }
     .raid-browser-dialog .raid-browser-results-shell { grid-column: 1 / -1; grid-row: 2; }
-    .raid-browser-dialog > .raid-browser-footer { grid-column: 1 / -1; grid-row: 3; }
     .raid-browser-dialog .raid-browser-heading-group { gap: 12px; }
     .raid-browser-dialog .raid-browser-heading-group h3 { margin-inline: 0; }
     .raid-browser-tab-scroll, .raid-browser-results-toolbar .raid-browser-result-controls { display: none; }
@@ -455,7 +445,7 @@ html.raid-browser-open { overflow: hidden; }
     .raid-browser-mobile-filter-button[aria-expanded="true"] { border-color: var(--accent); background: rgba(139,92,246,.18); }
     .raid-browser-filters { display: none; position: absolute; z-index: 30; top: var(--raid-filter-top, 64px); right: 16px; left: 16px; max-height: calc(100% - var(--raid-filter-top, 64px) - 16px); box-sizing: border-box; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 28px rgba(0,0,0,.45); overflow: hidden; }
     .raid-browser-dialog.is-filters-open .raid-browser-filters { display: flex; }
-    .raid-browser-filter-fields { display: flex; min-height: 0; flex-direction: column; gap: 16px; overflow-y: auto; overscroll-behavior: contain; }
+    .raid-browser-filter-fields { display: flex; min-height: 0; flex-direction: column; gap: 16px; padding: 4px; margin: -4px; overflow-y: auto; overscroll-behavior: contain; }
     .raid-browser-filter-submit { display: flex; flex: 0 0 auto; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); background: var(--surface); }
     .raid-browser-filter-submit button { flex: 1; border-radius: 999px; }
 }
@@ -467,15 +457,19 @@ html.raid-browser-open { overflow: hidden; }
     .raid-browser-dialog[open] { column-gap: 4px; }
     .raid-browser-dialog > .raid-browser-header > button { width: 32px; height: 32px; min-height: 32px; flex-basis: 32px; }
 }
-.raid-browser-footer .raid-browser-status { position: absolute; z-index: 5; right: 0; bottom: 0; left: 0; max-height: min(160px, 25dvh); margin: 0; padding: 6px 8px; border-radius: 6px; background: var(--surface); color: var(--muted); font-size: 12px; overflow-y: auto; }
-.raid-browser-footer .raid-browser-status.error { color: var(--danger); }
+.raid-browser-feedback { display: flex; flex: 0 0 auto; flex-direction: column; gap: 8px; margin-top: auto; }
+.raid-browser-status { max-height: min(160px, 25dvh); margin: 0; color: var(--muted); font-size: 12px; overflow-y: auto; overflow-wrap: anywhere; transition: opacity .35s ease; }
+.raid-browser-status.is-fading { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .raid-browser-status { transition: none; } }
+.raid-browser-status.error { color: var(--danger); }
 .raid-browser-status:empty { display: none; }
-.raid-browser-footer:has(.raid-browser-status:not(:empty)) > p:not(.raid-browser-status) { visibility: hidden; }
 .raid-browser-results { --overlay-scrollbar-outset: 12px; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; }
 .raid-browser-spacer { position: relative; width: 100%; }
 .raid-browser-window { position: absolute; right: 0; left: 0; display: grid; gap: 12px; }
 .raid-browser-channel { position: relative; display: flex; min-width: 0; flex-direction: column; gap: 7px; padding: 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
-.raid-browser-channel.is-favorite { border-color: #facc15; }
+.raid-browser-channel.is-favorite { border-color: rgb(250 204 21 / .5); }
+.raid-browser-channel.is-following { background: linear-gradient(rgb(236 72 153 / .07), rgb(236 72 153 / .07)), var(--surface); }
+.raid-browser-channel.is-mutual { background: linear-gradient(rgb(236 72 153 / .13), rgb(236 72 153 / .13)), var(--surface); }
 .raid-browser-match-debug { display: none; position: absolute; z-index: 8; top: 8px; left: 8px; max-width: calc(100% - 16px); max-height: calc(100% - 48px); margin: 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; background: var(--background); color: var(--text); font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow: auto; }
 .raid-browser-dialog.show-match-values .raid-browser-match-debug { display: block; }
 .raid-browser-pin { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; margin-left: auto; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
@@ -497,9 +491,9 @@ html.raid-browser-open { overflow: hidden; }
 .raid-browser-pin:is(:hover, :focus-visible), .raid-browser-pin[aria-pressed="true"] { color: #facc15; }
 @media (hover: hover) {
     .raid-browser-pin { opacity: 0; pointer-events: none; transition: opacity .15s ease; }
-    .raid-browser-channel:is(:hover, :focus-within, .is-favorite) .raid-browser-pin { opacity: 1; pointer-events: auto; }
+    .raid-browser-channel:is(:hover, :has(:focus-visible), .is-favorite) .raid-browser-pin { opacity: 1; pointer-events: auto; }
     .raid-browser-dialog:not(.is-list-view) .raid-browser-more { opacity: 0; pointer-events: none; transition: opacity .15s ease; }
-    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :focus-within) .raid-browser-more,
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) .raid-browser-more,
     .raid-browser-dialog:not(.is-list-view) .raid-browser-more[aria-expanded="true"] { opacity: 1; pointer-events: auto; }
 }
 .raid-browser-thumbnail { position: relative; display: block; width: 100%; flex: 0 0 auto; padding: 0; border: 0; aspect-ratio: 16 / 9; border-radius: 6px; background: var(--background); color: var(--text); font: inherit; text-align: left; cursor: pointer; overflow: visible; }
@@ -638,21 +632,28 @@ html.raid-browser-open { overflow: hidden; }
 .raid-browser-start-raid:not(:disabled):is(:hover,:focus-visible) { background: var(--accent-hover); color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.35); }
 .raid-browser-start-raid:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .raid-browser-start-raid:not(:disabled):active { background: var(--accent-hover); box-shadow: inset 0 1px 3px rgba(0,0,0,.25); }
-.dashboard-pending-raid { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 9px 11px; margin-bottom: 8px; border: 1px solid var(--accent); border-radius: 8px; background: rgba(139,92,246,.16); font-size: 12px; }
+.dashboard-pending-raid { position: relative; display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 9px 11px 12px; margin-bottom: 8px; border: 1px solid var(--accent); border-radius: 8px; background: rgba(139,92,246,.16); font-size: 12px; overflow: hidden; }
+.dashboard-raid-progress { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; background: var(--accent); transform-origin: left center; pointer-events: none; }
+.dashboard-raid-countdown { position: relative; display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dashboard-raid-countdown svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); fill: none; stroke-width: 2.5; }
+.dashboard-raid-countdown-track { stroke: var(--border); }
+.dashboard-raid-countdown-ring { stroke: var(--accent); stroke-dasharray: 1; stroke-dashoffset: 0; stroke-linecap: round; }
+.dashboard-raid-countdown[hidden], .dashboard-raid-progress[hidden] { display: none; }
 .dashboard-pending-raid[hidden] { display: none; }
 .dashboard-pending-raid-info { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
 .dashboard-pending-raid-avatar { display: block; width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%; object-fit: cover; }
 .dashboard-pending-raid-avatar[hidden] { display: none; }
 .dashboard-follow-raid { display: flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; }
+.dashboard-pending-raid button { flex: 0 0 auto; padding: 4px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); color: var(--text); font: inherit; cursor: pointer; }
 .dashboard-follow-raid input { margin: 0; width: 15px; height: 15px; accent-color: var(--accent); }
 .raid-browser-avatar-flyer { position: fixed; z-index: 2001; pointer-events: none; border-radius: 50%; object-fit: cover; transform-origin: top left; }
 .dashboard-pending-raid-info a { color: #c7b7ff; font-weight: 700; overflow-wrap: anywhere; }
 .dashboard-pending-raid-info span { color: var(--muted); }
-.dashboard-pending-raid button { flex: 0 0 auto; padding: 4px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); color: var(--text); font: inherit; cursor: pointer; }
+.dashboard-pending-raid-info span:empty { display: none; }
 .dashboard-pending-raid.is-error { border-color: var(--danger); }
-.dashboard-pending-raid.is-arriving { animation: raid-banner-arrival .5s ease both; }
+.dashboard-pending-raid.is-arriving { animation: raid-banner-arrival .65s ease both; }
 .raid-browser-flyer { position: fixed !important; z-index: 2000; margin: 0; transform-origin: top left; overflow: hidden; pointer-events: none; }
-@keyframes raid-banner-arrival { from { opacity: .25; } to { opacity: 1; } }
+@keyframes raid-banner-arrival { 0%, 75% { opacity: 0; } 100% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .dashboard-pending-raid.is-arriving { animation: none; } }
 .raid-browser-dialog:not(.is-list-view) .raid-browser-pin, .raid-browser-dialog:not(.is-list-view) .raid-browser-more { position: absolute; top: 15px; background: rgba(0,0,0,.8); color: #fff; }
 .raid-browser-dialog:not(.is-list-view) .raid-browser-pin { right: 41px; }
@@ -662,7 +663,7 @@ html.raid-browser-open { overflow: hidden; }
 .raid-browser-dialog .raid-browser-pin:is(:hover,:focus-visible) { color: #facc15; background: rgba(139,92,246,.25); }
 @media (hover: hover) {
     .raid-browser-dialog.is-list-view .raid-browser-pin { min-width: 0; overflow: hidden; transition: color .15s ease, opacity .15s ease, width .18s ease, flex-basis .18s ease, margin-left .18s ease; }
-    .raid-browser-dialog.is-list-view .raid-browser-channel:not(:hover):not(:focus-within):not(:active):not(.is-favorite) .raid-browser-pin:not([aria-pressed="true"]) { width: 0; flex-basis: 0; margin-left: -6px; }
+    .raid-browser-dialog.is-list-view .raid-browser-channel:not(:hover):not(:has(:focus-visible)):not(:active):not(.is-favorite) .raid-browser-pin:not([aria-pressed="true"]) { width: 0; flex-basis: 0; margin-left: -6px; }
 }
 @media (prefers-reduced-motion: reduce) {
     .raid-browser-dialog.is-list-view .raid-browser-pin { transition: none; }
@@ -763,11 +764,11 @@ html.raid-browser-open { overflow: hidden; }
     .raid-browser-dialog:not(.is-list-view) .raid-browser-stream-title { min-height: var(--raid-title-height); -webkit-line-clamp: unset; }
     .raid-browser-dialog:not(.is-list-view) .raid-browser-tags { min-height: var(--raid-tags-height); flex-wrap: wrap; }
     .raid-browser-dialog:not(.is-list-view) .raid-browser-tags span { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :focus-within) { z-index: 4; align-self: start; min-height: var(--raid-browser-row-height); height: max-content; box-shadow: 0 8px 20px rgba(0,0,0,.4); }
-    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :focus-within) .raid-browser-stream-title { height: auto; }
-    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :focus-within) .raid-browser-tags { height: auto; }
-    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :focus-within) .raid-browser-tags span { visibility: visible; }
-    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :focus-within) :is(.raid-browser-stream-title, .raid-browser-tags)::after { opacity: 0; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) { z-index: 4; align-self: start; min-height: var(--raid-browser-row-height); height: max-content; box-shadow: 0 8px 20px rgba(0,0,0,.4); }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) .raid-browser-stream-title { height: auto; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) .raid-browser-tags { height: auto; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) .raid-browser-tags span { visibility: visible; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) :is(.raid-browser-stream-title, .raid-browser-tags)::after { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
     .raid-browser-dialog:not(.is-list-view) .raid-browser-channel { transition: none; }
@@ -779,8 +780,6 @@ html.raid-browser-open { overflow: hidden; }
     .raid-browser-dialog.is-list-view .raid-browser-channel, .raid-browser-dialog[data-result-size].is-list-view .raid-browser-channel { gap: 4px 8px; }
     .raid-browser-dialog.is-list-view .raid-browser-thumbnail { grid-row: 1 / span 4; }
 }
-.raid-browser-footer { position: relative; display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.raid-browser-footer p { margin: 0; color: var(--muted); font-size: 12px; }
 .dashboard-video-card { position: relative; display: flex; grid-area: player; min-width: 0; align-self: start; flex-direction: column; }
 .dashboard-video-card > .panel-header { margin-bottom: 10px; }
 .dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }
@@ -1093,7 +1092,7 @@ html.raid-browser-open { overflow: hidden; }
 .chat-rich-input { display: block; box-sizing: border-box; width: 100%; min-width: 0; min-height: calc(1.4em + 22px); max-height: min(40dvh, 300px); overflow-y: auto; padding: 10px 50px 10px 12px; border: 1px solid var(--border); border-radius: 9px; outline: 0; background: var(--background); color: var(--text); font: inherit; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; text-indent: var(--chat-target-indent, 0px); }
 .dashboard-chat-composer textarea[data-emote-source][hidden] { display: none; }
 .chat-rich-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,92,246,.14); }
-.chat-rich-input:empty::before { color: var(--muted); content: attr(aria-placeholder); pointer-events: none; }
+.chat-rich-input:empty::before { color: var(--muted); content: attr(aria-placeholder); padding-inline-start: .25em; pointer-events: none; }
 .chat-input-emote { display: inline-block; height: 1.4em; width: auto; max-width: 5em; object-fit: contain; vertical-align: middle; user-select: all; text-indent: 0; }
 .dashboard-chat-compose-row .chat-rich-input { flex: 1; width: 0; margin: 0; border: 0; border-radius: 0; background: transparent; }
 .dashboard-chat-compose-row .chat-rich-input:focus { box-shadow: none; }
@@ -2528,11 +2527,13 @@ html.has-overlay-scrollbars, .has-overlay-scrollbars body, .has-overlay-scrollba
 .overlay-scrollbars { display: contents; }
 .overlay-scrollbar { position: fixed; z-index: 1500; opacity: 0; pointer-events: none; background: transparent; touch-action: none; transition: opacity .15s ease; }
 .overlay-scrollbar[hidden] { display: none; }
-.overlay-scrollbar.axis-y { width: 7px; }
-.overlay-scrollbar.axis-x { height: 7px; }
+.overlay-scrollbar.axis-y { width: 19px; transform: translateX(-6px); }
+.overlay-scrollbar.axis-x { height: 19px; transform: translateY(-6px); }
 .overlay-scrollbar.is-visible { opacity: 1; pointer-events: auto; }
 .overlay-scrollbar-thumb { position: absolute; inset: 0 auto auto 0; width: 100%; height: 100%; border-radius: 999px; background: rgba(139,92,246,.65); }
-.overlay-scrollbar-thumb:hover { background: var(--accent); }
+.overlay-scrollbar.axis-y .overlay-scrollbar-thumb { left: 6px; width: 7px; }
+.overlay-scrollbar.axis-x .overlay-scrollbar-thumb { top: 6px; height: 7px; }
+.overlay-scrollbar:hover .overlay-scrollbar-thumb { background: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .overlay-scrollbar { transition: none; } }
 
 .command-help-summary-grid {
