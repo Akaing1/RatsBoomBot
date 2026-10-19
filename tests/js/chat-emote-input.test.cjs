@@ -33,6 +33,26 @@ test('rich emote input in an isolated browser', {skip: !chromium || !fs.existsSy
         return page;
     }
     try {
+        await t.test('narrow composer keeps its placeholder on one line but still wraps typed messages', async () => {
+            const page = await fixture();
+            await page.evaluate(() => {
+                document.querySelector('form').style.width = '290px';
+                document.querySelector('.chat-message-entry').style.setProperty('--chat-target-indent', '80px');
+            });
+            const empty = await page.locator('.chat-rich-input').evaluate(node => {
+                const style = getComputedStyle(node), placeholder = getComputedStyle(node, '::before');
+                return {height: node.getBoundingClientRect().height, line: parseFloat(style.lineHeight),
+                    placeholderHeight: parseFloat(placeholder.height), nowrap: placeholder.whiteSpace,
+                    overflow: node.scrollWidth - node.clientWidth};
+            });
+            assert.equal(empty.nowrap, 'nowrap');
+            assert.ok(empty.placeholderHeight <= empty.line + 1);
+            assert.ok(empty.height <= empty.line + 22);
+            assert.ok(empty.overflow <= 1);
+            await page.keyboard.type('A longer chat message should still wrap onto the next line normally.');
+            assert.ok(await page.locator('.chat-rich-input').evaluate(node => node.getBoundingClientRect().height) > empty.height);
+            await page.close();
+        });
         await t.test('typed emotes display inline and Backspace/Delete remove whole codes', async () => {
             const page = await fixture();
             await page.keyboard.type('hello Kappa ');

@@ -965,6 +965,39 @@ async def test_same_team_loads_live_members_of_all_teams_and_deduplicates(monkey
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("selected, expected", [("", ["2", "3", "4"]), ("Team One", ["2", "4"]), ("Team Two", ["3", "4"]), ("Unknown", [])])
+async def test_specific_team_filter_preserves_all_dropdown_options(monkeypatch, selected, expected):
+    runtime(monkeypatch, [])
+    monkeypatch.setattr(dashboard, "raid_browser_team_streams", AsyncMock(return_value=(
+        [stream("2"), stream("3"), stream("4")],
+        {"2": ["Team One"], "3": ["Team Two"], "4": ["Team One", "Team Two"]})))
+    payload = json.loads((await dashboard.channel_raid_browser(request(), same_team=True, team=selected)).body)
+    assert [channel["id"] for channel in payload["channels"]] == expected
+    assert payload["teams"] == ["Team One", "Team Two"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("collection", ["favorites", "team"])
+@pytest.mark.parametrize("mode, expected", [("following", ["2", "3"]), ("not_following", ["4"]), ("mutual", ["2"])])
+async def test_collections_intersect_following_filters(monkeypatch, collection, mode, expected):
+    pages = []
+    if mode == "mutual":
+        pages.append({"scopes": ["user:read:follows", "moderator:read:followers"]})
+    if collection == "favorites":
+        pages.append({"data": [stream("2"), stream("3"), stream("4")]})
+    if mode == "mutual":
+        pages.extend([{"data": [{"user_id": "2"}]}, {"data": []}])
+    runtime(monkeypatch, pages)
+    monkeypatch.setattr(dashboard, "raid_browser_followed_streams", AsyncMock(return_value=[stream("2"), stream("3")]))
+    monkeypatch.setattr(dashboard, "raid_browser_team_streams", AsyncMock(return_value=(
+        [stream("2"), stream("3"), stream("4")], {"2": ["Our Team"], "3": ["Our Team"], "4": ["Our Team"]})))
+    payload = json.loads((await dashboard.channel_raid_browser(
+        request(), favorites="2,3,4" if collection == "favorites" else "", favorites_only=collection == "favorites", same_team=collection == "team",
+        **{mode: True})).body)
+    assert [channel["id"] for channel in payload["channels"]] == expected
+
+
+@pytest.mark.asyncio
 async def test_recommendations_include_unfollowed_teammate_in_different_category(monkeypatch):
     teammate = dict(stream("2", 2), game_id="different", language="en", tags=[])
     discovery = dict(stream("3", 10000), game_id="game", language="en", tags=[])

@@ -106,14 +106,15 @@ function setup(storage = new Map(), account = '1', hash = '', viewportWidth = 12
     dialog.querySelector = selector => controls[selector];
     dialog.querySelectorAll = selector => selector === '[data-raid-browser-view]' ? [cardView, listView] : [browseTab, favoritesTab, teamTab, developerTab];
     const fields = {};
-    for (const name of ['sort', 'category_id', 'tags', 'tag_match', 'follow_status', 'language', 'same_team', 'event']) {
+    const teamFilter = new Element(); teamFilter.hidden = true;
+    for (const name of ['sort', 'category_id', 'tags', 'tag_match', 'follow_status', 'language', 'same_team', 'event', 'team']) {
         fields[name] = new Element();
-        fields[name].type = ['tags', 'tag_match', 'language', 'category_id', 'sort', 'event', 'follow_status'].includes(name) ? 'text' : 'checkbox';
+        fields[name].type = ['tags', 'tag_match', 'language', 'category_id', 'sort', 'event', 'follow_status', 'team'].includes(name) ? 'text' : 'checkbox';
         if (name === 'tag_match') fields[name].value = 'all';
         fields[name].checked = false;
         if (name === 'sort') fields[name].value = 'for_you';
     }
-    search.querySelector = selector => selector === 'input' ? input : selector === '[data-raid-tag-search]' ? tagSearch : selector === '[data-raid-tag-limit]' ? tagLimit : selector === '[data-raid-tag-match]' ? tagMatchToggle : selector === '[data-raid-category-search]' ? categorySearch : fields[selector.match(/name="([^"]+)"/)?.[1]];
+    search.querySelector = selector => selector === '[data-raid-team-filter]' ? teamFilter : selector === 'input' ? input : selector === '[data-raid-tag-search]' ? tagSearch : selector === '[data-raid-tag-limit]' ? tagLimit : selector === '[data-raid-tag-match]' ? tagMatchToggle : selector === '[data-raid-category-search]' ? categorySearch : fields[selector.match(/name="([^"]+)"/)?.[1]];
     let onResize;
     const resizeCallbacks = [];
     const confirmations = []; let confirmResult = true;
@@ -373,7 +374,7 @@ test('results header stays on one line, compresses spacing and scrolls tabs with
     assert.match(styles, /\.raid-browser-results-toolbar \{[^}]*container-type: inline-size;[^}]*flex-wrap: nowrap/);
     assert.match(styles, /\.raid-browser-heading-group \{[^}]*flex-wrap: nowrap;[^}]*gap: clamp/);
     assert.match(styles, /\.raid-browser-result-controls \{[^}]*flex-wrap: nowrap/);
-    assert.match(styles, /\.raid-browser-tab-scroll \{[^}]*padding-bottom: 10px;[^}]*margin-bottom: -10px;[^}]*overflow-x: auto;[^}]*overflow-y: hidden/);
+    assert.match(styles, /\.raid-browser-tab-scroll \{[^}]*padding-bottom: 12px;[^}]*margin-bottom: -12px;[^}]*overflow-x: auto;[^}]*overflow-y: hidden/);
     assert.match(styles, /\.raid-browser-heading-group \.raid-browser-tabs \{[^}]*width: max-content;[^}]*flex-wrap: nowrap/);
     assert.match(styles, /\.raid-browser-heading-group \.raid-browser-tabs button \{[^}]*flex: 0 0 auto/);
     assert.match(styles, /\.raid-browser-size-control input \{ width: clamp\(48px,/);
@@ -707,6 +708,7 @@ test('preview favorite and blacklist controls share the original card actions', 
     assert.equal(favorite.attributes['aria-pressed'], 'true');
     assert.equal(favorite.innerHTML, card.querySelector('.raid-browser-pin').innerHTML);
     assert.match(favorite.innerHTML, /<svg/);
+    assert.match(favorite.innerHTML, /m12 2 3\.09 6\.26L22 9\.27/);
     app.confirm(false); app.previewControls['[data-raid-preview-block]'].handlers.click();
     assert.equal(app.previewDialog.open, true);
     app.confirm(true); app.previewControls['[data-raid-preview-block]'].handlers.click();
@@ -1248,16 +1250,37 @@ test('changing from not following to following or mutual replaces the previous f
     }
 });
 
-test('not following follows the existing favorites-tab filter behavior', async () => {
+test('following filters remain enabled and apply on the favorites tab', async () => {
     const app = setup(new Map([['ratsboombot:raid-favorites:1', '["2"]']]));
     app.opener.handlers.click();
     app.fields.follow_status.value = 'not_following';
     app.favoritesTab.handlers.click();
-    assert.equal(app.fields.follow_status.disabled, true);
-    assert.equal(app.requests.at(-1).url.searchParams.has('not_following'), false);
-    app.browseTab.handlers.click();
-    assert.equal(app.fields.follow_status.disabled, false);
+    assert.notEqual(app.fields.follow_status.disabled, true);
     assert.equal(app.requests.at(-1).url.searchParams.get('not_following'), 'true');
+    app.browseTab.handlers.click();
+    assert.notEqual(app.fields.follow_status.disabled, true);
+    assert.equal(app.requests.at(-1).url.searchParams.get('not_following'), 'true');
+});
+
+test('stream-team dropdown applies only in its collection and resets with the other filters', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel()], cursor: '', team_live: true}); await flush();
+    const label = app.search.querySelector('[data-raid-team-filter]');
+    assert.equal(label.hidden, true);
+    app.teamTab.handlers.click();
+    assert.equal(label.hidden, false);
+    app.requests.at(-1).respond({channels: [channel()], cursor: '', teams: ['Team One', 'Team Two']}); await flush();
+    assert.deepEqual(app.fields.team.children.map(option => option.textContent), ['All teams', 'Team One', 'Team Two']);
+    app.fields.team.value = 'Team Two';
+    app.search.handlers.change({target: app.fields.team});
+    assert.equal(app.requests.at(-1).url.searchParams.get('team'), 'Team Two');
+    app.browseTab.handlers.click();
+    assert.equal(label.hidden, true);
+    assert.equal(app.requests.at(-1).url.searchParams.has('team'), false);
+    app.teamTab.handlers.click();
+    assert.equal(app.requests.at(-1).url.searchParams.get('team'), 'Team Two');
+    app.search.handlers.reset({preventDefault() {}});
+    assert.equal(app.fields.team.value, '');
 });
 
 test('pinning saves immediately but preserves order and scroll until refresh', async () => {
@@ -1748,7 +1771,7 @@ for (const [tab, property] of [['favoritesTab', 'favorites_live'], ['teamTab', '
         app.requests[1].respond({channels: [], cursor: '', [property]: false}); await flush();
         assert.equal(app[tab].hidden, true);
         assert.equal(app.browseTab.attributes['aria-pressed'], 'true');
-        assert.equal(app.fields.follow_status.disabled, false);
+        assert.notEqual(app.fields.follow_status.disabled, true);
         assert.equal(app.requests[2].url.searchParams.has('same_team'), false);
         assert.equal(app.requests[2].url.searchParams.has('favorites_only'), false);
     });

@@ -1037,6 +1037,7 @@
                     <option value="uptime_desc">Uptime (high to low)</option>
                 </select></label>
                 <label>Following<select name="follow_status" data-hover-current-value><option value="">Any</option><option value="not_following">Not following</option><option value="following">Following</option><option value="mutual">Mutual following</option></select></label>
+                <label data-raid-team-filter hidden>Stream team<select name="team" data-hover-current-value><option value="">All teams</option></select></label>
                 <label>Category<input type="search" data-raid-category-search placeholder="Search categories..." autocomplete="off" maxlength="100" aria-controls="raid-browser-category-options" aria-expanded="false"></label>
                 <input type="hidden" name="category_id" value="">
                 <div id="raid-browser-category-options" class="raid-browser-tag-dropdown raid-browser-category-options" popover="manual" role="group" aria-label="Category suggestions" hidden></div>
@@ -1078,7 +1079,7 @@
         </header>
         <div class="raid-preview-body" data-raid-preview-body>
             <section class="raid-preview-main" data-raid-preview-main aria-label="Stream and channel details">
-                <div class="raid-preview-video" data-raid-preview-video></div>
+                <div class="raid-preview-video-row"><div class="raid-preview-video" data-raid-preview-video></div></div>
                 <div class="raid-preview-details" data-raid-preview-details>
                     <div class="raid-preview-details-upper">
                     <div class="raid-preview-details-header">
@@ -1124,6 +1125,8 @@
     <script src="{{ url_for('static', path='/js/chat-emote-picker.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/raid-preview-chat.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/raid-preview-player.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/raid-browser-search-fields.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/raid-browser-selects.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-raid-browser.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-raid-status.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>

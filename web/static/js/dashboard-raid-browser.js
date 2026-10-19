@@ -42,7 +42,7 @@
     const previewRaid = channelPreview?.querySelector("[data-raid-preview-raid]");
     const previewStatus = channelPreview?.querySelector("[data-raid-preview-status]");
     const previewFavorite = channelPreview?.querySelector("[data-raid-preview-favorite]");
-    const favoriteIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5-3 1-3 5v3l-3-3-7 7-1-1 7-7-3-3h3l5-3z"/></svg>';
+    const favoriteIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
     const previewMenu = channelPreview?.querySelector("[data-raid-preview-menu]");
     let previewDetailsController = null;
     let previewSource = null;
@@ -601,12 +601,17 @@
     let currentQuery = "";
     let currentFilters = {};
     let rankedFavorites = new Set();
-    const filterNames = ["sort", "category_id", "tags", "tag_match", "follow_status", "language", "event"];
+    const teamFilter = search.querySelector("[data-raid-team-filter]");
+    const teamSelect = search.querySelector('[name="team"]');
+    const filterNames = ["sort", "category_id", "tags", "tag_match", "follow_status", "language", "event", "team"];
+    function syncTeamFilter() {
+        if (teamFilter) teamFilter.hidden = activeTab !== "team";
+    }
     function readFilters() {
         const values = {};
         for (const name of filterNames) {
             if (name === "tag_match" && !search.querySelector('[name="tags"]')?.value.trim()) continue;
-            if (activeTab === "favorites" && name === "follow_status") continue;
+            if (activeTab !== "team" && name === "team") continue;
             const field = search.querySelector(`[name="${name}"]`);
             if (!field) continue;
             const value = field.type === "checkbox" ? (field.checked ? "true" : "") : field.value.trim();
@@ -813,8 +818,7 @@
         activeTab = button.dataset.raidBrowserTab;
         collectionButtons.forEach(item => item.setAttribute("aria-pressed", String(item === button)));
         syncTabIndicator();
-        const followStatus = search.querySelector('[name="follow_status"]');
-        if (followStatus) followStatus.disabled = activeTab === "favorites";
+        syncTeamFilter();
         load(false, origins);
     }));
     function applyView() {
@@ -1303,6 +1307,16 @@
                 for (const id of payload.live_favorite_ids) knownLiveChannels.add(id);
             }
             for (const channel of payload.channels || []) knownLiveChannels.add(channel.id);
+            if (teamSelect && Array.isArray(payload.teams)) {
+                const selected = teamSelect.value;
+                teamSelect.replaceChildren();
+                for (const label of ["", ...payload.teams]) {
+                    const option = document.createElement("option");
+                    option.value = label; option.textContent = label || "All teams";
+                    teamSelect.append(option);
+                }
+                teamSelect.value = payload.teams.includes(selected) ? selected : "";
+            }
             let activeCollectionEmpty = false;
             for (const [tab, property] of [["developer", "developers_live"], ["favorites", "favorites_live"], ["team", "team_live"]]) {
                 if (typeof payload[property] !== "boolean") continue;
@@ -1315,8 +1329,7 @@
             if (activeCollectionEmpty) {
                 activeTab = "browse";
                 collectionButtons.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.raidBrowserTab === "browse")));
-                const followStatus = search.querySelector('[name="follow_status"]');
-                if (followStatus) followStatus.disabled = false;
+                syncTeamFilter();
                 load();
                 return;
             }

@@ -133,7 +133,7 @@
             moderateMessage(feed, "pin-duration", message.id, duration, {duration_minutes: duration.value});
         });
 
-        const unpin = makeElement("button", "live-chat-pinned-action live-chat-unpin", "📌");
+        const unpin = makeElement("button", "live-chat-pinned-action live-chat-unpin", "⭐");
         unpin.type = "button";
         unpin.title = "Unpin message";
         unpin.setAttribute("aria-label", "Unpin message");
@@ -334,7 +334,7 @@
                     message: message.message || ""
                 }}));
             });
-            const pin = makeElement("button", "live-chat-message-action pin", "📌");
+            const pin = makeElement("button", "live-chat-message-action pin", "⭐");
             pin.type = "button";
             pin.title = "Pin message";
             pin.setAttribute("aria-label", "Pin message");

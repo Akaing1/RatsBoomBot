@@ -722,7 +722,7 @@ async def channel_raid_preview(request: Request, target_id: str = ""):
 async def channel_raid_browser(
     request: Request, query: str = "", after: str = "", same_category: bool = False,
     same_tags: bool = False, tags: str = "", tag_match: str = "all", language: str = "", following: bool = False, not_following: bool = False,
-    mutual: bool = False, recommended: bool = False, same_team: bool = False, favorites: str = "",
+    mutual: bool = False, recommended: bool = False, same_team: bool = False, team: str = "", favorites: str = "",
     favorites_only: bool = False, blocked: str = "", category_id: str = "", suggested: bool = False, sort: str = "", event: str = "", developer_only: bool = False,
 ):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
@@ -761,7 +761,9 @@ async def channel_raid_browser(
         recommended = True
     if favorites_only:
         recommended = sort == "for_you"
-        following = not_following = mutual = suggested = False
+        suggested = False
+    if len(team) > 200:
+        return JSONResponse({"detail": "Invalid stream team."}, status_code=400)
     if not_following and (following or mutual):
         return JSONResponse({"detail": "Select either Following or Not following."}, status_code=400)
     params = {"first": 20}
@@ -802,13 +804,13 @@ async def channel_raid_browser(
                     live = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": ids[offset:offset + 100], "first": 100})
                     suggested_streams.extend(live.get("data", []))
         team_streams, team_members = await raid_browser_team_streams(runtime_bot, broadcaster_id) if recommended or same_team else ([], {})
-        if (recommended or not_following) and not (following or mutual):
+        if ((recommended or not_following) and not (following or mutual)) or ((favorites_only or same_team) and (following or mutual)):
             try:
                 followed_streams = await raid_browser_followed_streams(runtime_bot, broadcaster_id)
             except HTTPException as error:
                 # Favorites remain usable without follow scopes; compatibility
                 # scores still apply even when following bonuses are unknown.
-                if not favorites_only or error.status not in {401, 403}:
+                if not favorites_only or following or mutual or not_following or error.status not in {401, 403}:
                     raise
                 LOGGER.warning("[Dashboard] Following bonuses unavailable for favorites in %s.", broadcaster_id)
         recent_raiders = {}
@@ -835,6 +837,9 @@ async def channel_raid_browser(
         elif favorites_only:
             page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100}) if favorite_ids else {"data": [], "pagination": {}}
             streams = page
+        elif same_team:
+            page = {"data": team_streams, "pagination": {}}
+            streams = page
         elif following or mutual:
             if sort in {"viewers_asc", "uptime_asc", "uptime_desc", "name_asc", "name_desc"}:
                 followed_streams = await raid_browser_followed_streams(runtime_bot, broadcaster_id)
@@ -843,9 +848,6 @@ async def channel_raid_browser(
                 params["user_id"] = broadcaster_id
                 page = await runtime_bot._http.request_json(Route(
                     "GET", "streams/followed", params=params, token_for=broadcaster_id))
-            streams = page
-        elif same_team:
-            page = {"data": team_streams, "pagination": {}}
             streams = page
         elif suggested:
             page = {"data": suggested_streams, "pagination": {}}
@@ -941,7 +943,7 @@ async def channel_raid_browser(
             # Continue with compatible channels outside that narrow candidate pool.
             page = {**page, "pagination": {"cursor": discovery_prefix}}
         followed_ids = {str(stream.get("user_id", "")) for stream in followed_streams}
-        if following or mutual:
+        if (following or mutual) and not (favorites_only or same_team):
             followed_ids.update(str(stream.get("user_id", "")) for stream in streams.get("data", []))
         favorite_streams = []
         if favorite_ids and not after and not favorites_only and (recommended or sort not in {"viewers_asc", "uptime_asc"}):
@@ -983,6 +985,8 @@ async def channel_raid_browser(
             if language and str(stream.get("language", "")).lower() != language:
                 continue
             if same_team and user_id not in team_members:
+                continue
+            if same_team and team and team not in team_members.get(user_id, []):
                 continue
             search_score = raid_channel_search_score(query, login, stream.get("user_name") or "", stream.get("game_name") or "") if query else 0
             if query and not search_score:
@@ -1077,6 +1081,7 @@ async def channel_raid_browser(
             channel["description"] = str(profile.get("description") or "") if profile else ""
         collection_visibility = await raid_browser_collection_visibility(runtime_bot, broadcaster_id, favorite_ids, blocked_ids) if not after else {}
         return JSONResponse({"channels": channels, "cursor": page.get("pagination", {}).get("cursor", ""), "suggested_status": suggested_status,
+                             **({"teams": sorted({label for labels in team_members.values() for label in labels}, key=str.casefold)} if same_team else {}),
                              "sort_scope": page.get("sort_scope", ""), "search_limited": page.get("search_limited", False),
                              **collection_visibility,
                              **({"developers_live": bool(dev_streams)} if not after else {}),
