@@ -69,9 +69,17 @@ test('Shift+Enter submits to All immediately without changing the persistent des
     assert.equal(app.selector.handleKey(key('Enter', {shiftKey: true, isComposing: true})), false);
 });
 
-test('disconnected YouTube is excluded and does not trap Tab', () => {
+test('single-platform chat consumes Tab without changing destinations or redrawing', () => {
     const app = setup(false); assert.equal(app.button.disabled, true);
-    assert.equal(app.selector.handleKey(key('Tab')), false);
+    const tab = key('Tab');
+    assert.equal(app.selector.handleKey(tab), true);
+    assert.equal(tab.prevented, true);
+    assert.equal(app.selector.handleKey(key('Tab'), () => true), true);
+    for (const extra of [{shiftKey: true}, {ctrlKey: true}, {altKey: true}, {metaKey: true}, {isComposing: true}]) {
+        const shortcut = key('Tab', extra);
+        assert.equal(app.selector.handleKey(shortcut), false);
+        assert.equal(shortcut.prevented, undefined);
+    }
     app.selector.select('youtube'); app.form.handlers.keydown(key('Shift'));
     assert.equal(app.selector.target(), 'twitch'); assert.equal(app.button.textContent, '[Twitch]');
     app.selector.handleKey(key('Enter', {shiftKey: true})); assert.deepEqual(app.sent, ['twitch']);

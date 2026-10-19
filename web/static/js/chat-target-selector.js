@@ -44,7 +44,9 @@
             }
             if (event.key === "Tab" && !event.shiftKey) {
                 if (complete()) return true;
-                if (targets.length > 1) { event.preventDefault(); cycle(); return true; }
+                event.preventDefault();
+                if (targets.length > 1) cycle();
+                return true;
             }
             return false;
         }
