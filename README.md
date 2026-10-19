@@ -237,89 +237,9 @@ Two preview-first tools are included:
 
 Both require a broadcaster ID and only write when `--apply` is supplied. Imports replace the corresponding totals for that broadcaster, so create a backup first.
 
-## Local Setup
+## Local Development
 
-### 1. Clone and create a virtual environment
-
-```bash
-git clone https://github.com/Akaing1/RatsBoomBot.git
-cd RatsBoomBot
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Windows PowerShell activation:
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-
-### 2. Install dependencies
-
-```bash
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### 3. Configure the environment
-
-Copy `.env.example` to `.env` and configure the Twitch application, account IDs, callbacks, session secret, and scopes.
-
-```env
-CLIENT_ID=
-CLIENT_SECRET=
-BOT_ID=
-OWNER_ID=
-
-DATABASE_PATH=.data/tokens.db
-LEAGUE_DATABASE_PATH=.data/league.db
-STREAM_LOGS_PATH=.data/logs
-
-ADMIN_HOST=127.0.0.1
-ADMIN_PORT=4345
-ADMIN_BASE_URL=http://127.0.0.1:4345
-PUBLIC_BASE_URL=http://127.0.0.1:4345
-DASHBOARD_BASE_URL=http://127.0.0.1:4345
-
-SESSION_SECRET=
-SESSION_COOKIE_DOMAIN=
-ENVIRONMENT=local
-SESSION_HTTPS_ONLY=false
-TRUST_PROXY_HEADERS=false
-
-BOT_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/bot
-CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/channel
-PUBLIC_CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel/connect
-
-YOUTUBE_CLIENT_ID=
-YOUTUBE_CLIENT_SECRET=
-YOUTUBE_REDIRECT_URI=http://127.0.0.1:4345/oauth/youtube/connect
-YOUTUBE_CHAT_DISCOVERY_SECONDS=30
-```
-
-Keep `SESSION_SECRET` stable across deployments or existing browser sessions will become invalid. Administrator sessions default to eight hours; broadcaster sessions default to 30 days. In production, set `SESSION_COOKIE_DOMAIN=.ratsboombot.com` so an authenticated session is available to both the public site and dashboard subdomain.
-
-Register each callback exactly in the Twitch developer application. Changing scopes requires the affected account to reconnect.
-
-To enable combined Twitch and YouTube chat, enable the YouTube Data API v3 in a Google Cloud project and create an OAuth 2.0 Web application. Add `YOUTUBE_REDIRECT_URI` as an exact authorized redirect URI, then set its client ID and secret in `.env`. The integration requests `youtube.force-ssl` to read and send live-chat messages. It uses streaming with polling fallback, token renewal, and reconnect handling. Dashboard messages can target Twitch, YouTube, or both; YouTube must have an active live chat. If the OAuth consent screen is still in Testing, add each broadcaster as a test user.
-
-Connected broadcasters receive three private OBS Browser Source URLs under **Customization → Socials → YouTube chat**: chat without commands, commands only, and both. Regenerating these URLs invalidates the previous set.
-
-### 4. Run
-
-```bash
-python main.py
-```
-
-```text
-Public landing page: http://127.0.0.1:4345/
-Streamer dashboard:  http://127.0.0.1:4345/channel
-Admin dashboard:    http://127.0.0.1:4345/admin
-Health endpoint:    http://127.0.0.1:4345/health
-```
-
-Create the first owner account with the administration script before opening the admin dashboard. Administrator passwords must contain at least 12 characters.
+Streamers and chatters use the hosted website; no desktop installation is required. Maintainers can run the Python service and dashboard locally for development and testing. See [the local-development guide](docs/development.md) for environment setup, OAuth callbacks, and test commands.
 
 ## Commands
 
@@ -401,59 +321,15 @@ New behavior should include tests for the affected service and, when relevant, a
 
 ## Versioning
 
-Version **14.2.3** cleans up pet prototype names and updates the documentation. Version **14.2.2** fixed the corrupted cat sprite and collection alignment. The active `release/15.0.0` branch also includes the raid-browser and shared-chat work; its branch name does not automatically change `APP_VERSION`.
+The application version is defined in [`config/version.py`](config/version.py). Published release history and unreleased changes live in [`CHANGELOG.md`](CHANGELOG.md), with links to GitHub releases and pull requests.
 
 RatsBoomBot uses a practical three-part version number:
 
-- Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes
-- Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement
-- Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
+- Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes.
+- Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement.
+- Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone.
 
-The home page’s **What’s New** panel is intentionally updated only for minor and major releases. Patch releases remain available in the full GitHub release history.
-
-Version **9.1.0** adds an isolated UAT deployment environment for testing changes before production.
-
-Version **9.0.5** adds independent 5% Basic weapon drops for every successful raid participant and fixed 50% resale values for standard and Overclocked weapons.
-
-Version **8.10.3** improves the Patch Notes composer layout.
-
-Version **8.10.2** fixes Discord deployment-status updates on Raspberry Pi runners without `jq`.
-
-Version **8.10.1** adds follow-up Discord status and patch-notes setup fixes.
-
-Version **8.10.0** adds dashboard-managed public patch notes with Discord announcements.
-
-Version **8.9.3** adds a persistent Discord status card that updates during and after production deployments.
-
-Version **8.9.0** adds a curated home-page **What’s New** panel for meaningful feature-release highlights.
-
-Version **8.8.3** simplifies raid crafting to weapon-family commands that automatically choose the highest available next tier.
-
-Version **8.8.2** moves loot lookup into the raid command group as `!raid loot`.
-
-Version **8.8.1** adds raid weapon unequipping and consolidates raid help on the dedicated raid page.
-
-Version **8.8.0** adds raid weapon crafting, expanded consumables, second attacks, stream-wide Blessings, and stronger mythical weapons.
-
-Version **8.7.1** replaces session-bound custom bot authorization with username-verified, single-use links that can be opened in a separate browser or device.
-
-Version **8.7.0** adds streamer-managed OAuth onboarding for premium custom bot identities. Administrators grant access, while streamers securely connect and manage their own dedicated Twitch bot accounts from Streamer Control.
-
-Version **8.6.1** fixes the public raid page's recent-history query against the production raid schema.
-
-Version **8.6.0** adds public `/raid/{channel}` guides with live encounter progress, contributor rankings, shop details, mechanics, rewards, commands, and recent raid history.
-
-Version **8.5.3** moves public channel command references to `/help/{channel}` and collapses active raid leaderboards after the top ten contributors.
-
-Version **8.5.2** corrects the Ahriman test-run cleanup and converts the public command Help page to full-width dropdown sections with an active raid contributor leaderboard.
-
-Version **8.5.0** adds standard single-zero roulette as a Meinya loyalty-points game.
-
-Version **8.4.1** removes the remaining pre-release Ahirman test encounter from raid history.
-
-Version **8.4.0** adds persistent passive point earnings for connected live chatters.
-
-Version **6.0.0** marks the checkpoint where RatsBoomBot became a structured multi-channel platform with profile-specific engagement, streamer dashboards, migration tools, clips, raids, first-chat shoutouts, and production-oriented stream logging.
+The active release branch is `release/15.0.0`. Branch names denote planned milestones; only published GitHub releases belong in the dated changelog. The home page's **What's New** panel is updated for minor and major releases; patch history remains in the changelog and GitHub releases.
 
 ## Current Limitations
 
@@ -467,6 +343,10 @@ Version **6.0.0** marks the checkpoint where RatsBoomBot became a structured mul
 
 Follow `docs/styling_guide.md`. Keep commands thin, put shared behavior in services, keep broadcaster customization in profiles, and use migrations for persistent schema changes.
 
-## License
+## Licensing Status
 
-RatsBoomBot is a personal project without a formal open-source license. Add a license before public distribution or accepting outside contributions.
+RatsBoomBot is a privately operated project and is not currently offered under an open-source license. No general source-code license is granted by this repository. All rights in copyrightable original contributions are reserved by their respective copyright holders, except where permission has already been granted or applicable law provides otherwise.
+
+This notice does not revoke existing permissions, override GitHub's terms (including viewing and forking rights for public repositories), or replace the licenses of third-party dependencies and assets. Permission to use the hosted service is separate from permission to reuse its source code. Contact the maintainers about source-code licensing; any future project-wide license must account for contributor and third-party rights.
+
+This is a statement of the current licensing status, not a new open-source license or a transfer of contributors' copyright. See [GitHub's licensing guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository) and [the no-license explanation](https://choosealicense.com/no-permission/).
