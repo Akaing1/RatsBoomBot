@@ -5,6 +5,38 @@ let chromium;
 try { ({chromium} = require('playwright')); } catch (_) {}
 const executablePath = process.env.CHAT_TEST_BROWSER_PATH || chromium?.executablePath();
 
+test('card usernames retain their full width before team badges', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage();
+        await page.setContent(`<style>${fs.readFileSync('web/static/css/style.css', 'utf8')}</style>
+            <div class="raid-browser-dialog" data-result-size="2">
+                <article class="raid-browser-channel" style="width:290px">
+                    <div class="raid-browser-channel-heading">
+                        <span class="raid-browser-language">EN</span><span class="raid-browser-language">♥</span>
+                        <a class="raid-browser-name"><img class="raid-browser-avatar"><span>froggymochi</span></a>
+                        <span class="raid-browser-verified">✓</span>
+                        <div class="raid-browser-stream-actions"><span class="raid-browser-team">Hanami 🌸 · No Sleep Club</span></div>
+                    </div>
+                </article>
+            </div>`);
+        const layout = await page.evaluate(() => {
+            const name = document.querySelector('.raid-browser-name');
+            const text = name.querySelector('span');
+            const team = document.querySelector('.raid-browser-team');
+            const heading = name.parentElement;
+            return {nameWidth: name.clientWidth, nameContent: name.scrollWidth,
+                textWidth: text.clientWidth, textContent: text.scrollWidth,
+                teamWidth: team.clientWidth, teamContent: team.scrollWidth,
+                headingWidth: heading.clientWidth, headingContent: heading.scrollWidth};
+        });
+        assert.equal(layout.nameWidth, layout.nameContent);
+        assert.equal(layout.textWidth, layout.textContent);
+        assert.ok(layout.teamWidth < layout.teamContent, 'Team badge should yield space to the username');
+        assert.ok(layout.headingContent <= layout.headingWidth, 'Header should stay within the card');
+    } finally { await browser.close(); }
+});
+
 test('vertical preview centers the video within a full-width black row of matching height', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
     const browser = await chromium.launch({executablePath, headless: true});
     try {

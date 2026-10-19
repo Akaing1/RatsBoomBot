@@ -693,7 +693,52 @@
             animation.finished.then(() => cardMoves.delete(animation), () => cardMoves.delete(animation));
         }
     }
+    const pendingProfiles = new Set(), requestedProfiles = new Set(), profileControllers = new Set();
+    let profileGeneration = 0;
+    function clearProfileRequests() {
+        profileGeneration++;
+        for (const request of profileControllers) request.abort();
+        profileControllers.clear(); pendingProfiles.clear(); requestedProfiles.clear();
+    }
+    async function loadVisibleProfiles(ids) {
+        const batch = ids.filter(id => pendingProfiles.has(id) && !requestedProfiles.has(id)).slice(0, 100);
+        if (!batch.length) return;
+        batch.forEach(id => requestedProfiles.add(id));
+        const request = new AbortController(), generation = profileGeneration;
+        profileControllers.add(request);
+        try {
+            const url = new URL('/channel/api/raid-browser/profiles', window.location.origin);
+            url.searchParams.set('ids', batch.join(','));
+            const response = await fetch(url, {signal: request.signal, cache: 'no-store', headers: {Accept: 'application/json'}});
+            if (!response.ok) return;
+            const payload = await response.json();
+            if (request.signal.aborted || generation !== profileGeneration || !dialog.open) return;
+            const requestedIds = new Set(batch);
+            const channelsById = new Map(channels.map(channel => [channel.id, channel]));
+            const cardsById = new Map([...rendered.values()].map(card => [card.dataset.channelId, card]));
+            for (const profile of payload.profiles || []) {
+                if (!requestedIds.has(profile.id)) continue;
+                const channel = channelsById.get(profile.id);
+                if (!channel) continue;
+                Object.assign(channel, {profile_image_url: profile.profile_image_url, verified: profile.verified, description: profile.description});
+                const card = cardsById.get(channel.id);
+                if (card) updateCardProfile(card, channel);
+                if (channelPreview?.open && previewSource?.channel.id === channel.id) {
+                    const identity = channelPreview.querySelector('[data-raid-preview-identity]');
+                    if (!identity.querySelector('img') && /^https:\/\/static-cdn\.jtvnw\.net\//.test(channel.profile_image_url || '')) {
+                        const avatar = document.createElement('img'); avatar.src = channel.profile_image_url; avatar.alt = '';
+                        identity.insertBefore(avatar, identity.children[0] || null);
+                    }
+                    const description = channelPreview.querySelector('[data-raid-preview-description]');
+                    description.textContent = channel.description || ''; description.title = channel.description || '';
+                }
+            }
+            batch.forEach(id => pendingProfiles.delete(id));
+        } catch (_) { /* Missing profile decoration must never hide live results. */ }
+        finally { profileControllers.delete(request); }
+    }
     function clearLoadedCards() {
+        clearProfileRequests();
         scrollAnchor = null;
         seen.clear();
         channels.length = 0;
@@ -886,6 +931,8 @@
         }
         const firstRow = Math.max(0, Math.floor(results.scrollTop / rowStride) - 2);
         const lastRow = Math.min(rows, Math.ceil((results.scrollTop + results.clientHeight) / rowStride) + 2);
+        const firstVisibleRow = Math.floor(results.scrollTop / rowStride);
+        const lastVisibleRow = Math.ceil((results.scrollTop + results.clientHeight) / rowStride);
         const start = Math.min(channels.length, firstRow * columns);
         const end = Math.min(channels.length, lastRow * columns);
         windowGrid.style.top = `${firstRow * rowStride}px`;
@@ -899,9 +946,10 @@
             rendered.delete(index);
         }
         for (let index = start; index < end; index++) {
+            const visible = Math.floor(index / columns) >= firstVisibleRow && Math.floor(index / columns) < lastVisibleRow;
             let card = rendered.get(index);
             if (!card) {
-                card = channelCard(channels[index]);
+                card = channelCard(channels[index], !visible);
                 card.dataset.channelIndex = String(index);
                 card.dataset.channelId = channels[index].id;
                 card.setAttribute("role", "listitem");
@@ -912,6 +960,16 @@
             // Leave existing cards in place so scrolling doesn't steal link focus.
             const slot = windowGrid.children[index - start];
             if (slot !== card) windowGrid.insertBefore(card, slot || null);
+            if (visible) {
+                const image = card.querySelector(".raid-browser-thumbnail")?.querySelector("img");
+                if (image?.dataset.thumbnailSrc) {
+                    image.fetchPriority = "high";
+                    image.srcset = image.dataset.thumbnailSrcset;
+                    image.src = image.dataset.thumbnailSrc;
+                    delete image.dataset.thumbnailSrc;
+                    delete image.dataset.thumbnailSrcset;
+                }
+            }
         }
         for (const card of rendered.values()) {
             const title = card.querySelector(".raid-browser-stream-title");
@@ -942,6 +1000,10 @@
         }
         updateLiveTimes();
         animateSharedCards();
+        loadVisibleProfiles([...rendered.values()].filter(card => {
+            const row = Math.floor(Number(card.dataset.channelIndex) / columns);
+            return row >= firstVisibleRow && row < lastVisibleRow;
+        }).map(card => card.dataset.channelId));
         if (!loading && !loadError && cursor && input.value.trim() === currentQuery
             && JSON.stringify(readFilters()) === JSON.stringify(currentFilters)
             && totalHeight - results.scrollTop - results.clientHeight < rowStride * 2) load(true);
@@ -971,7 +1033,27 @@
             previewStatus.classList.toggle("error", error);
         }
     }
-    function channelCard(channel) {
+    function updateCardProfile(card, channel) {
+        const name = card.querySelector('.raid-browser-name');
+        const heading = card.querySelector('.raid-browser-channel-heading');
+        if (!name || !heading) return;
+        if (!name.querySelector('.raid-browser-avatar') && /^https:\/\/static-cdn\.jtvnw\.net\//.test(channel.profile_image_url || '')) {
+            const avatar = document.createElement('img');
+            avatar.className = 'raid-browser-avatar'; avatar.src = channel.profile_image_url; avatar.alt = '';
+            avatar.width = 20; avatar.height = 20; avatar.loading = 'lazy';
+            avatar.addEventListener('error', () => avatar.remove(), {once: true});
+            const label = document.createElement('span'); label.textContent = name.textContent;
+            name.textContent = ''; name.append(avatar, label);
+        }
+        if (channel.verified === true && !heading.querySelector('.raid-browser-verified')) {
+            const badge = document.createElement('span'); badge.className = 'raid-browser-verified';
+            badge.setAttribute('role', 'img'); badge.setAttribute('aria-label', 'Verified Twitch Partner'); badge.title = 'Verified';
+            badge.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 1 3 3 4-.2.2 4 3 3-3 3-.2 4-4-.2-3 3-3-3-4 .2-.2-4-3-3 3-3 .2-4 4 .2z"/><path d="m7.5 12 3 3 6-6" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            const next = [...heading.children][[...heading.children].indexOf(name) + 1];
+            heading.insertBefore(badge, next || null);
+        }
+    }
+    function channelCard(channel, deferThumbnail = false) {
         const card = document.createElement("article");
         card.className = "raid-browser-channel";
         card.classList.toggle("is-following", Boolean(channel.followed || channel.mutual));
@@ -1039,6 +1121,8 @@
             const image = document.createElement("img");
             image.alt = "";
             image.loading = "lazy";
+            image.decoding = "async";
+            image.fetchPriority = deferThumbnail ? "low" : "high";
             image.width = 320;
             image.height = 180;
             // Lazy auto-sizing lets the browser use the actual card/row width
@@ -1048,8 +1132,16 @@
             for (const [url, width] of [[channel.thumbnail_url, 320], [channel.thumbnail_url_medium, 640], [channel.thumbnail_url_large, 1280]]) {
                 if (/^https:\/\/static-cdn\.jtvnw\.net\//.test(url || "") && !sources.has(url)) sources.set(url, width);
             }
-            image.srcset = [...sources].map(([url, width]) => `${url} ${width}w`).join(", ");
-            image.src = channel.thumbnail_url;
+            const srcset = [...sources].map(([url, width]) => `${url} ${width}w`).join(", ");
+            if (deferThumbnail) {
+                // Native lazy loading can fetch far beyond the viewport.
+                // Overscan cards retain their space, but get no URL until visible.
+                image.dataset.thumbnailSrcset = srcset;
+                image.dataset.thumbnailSrc = channel.thumbnail_url;
+            } else {
+                image.srcset = srcset;
+                image.src = channel.thumbnail_url;
+            }
             image.addEventListener("error", () => image.remove(), {once: true});
             preview.append(image);
         }
@@ -1093,29 +1185,8 @@
         const display = channel.display_name || channel.login;
         name.textContent = display.toLowerCase() === channel.login.toLowerCase()
             ? display : `${display} (${channel.login})`;
-        if (/^https:\/\/static-cdn\.jtvnw\.net\//.test(channel.profile_image_url || "")) {
-            const avatar = document.createElement("img");
-            avatar.className = "raid-browser-avatar";
-            avatar.src = channel.profile_image_url;
-            avatar.alt = "";
-            avatar.width = 20; avatar.height = 20;
-            avatar.loading = "lazy";
-            avatar.addEventListener("error", () => avatar.remove(), {once: true});
-            const label = document.createElement("span"); label.textContent = name.textContent;
-            name.textContent = "";
-            name.append(avatar, label);
-        }
         name.title = display.toLowerCase() === channel.login.toLowerCase() ? display : `${display} (${channel.login})`;
         heading.append(name);
-        if (channel.verified === true) {
-            const badge = document.createElement("span");
-            badge.className = "raid-browser-verified";
-            badge.setAttribute("role", "img");
-            badge.setAttribute("aria-label", "Verified Twitch Partner");
-            badge.title = "Verified";
-            badge.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 1 3 3 4-.2.2 4 3 3-3 3-.2 4-4-.2-3 3-3-3-4 .2-.2-4-3-3 3-3 .2-4 4 .2z"/><path d="m7.5 12 3 3 6-6" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-            heading.append(badge);
-        }
         const startedAt = Date.parse(channel.started_at);
         const streamActions = document.createElement("div");
         streamActions.className = "raid-browser-stream-actions";
@@ -1255,14 +1326,50 @@
         if (channel.mutual === null) lines.push("Mutual following: unverified");
         matchInfo.textContent = lines.join("\n");
         card.append(matchInfo);
+        updateCardProfile(card, channel);
         return card;
     }
+    let prefetchedRequest = null;
+    const prefetchLifetimeMs = 60_000;
+    function matchesPrefetch(request, url) {
+        return request?.url === url.href && Date.now() - request.started < prefetchLifetimeMs;
+    }
+    function hasOversizedTag() {
+        return (search.querySelector('[name="tags"]')?.value || '').split(',').some(tag => Array.from(tag.trim()).length > 25);
+    }
+    function browserRequestUrl(query, filters, after = '') {
+        const url = new URL(dialog.dataset.browserUrl, window.location.origin);
+        url.searchParams.set('defer_profiles', 'true');
+        if (query) url.searchParams.set('query', query);
+        for (const [name, value] of Object.entries(filters)) url.searchParams.set(name, value);
+        if (activeTab === 'favorites') url.searchParams.set('favorites_only', 'true');
+        if (favorites.size) url.searchParams.set('favorites', [...favorites].join(','));
+        if (blacklist.size) url.searchParams.set('blocked', [...blacklist].join(','));
+        if (after) url.searchParams.set('after', after);
+        return url;
+    }
+    async function fetchBrowserResults(url, signal) {
+        const response = await fetch(url, {signal, cache: 'no-store', headers: {Accept: 'application/json'}});
+        return {ok: response.ok, payload: await response.json()};
+    }
+    function prefetchInitialResults(event) {
+        if (dialog.open || event.pointerType === 'touch') return;
+        if (hasOversizedTag()) return;
+        const url = browserRequestUrl(input.value.trim(), readFilters());
+        if (matchesPrefetch(prefetchedRequest, url)) return;
+        prefetchedRequest?.controller.abort();
+        const request = new AbortController();
+        prefetchedRequest = {url: url.href, started: Date.now(), controller: request,
+            promise: fetchBrowserResults(url, request.signal).then(result => result.ok ? result : null).catch(() => null)};
+    }
+    opener.addEventListener('pointerenter', prefetchInitialResults);
+    window.addEventListener('pagehide', () => prefetchedRequest?.controller.abort());
     async function load(append = false, origins = null) {
         if (append && (loading || !cursor)) return;
         clearTimeout(searchTimer);
         controller?.abort();
         const tagField = search.querySelector('[name="tags"]');
-        const tagTooLong = (tagField?.value || "").split(",").some(tag => Array.from(tag.trim()).length > 25);
+        const tagTooLong = hasOversizedTag();
         tagField?.setCustomValidity?.(tagTooLong ? "Each tag must be 25 characters or fewer." : "");
         if (tagTooLong) {
             loading = false;
@@ -1286,18 +1393,21 @@
         }
         showStatus("Loading live channels...");
         results.setAttribute("aria-busy", "true");
-        const url = new URL(dialog.dataset.browserUrl, window.location.origin);
         const requestedFavorites = [...favorites].join(",");
-        if (currentQuery) url.searchParams.set("query", currentQuery);
-        for (const [name, value] of Object.entries(currentFilters)) url.searchParams.set(name, value);
-        if (activeTab === "favorites") url.searchParams.set("favorites_only", "true");
-        if (favorites.size) url.searchParams.set("favorites", [...favorites].join(","));
-        if (blacklist.size) url.searchParams.set("blocked", [...blacklist].join(","));
         const previousCursor = cursor;
-        if (append && previousCursor) url.searchParams.set("after", previousCursor);
+        const url = browserRequestUrl(currentQuery, currentFilters, append ? previousCursor : '');
         try {
-            const response = await fetch(url, {signal: request.signal, cache: "no-store", headers: {Accept: "application/json"}});
-            const payload = await response.json();
+            let prefetched = null;
+            if (!append && prefetchedRequest) {
+                const warm = prefetchedRequest; prefetchedRequest = null;
+                if (matchesPrefetch(warm, url)) {
+                    request.signal.addEventListener('abort', () => warm.controller.abort(), {once: true});
+                    prefetched = await warm.promise;
+                    if (request.signal.aborted || !dialog.open) return;
+                } else warm.controller.abort();
+            }
+            const response = prefetched || await fetch(url, {signal: request.signal, cache: 'no-store', headers: {Accept: 'application/json'}});
+            const payload = prefetched ? prefetched.payload : await response.json();
             if (request.signal.aborted || !dialog.open) return;
             if (!response.ok) {
                 throw new Error(payload.detail || "Live channels could not be loaded.");
@@ -1338,6 +1448,7 @@
                 tabSwapWaiting = false;
                 tabCardOrigins = origins;
             }
+            for (const id of payload.profile_pending_ids || []) pendingProfiles.add(id);
             const anchor = append ? {
                 id: channels[Math.floor(results.scrollTop / rowStride) * columns]?.id,
                 offset: results.scrollTop % rowStride,
@@ -1455,6 +1566,7 @@
     dialog.addEventListener("click", event => dismissOnBackdropClick(dialog, event));
     dialog.addEventListener("pointercancel", () => backdropPresses.delete(dialog));
     dialog.addEventListener("close", () => {
+        clearProfileRequests();
         clearTimeout(statusTimer); statusTimer = null; statusRevision++;
         status.classList.remove("is-fading");
         previewLinkController?.abort(); previewLinkController = null; previewLinkLogin = "";

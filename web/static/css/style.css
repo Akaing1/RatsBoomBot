@@ -644,7 +644,7 @@ html.raid-browser-open { overflow: hidden; }
 .raid-browser-viewers { position: absolute; left: 5px; bottom: 5px; padding: 2px 5px; border-radius: 4px; background: rgba(0,0,0,.8); color: #fff; font-size: 11px; line-height: 16px; }
 .raid-browser-live-time { position: absolute; right: 5px; bottom: 5px; padding: 2px 5px; border-radius: 4px; background: rgba(0,0,0,.8); color: #fff; font-size: 11px; line-height: 16px; white-space: nowrap; }
 .raid-browser-team { max-width: 120px; min-width: 0; padding: 2px 5px; border-radius: 4px; background: rgba(139,92,246,.15); color: #c7b7ff; font-size: 11px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.raid-browser-stream-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; margin-left: auto; }
+.raid-browser-stream-actions { display: flex; min-width: 0; flex: 0 1 auto; align-items: center; gap: 6px; margin-left: auto; }
 .raid-browser-channel-heading > .raid-browser-pin { margin-left: 0; }
 .raid-browser-start-raid { height: 30px; padding: 0 16px; border: 1px solid transparent; border-radius: 6px; background: var(--accent); box-shadow: 0 2px 3px rgba(0,0,0,.25); color: #fff; font: inherit; font-size: 14px; font-weight: 700; line-height: 28px; transition: background .15s ease, box-shadow .15s ease; }
 .raid-browser-start-raid:disabled { opacity: .65; cursor: not-allowed; }
@@ -718,7 +718,7 @@ html.raid-browser-open { overflow: hidden; }
 .raid-browser-channel img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .raid-browser-name, .raid-browser-channel p { margin: 0; overflow-wrap: anywhere; }
 .raid-browser-channel p { color: var(--muted); font-size: 12px; }
-.raid-browser-name { display: block; min-width: 0; height: 20px; flex: 0 1 auto; color: var(--text); font-size: 14px; font-weight: 700; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.raid-browser-name { display: block; min-width: 0; height: 20px; flex: 0 0 auto; color: var(--text); font-size: 14px; font-weight: 700; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .raid-browser-name:has(.raid-browser-avatar) { display: inline-flex; align-items: center; gap: 6px; }
 .raid-browser-name .raid-browser-avatar { display: block; width: 20px; height: 20px; flex: 0 0 20px; border-radius: 50%; object-fit: cover; }
 .raid-browser-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

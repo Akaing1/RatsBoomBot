@@ -46,6 +46,9 @@ CHAT_SEND_TARGETS = {"twitch", "youtube", "both"}
 CHAT_MESSAGE_MAX_LENGTH = 500
 TOP_GAMES_CACHE_SECONDS = 300
 RAID_BROWSER_DEV_CHANNELS = {"minamichimaa", "ninjakaing"}
+RAID_BROWSER_METADATA_CACHE_SECONDS = 24 * 60 * 60
+RAID_BROWSER_FOLLOW_CACHE_SECONDS = 60 * 60
+RAID_BROWSER_LIVE_CACHE_SECONDS = 60
 
 
 def raid_channel_search_score(query, login, display_name="", category=""):
@@ -723,7 +726,7 @@ async def channel_raid_browser(
     request: Request, query: str = "", after: str = "", same_category: bool = False,
     same_tags: bool = False, tags: str = "", tag_match: str = "all", language: str = "", following: bool = False, not_following: bool = False,
     mutual: bool = False, recommended: bool = False, same_team: bool = False, team: str = "", favorites: str = "",
-    favorites_only: bool = False, blocked: str = "", category_id: str = "", suggested: bool = False, sort: str = "", event: str = "", developer_only: bool = False,
+    favorites_only: bool = False, blocked: str = "", category_id: str = "", suggested: bool = False, sort: str = "", event: str = "", developer_only: bool = False, defer_profiles: bool = False,
 ):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
     if not broadcaster_id:
@@ -791,28 +794,42 @@ async def channel_raid_browser(
                 return JSONResponse({"detail": "Set your channel category before using Same category."}, status_code=400)
             if same_tags and not own_tags:
                 return JSONResponse({"detail": "Your channel has no tags to match yet."}, status_code=400)
-        followed_streams = []
-        suggested_streams, suggested_ids = [], set()
-        suggested_status = None
-        if recommended or suggested:
+        async def load_suggested():
+            if not (recommended or suggested):
+                return [], set(), None
             broadcaster = runtime_bot.services.broadcasters.get_broadcasters()[broadcaster_id]
             shelf, suggested_status = await get_suggested_streamers(runtime_bot, broadcaster_id, getattr(broadcaster, "login", None))
             suggested_ids = {channel["id"] for channel in shelf}
+            suggested_streams = []
             if (suggested or not after) and suggested_ids and not favorites_only:
                 ids = sorted(suggested_ids)
                 for offset in range(0, len(ids), 100):
                     live = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": ids[offset:offset + 100], "first": 100})
                     suggested_streams.extend(live.get("data", []))
-        team_streams, team_members = await raid_browser_team_streams(runtime_bot, broadcaster_id) if recommended or same_team else ([], {})
-        if ((recommended or not_following) and not (following or mutual)) or ((favorites_only or same_team) and (following or mutual)):
+            return suggested_streams, suggested_ids, suggested_status
+
+        async def load_teams():
+            return await raid_browser_team_streams(runtime_bot, broadcaster_id) if recommended or same_team else ([], {})
+
+        async def load_followed():
+            if not (((recommended or not_following) and not (following or mutual)) or ((favorites_only or same_team) and (following or mutual))):
+                return []
             try:
-                followed_streams = await raid_browser_followed_streams(runtime_bot, broadcaster_id)
+                return await raid_browser_followed_streams(runtime_bot, broadcaster_id)
             except HTTPException as error:
                 # Favorites remain usable without follow scopes; compatibility
                 # scores still apply even when following bonuses are unknown.
                 if not favorites_only or following or mutual or not_following or error.status not in {401, 403}:
                     raise
                 LOGGER.warning("[Dashboard] Following bonuses unavailable for favorites in %s.", broadcaster_id)
+                return []
+
+        sources = await asyncio.gather(load_suggested(), load_teams(), load_followed(), return_exceptions=True)
+        for source in sources:
+            if isinstance(source, BaseException):
+                raise source
+        (suggested_streams, suggested_ids, suggested_status), (team_streams, team_members), followed_streams = sources
+        favorite_availability = None
         recent_raiders = {}
         if recommended:
             try:
@@ -837,6 +854,7 @@ async def channel_raid_browser(
         elif favorites_only:
             page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100}) if favorite_ids else {"data": [], "pagination": {}}
             streams = page
+            favorite_availability = page.get("data", [])
         elif same_team:
             page = {"data": team_streams, "pagination": {}}
             streams = page
@@ -846,8 +864,7 @@ async def channel_raid_browser(
                 page = {"data": followed_streams, "pagination": {}}
             else:
                 params["user_id"] = broadcaster_id
-                page = await runtime_bot._http.request_json(Route(
-                    "GET", "streams/followed", params=params, token_for=broadcaster_id))
+                page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams/followed", params)
             streams = page
         elif suggested:
             page = {"data": suggested_streams, "pagination": {}}
@@ -949,6 +966,7 @@ async def channel_raid_browser(
         if favorite_ids and not after and not favorites_only and (recommended or sort not in {"viewers_asc", "uptime_asc"}):
             favorite_page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100})
             favorite_streams = favorite_page.get("data", [])
+            favorite_availability = favorite_streams
         candidates = [*dev_streams, *favorite_streams, *recent_raid_streams, *(followed_streams if not after else []),
                       *(suggested_streams if recommended and not after else []),
                       *(team_streams if recommended and not after and not (following or mutual) else []), *streams.get("data", [])]
@@ -1035,9 +1053,28 @@ async def channel_raid_browser(
                 "thumbnail_url_medium": str(stream.get("thumbnail_url") or "").replace("{width}", "640").replace("{height}", "360"),
                 "thumbnail_url_large": str(stream.get("thumbnail_url") or "").replace("{width}", "1280").replace("{height}", "720"),
             })
-        relationships = await raid_browser_relationships(runtime_bot, broadcaster_id, channels,
-            followed_ids if recommended or following or mutual or not_following else None)
-        sizes = await raid_browser_channel_sizes(runtime_bot, broadcaster_id, [channel["id"] for channel in channels]) if sort == "for_you" and channels else {}
+        async def load_sizes():
+            return await raid_browser_channel_sizes(runtime_bot, broadcaster_id, [channel["id"] for channel in channels]) if sort == "for_you" and channels else {}
+
+        async def load_collections():
+            return await raid_browser_collection_visibility(runtime_bot, broadcaster_id, favorite_ids, blocked_ids,
+                team_streams=team_streams if recommended or same_team else None,
+                favorite_streams=favorite_availability) if not after else {}
+
+        profile_pending_ids = []
+        async def load_profiles():
+            if not defer_profiles:
+                return await raid_browser_profiles(runtime_bot, broadcaster_id, channels)
+            profiles, missing = raid_browser_cached_profiles(runtime_bot, broadcaster_id, channels)
+            profile_pending_ids.extend(missing)
+            return profiles
+
+        # Ranking still completes before rendering, but uncached pictures
+        # can be filled in afterward without changing card order.
+        relationships, sizes, profiles, collection_visibility = await asyncio.gather(
+            raid_browser_relationships(runtime_bot, broadcaster_id, channels,
+                followed_ids if recommended or following or mutual or not_following else None),
+            load_sizes(), load_profiles(), load_collections())
         own_viewers = getattr(runtime_bot.services.broadcasters.get_broadcasters()[broadcaster_id], "viewer_count", None)
         for channel in channels:
             channel.update(relationships.get(channel["id"], {}))
@@ -1065,22 +1102,13 @@ async def channel_raid_browser(
         else:
             channels.sort(key=lambda item: item["viewers"], reverse=True)
         channels.sort(key=lambda item: (item["id"] not in favorite_ids, not item["dev_priority"]))
-        # Stream objects don't contain Partner status. Get Users is authoritative.
-        profiles = {}
-        try:
-            ids = [channel["id"] for channel in channels]
-            for offset in range(0, len(ids), 100):
-                users = await raid_browser_cached_request(runtime_bot, broadcaster_id, "users", {"id": ids[offset:offset + 100]})
-                profiles.update({str(user["id"]): user for user in users.get("data", [])})
-        except Exception:
-            LOGGER.warning("[Dashboard] Partner status unavailable for raid-browser channels.")
         for channel in channels:
             profile = profiles.get(channel["id"])
             channel["verified"] = profile.get("broadcaster_type") == "partner" if profile else None
             channel["profile_image_url"] = str(profile.get("profile_image_url") or "") if profile else ""
             channel["description"] = str(profile.get("description") or "") if profile else ""
-        collection_visibility = await raid_browser_collection_visibility(runtime_bot, broadcaster_id, favorite_ids, blocked_ids) if not after else {}
         return JSONResponse({"channels": channels, "cursor": page.get("pagination", {}).get("cursor", ""), "suggested_status": suggested_status,
+                             **({"profile_pending_ids": profile_pending_ids} if profile_pending_ids else {}),
                              **({"teams": sorted({label for labels in team_members.values() for label in labels}, key=str.casefold)} if same_team else {}),
                              "sort_scope": page.get("sort_scope", ""), "search_limited": page.get("search_limited", False),
                              **collection_visibility,
@@ -1140,7 +1168,7 @@ async def raid_browser_official_directory(runtime_bot, broadcaster_id, *, after=
             "search_limited": bool(next_cursor and checked >= 5)}
 
 
-async def raid_browser_collection_visibility(runtime_bot, broadcaster_id, favorite_ids, blocked_ids):
+async def raid_browser_collection_visibility(runtime_bot, broadcaster_id, favorite_ids, blocked_ids, *, team_streams=None, favorite_streams=None):
     def has_visible_stream(streams):
         return any(str(stream.get("user_id", "")) not in blocked_ids
                    and (str(stream.get("user_id", "")) != broadcaster_id or str(stream.get("user_login", "")).casefold() in RAID_BROWSER_DEV_CHANNELS)
@@ -1148,14 +1176,17 @@ async def raid_browser_collection_visibility(runtime_bot, broadcaster_id, favori
 
     visibility = {}
     try:
-        favorites = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100}) if favorite_ids else {"data": []}
-        visibility["favorites_live"] = has_visible_stream(favorites.get("data", []))
-        visibility["live_favorite_ids"] = [str(stream.get("user_id", "")) for stream in favorites.get("data", []) if has_visible_stream([stream])]
+        if favorite_streams is None:
+            favorites = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100}) if favorite_ids else {"data": []}
+            favorite_streams = favorites.get("data", [])
+        visibility["favorites_live"] = has_visible_stream(favorite_streams)
+        visibility["live_favorite_ids"] = [str(stream.get("user_id", "")) for stream in favorite_streams if has_visible_stream([stream])]
     except Exception:
         LOGGER.warning("[Dashboard] Live favorites availability could not be checked.")
     try:
-        teams, _ = await raid_browser_team_streams(runtime_bot, broadcaster_id)
-        visibility["team_live"] = has_visible_stream(teams)
+        if team_streams is None:
+            team_streams, _ = await raid_browser_team_streams(runtime_bot, broadcaster_id)
+        visibility["team_live"] = has_visible_stream(team_streams)
     except Exception:
         LOGGER.warning("[Dashboard] Live stream-team availability could not be checked.")
     return visibility
@@ -1208,6 +1239,65 @@ async def raid_browser_relationships(runtime_bot, broadcaster_id, channels, foll
         return {}
 
 
+@router.get("/channel/api/raid-browser/profiles", response_class=JSONResponse)
+async def channel_raid_browser_profiles(request: Request, ids: str = ""):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster_id = str(broadcaster_id)
+    if broadcaster_id not in runtime_bot.services.broadcasters.get_broadcasters():
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    user_ids = list(dict.fromkeys(ids.split(","))) if ids else []
+    if len(ids) > 2600 or len(user_ids) > 100 or any(not re.fullmatch(r"\d{1,25}", item) for item in user_ids):
+        return JSONResponse({"detail": "Invalid channel IDs."}, status_code=400)
+    profiles = await raid_browser_profiles(runtime_bot, broadcaster_id, [{"id": user_id} for user_id in user_ids])
+    return JSONResponse({"profiles": [{"id": user_id,
+        "profile_image_url": str(profile.get("profile_image_url") or ""),
+        "description": str(profile.get("description") or ""),
+        "verified": profile.get("broadcaster_type") == "partner"} for user_id, profile in profiles.items()]})
+
+
+def raid_browser_cached_profiles(runtime_bot, broadcaster_id, channels):
+    """Read daily profile entries, including cached missing profiles."""
+    profiles = {}
+    cache = getattr(runtime_bot, "_raid_browser_profile_cache", {})
+    now = time.monotonic()
+    missing = []
+    for user_id in sorted({channel["id"] for channel in channels}):
+        cached = cache.get((broadcaster_id, user_id))
+        if cached and now - cached[0] < RAID_BROWSER_METADATA_CACHE_SECONDS:
+            if cached[1] is not None:
+                profiles[user_id] = cached[1]
+        else:
+            missing.append(user_id)
+    return profiles, missing
+
+
+async def raid_browser_profiles(runtime_bot, broadcaster_id, channels):
+    """Fetch authoritative profile data independently of ranking lookups."""
+    profiles, missing = raid_browser_cached_profiles(runtime_bot, broadcaster_id, channels)
+    cache = getattr(runtime_bot, "_raid_browser_profile_cache", None)
+    if cache is None:
+        cache = runtime_bot._raid_browser_profile_cache = {}
+    try:
+        for offset in range(0, len(missing), 100):
+            batch = missing[offset:offset + 100]
+            users = await raid_browser_cached_request(runtime_bot, broadcaster_id, "users", {"id": batch})
+            found = {str(user["id"]): user for user in users.get("data", [])}
+            profiles.update(found)
+            for user_id in batch:
+                key = (broadcaster_id, user_id)
+                if len(cache) >= 1000 and key not in cache:
+                    cache.pop(next(iter(cache)))
+                cache[key] = (time.monotonic(), found.get(user_id))
+    except Exception:
+        LOGGER.warning("[Dashboard] Partner status unavailable for raid-browser channels.")
+    return profiles
+
+
 async def raid_browser_channel_sizes(runtime_bot, reader, targets):
     """Public follower totals, cached for an hour, with a short discovery budget."""
     cache = getattr(runtime_bot, "_raid_browser_size_cache", None)
@@ -1238,39 +1328,67 @@ async def raid_browser_channel_sizes(runtime_bot, reader, targets):
                 total = None
             if len(cache) >= 1000 and key not in cache:
                 cache.pop(next(iter(cache)))
-            cache[key] = (time.monotonic() + (3600 if total is not None else 60), total)
+            cache[key] = (time.monotonic() + (RAID_BROWSER_FOLLOW_CACHE_SECONDS if total is not None else RAID_BROWSER_LIVE_CACHE_SECONDS), total)
             totals[target] = total
 
     tasks = [asyncio.create_task(load(target)) for target in dict.fromkeys([reader, *targets])]
     try:
-        _, pending = await asyncio.wait(tasks, timeout=2)
-        for task in pending:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        return totals
+        await asyncio.wait(tasks, timeout=2)
     finally:
         for task in tasks:
             if not task.done():
                 task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+    return totals
 
 
 async def raid_browser_cached_request(runtime_bot, broadcaster_id: str, path: str, params: dict, *, refresh: bool = False):
-    """Cache channel metadata and mutual-follow checks briefly, scoped to this runtime/account."""
+    """Cache stable metadata for a day, but keep live results short-lived."""
     cache = getattr(runtime_bot, "_raid_browser_cache", None)
     if cache is None:
         cache = runtime_bot._raid_browser_cache = {}
+    # Repeated ID/login query parameters are sets, not ordering instructions.
+    params = {name: sorted(set(value)) if name in {"id", "user_id", "login", "broadcaster_id"} and isinstance(value, list)
+              else value for name, value in params.items()}
     key = (broadcaster_id, path, tuple((name, tuple(value) if isinstance(value, list) else value)
                                     for name, value in sorted(params.items())))
     cached = cache.get(key)
-    if not refresh and cached and time.monotonic() - cached[0] < 60:
+    if path in {"users", "teams", "teams/channel"}:
+        ttl = RAID_BROWSER_METADATA_CACHE_SECONDS
+    elif path in {"channels/followed", "channels/followers"}:
+        ttl = RAID_BROWSER_FOLLOW_CACHE_SECONDS
+    else:
+        ttl = RAID_BROWSER_LIVE_CACHE_SECONDS
+    if not refresh and cached and time.monotonic() - cached[0] < ttl:
         return cached[1]
-    payload = await runtime_bot._http.request_json(Route(
-        "GET", path, use_id=path == "oauth2/validate", params=params, token_for=broadcaster_id))
-    if len(cache) >= 500:
-        cache.pop(next(iter(cache)))
-    cache[key] = (time.monotonic(), payload)
-    return payload
+    inflight = getattr(runtime_bot, "_raid_browser_inflight", None)
+    if inflight is None:
+        inflight = runtime_bot._raid_browser_inflight = {}
+    task = None if refresh else inflight.get(key)
+    if task is None:
+        async def load():
+            payload = await runtime_bot._http.request_json(Route(
+                "GET", path, use_id=path == "oauth2/validate", params=params, token_for=broadcaster_id))
+            # An older lookup must not overwrite an explicit refresh.
+            if inflight.get(key) is asyncio.current_task():
+                if len(cache) >= 500 and key not in cache:
+                    cache.pop(next(iter(cache)))
+                cache[key] = (time.monotonic(), payload)
+            return payload
+
+        task = asyncio.create_task(load())
+        inflight[key] = task
+
+        def finished(completed):
+            if inflight.get(key) is completed:
+                inflight.pop(key, None)
+            if not completed.cancelled():
+                completed.exception()  # Observe failures even if every caller left.
+
+        task.add_done_callback(finished)
+    # Changing a filter can cancel its request without cancelling a lookup
+    # another request is already sharing.
+    return await asyncio.shield(task)
 
 
 async def raid_browser_followed_streams(runtime_bot, broadcaster_id: str):

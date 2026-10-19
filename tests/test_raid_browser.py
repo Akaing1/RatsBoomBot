@@ -1,4 +1,5 @@
 import json
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -12,6 +13,244 @@ from web.channel.routers import dashboard
 relationship_lookup = dashboard.raid_browser_relationships
 dev_lookup = dashboard.raid_browser_dev_streams
 collection_lookup = dashboard.raid_browser_collection_visibility
+
+
+@pytest.mark.asyncio
+async def test_identical_cache_misses_share_one_request_when_a_caller_cancels():
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def respond(route):
+        started.set()
+        await release.wait()
+        return {"data": [{"id": "2"}]}
+
+    api = AsyncMock(side_effect=respond)
+    bot = SimpleNamespace(_http=SimpleNamespace(request_json=api))
+    first = asyncio.create_task(dashboard.raid_browser_cached_request(bot, "1", "users", {"id": ["2"]}))
+    await started.wait()
+    second = asyncio.create_task(dashboard.raid_browser_cached_request(bot, "1", "users", {"id": ["2"]}))
+    await asyncio.sleep(0)
+    first.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    release.set()
+    assert await second == {"data": [{"id": "2"}]}
+    assert api.await_count == 1
+    assert not bot._raid_browser_inflight
+
+
+@pytest.mark.asyncio
+async def test_shared_lookup_failure_is_not_cached_and_can_be_retried():
+    api = AsyncMock(side_effect=[RuntimeError("temporary"), {"data": []}])
+    bot = SimpleNamespace(_http=SimpleNamespace(request_json=api))
+    results = await asyncio.gather(*(dashboard.raid_browser_cached_request(bot, "1", "teams/channel", {})
+                                     for _ in range(2)), return_exceptions=True)
+    assert all(isinstance(result, RuntimeError) for result in results)
+    assert api.await_count == 1
+    assert await dashboard.raid_browser_cached_request(bot, "1", "teams/channel", {}) == {"data": []}
+    assert api.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_explicit_refresh_cannot_be_overwritten_by_an_older_request():
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def old(route):
+        started.set()
+        await release.wait()
+        return {"data": ["old"]}
+
+    bot = SimpleNamespace(_http=SimpleNamespace(request_json=AsyncMock(side_effect=old)))
+    first = asyncio.create_task(dashboard.raid_browser_cached_request(bot, "1", "channels", {}))
+    await started.wait()
+    bot._http.request_json.side_effect = None
+    bot._http.request_json.return_value = {"data": ["new"]}
+    assert await dashboard.raid_browser_cached_request(bot, "1", "channels", {}, refresh=True) == {"data": ["new"]}
+    release.set()
+    assert await first == {"data": ["old"]}
+    assert await dashboard.raid_browser_cached_request(bot, "1", "channels", {}) == {"data": ["new"]}
+
+
+@pytest.mark.asyncio
+async def test_profile_cache_is_reused_across_sort_orders(monkeypatch):
+    api = runtime(monkeypatch, [], profiles=[{"id": "2"}, {"id": "3"}])
+    bot = dashboard.get_bot()
+    first = await dashboard.raid_browser_profiles(bot, "1", [{"id": "3"}, {"id": "2"}])
+    assert await dashboard.raid_browser_profiles(bot, "1", [{"id": "2"}, {"id": "3"}]) == first
+    assert api.await_count == 1
+    assert await dashboard.raid_browser_profiles(bot, "1", [{"id": "2"}]) == {"2": {"id": "2"}}
+    assert api.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_reordered_duplicate_ids_share_cache_without_crossing_accounts():
+    api = AsyncMock(return_value={"data": []})
+    bot = SimpleNamespace(_http=SimpleNamespace(request_json=api))
+    await dashboard.raid_browser_cached_request(bot, "1", "streams", {"user_id": ["3", "2", "2"]})
+    await dashboard.raid_browser_cached_request(bot, "1", "streams", {"user_id": ["2", "3"]})
+    assert api.await_count == 1
+    await dashboard.raid_browser_cached_request(bot, "other", "streams", {"user_id": ["2", "3"]})
+    assert api.await_count == 2
+
+
+def test_cached_profile_reader_preserves_missing_entries_expiry_and_account_scope():
+    now = dashboard.time.monotonic()
+    profile = {"id": "2", "description": "Cached"}
+    bot = SimpleNamespace(_raid_browser_profile_cache={
+        ("1", "2"): (now, profile),
+        ("1", "3"): (now, None),
+        ("1", "4"): (now - dashboard.RAID_BROWSER_METADATA_CACHE_SECONDS - 1, {"id": "4"}),
+        ("other", "5"): (now, {"id": "5"}),
+    })
+    channels = [{"id": user_id} for user_id in ["5", "4", "3", "2", "2"]]
+    assert dashboard.raid_browser_cached_profiles(bot, "1", channels) == ({"2": profile}, ["4", "5"])
+    assert dashboard.raid_browser_cached_profiles(SimpleNamespace(), "1", channels) == ({}, ["2", "3", "4", "5"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path, params, ttl", [
+    ("users", {"id": ["2"]}, 86400),
+    ("teams/channel", {"broadcaster_id": "1"}, 86400),
+    ("teams", {"id": "team"}, 86400),
+    ("channels/followers", {"broadcaster_id": "1", "user_id": "2"}, 3600),
+    ("channels/followers", {"broadcaster_id": "1", "first": 1}, 3600),
+    ("channels/followed", {"user_id": "1"}, 3600),
+    ("streams", {"user_id": ["2"]}, 60),
+    ("streams/followed", {"user_id": "1"}, 60),
+    ("channels", {"broadcaster_id": "1"}, 60),
+    ("oauth2/validate", {}, 60),
+])
+async def test_cache_groups_use_daily_metadata_hourly_follows_and_minute_live_results(path, params, ttl):
+    api = AsyncMock(return_value={"data": []})
+    bot = SimpleNamespace(_http=SimpleNamespace(request_json=api))
+    await dashboard.raid_browser_cached_request(bot, "1", path, params)
+    key = next(iter(bot._raid_browser_cache))
+    _, payload = bot._raid_browser_cache[key]
+    bot._raid_browser_cache[key] = (dashboard.time.monotonic() - ttl + 10, payload)
+    await dashboard.raid_browser_cached_request(bot, "1", path, params)
+    assert api.await_count == 1
+    bot._raid_browser_cache[key] = (dashboard.time.monotonic() - ttl - 1, payload)
+    await dashboard.raid_browser_cached_request(bot, "1", path, params)
+    assert api.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_per_channel_profiles_are_reused_after_one_hour(monkeypatch):
+    api = runtime(monkeypatch, [], profiles=[{"id": "2"}])
+    bot = dashboard.get_bot()
+    await dashboard.raid_browser_profiles(bot, "1", [{"id": "2"}])
+    key = ("1", "2")
+    _, profile = bot._raid_browser_profile_cache[key]
+    bot._raid_browser_profile_cache[key] = (dashboard.time.monotonic() - 3600, profile)
+    # A subset would otherwise make a distinct API query; the per-ID cache
+    # should still satisfy it for the full 24-hour window.
+    assert await dashboard.raid_browser_profiles(bot, "1", [{"id": "2"}]) == {"2": profile}
+    assert api.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_response_enrichments_start_together_before_first_render(monkeypatch):
+    runtime(monkeypatch, [{"data": [{"game_id": "", "tags": []}]}, {"data": [stream("2")]}])
+    monkeypatch.setattr(dashboard, "get_suggested_streamers", AsyncMock(return_value=([], None)))
+    monkeypatch.setattr(dashboard, "raid_browser_team_streams", AsyncMock(return_value=([], {})))
+    monkeypatch.setattr(dashboard, "raid_browser_followed_streams", AsyncMock(return_value=[]))
+    started, ready = set(), asyncio.Event()
+
+    def lookup(name, result):
+        async def run(*args, **kwargs):
+            started.add(name)
+            if len(started) == 4:
+                ready.set()
+            await asyncio.wait_for(ready.wait(), 1)
+            return result
+        return run
+
+    monkeypatch.setattr(dashboard, "raid_browser_relationships", lookup("relationships", {"2": {"followed": True, "mutual": True}}))
+    monkeypatch.setattr(dashboard, "raid_browser_channel_sizes", lookup("sizes", {"1": 100, "2": 100}))
+    monkeypatch.setattr(dashboard, "raid_browser_profiles", lookup("profiles", {"2": {"id": "2", "broadcaster_type": "partner", "profile_image_url": "picture"}}))
+    monkeypatch.setattr(dashboard, "raid_browser_collection_visibility", lookup("collections", {"favorites_live": True}))
+    response = await dashboard.channel_raid_browser(request(), favorites="2", favorites_only=True, sort="for_you")
+    assert response.status_code == 200
+    payload = json.loads(response.body)
+    assert started == {"relationships", "sizes", "profiles", "collections"}
+    assert payload["channels"][0]["verified"] is True
+    assert payload["channels"][0]["profile_image_url"] == "picture"
+    assert payload["channels"][0]["mutual"] is True
+
+
+@pytest.mark.asyncio
+async def test_source_lookups_run_together_and_availability_reuses_their_results(monkeypatch):
+    runtime(monkeypatch, [{"data": [{"game_id": "", "tags": []}]}, {"data": [stream("2")]}])
+    started, ready = set(), asyncio.Event()
+    teams = [stream("3")]
+
+    def lookup(name, result):
+        async def run(*args):
+            started.add(name)
+            if len(started) == 3:
+                ready.set()
+            await asyncio.wait_for(ready.wait(), 1)
+            return result
+        return run
+
+    monkeypatch.setattr(dashboard, "get_suggested_streamers", lookup("suggested", ([], None)))
+    monkeypatch.setattr(dashboard, "raid_browser_team_streams", lookup("teams", (teams, {"3": ["Our Team"]})))
+    monkeypatch.setattr(dashboard, "raid_browser_followed_streams", lookup("followed", []))
+    visibility = AsyncMock(return_value={})
+    monkeypatch.setattr(dashboard, "raid_browser_collection_visibility", visibility)
+    response = await dashboard.channel_raid_browser(request(), favorites="2", favorites_only=True, sort="for_you")
+    assert response.status_code == 200
+    assert started == {"suggested", "teams", "followed"}
+    assert visibility.call_args.kwargs["team_streams"] is teams
+    assert [item["user_id"] for item in visibility.call_args.kwargs["favorite_streams"]] == ["2"]
+
+
+@pytest.mark.asyncio
+async def test_deferred_profiles_do_not_block_cards_and_warm_daily_cache(monkeypatch):
+    image = "https://static-cdn.jtvnw.net/jtv_user_pictures/target.png"
+    api = runtime(monkeypatch, [{"data": [stream("2")]}, {"data": [stream("2")]}],
+                  profiles=[{"id": "2", "profile_image_url": image, "broadcaster_type": "partner", "description": "Bio"}])
+    lookup = AsyncMock(wraps=dashboard.raid_browser_profiles)
+    monkeypatch.setattr(dashboard, "raid_browser_profiles", lookup)
+    first = json.loads((await dashboard.channel_raid_browser(request(), defer_profiles=True)).body)
+    assert first["profile_pending_ids"] == ["2"]
+    assert first["channels"][0]["profile_image_url"] == ""
+    lookup.assert_not_awaited()
+    result = json.loads((await dashboard.channel_raid_browser_profiles(request(), ids="2")).body)
+    assert result["profiles"] == [{"id": "2", "profile_image_url": image, "verified": True, "description": "Bio"}]
+    second = json.loads((await dashboard.channel_raid_browser(request(), defer_profiles=True)).body)
+    assert "profile_pending_ids" not in second
+    assert second["channels"][0]["profile_image_url"] == image
+    assert sum(call.args[0].path == "users" for call in api.await_args_list) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ids", ["nope", "../2", "2,,3", ",".join(str(i) for i in range(101))])
+async def test_profile_enrichment_rejects_invalid_or_oversized_batches(monkeypatch, ids):
+    api = runtime(monkeypatch, [])
+    assert (await dashboard.channel_raid_browser_profiles(request(), ids=ids)).status_code == 400
+    api.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_profile_enrichment_requires_connected_account(monkeypatch):
+    api = runtime(monkeypatch, [])
+    assert (await dashboard.channel_raid_browser_profiles(request(None), ids="2")).status_code == 401
+    assert (await dashboard.channel_raid_browser_profiles(request("missing"), ids="2")).status_code == 404
+    api.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_collection_visibility_does_not_repeat_loaded_source_lookups(monkeypatch):
+    fetch = AsyncMock(side_effect=AssertionError("Already loaded"))
+    teams = AsyncMock(side_effect=AssertionError("Already loaded"))
+    monkeypatch.setattr(dashboard, "raid_browser_cached_request", fetch)
+    monkeypatch.setattr(dashboard, "raid_browser_team_streams", teams)
+    result = await collection_lookup(object(), "1", ["2"], {"2"},
+                                     team_streams=[stream("3")], favorite_streams=[stream("2")])
+    assert result == {"favorites_live": False, "live_favorite_ids": [], "team_live": True}
+    fetch.assert_not_awaited()
+    teams.assert_not_awaited()
 
 
 @pytest.fixture(autouse=True)
@@ -1001,14 +1240,18 @@ async def test_collections_intersect_following_filters(monkeypatch, collection, 
 async def test_recommendations_include_unfollowed_teammate_in_different_category(monkeypatch):
     teammate = dict(stream("2", 2), game_id="different", language="en", tags=[])
     discovery = dict(stream("3", 10000), game_id="game", language="en", tags=[])
-    api = runtime(monkeypatch, [
-        {"data": [{"game_id": "game", "broadcaster_language": "en", "tags": []}]},
-        {"data": [{"team_id": "team"}]},
-        {"data": [{"team_display_name": "Our Team", "users": [{"user_id": "2"}]}]},
-        {"data": [teammate]},
-        {"data": [], "pagination": {}},
-        {"data": [discovery], "pagination": {}},
-    ])
+    api = runtime(monkeypatch, [])
+    async def respond(route):
+        if route.path == "channels":
+            return {"data": [{"game_id": "game", "broadcaster_language": "en", "tags": []}]}
+        if route.path == "teams/channel":
+            return {"data": [{"team_id": "team"}]}
+        if route.path == "teams":
+            return {"data": [{"team_display_name": "Our Team", "users": [{"user_id": "2"}]}]}
+        if route.path == "streams":
+            return {"data": [teammate if route.params.get("user_id") else discovery], "pagination": {}}
+        return {"data": [], "pagination": {}}
+    api.side_effect = respond
     response = await dashboard.channel_raid_browser(request(), recommended=True)
     channels = json.loads(response.body)["channels"]
     assert [channel["id"] for channel in channels] == ["3", "2"]

@@ -48,6 +48,7 @@ class Element {
     }
 }
 function setup(storage = new Map(), account = '1', hash = '', viewportWidth = 1280) {
+    let taskTimeOffset = 0;
     const location = {origin: 'http://localhost:4345', pathname: '/channel', search: '?test=1', hash};
     const windowHandlers = {};
     const setLocation = value => {
@@ -131,6 +132,7 @@ function setup(storage = new Map(), account = '1', hash = '', viewportWidth = 12
             history: {pushState: (_, __, url) => setLocation(url), replaceState: (_, __, url) => setLocation(url)},
             confirm: message => { confirmations.push(message); return confirmResult; }, localStorage: {
             getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value)}}), URL, URLSearchParams, AbortController,
+        Date: class extends Date { static now() { return Date.now() + taskTimeOffset; } },
         CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } },
         ResizeObserver: class { constructor(callback) { onResize = callback; resizeCallbacks.push(callback); } observe() {} },
         requestAnimationFrame: callback => setImmediate(callback), cancelAnimationFrame: clearImmediate,
@@ -140,13 +142,59 @@ function setup(storage = new Map(), account = '1', hash = '', viewportWidth = 12
         fetch: (url, options) => new Promise(resolve => requests.push({url, options,
             respond: (payload, ok = true) => resolve({ok, json: async () => payload})}))
     });
-    return {location, viewport, createdElements, tick: () => intervals.forEach(callback => callback()), windowHandlers, dialog, opener, search, input, results, status, tagOptions, close, root, requests, events, timers, delays, fields, storage, cardView, listView, filtersToggle, collectionTabs, collectionSelect,
+    return {advanceTime: seconds => { taskTimeOffset += seconds * 1000; }, location, viewport, createdElements, tick: () => intervals.forEach(callback => callback()), windowHandlers, dialog, opener, search, input, results, status, tagOptions, close, root, requests, events, timers, delays, fields, storage, cardView, listView, filtersToggle, collectionTabs, collectionSelect,
         browseTab, favoritesTab, teamTab, developerTab, manageButton, manager, managerClose, managerStatus, favoriteList, blockedList, confirmations, previewDialog, previewControls, previewPaneButtons,
         sizeSlider, tagSearch, tagLimit, tagMatchToggle, selectedTags, categorySearch, categoryOptions, favoriteTab, blacklistTab, favoritePanel, blacklistPanel,
         confirm: value => { confirmResult = value; },
         grid: () => results.children[0].children[0], resize: () => onResize(), resizePreview: () => resizeCallbacks[0]()};
 }
 const flush = () => new Promise(resolve => setImmediate(() => setImmediate(resolve)));
+
+for (const ready of [false, true]) test(`hover preload is reused on click when ${ready ? 'complete' : 'still running'}`, async () => {
+    const app = setup();
+    app.opener.handlers.pointerenter({pointerType: 'mouse'});
+    app.opener.handlers.pointerenter({pointerType: 'mouse'});
+    assert.equal(app.requests.length, 1);
+    assert.ok(!app.dialog.open);
+    if (ready) { app.requests[0].respond({channels: [channel()], cursor: ''}); await flush(); }
+    app.opener.handlers.click();
+    assert.equal(app.requests.length, 1);
+    if (!ready) app.requests[0].respond({channels: [channel()], cursor: ''});
+    await flush();
+    assert.equal(app.grid().children.length, 1);
+    assert.equal(app.requests.length, 1);
+});
+
+test('expired or mismatched hover preloads are aborted and replaced', async () => {
+    for (const expired of [false, true]) {
+        const app = setup(); app.opener.handlers.pointerenter({pointerType: 'mouse'});
+        if (expired) app.advanceTime(61);
+        else app.fields.language.value = 'ja';
+        app.opener.handlers.click();
+        assert.equal(app.requests[0].options.signal.aborted, true);
+        assert.equal(app.requests.length, 2);
+        app.requests[1].respond({channels: [channel('3')], cursor: ''}); await flush();
+        assert.equal(app.grid().children[0].dataset.channelId, '3');
+    }
+});
+
+test('failed hover preload retries on opening without showing an early error', async () => {
+    const app = setup(); app.opener.handlers.pointerenter({pointerType: 'mouse'});
+    app.requests[0].respond({detail: 'Temporary failure'}, false); await flush();
+    assert.ok(!app.dialog.open);
+    app.opener.handlers.click(); await flush();
+    assert.equal(app.requests.length, 2);
+    app.requests[1].respond({channels: [channel()], cursor: ''}); await flush();
+    assert.equal(app.grid().children.length, 1);
+});
+
+test('touch entry does not preload and closing aborts an adopted hover request', () => {
+    const app = setup(); app.opener.handlers.pointerenter({pointerType: 'touch'});
+    assert.equal(app.requests.length, 0);
+    app.opener.handlers.pointerenter({pointerType: 'mouse'});
+    app.opener.handlers.click(); app.close.handlers.click();
+    assert.equal(app.requests[0].options.signal.aborted, true);
+});
 
 test('compact layout toggle keeps its sliding bubble aligned with its buttons', () => {
     const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
@@ -1395,6 +1443,57 @@ test('thumbnails offer native responsive sources without scripted resolution swi
     app.sizeSlider.value = '0'; app.sizeSlider.handlers.input(); await flush();
     assert.equal(image.src, item.thumbnail_url);
     assert.equal(image.srcset, sources);
+});
+
+test('overscan thumbnails wait for visibility and activate without rebuilding cards', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: Array.from({length: 20}, (_, index) => channel(String(index + 2))), cursor: ''}); await flush();
+    const cards = [...app.grid().children];
+    const images = cards.map(card => card.querySelector('.raid-browser-thumbnail').querySelector('img'));
+    assert.equal(images[0].fetchPriority, 'high');
+    assert.equal(images[0].decoding, 'async');
+    assert.ok(images.some(image => image.src));
+    const deferredIndex = images.findIndex(image => !image.src);
+    assert.ok(deferredIndex > 0, 'Cards below the viewport must not start image requests');
+    assert.ok(images[deferredIndex].dataset.thumbnailSrc);
+    assert.equal(images[deferredIndex].srcset, undefined);
+    const stride = parseInt(app.grid().style.gridAutoRows) + 12;
+    app.results.scrollTop = stride * Math.floor(deferredIndex / 2);
+    app.results.handlers.scroll(); await flush();
+    assert.equal(app.grid().children.includes(cards[deferredIndex]), true);
+    assert.ok(images[deferredIndex].src);
+    assert.equal(images[deferredIndex].fetchPriority, 'high');
+    assert.equal(images[deferredIndex].dataset.thumbnailSrc, undefined);
+    assert.equal(app.requests.length, 1);
+});
+
+test('missing profile pictures load after visible cards without replacing them or repeating requests', async () => {
+    const app = setup(); app.opener.handlers.click();
+    assert.equal(app.requests[0].url.searchParams.get('defer_profiles'), 'true');
+    app.requests[0].respond({channels: [channel('2'), channel('3')], cursor: '', profile_pending_ids: ['2', '3']}); await flush();
+    const cards = [...app.grid().children];
+    assert.equal(cards.length, 2);
+    assert.equal(app.requests[1].url.pathname, '/channel/api/raid-browser/profiles');
+    assert.equal(app.requests[1].url.searchParams.get('ids'), '2,3');
+    const image = 'https://static-cdn.jtvnw.net/jtv_user_pictures/target.png';
+    app.requests[1].respond({profiles: [{id: '2', profile_image_url: image, verified: true, description: 'Bio'}]}); await flush();
+    assert.equal(app.grid().children[0], cards[0]);
+    assert.equal(app.grid().children[1], cards[1]);
+    assert.equal(cards[0].querySelector('.raid-browser-avatar').src, image);
+    assert.ok(cards[0].querySelector('.raid-browser-verified'));
+    app.results.handlers.scroll(); await flush();
+    assert.equal(app.requests.length, 2);
+});
+
+test('late profile response cannot modify a different filter result', async () => {
+    const app = setup(); app.opener.handlers.click();
+    app.requests[0].respond({channels: [channel('2')], cursor: '', profile_pending_ids: ['2']}); await flush();
+    app.fields.language.value = 'ja'; app.search.handlers.change({target: app.fields.language});
+    app.requests[2].respond({channels: [channel('3')], cursor: ''}); await flush();
+    const card = app.grid().children[0];
+    app.requests[1].respond({profiles: [{id: '2', profile_image_url: 'https://static-cdn.jtvnw.net/old.png'}]}); await flush();
+    assert.equal(app.grid().children[0], card);
+    assert.equal(card.querySelector('.raid-browser-avatar'), undefined);
 });
 
 test('responsive thumbnails omit untrusted and duplicate source URLs', async () => {
