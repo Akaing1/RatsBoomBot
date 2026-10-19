@@ -50,6 +50,32 @@ function setup({mobile = false, textRects = null} = {}) {
     return {Element, timers, observers, tooltip, handlers, hover: target => handlers.pointerover({target, type: 'pointerover'}), focus: target => handlers.focusin({target, type: 'focusin'})};
 }
 
+test('selected-value hovers show only the current option and refresh when it changes', () => {
+    const {Element, hover, handlers} = setup();
+    const language = new Element('select', {'data-hover-current-value': ''}, 'All languages English Japanese');
+    language.labels = [{textContent: 'Language All languages English Japanese'}];
+    language.selectedOptions = [{textContent: 'English'}];
+    hover(language);
+    assert.equal(language.attributes.title, 'English');
+    language.selectedOptions = [{textContent: 'Japanese'}];
+    handlers.input({target: language});
+    assert.equal(language.attributes.title, 'Japanese');
+    const event = new Element('select', {'data-hover-current-value': ''}, 'All events Drops Enabled');
+    event.selectedOptions = [{textContent: 'Drops Enabled'}];
+    hover(event);
+    assert.equal(event.attributes.title, 'Drops Enabled');
+});
+
+test('explicit Search and Tags labels do not include duplicate labels or helper text', () => {
+    const {Element, hover} = setup();
+    for (const name of ['Search', 'Tags']) {
+        const input = new Element('input', {'aria-label': name, title: name});
+        input.labels = [{textContent: name}, {textContent: `${name} Maximum 25 characters`}];
+        hover(input);
+        assert.equal(input.attributes.title, name);
+    }
+});
+
 test('adds descriptive labels to controls and dynamically added elements', () => {
     const {Element, hover} = setup();
     const button = new Element('button', {'aria-label': 'Pin message'}, '📌');
@@ -63,6 +89,21 @@ test('adds descriptive labels to controls and dynamically added elements', () =>
     assert.equal(field.attributes.title, 'New category');
     const emote = new Element('img', {alt: 'Kappa'});
     hover(emote); assert.equal(emote.attributes.title, 'Kappa');
+});
+
+test('pointer-only suggestions do not show hover labels on keyboard focus but still allow pointer hover', () => {
+    const ui = setup();
+    const suggestion = new ui.Element('button', {'data-hover-pointer-only': '', 'aria-label': 'Add VTuber'}, 'VTuber');
+    ui.focus(suggestion);
+    assert.equal(ui.timers.length, 0);
+    assert.equal(suggestion.getAttribute('title'), null);
+    ui.hover(suggestion);
+    ui.timers.at(-1).callback();
+    assert.equal(ui.tooltip.hidden, false);
+    assert.equal(ui.tooltip.textContent, 'Add VTuber');
+    ui.focus(suggestion);
+    assert.equal(ui.tooltip.hidden, true);
+    assert.equal(suggestion.getAttribute('title'), null);
 });
 
 test('live values update an open tooltip without restarting the hover delay', () => {
@@ -123,7 +164,8 @@ test('preserves explicit descriptions and refreshes changing accessible names', 
 test('uses associated labels and placeholders without exposing input values', () => {
     const {Element, hover, focus} = setup();
     const input = new Element('input'); input.labels = [{textContent: 'Duration'}];
-    focus(input); assert.equal(input.attributes.title, 'Duration');
+    hover(input); assert.equal(input.attributes.title, 'Duration');
+    focus(input); assert.equal(input.attributes.title, undefined);
     const search = new Element('input', {placeholder: 'Search emotes…'});
     hover(search); assert.equal(search.attributes.title, 'Search emotes…');
     const password = new Element('input', {type: 'password', value: 'secret'});
@@ -138,6 +180,40 @@ test('does not add tooltips to headings or ordinary static labels', () => {
         const heading = new Element(tag, {}, 'Title');
         hover(heading); assert.equal(heading.attributes.title, undefined);
     }
+});
+
+test('focused inputs hide open and pending labels until blurred', () => {
+    for (const tag of ['input', 'textarea', 'editable']) {
+        const ui = setup();
+        const field = new ui.Element(tag, {title: 'Edit value'});
+        // Model a contenteditable element in the minimal DOM fixture.
+        if (tag === 'editable') field.attributes.contenteditable = 'true';
+        ui.hover(field); ui.timers.at(-1).callback();
+        ui.focus(field);
+        assert.equal(ui.tooltip.hidden, true);
+        assert.equal(field.getAttribute('title'), null);
+        const count = ui.timers.length;
+        ui.hover(field);
+        ui.handlers.input({target: field, type: 'input'});
+        assert.equal(ui.timers.length, count);
+        assert.equal(ui.tooltip.hidden, true);
+        ui.handlers.focusout({target: field, relatedTarget: null});
+        ui.hover(field);
+        assert.equal(ui.timers.length, count + 1);
+        ui.focus(field);
+        assert.equal(ui.timers.at(-1).cancelled, true);
+    }
+});
+
+test('hiding input hover labels does not manipulate the native suggestion popover stack', () => {
+    const ui = setup();
+    ui.tooltip.showPopover = () => assert.fail('Hover labels must not open native popovers');
+    ui.tooltip.hidePopover = () => assert.fail('Hover labels must not close native popovers');
+    const field = new ui.Element('input', {placeholder: 'Search tags'});
+    ui.hover(field); ui.timers.at(-1).callback();
+    assert.equal(ui.tooltip.attributes.popover, undefined);
+    ui.focus(field);
+    assert.equal(ui.tooltip.hidden, true);
 });
 
 test('queued and points-lost summaries show their current values', () => {

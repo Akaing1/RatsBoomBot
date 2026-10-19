@@ -10,6 +10,7 @@ class BroadcasterSettings:
     discord_url: str | None = None
     youtube_url: str | None = None
     timers_enabled: bool = True
+    follow_raid: bool = True
 
 
 class BroadcasterSettingsService:
@@ -25,7 +26,8 @@ class BroadcasterSettingsService:
             broadcaster_id TEXT PRIMARY KEY,
             discord_url TEXT,
             youtube_url TEXT,
-            timers_enabled INTEGER NOT NULL DEFAULT 1
+            timers_enabled INTEGER NOT NULL DEFAULT 1,
+            follow_raid INTEGER NOT NULL DEFAULT 1
         )
         """
 
@@ -44,7 +46,7 @@ class BroadcasterSettingsService:
         broadcaster_id = str(broadcaster_id)
 
         query = """
-        SELECT broadcaster_id, discord_url, youtube_url, timers_enabled
+        SELECT broadcaster_id, discord_url, youtube_url, timers_enabled, follow_raid
         FROM broadcaster_settings
         WHERE broadcaster_id = ?
         """
@@ -75,8 +77,15 @@ class BroadcasterSettingsService:
             broadcaster_id=row["broadcaster_id"],
             discord_url=row["discord_url"],
             youtube_url=row["youtube_url"],
-            timers_enabled=bool(row["timers_enabled"])
+            timers_enabled=bool(row["timers_enabled"]),
+            follow_raid=bool(row["follow_raid"])
         )
+
+    async def set_follow_raid(self, broadcaster_id: str, enabled: bool) -> None:
+        async with self.db.acquire() as connection:
+            await connection.execute("""INSERT INTO broadcaster_settings (broadcaster_id, follow_raid) VALUES (?, ?)
+                ON CONFLICT(broadcaster_id) DO UPDATE SET follow_raid = excluded.follow_raid""",
+                (str(broadcaster_id), int(enabled)))
 
     async def set_discord_url(self, broadcaster_id: str, discord_url: str) -> None:
         broadcaster_id = str(broadcaster_id)

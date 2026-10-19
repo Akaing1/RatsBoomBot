@@ -70,6 +70,9 @@ from storage.migrations.v060_royal_raven import migrate as migrate_royal_raven
 from storage.migrations.v061_adaptive_mini_bosses import migrate as migrate_adaptive_mini_bosses
 
 from storage.migrations.v063_dog_of_the_sun import migrate as migrate_dog_of_the_sun
+from storage.migrations.v065_incoming_raid_recency import migrate as migrate_incoming_raid_recency
+from storage.migrations.v066_repair_honey_hen_collision import migrate as migrate_repair_honey_hen_collision
+from storage.migrations.v067_follow_raid import migrate as migrate_follow_raid
 
 from storage.migrations.v064_honey_hen import migrate as migrate_honey_hen
 
@@ -148,4 +151,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     , Migration(version=62, name="witch_cat", run=migrate_witch_cat)
     , Migration(version=63, name="dog_of_the_sun", run=migrate_dog_of_the_sun)
     , Migration(version=64, name="honey_hen", run=migrate_honey_hen)
+    , Migration(version=65, name="incoming_raid_recency", run=migrate_incoming_raid_recency)
+    , Migration(version=66, name="repair_honey_hen_collision", run=migrate_repair_honey_hen_collision)
+    , Migration(version=67, name="follow_raid", run=migrate_follow_raid)
 )

@@ -313,12 +313,494 @@ button, input { font: inherit; }
 .admin-channel-dashboard-layout .activity-scroll, .admin-channel-dashboard-layout #viewer-queue-content { min-height: 0; max-height: 680px; overflow-y: auto; }
 .admin-readonly-chat-description { margin-top: -4px; margin-bottom: 14px; }
 .admin-readonly-chat-panel .dashboard-chat-feed { min-height: 430px; max-height: 680px; }
-.channel-dashboard-layout { display: grid; grid-template-columns: minmax(600px,1.35fr) minmax(260px,.65fr) minmax(340px,.8fr); grid-template-rows: max-content minmax(540px,1fr); grid-template-areas: "player queue chat" "activities activities chat"; align-items: stretch; gap: 12px; margin-bottom: 16px; }
+.channel-dashboard-layout { display: grid; grid-template-columns: minmax(600px,1.35fr) minmax(260px,.65fr) minmax(340px,.8fr); grid-template-rows: max-content minmax(540px,1fr); grid-template-areas: "player queue chat" "lower lower chat"; align-items: stretch; gap: 12px; margin-bottom: 16px; }
 .channel-dashboard-layout > .channel-live-layout { display: contents; }
 .channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }
 .dashboard-carousel-deck, .dashboard-carousel-slide { display: contents; }
 .dashboard-carousel-controls { display: none; }
 .dashboard-activity-grid { display: grid; grid-area: activities; min-width: 0; min-height: 0; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.dashboard-lower-panels { display: grid; grid-area: lower; min-width: 0; min-height: 0; grid-template-columns: minmax(0,1fr) 44px; grid-template-areas: "activities actions"; gap: 12px; }
+.dashboard-actions-panel { display: grid; grid-area: actions; min-width: 0; min-height: 0; width: 100%; height: 100%; max-height: 356px; align-self: start; flex: 0 0 auto; grid-template-columns: minmax(0,1fr); grid-template-rows: repeat(7,minmax(0,1fr)); align-items: center; justify-items: center; gap: 8px; }
+.dashboard-lower-panels > .dashboard-actions-panel > .dashboard-action-placeholder { width: auto; height: 100%; max-height: 44px; }
+@media (max-width: 768px) { .dashboard-lower-panels { display: contents; } }
+.dashboard-action-placeholder { display: grid; place-items: center; width: 100%; max-width: 44px; aspect-ratio: 1; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 50%; background: var(--surface-raised); color: var(--muted); font: inherit; cursor: default; opacity: 1; }
+.dashboard-action-placeholder svg { display: block; width: 20px; height: 20px; max-width: 100%; max-height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.dashboard-action-placeholder:disabled { opacity: .35; filter: grayscale(1); border-style: dashed; background: transparent; cursor: not-allowed; }
+.dashboard-action-placeholder:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dashboard-action-placeholder:not(:disabled) { color: var(--text); cursor: pointer; transition: background .18s ease, border-color .18s ease; }
+.dashboard-action-placeholder:not(:disabled):is(:hover, :focus-visible) { border-color: var(--accent); background: rgba(139,92,246,.18); }
+.raid-browser-dialog { --raid-collection-background: var(--background); width: calc(100vw - 32px); max-width: none; height: calc(100dvh - 32px); max-height: none; margin: auto; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); overflow: hidden; }
+.raid-browser-dialog[open] { display: flex; flex-direction: column; gap: 0; }
+.raid-browser-dialog::backdrop { background: rgba(0,0,0,.65); }
+html.raid-browser-open { overflow: hidden; }
+.raid-browser-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 0 0 auto; }
+.raid-browser-header h3 { flex: 1; margin: 0; color: #c7b7ff; }
+.raid-browser-heading-group { display: flex; min-width: 0; flex: 1; flex-wrap: nowrap; align-items: center; gap: clamp(4px, calc((100cqi - 480px) / 20), 12px); }
+.raid-browser-heading-group h3 { flex: 0 0 auto; margin: 0; color: #c7b7ff; white-space: nowrap; }
+.raid-browser-dialog > .raid-browser-header { min-width: 0; flex-wrap: nowrap; align-items: flex-end; justify-content: flex-end; gap: clamp(4px, calc((100vw - 750px) / 30), 12px); margin-top: -4px; margin-bottom: 8px; }
+.raid-browser-dialog .raid-browser-heading-group { align-items: center; }
+.raid-browser-dialog .raid-browser-heading-group h3 { align-self: center; margin-inline: clamp(0px, calc((100cqi - 560px) / 20), 8px); }
+.raid-browser-dialog > .raid-browser-header > :is(.raid-browser-reset, .raid-browser-manage-lists, .raid-browser-close) { align-self: center; }
+.raid-browser-tab-scroll { min-width: min(72px, 40%); flex: 1 1 auto; padding-inline: 12px; margin-inline: -12px; padding-bottom: 12px; margin-bottom: -12px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; }
+.raid-browser-tab-scroll::-webkit-scrollbar { display: none; }
+.raid-browser-collection-select { display: none; }
+.raid-browser-heading-group .raid-browser-tabs { min-width: max-content; width: max-content; flex: 0 0 auto; flex-wrap: nowrap; padding: 0; }
+.raid-browser-size-control { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; height: 38px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-raised); color: var(--text); }
+.raid-browser-size-control input { width: clamp(48px, calc((100cqi - 480px) / 4), 90px); margin: 0; accent-color: var(--accent); cursor: pointer; }
+.raid-browser-size-small { font-size: 10px; }
+.raid-browser-size-large { font-size: 14px; transform: translateY(-1px); }
+.raid-browser-view-toggle { --raid-view-size: 30px; position: relative; isolation: isolate; display: flex; flex: 0 0 auto; align-self: center; gap: 0; padding: 3px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-raised); }
+.raid-browser-view-toggle::before { position: absolute; z-index: 0; top: 3px; left: 3px; width: var(--raid-view-size); height: var(--raid-view-size); border: 1px solid var(--border); border-radius: 50%; background: var(--background); box-shadow: 0 1px 4px rgba(0,0,0,.25); content: ""; transform: translateX(var(--raid-view-size)); transition: transform .22s cubic-bezier(.22,1,.36,1); pointer-events: none; }
+.raid-browser-view-toggle:has([data-raid-browser-view="list"][aria-pressed="true"])::before { transform: translateX(0); }
+.raid-browser-view-toggle button { position: relative; z-index: 1; display: grid; width: var(--raid-view-size); height: var(--raid-view-size); padding: 6px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font: inherit; cursor: pointer; transition: color .18s ease; }
+.raid-browser-view-toggle button:is([aria-pressed="true"], :hover) { color: var(--text); }
+.raid-browser-view-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.raid-browser-view-toggle svg { width: 18px; height: 18px; fill: currentColor; pointer-events: none; }
+.raid-browser-collection { --raid-tab-gap: 10px; display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; }
+.raid-browser-result-controls { display: flex; flex: 0 0 auto; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: clamp(4px, calc((100cqi - 480px) / 20), 12px); margin-left: auto; margin-bottom: 8px; }
+.raid-browser-results-toolbar { position: relative; z-index: 1; container-type: inline-size; display: flex; flex: 0 0 auto; flex-wrap: nowrap; align-items: center; gap: 0 8px; margin-bottom: 0; }
+.raid-browser-results-toolbar .raid-browser-result-controls { margin-bottom: 0; }
+@container (max-width: 720px) {
+    .raid-browser-size-control { gap: 4px; padding-inline: 8px; }
+}
+.raid-browser-tabs { display: flex; flex: 0 0 auto; align-items: flex-end; gap: 4px; padding-inline: 8px; }
+.raid-browser-tabs button { position: relative; padding: 8px 14px; margin-bottom: -1px; border: 1px solid transparent; border-bottom-color: var(--border); border-radius: 8px 8px 0 0; background: transparent; color: var(--muted); font: inherit; white-space: nowrap; cursor: pointer; }
+.raid-browser-tabs button:hover { color: var(--text); background: var(--surface-raised); }
+.raid-browser-tabs button[aria-pressed="true"] { z-index: 1; border-color: var(--border); border-bottom-color: var(--raid-collection-background); background: var(--raid-collection-background); color: #c7b7ff; }
+.raid-browser-tabs button[data-raid-browser-tab="favorites"][aria-pressed="true"] { color: #facc15; }
+.raid-browser-results-shell { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; margin-top: var(--raid-tab-gap); padding: 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--raid-collection-background); }
+@media (prefers-reduced-motion: reduce) { .raid-browser-view-toggle::before, .raid-browser-view-toggle button { transition: none; } }
+.raid-browser-close { display: grid; place-items: center; box-sizing: border-box; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--text); cursor: pointer; }
+.raid-browser-close svg, .raid-preview-header [data-raid-preview-back] svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.raid-browser-manage-lists { display: grid; width: 32px; height: 32px; flex: 0 0 32px; padding: 0; place-items: center; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--text); cursor: pointer; }
+.raid-browser-manage-lists svg { display: block; width: 20px; height: 20px; fill: currentColor; }
+.raid-browser-manage-lists:hover { background: rgba(139,92,246,.2); }
+.raid-browser-body { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(0,1fr) min(320px, 28vw); gap: 16px; }
+@media (min-width: 751px) {
+    .raid-browser-dialog[open] { display: grid; grid-template-columns: minmax(0,1fr) min(320px, 28vw); grid-template-rows: max-content minmax(0,1fr); column-gap: 16px; }
+    .raid-browser-dialog > .raid-browser-header { grid-column: 2; grid-row: 1; align-self: start; margin-bottom: 0; }
+    .raid-browser-dialog > .raid-browser-body { display: contents; }
+    .raid-browser-dialog .raid-browser-collection { display: contents; }
+    .raid-browser-dialog .raid-browser-results-toolbar { grid-column: 1; grid-row: 1; margin-top: -4px; }
+    .raid-browser-dialog .raid-browser-results-toolbar .raid-browser-heading-group { align-self: stretch; }
+    .raid-browser-dialog .raid-browser-results-toolbar .raid-browser-tabs { align-self: stretch; align-items: stretch; }
+    .raid-browser-dialog .raid-browser-results-shell { grid-column: 1; grid-row: 2; }
+    .raid-browser-dialog .raid-browser-filters { grid-column: 2; grid-row: 2; margin-top: 10px; }
+}
+.raid-browser-filters { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 16px; padding: 10px 4px 10px 20px; border-left: 1px solid var(--border); overflow-y: auto; font-size: 14px; }
+.raid-browser-filter-fields { display: contents; }
+.raid-browser-filters [data-raid-team-filter][hidden] { display: none; }
+.raid-browser-mobile-filter-button, .raid-browser-filter-submit { display: none; }
+.raid-browser-search-heading { flex: 1; min-width: 0; align-self: center; margin-right: auto; padding-left: 21px; font-size: 18px; font-weight: 700; text-align: left; white-space: nowrap; transform: translateY(6px); }
+.raid-browser-search-caption { display: none; }
+.raid-browser-reset, .raid-browser-mobile-filter-button { border-color: var(--border); background: var(--surface-raised); color: var(--text); }
+.raid-browser-dialog > .raid-browser-header > button { height: 38px; min-height: 38px; border-radius: 999px; }
+.raid-browser-dialog > .raid-browser-header > :is(.raid-browser-manage-lists, .raid-browser-close) { width: 38px; flex: 0 0 38px; }
+.raid-browser-dialog > .raid-browser-header > :is(.raid-browser-reset, .raid-browser-mobile-filter-button) { padding-inline: clamp(6px, calc((100vw - 750px) / 30), 12px); white-space: nowrap; }
+.raid-browser-reset:is(:hover, :focus-visible), .raid-browser-mobile-filter-button:is(:hover, :focus-visible) { border-color: var(--accent); background: rgba(139,92,246,.18); }
+.raid-browser-filters label { display: flex; flex-direction: column; gap: 7px; }
+.raid-browser-tag-input-row { display: grid; grid-template-columns: minmax(0,1fr) 66px; align-items: start; gap: 8px; }
+.raid-browser-tag-input-row > label { min-width: 0; }
+.raid-browser-tag-match { display: flex; min-width: 0; flex-direction: column; gap: 7px; }
+.raid-browser-tag-match .queue-state-toggle { min-width: 0; width: 100%; height: 38px; }
+.raid-browser-tag-match button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.raid-browser-tag-input-row input, .raid-browser-tag-input-row select { box-sizing: border-box; width: 100%; min-width: 0; }
+.raid-browser-filters .raid-browser-tag-limit { color: var(--danger); }
+.raid-browser-tag-limit[hidden] { display: none; }
+.raid-browser-filters input:not([type="checkbox"]), .raid-browser-filters select { width: 100%; min-width: 0; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font: inherit; }
+.raid-browser-filters select { box-sizing: border-box; appearance: none; padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23a8adb7' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+@media (forced-colors: active) { .raid-browser-filters select { appearance: auto; background-image: none; padding-right: 9px; } }
+.raid-browser-filters :is(input,select):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.raid-browser-search-field { display: block; position: relative; min-width: 0; width: 100%; }
+.raid-browser-filters .raid-browser-search-field input { padding-right: 36px; }
+.raid-browser-search-field input::-webkit-search-cancel-button { appearance: none; display: none; }
+.raid-browser-search-clear { position: absolute; top: 50%; right: 7px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--muted); transform: translateY(-50%); cursor: pointer; }
+.raid-browser-search-clear svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.raid-browser-search-clear:is(:hover,:focus-visible) { background: var(--surface-raised); color: var(--text); }
+.raid-browser-search-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.raid-browser-search-field input:placeholder-shown + .raid-browser-search-clear { display: none; }
+.raid-browser-select { display: block; min-width: 0; }
+.raid-browser-filters select[data-custom-select] { display: none; }
+.raid-browser-filters .raid-browser-select-trigger { display: block; width: 100%; min-width: 0; padding: 9px 28px 9px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font: inherit; text-align: left; cursor: pointer; position: relative; }
+.raid-browser-select-trigger::after { position: absolute; right: 12px; top: calc(50% - 4px); width: 6px; height: 6px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg); content: ""; }
+.raid-browser-select-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.raid-browser-select-trigger:disabled { opacity: .5; cursor: default; }
+.raid-browser-select-options button[aria-selected="true"] { background: rgba(139,92,246,.18); }
+.raid-browser-select-options button:disabled { opacity: .5; cursor: default; }
+.raid-browser-filters .raid-browser-filter-toggle { flex-direction: row; align-items: center; gap: 7px; flex-wrap: wrap; cursor: pointer; }
+.raid-browser-filter-toggle input { margin: 0; accent-color: var(--accent); }
+.raid-browser-filter-toggle:has(input:disabled) { color: var(--muted); cursor: default; }
+.raid-browser-filter-child { margin-left: 18px; }
+.raid-browser-filters small { color: var(--muted); font-size: 11px; }
+.raid-browser-filter-actions { display: flex; gap: 8px; }
+.raid-browser-filter-actions button { flex: 1; padding-inline: 8px; }
+.raid-browser-tag-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.raid-browser-tag-options button { padding: 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.raid-browser-tag-options button:is(:hover,[aria-pressed="true"]) { border-color: var(--accent); background: rgba(139,92,246,.18); }
+.raid-browser-tag-dropdown { position: fixed; inset: auto; margin: 0; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--text); box-shadow: 0 6px 20px rgba(0,0,0,.4); overflow-y: auto; }
+.raid-browser-tag-dropdown[hidden] { display: none; }
+.raid-browser-tag-dropdown button { display: block; width: 100%; padding: 7px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--text); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.raid-browser-tag-dropdown button:is(:hover,:focus-visible) { background: rgba(139,92,246,.18); }
+.raid-browser-category-options button { display: flex; align-items: center; gap: 8px; }
+.raid-browser-category-options img { width: 24px; height: 32px; flex: 0 0 24px; object-fit: cover; border-radius: 3px; }
+@media (max-width: 750px) {
+    .raid-browser-search-heading { display: none; }
+    .raid-browser-dialog[open] { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: max-content minmax(0,1fr); gap: 0 8px; }
+    .raid-browser-dialog > .raid-browser-header { grid-column: 2; grid-row: 1; flex-wrap: nowrap; align-items: center; align-self: center; gap: 4px; margin: 0; }
+    .raid-browser-dialog > .raid-browser-body, .raid-browser-dialog .raid-browser-collection { display: contents; }
+    .raid-browser-dialog .raid-browser-results-toolbar { grid-column: 1; grid-row: 1; }
+    .raid-browser-dialog .raid-browser-results-shell { grid-column: 1 / -1; grid-row: 2; }
+    .raid-browser-dialog .raid-browser-heading-group { gap: 12px; }
+    .raid-browser-dialog .raid-browser-heading-group h3 { margin-inline: 0; }
+    .raid-browser-tab-scroll, .raid-browser-results-toolbar .raid-browser-result-controls { display: none; }
+    .raid-browser-collection-select { display: block; flex: 0 1 auto; width: 120px; min-width: 0; height: 38px; box-sizing: border-box; padding: 0 6px 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-raised); color: var(--text); font: inherit; font-size: 12px; text-overflow: ellipsis; }
+    .raid-browser-collection-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .raid-browser-search-caption { display: inline; }
+    .raid-browser-body { display: flex; flex-direction: column; gap: 10px; }
+    .raid-browser-mobile-filter-button { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; }
+    .raid-browser-header > .raid-browser-reset, .raid-browser-view-toggle, .raid-browser-size-control { display: none; }
+    .raid-browser-mobile-filter-button[aria-expanded="true"] { border-color: var(--accent); background: rgba(139,92,246,.18); }
+    .raid-browser-filters { display: none; position: absolute; z-index: 30; top: var(--raid-filter-top, 64px); right: 16px; left: 16px; max-height: calc(100% - var(--raid-filter-top, 64px) - 16px); box-sizing: border-box; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 28px rgba(0,0,0,.45); overflow: hidden; }
+    .raid-browser-dialog.is-filters-open .raid-browser-filters { display: flex; }
+    .raid-browser-filter-fields { display: flex; min-height: 0; flex-direction: column; gap: 16px; padding: 4px; margin: -4px; overflow-y: auto; overscroll-behavior: contain; }
+    .raid-browser-filter-submit { display: flex; flex: 0 0 auto; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); background: var(--surface); }
+    .raid-browser-filter-submit button { flex: 1; border-radius: 999px; }
+}
+@media (max-width: 479px) {
+    .raid-browser-filter-label { display: none; }
+    .raid-browser-dialog > .raid-browser-header > .raid-browser-mobile-filter-button { width: 38px; padding: 0; justify-content: center; }
+}
+@media (max-width: 380px) {
+    .raid-browser-dialog[open] { column-gap: 4px; }
+    .raid-browser-dialog > .raid-browser-header > button { width: 32px; height: 32px; min-height: 32px; flex-basis: 32px; }
+}
+.raid-browser-feedback { display: flex; flex: 0 0 auto; flex-direction: column; gap: 8px; margin-top: auto; }
+.raid-browser-status { max-height: min(160px, 25dvh); margin: 0; color: var(--muted); font-size: 12px; overflow-y: auto; overflow-wrap: anywhere; transition: opacity .35s ease; }
+.raid-browser-status.is-fading { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .raid-browser-status { transition: none; } }
+.raid-browser-status.error { color: var(--danger); }
+.raid-browser-status:empty { display: none; }
+.raid-browser-results { --overlay-scrollbar-outset: 12px; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; }
+.raid-browser-spacer { position: relative; width: 100%; }
+.raid-browser-window { position: absolute; right: 0; left: 0; display: grid; gap: 12px; }
+.raid-browser-channel { position: relative; display: flex; min-width: 0; flex-direction: column; gap: 7px; padding: 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.raid-browser-channel.is-favorite { border-color: rgb(250 204 21 / .5); }
+.raid-browser-channel.is-following { background: linear-gradient(rgb(236 72 153 / .07), rgb(236 72 153 / .07)), var(--surface); }
+.raid-browser-channel.is-mutual { background: linear-gradient(rgb(236 72 153 / .13), rgb(236 72 153 / .13)), var(--surface); }
+.raid-browser-match-debug { display: none; position: absolute; z-index: 8; top: 8px; left: 8px; max-width: calc(100% - 16px); max-height: calc(100% - 48px); margin: 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; background: var(--background); color: var(--text); font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow: auto; }
+.raid-browser-dialog.show-match-values .raid-browser-match-debug { display: block; }
+.raid-browser-pin { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; margin-left: auto; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
+.raid-browser-more { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--text); font-size: 20px; line-height: 20px; cursor: pointer; }
+.raid-browser-more:is(:hover,:focus-visible) { background: rgba(139,92,246,.18); }
+.raid-browser-channel-menu { position: fixed; inset: auto; width: 200px; margin: 0; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--text); box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+.raid-browser-channel-menu[hidden] { display: none; }
+.raid-browser-channel-menu button { width: 100%; padding: 9px; border: 0; border-radius: 5px; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.raid-browser-channel-menu button:is(:hover,:focus-visible) { background: rgba(139,92,246,.18); }
+.raid-lists-dialog { width: min(850px,calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 32px); padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); overflow-y: auto; }
+.raid-lists-dialog::backdrop { background: rgba(0,0,0,.55); }
+.raid-lists-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+.raid-lists-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.raid-lists-row span { min-width: 0; overflow-wrap: anywhere; }
+.raid-lists-row button { flex: 0 0 auto; padding: 7px; font-size: 11px; }
+.raid-lists-note { color: var(--muted); font-size: 12px; }
+@media (max-width: 600px) { .raid-lists-columns { grid-template-columns: minmax(0,1fr); } .raid-browser-header { flex-wrap: wrap; } }
+.raid-browser-pin svg { width: 18px; height: 18px; fill: currentColor; }
+.raid-browser-pin:is(:hover, :focus-visible), .raid-browser-pin[aria-pressed="true"] { color: #facc15; }
+@media (hover: hover) {
+    .raid-browser-pin { opacity: 0; pointer-events: none; transition: opacity .15s ease, transform .18s ease; }
+    .raid-browser-channel:is(:hover, :has(:focus-visible), .is-favorite) .raid-browser-pin { opacity: 1; pointer-events: auto; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel.is-favorite .raid-browser-pin { transform: translateX(26px); }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel.is-favorite:is(:hover, :has(:focus-visible), :has(.raid-browser-more[aria-expanded="true"])) .raid-browser-pin { transform: translateX(0); }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-more { opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) .raid-browser-more,
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-more[aria-expanded="true"] { opacity: 1; pointer-events: auto; }
+}
+.raid-browser-thumbnail { position: relative; display: block; width: 100%; flex: 0 0 auto; padding: 0; border: 0; aspect-ratio: 16 / 9; border-radius: 6px; background: var(--background); color: var(--text); font: inherit; text-align: left; cursor: pointer; overflow: visible; }
+.raid-browser-thumbnail:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.raid-browser-thumbnail { transition: transform .18s ease; transform-origin: center; }
+@media (hover: hover) and (pointer: fine) {
+    .raid-browser-thumbnail:hover { transform: scale(1.02); }
+}
+.raid-browser-thumbnail:focus-visible { transform: scale(1.02); }
+@media (prefers-reduced-motion: reduce) {
+    .raid-browser-thumbnail { transition: none; }
+    .raid-browser-thumbnail:is(:hover, :focus-visible) { transform: none; }
+}
+.raid-preview-dialog { width: var(--raid-preview-width, calc(100vw - 48px)); max-width: calc(100vw - 48px); height: calc(100dvh - 64px); max-height: none; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); overflow: hidden; }
+.raid-preview-dialog[open] { display: flex; flex-direction: column; gap: 14px; }
+.raid-preview-dialog::backdrop { background: rgba(0,0,0,.75); }
+.raid-preview-header { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; }
+.raid-preview-header h3 { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c7b7ff; font-size: 18px; }
+.raid-preview-header button { height: 38px; min-height: 38px; border-radius: 999px; }
+.raid-preview-header .raid-browser-close { width: 38px; }
+.raid-preview-header [data-raid-preview-back] { display: grid; place-items: center; box-sizing: border-box; flex: 0 0 38px; width: 38px; padding: 0; }
+.raid-preview-header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+.raid-preview-header-labels { display: flex; flex: 0 1 auto; min-width: 0; max-width: 45%; align-items: center; gap: 5px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.raid-preview-header-labels:not(:has(span)) { display: none; }
+.raid-preview-header-labels :is(.raid-preview-events, .raid-preview-teams) { flex: 0 0 auto; flex-wrap: nowrap; }
+.raid-preview-header-labels span { flex: 0 0 auto; white-space: nowrap; }
+.raid-preview-header-labels:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 5px; }
+.raid-preview-details-actions .raid-preview-badges { margin: 0; max-height: none; }
+.raid-preview-body { display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0,1fr) 340px; grid-template-rows: minmax(0,1fr); gap: 16px; overflow: hidden; }
+.raid-preview-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; background: var(--background); border: 1px solid var(--border); border-radius: 10px; }
+.raid-preview-video-row { display: flex; flex: 0 0 auto; justify-content: center; min-width: 400px; width: 100%; background: #000; }
+.raid-preview-video { position: relative; flex: 0 0 auto; width: 100%; height: auto; min-width: 400px; min-height: 300px; aspect-ratio: 16 / 9; align-self: start; background: #000; overflow: hidden; }
+.raid-preview-video iframe { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border: 0; }
+.raid-preview-player { position: absolute; inset: 0; }
+.raid-preview-chat { display: flex; flex-direction: column; align-self: stretch; height: auto; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--background); }
+.raid-preview-chat-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-weight: 700; border-bottom: 1px solid var(--border); }
+.raid-preview-chat > .live-chat-feed-shell { flex: 1; min-height: 0; overflow: hidden; }
+.raid-preview-chat-messages { height: 100%; overflow-y: auto; overscroll-behavior: contain; }
+.raid-preview-chat .raid-preview-chat-messages { padding: 8px; }
+.raid-preview-chat-reconnect { margin: 0 10px 8px; font-size: 13px; }
+.raid-preview-chat .live-chat-platform { display: none; }
+.raid-preview-chat .raid-preview-chat-compose { position: relative; flex: 0 0 auto; flex-direction: row; align-items: stretch; gap: 8px; margin: 0; padding: 8px; }
+.raid-preview-chat .chat-emote-picker { box-sizing: border-box; left: 0; right: 0; bottom: 100%; width: auto; }
+.raid-preview-chat .dashboard-chat-composer textarea { min-width: 0; padding-right: 50px; max-height: 110px; margin: 0; }
+.raid-preview-chat-entry { flex: 1; min-width: 0; }
+.raid-preview-chat .raid-preview-chat-entry textarea { display: block; height: calc(1.4em + 22px); }
+.raid-preview-chat .chat-send-status { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); max-width: min(calc(45% - 10px), 120px); }
+.raid-preview-chat-entry:focus-within .chat-send-status { opacity: 0; }
+.raid-preview-chat .raid-preview-chat-send { display: grid; place-items: center; align-self: center; flex: 0 0 40px; width: 40px; height: 40px; min-height: 40px; aspect-ratio: 1; padding: 8px; }
+.raid-preview-chat-send svg { display: block; width: 20px; height: 20px; fill: currentColor; }
+.raid-preview-chat .chat-emote-suggestions { max-height: min(28dvh, 240px); }
+.raid-preview-details { display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; min-height: 0; max-height: min(310px, 42dvh); padding: 12px; overflow: hidden; }
+.raid-preview-details-upper { display: contents; }
+.raid-preview-details-header { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.raid-preview-details-header .raid-preview-identity { min-width: 0; flex: 1 1 280px; }
+.raid-preview-details-actions { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.raid-preview-events, .raid-preview-teams { display: flex; flex-wrap: wrap; gap: 5px; }
+.raid-preview-events:empty, .raid-preview-teams:empty, .raid-preview-badges:empty { display: none; }
+.raid-preview-events span, .raid-preview-teams span, .raid-preview-followers { padding: 3px 6px; border-radius: 5px; background: var(--surface-raised); color: var(--text); font-size: 12px; font-weight: 400; line-height: 16px; }
+.raid-preview-followers { flex-shrink: 0; white-space: nowrap; }
+.raid-preview-details-copy { min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.raid-preview-identity { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; }
+.raid-preview-identity img { flex: 0 0 40px; border-radius: 50%; }
+.raid-preview-identity a { color: #c7b7ff; overflow-wrap: anywhere; }
+.raid-preview-identity a:hover { text-decoration: underline; }
+.raid-preview-identity a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.raid-preview-identity :is(.raid-browser-language, .raid-browser-follow-badge, .raid-browser-verified) { flex-shrink: 0; }
+.raid-preview-badges { display: flex; flex-wrap: wrap; gap: 5px; max-height: 48px; margin: 6px 0; overflow: hidden; }
+.raid-preview-badges span { padding: 3px 6px; border-radius: 5px; background: var(--surface-raised); color: var(--text); font-size: 12px; line-height: 16px; white-space: nowrap; }
+.raid-preview-details h4 { display: -webkit-box; margin: 8px 0 6px; font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.raid-preview-meta, .raid-preview-description { margin: 6px 0; color: var(--muted); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.raid-preview-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.raid-preview-description { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+.raid-preview-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.raid-preview-tags span { flex: 0 1 auto; max-width: 100%; white-space: normal; }
+.raid-preview-tags span { padding: 3px 7px; border-radius: 5px; background: rgba(139,92,246,.15); color: #c7b7ff; font-size: 12px; overflow-wrap: anywhere; }
+.raid-preview-tags .raid-browser-tag-matched { background: rgba(139,92,246,.38); color: #ede9fe; box-shadow: inset 0 0 0 1px rgba(167,139,250,.5); }
+.raid-preview-footer { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 6px 0 0; }
+.raid-preview-footer-copy { flex: 1; min-width: 0; max-height: min(150px, 14dvh); overflow-y: auto; overscroll-behavior: contain; }
+.raid-preview-footer-copy .raid-preview-description { margin: 0; }
+.raid-preview-footer-copy [data-raid-preview-status]:empty { display: none; }
+.raid-preview-footer > button { min-height: 38px; border-radius: 999px; }
+.raid-preview-footer > [data-raid-preview-raid] { flex: 0 0 auto; align-self: flex-end; }
+.raid-preview-footer [data-raid-preview-raid] { margin-left: auto; }
+.raid-preview-dialog [data-raid-preview-favorite] { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; padding: 0; }
+.raid-preview-dialog [data-raid-preview-favorite] svg { width: 18px; height: 18px; fill: currentColor; }
+.raid-preview-dialog [data-raid-preview-favorite]:is(:hover, :focus-visible, [aria-pressed="true"]) { color: #facc15; }
+.raid-preview-dialog [data-raid-preview-favorite]:is(:hover, :focus-visible) { background: rgba(139,92,246,.25); }
+.raid-preview-menu { position: relative; }
+.raid-preview-menu summary { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--surface-raised); color: var(--text); font-size: 22px; list-style: none; cursor: pointer; }
+.raid-preview-menu summary::-webkit-details-marker { display: none; }
+.raid-preview-menu button { position: absolute; z-index: 10; top: calc(100% + 6px); right: 0; width: 170px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--text); text-align: left; cursor: pointer; }
+.raid-preview-menu button:hover { background: var(--accent-hover); }
+.raid-preview-footer p { flex: 1; margin: 0; color: var(--muted); font-size: 13px; }
+.raid-preview-footer p.error { color: var(--danger); }
+@media (min-width: 751px) {
+    .raid-preview-main { position: relative; }
+    .raid-preview-footer { min-height: 44px; padding-right: 84px; }
+    .raid-preview-footer > [data-raid-preview-raid] { position: absolute; right: 12px; bottom: 12px; width: 76px; padding-left: 10px; padding-right: 10px; }
+}
+@media (max-height: 700px) {
+    .raid-preview-dialog { height: calc(100dvh - 24px); padding: 12px; }
+    .raid-preview-dialog[open] { gap: 8px; }
+    .raid-preview-details { max-height: 170px; padding: 8px 10px; }
+    .raid-preview-identity { font-size: 16px; }
+    .raid-preview-identity img { width: 28px; height: 28px; flex-basis: 28px; }
+    .raid-preview-details h4 { -webkit-line-clamp: 1; margin-top: 5px; }
+}
+@media (max-width: 750px) {
+    .raid-preview-dialog { width: calc(100vw - 16px); max-width: calc(100vw - 16px); height: calc(100dvh - 24px); padding: 12px; }
+    .raid-preview-dialog[open] { gap: 8px; }
+    .raid-preview-body { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(440px,3fr) minmax(160px,1.75fr); gap: 8px; overflow: auto; }
+    .raid-preview-video { width: min(100%, max(400px, calc(300px * 16 / 9))); align-self: start; }
+    .raid-preview-details { flex: 1; max-height: none; padding: 8px; }
+    .raid-preview-details-upper { display: block; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+    .raid-preview-details-header { flex-wrap: wrap; gap: 6px; }
+    .raid-preview-identity { gap: 5px; font-size: 16px; }
+    .raid-preview-identity img { width: 28px; height: 28px; flex-basis: 28px; }
+    .raid-preview-details-actions { gap: 5px; }
+    .raid-preview-details-copy { overflow: visible; }
+    .raid-preview-footer-copy { max-height: min(56px, 8dvh); overflow-y: auto; }
+    .raid-preview-chat { height: auto; min-height: 0; margin-top: 0; align-self: stretch; }
+    .raid-preview-chat-heading { padding: 6px 8px; flex: 0 0 auto; }
+    .raid-preview-chat .raid-preview-chat-compose { padding: 6px; }
+    .raid-preview-chat .dashboard-chat-composer textarea { max-height: 60px; }
+}
+.raid-browser-thumbnail > img { border-radius: inherit; }
+.raid-browser-vtuber { position: absolute; top: -4px; left: -4px; display: grid; min-width: 30px; height: 22px; padding: 0 4px; box-sizing: border-box; place-items: center; transform: rotate(-12deg); color: #fff; font-size: 20px; font-weight: 800; line-height: 1; text-shadow: 0 1px 2px #000, 0 2px 6px #000, 0 0 10px rgba(0,0,0,.9); }
+.raid-browser-viewers { position: absolute; left: 5px; bottom: 5px; padding: 2px 5px; border-radius: 4px; background: rgba(0,0,0,.8); color: #fff; font-size: 11px; line-height: 16px; }
+.raid-browser-live-time { position: absolute; right: 5px; bottom: 5px; padding: 2px 5px; border-radius: 4px; background: rgba(0,0,0,.8); color: #fff; font-size: 11px; line-height: 16px; white-space: nowrap; }
+.raid-browser-team { max-width: 120px; min-width: 0; padding: 2px 5px; border-radius: 4px; background: rgba(139,92,246,.15); color: #c7b7ff; font-size: 11px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.raid-browser-stream-actions { display: flex; min-width: 0; flex: 0 1 auto; align-items: center; gap: 6px; margin-left: auto; }
+.raid-browser-channel-heading > .raid-browser-pin { margin-left: 0; }
+.raid-browser-start-raid { height: 30px; padding: 0 16px; border: 1px solid transparent; border-radius: 6px; background: var(--accent); box-shadow: 0 2px 3px rgba(0,0,0,.25); color: #fff; font: inherit; font-size: 14px; font-weight: 700; line-height: 28px; transition: background .15s ease, box-shadow .15s ease; }
+.raid-browser-start-raid:disabled { opacity: .65; cursor: not-allowed; }
+.raid-browser-start-raid:not(:disabled) { cursor: pointer; }
+.raid-browser-start-raid:not(:disabled):is(:hover,:focus-visible) { background: var(--accent-hover); color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.35); }
+.raid-browser-start-raid:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.raid-browser-start-raid:not(:disabled):active { background: var(--accent-hover); box-shadow: inset 0 1px 3px rgba(0,0,0,.25); }
+.dashboard-pending-raid { position: relative; display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 9px 11px 12px; margin-bottom: 8px; border: 1px solid var(--accent); border-radius: 8px; background: rgba(139,92,246,.16); font-size: 12px; overflow: hidden; }
+.dashboard-raid-progress { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; background: var(--accent); transform-origin: left center; pointer-events: none; }
+.dashboard-raid-countdown { position: relative; display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dashboard-raid-countdown svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); fill: none; stroke-width: 2.5; }
+.dashboard-raid-countdown-track { stroke: var(--border); }
+.dashboard-raid-countdown-ring { stroke: var(--accent); stroke-dasharray: 1; stroke-dashoffset: 0; stroke-linecap: round; }
+.dashboard-raid-countdown[hidden], .dashboard-raid-progress[hidden] { display: none; }
+.dashboard-pending-raid[hidden] { display: none; }
+.dashboard-pending-raid-info { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.dashboard-pending-raid-avatar { display: block; width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%; object-fit: cover; }
+.dashboard-pending-raid-avatar[hidden] { display: none; }
+.dashboard-follow-raid { display: flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; }
+.dashboard-pending-raid button { flex: 0 0 auto; padding: 4px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); color: var(--text); font: inherit; cursor: pointer; }
+.dashboard-follow-raid input { margin: 0; width: 15px; height: 15px; accent-color: var(--accent); }
+.raid-browser-avatar-flyer { position: fixed; z-index: 2001; pointer-events: none; border-radius: 50%; object-fit: cover; transform-origin: top left; }
+.dashboard-pending-raid-info a { color: #c7b7ff; font-weight: 700; overflow-wrap: anywhere; }
+.dashboard-pending-raid-info span { color: var(--muted); }
+.dashboard-pending-raid-info span:empty { display: none; }
+.dashboard-pending-raid.is-error { border-color: var(--danger); }
+.dashboard-pending-raid.is-arriving { animation: raid-banner-arrival .65s ease both; }
+.raid-browser-flyer { position: fixed !important; z-index: 2000; margin: 0; transform-origin: top left; overflow: hidden; pointer-events: none; }
+@keyframes raid-banner-arrival { 0%, 75% { opacity: 0; } 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dashboard-pending-raid.is-arriving { animation: none; } }
+.raid-browser-dialog:not(.is-list-view) .raid-browser-pin, .raid-browser-dialog:not(.is-list-view) .raid-browser-more { position: absolute; top: 15px; background: rgba(0,0,0,.8); color: #fff; }
+.raid-browser-dialog:not(.is-list-view) .raid-browser-pin { right: 41px; }
+.raid-browser-dialog:not(.is-list-view) .raid-browser-more { right: 15px; }
+.raid-browser-dialog .raid-browser-pin { transition: color .15s ease, opacity .15s ease, transform .18s ease; }
+.raid-browser-dialog .raid-browser-pin[aria-pressed="true"] { color: #facc15; }
+.raid-browser-dialog .raid-browser-pin:is(:hover,:focus-visible) { color: #facc15; background: rgba(139,92,246,.25); }
+@media (hover: hover) {
+    .raid-browser-dialog.is-list-view .raid-browser-pin { min-width: 0; overflow: hidden; transition: color .15s ease, opacity .15s ease, width .18s ease, flex-basis .18s ease, margin-left .18s ease; }
+    .raid-browser-dialog.is-list-view .raid-browser-channel:not(:hover):not(:has(:focus-visible)):not(:active):not(.is-favorite) .raid-browser-pin:not([aria-pressed="true"]) { width: 0; flex-basis: 0; margin-left: -6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .raid-browser-dialog .raid-browser-pin { transition: none; }
+    .raid-browser-dialog.is-list-view .raid-browser-pin { transition: none; }
+}
+.raid-lists-dialog .raid-browser-tabs { margin-bottom: 16px; }
+.raid-lists-dialog .raid-browser-tabs button[aria-selected="true"] { border-color: var(--accent); background: rgba(139,92,246,.18); color: var(--text); }
+.raid-lists-dialog .raid-browser-tabs button[data-raid-list-tab="favorites"][aria-selected="true"] { border-color: #facc15; background: rgba(250,204,21,.18); color: #facc15; }
+.raid-browser-tabs button { transition: color .15s ease, border-color .15s ease, background-color .15s ease; }
+.raid-browser-heading-group .raid-browser-tabs { gap: 0; }
+.raid-browser-heading-group .raid-browser-tabs button { display: grid; flex: 0 0 auto; place-items: center; box-sizing: border-box; width: auto; height: 38px; margin-right: 4px; margin-bottom: -1px; padding: 0 clamp(6px, calc((100cqi - 480px) / 20), 12px); font-size: 14px; border-bottom-color: transparent; border-radius: 12px; overflow: hidden; opacity: 1; interpolate-size: allow-keywords; transition: width .2s ease, padding-inline .2s ease, margin-right .2s ease, border-inline-width .2s ease, opacity .2s ease, display .2s allow-discrete, color .15s ease, border-color .15s ease, background-color .15s ease; }
+.raid-browser-heading-group .raid-browser-tabs button[hidden] { display: none; width: 0; padding-inline: 0; margin-right: 0; border-inline-width: 0; opacity: 0; }
+@starting-style {
+    .raid-browser-heading-group .raid-browser-tabs button:not([hidden]) { width: 0; padding-inline: 0; margin-right: 0; border-inline-width: 0; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .raid-browser-heading-group .raid-browser-tabs button { transition: none; }
+}
+.raid-browser-tabs button:hover { color: var(--text); background: rgba(139,92,246,.25); }
+.raid-browser-tabs button:is([data-raid-browser-tab="favorites"],[data-raid-list-tab="favorites"]):hover { color: #fde68a; background: rgba(250,204,21,.25); }
+.raid-browser-heading-group .raid-browser-tabs button[aria-pressed="true"] { z-index: 1; border-color: var(--border); border-bottom-color: var(--raid-collection-background); background: var(--raid-collection-background); }
+.raid-browser-heading-group .raid-browser-tabs button:not([aria-pressed="true"]):is(:hover, :focus-visible) { background: var(--surface-raised); }
+.raid-browser-heading-group [data-raid-collection-tabs] { --raid-tab-gap: 4px; position: relative; isolation: isolate; transform: translateY(6px); }
+.raid-browser-heading-group .raid-browser-tabs.has-tab-indicator::before { position: absolute; z-index: 0; top: 0; left: 0; width: var(--raid-tab-width); height: calc(var(--raid-tab-height) + var(--raid-tab-gap)); box-sizing: border-box; border: 1px solid var(--border); border-bottom-color: var(--raid-collection-background); border-radius: 12px 12px 0 0; background: var(--raid-collection-background); transform: translate(var(--raid-tab-x), var(--raid-tab-y)); transition: transform .22s ease, width .22s ease, height .22s ease; content: ""; pointer-events: none; }
+/* Outward feet share the sliding highlight's position and cover the panel seam. */
+.raid-browser-heading-group .raid-browser-tabs.has-tab-indicator::after { position: absolute; z-index: 0; top: calc(var(--raid-tab-height) + var(--raid-tab-gap) - 12px); left: -12px; width: calc(var(--raid-tab-width) + 24px); height: 12px; background: radial-gradient(circle at left top, transparent 11px, var(--border) 11px 12px, var(--raid-collection-background) 12px) left bottom / 13px 12px no-repeat, radial-gradient(circle at right top, transparent 11px, var(--border) 11px 12px, var(--raid-collection-background) 12px) right bottom / 13px 12px no-repeat; transform: translate(var(--raid-tab-x), var(--raid-tab-y)); transition: transform .22s ease, width .22s ease, top .22s ease; content: ""; pointer-events: none; }
+.raid-browser-heading-group .raid-browser-tabs button { border-radius: 12px 12px 0 0; }
+.raid-browser-heading-group .raid-browser-tabs.has-tab-indicator button { z-index: 1; }
+.raid-browser-heading-group .raid-browser-tabs.has-tab-indicator button[aria-pressed="true"] { background: transparent; border-color: transparent; }
+@media (prefers-reduced-motion: reduce) { .raid-browser-heading-group .raid-browser-tabs.has-tab-indicator::before { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .raid-browser-heading-group .raid-browser-tabs.has-tab-indicator::after { transition: none; } }
+.raid-browser-channel img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.raid-browser-name, .raid-browser-channel p { margin: 0; overflow-wrap: anywhere; }
+.raid-browser-channel p { color: var(--muted); font-size: 12px; }
+.raid-browser-name { display: block; min-width: 0; height: 20px; flex: 0 0 auto; color: var(--text); font-size: 14px; font-weight: 700; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.raid-browser-name:has(.raid-browser-avatar) { display: inline-flex; align-items: center; gap: 6px; }
+.raid-browser-name .raid-browser-avatar { display: block; width: 20px; height: 20px; flex: 0 0 20px; border-radius: 50%; object-fit: cover; }
+.raid-browser-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.raid-browser-verified { display: inline-flex; width: 16px; height: 20px; flex: 0 0 16px; align-items: center; justify-content: center; margin-left: -3px; }
+.raid-browser-verified svg { display: block; width: 16px; height: 16px; fill: #7046ad; transform: translateY(2px); }
+.raid-browser-name:is(:hover, :focus-visible) { color: #c7b7ff; text-decoration: underline; }
+.raid-browser-channel-heading { display: flex; min-width: 0; height: 24px; flex: 0 0 auto; align-items: center; gap: 6px; }
+.raid-browser-language { display: grid; width: 24px; height: 24px; flex: 0 0 24px; padding: 0; place-items: center; border: 1px solid var(--border); border-radius: 5px; background: var(--background); color: #c7b7ff; font-size: 12px; font-weight: 600; line-height: 16px; white-space: nowrap; }
+.raid-browser-stream-title { --raid-title-height: 36px; display: -webkit-box; height: 36px; flex: 0 0 auto; line-height: 18px; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.raid-browser-stream-info { display: flex; align-items: center; gap: 8px; min-width: 0; height: 18px; flex: 0 0 auto; line-height: 18px; overflow: hidden; white-space: nowrap; }
+.raid-browser-category-name { min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.raid-browser-channel :is(.raid-browser-stream-title, .raid-browser-stream-info) { margin-inline: 4px; }
+.raid-browser-stream-events { display: inline-block; min-width: 0; max-width: 60%; flex: 0 1 auto; margin-left: auto; padding-left: 8px; color: #c7b7ff; font-size: 11px; font-weight: 400; text-align: right; overflow: hidden; text-overflow: ellipsis; }
+.raid-browser-channel-footer { display: flex; min-width: 0; flex: 0 0 auto; align-items: flex-end; gap: 8px; margin-top: auto; }
+.raid-browser-channel-footer .raid-browser-start-raid { flex: 0 0 auto; margin-left: auto; }
+.raid-browser-dialog:not(.is-list-view) .raid-browser-channel .raid-browser-stream-info { margin-bottom: -4px; }
+/* Auto margins redistribute fractional spare height during expansion. */
+.raid-browser-dialog:not(.is-list-view) .raid-browser-channel-footer { min-height: 30px; margin-top: 0; padding-right: 72px; gap: 0; align-items: flex-start; }
+.raid-browser-dialog:not(.is-list-view) .raid-browser-channel-footer .raid-browser-tags { margin-top: max(0px, calc(30px - var(--raid-tags-height))); align-content: flex-start; align-items: flex-start; }
+.raid-browser-dialog:not(.is-list-view) .raid-browser-tags span { box-sizing: border-box; min-height: var(--raid-tags-height); }
+/* Anchor to the collapsed row height, not the expanding content's bottom. */
+.raid-browser-dialog:not(.is-list-view) .raid-browser-start-raid { position: absolute; top: calc(var(--raid-browser-row-height) - 41px); right: 10px; width: 64px; box-sizing: border-box; }
+.raid-browser-tags { --raid-tags-height: 22px; display: flex; height: 22px; min-width: 0; flex: 1 1 auto; gap: 5px; overflow: hidden; }
+.raid-browser-tags span, .raid-browser-tags::after { padding: 2px 5px; border-radius: 4px; background: rgba(139,92,246,.15); color: #c7b7ff; font-size: 10px; white-space: nowrap; }
+.raid-browser-tags .raid-browser-tag-overflowed { visibility: hidden; }
+.raid-browser-tags .raid-browser-tag-matched { background: rgba(139,92,246,.38); color: #ede9fe; box-shadow: inset 0 0 0 1px rgba(167,139,250,.5); }
+.raid-browser-follow-badge { display: grid; width: 24px; height: 24px; flex: 0 0 24px; box-sizing: border-box; padding: 0; place-items: center; border: 1px solid rgba(139,92,246,.4); border-radius: 5px; background: rgba(139,92,246,.15); color: #c7b7ff; font-size: 12px; font-weight: 600; line-height: 16px; }
+.raid-browser-follow-badge.is-mutual { background: rgba(139,92,246,.28); color: #e0d5ff; }
+.raid-browser-follow-badge svg { display: block; width: 12px; height: 12px; fill: #ef4444; stroke: #d8b4fe; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.raid-browser-follow-badge.is-mutual svg { width: 18px; height: 14px; }
+.raid-browser-dialog.is-list-view .raid-browser-channel { display: grid; grid-template-columns: calc((var(--raid-browser-row-height, 156px) - 22px) * 16 / 9) minmax(0,1fr); grid-template-rows: 20px minmax(0,1fr) 18px 30px; gap: 4px 12px; }
+.raid-browser-dialog.is-list-view .raid-browser-thumbnail { grid-column: 1; grid-row: 1 / span 4; min-height: 0; height: 100%; aspect-ratio: 16 / 9; align-self: stretch; }
+.raid-browser-dialog.is-list-view .raid-browser-channel-heading { grid-column: 2; grid-row: 1; }
+.raid-browser-dialog.is-list-view .raid-browser-stream-title { grid-column: 2; grid-row: 2; }
+.raid-browser-dialog.is-list-view .raid-browser-stream-info { grid-column: 2; grid-row: 3; }
+.raid-browser-dialog.is-list-view .raid-browser-channel-footer { grid-column: 2; grid-row: 4; margin-top: 0; }
+.raid-browser-dialog[data-result-size="0"] .raid-browser-name { font-size: 12px; }
+.raid-browser-dialog[data-result-size="0"] .raid-browser-stream-title { --raid-title-height: 28px; height: 28px; font-size: 11px; line-height: 14px; }
+.raid-browser-dialog[data-result-size="0"] .raid-browser-stream-info { height: 16px; font-size: 11px; line-height: 16px; }
+.raid-browser-dialog[data-result-size="0"] .raid-browser-tags { --raid-tags-height: 18px; height: 18px; }
+.raid-browser-dialog[data-result-size="0"] .raid-browser-tags span, .raid-browser-dialog[data-result-size="0"] .raid-browser-tags::after { font-size: 9px; padding-block: 1px; }
+.raid-browser-dialog[data-result-size="0"].is-list-view .raid-browser-channel { grid-template-rows: 20px minmax(0,1fr) 16px 30px; }
+.raid-browser-dialog[data-result-size="2"] .raid-browser-channel-heading, .raid-browser-dialog[data-result-size="2"] .raid-browser-name { height: 24px; line-height: 24px; }
+.raid-browser-dialog[data-result-size="2"] .raid-browser-name { font-size: 16px; }
+.raid-browser-dialog[data-result-size="2"] .raid-browser-stream-title { --raid-title-height: 44px; height: 44px; font-size: 14px; line-height: 22px; }
+.raid-browser-dialog[data-result-size="2"] .raid-browser-stream-info { height: 20px; font-size: 13px; line-height: 20px; }
+.raid-browser-dialog[data-result-size="2"] .raid-browser-tags { --raid-tags-height: 24px; height: 24px; }
+.raid-browser-dialog[data-result-size="2"] .raid-browser-tags span, .raid-browser-dialog[data-result-size="2"] .raid-browser-tags::after { font-size: 12px; }
+.raid-browser-dialog[data-result-size="2"].is-list-view .raid-browser-channel { grid-template-rows: 24px minmax(0,1fr) 20px 30px; }
+.raid-browser-dialog[data-result-size="1"].is-list-view .raid-browser-channel { grid-template-rows: 24px minmax(0,1fr) 20px 30px; }
+.raid-browser-dialog[data-result-size="1"].is-list-view .raid-browser-channel-heading, .raid-browser-dialog[data-result-size="1"].is-list-view .raid-browser-name { height: 24px; line-height: 24px; }
+.raid-browser-dialog[data-result-size="1"].is-list-view .raid-browser-name { font-size: 16px; }
+.raid-browser-dialog[data-result-size="1"].is-list-view .raid-browser-stream-title { height: 44px; font-size: 14px; line-height: 22px; }
+.raid-browser-dialog[data-result-size="1"].is-list-view .raid-browser-stream-info { height: 20px; font-size: 13px; line-height: 20px; }
+.raid-browser-dialog[data-result-size="1"].is-list-view .raid-browser-tags { --raid-tags-height: 24px; height: 24px; }
+.raid-browser-dialog[data-result-size="1"].is-list-view .raid-browser-tags span, .raid-browser-dialog[data-result-size="1"].is-list-view .raid-browser-tags::after { font-size: 12px; }
+.raid-browser-stream-title, .raid-browser-tags { position: relative; }
+.raid-browser-channel.has-title-overflow .raid-browser-stream-title::after { position: absolute; right: 0; bottom: 0; width: 28px; background: linear-gradient(to right, transparent, var(--surface-raised) 35%); color: var(--muted); text-align: right; content: "…"; pointer-events: none; transition: opacity .18s ease; }
+.raid-browser-channel.has-tags-overflow .raid-browser-tags::after { position: absolute; top: 0; left: var(--raid-tags-more-left, 0px); display: grid; width: calc(1em + 10px); height: var(--raid-tags-more-height, var(--raid-tags-height)); box-sizing: border-box; place-items: center; content: "…"; pointer-events: none; transition: opacity .18s ease; }
+@media (hover: hover) {
+    /* Expand over the next row, preserving the virtualized grid's row positions. */
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel { height: var(--raid-browser-row-height); interpolate-size: allow-keywords; transition: height .18s ease, box-shadow .18s ease; }
+    .raid-browser-dialog:not(.is-list-view) :is(.raid-browser-stream-title, .raid-browser-tags) { transition: height .18s ease; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-stream-title { min-height: var(--raid-title-height); -webkit-line-clamp: unset; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-tags { min-height: var(--raid-tags-height); flex-wrap: wrap; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-tags span { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) { z-index: 4; align-self: start; min-height: var(--raid-browser-row-height); height: max-content; box-shadow: 0 8px 20px rgba(0,0,0,.4); }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) .raid-browser-stream-title { height: auto; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) .raid-browser-tags { height: auto; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) .raid-browser-tags span { visibility: visible; }
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel:is(:hover, :has(:focus-visible)) :is(.raid-browser-stream-title, .raid-browser-tags)::after { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .raid-browser-dialog:not(.is-list-view) .raid-browser-channel { transition: none; }
+    .raid-browser-dialog:not(.is-list-view) :is(.raid-browser-stream-title, .raid-browser-tags) { transition: none; }
+    .raid-browser-channel :is(.raid-browser-stream-title, .raid-browser-tags)::after { transition: none; }
+}
+@media (max-width: 600px) {
+    .raid-browser-dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); padding: 12px; }
+    .raid-browser-dialog.is-list-view .raid-browser-channel, .raid-browser-dialog[data-result-size].is-list-view .raid-browser-channel { gap: 4px 8px; }
+    .raid-browser-dialog.is-list-view .raid-browser-thumbnail { grid-row: 1 / span 4; }
+}
 .dashboard-video-card { position: relative; display: flex; grid-area: player; min-width: 0; align-self: start; flex-direction: column; }
 .dashboard-video-card > .panel-header { margin-bottom: 10px; }
 .dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }
@@ -393,6 +875,7 @@ button, input { font: inherit; }
 .viewer-queue-column { grid-area: queue; }
 .channel-dashboard-layout .viewer-queue-column { gap: 12px; }
 .channel-dashboard-layout .panel { margin-bottom: 0; padding: 16px; }
+.channel-dashboard-layout .live-chat-panel:has([data-chat-composer]) { padding-bottom: 8px; }
 .dashboard-activity-panel, .viewer-queue-column > [data-viewer-queue-panel] { min-height: 420px; }
 .live-chat-panel, .dashboard-activity-panel, .viewer-queue-column > [data-viewer-queue-panel] { display: flex; min-width: 0; flex-direction: column; }
 .dashboard-ads-panel { display: flex; flex: 0 0 auto; flex-direction: column; gap: 10px; }
@@ -437,7 +920,7 @@ button, input { font: inherit; }
 .dashboard-ad-action-status.success { color: var(--success); }
 .dashboard-ad-action-status.error { color: var(--danger); }
 .chat-platform-states { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-.live-chat-feed { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 8px; overflow-y: auto; scrollbar-gutter: stable; }
+.live-chat-feed { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 4px; overflow-y: auto; scrollbar-gutter: stable; }
 .live-chat-feed-shell { position: relative; display: flex; min-height: 0; flex: 1; flex-direction: column; }
 .activity-feed-shell { position: relative; display: flex; min-height: 0; flex: 1; flex-direction: column; }
 .live-chat-feed-shell > .live-chat-feed { width: 100%; min-height: 0; flex: 1; }
@@ -500,7 +983,7 @@ button, input { font: inherit; }
     .channel-page-overview .channel-heading-placeholder { width: 50px; height: 50px; flex-basis: 50px; }
     .channel-page-overview .page-header h2 { font-size: 28px; }
     .channel-page-overview .page-description { margin-top: 5px; line-height: 1.35; }
-    .channel-page-overview .channel-dashboard-layout { min-width: 0; min-height: 0; flex: 1; grid-template-columns: minmax(0,1.35fr) minmax(0,.65fr) minmax(0,.8fr); grid-template-rows: minmax(0,3fr) minmax(0,2fr); grid-template-areas: "player queue chat" "activities activities chat"; margin-bottom: 0; overflow: hidden; }
+    .channel-page-overview .channel-dashboard-layout { min-width: 0; min-height: 0; flex: 1; grid-template-columns: minmax(0,1.35fr) minmax(0,.65fr) minmax(0,.8fr); grid-template-rows: minmax(0,3fr) minmax(0,2fr); grid-template-areas: "player queue chat" "lower lower chat"; margin-bottom: 0; overflow: hidden; }
     .channel-page-overview .dashboard-video-card { align-self: stretch; min-height: 0; overflow: hidden; }
     .channel-page-overview .dashboard-video-frame { display: flex; min-height: 0; flex: 1; align-items: center; justify-content: center; container-type: size; }
     .channel-page-overview .dashboard-video-player,
@@ -549,7 +1032,7 @@ button, input { font: inherit; }
     .channel-page-overview, .channel-page-overview .app-shell { height: auto; min-height: 100dvh; overflow: visible; }
     .channel-page-overview .sidebar { height: auto; min-height: 100dvh; }
     .channel-page-overview .streamer-main-content { height: auto; min-height: 100dvh; overflow: visible; padding-top: 16px; }
-    .channel-page-overview .channel-dashboard-layout { height: calc(200dvh - var(--dashboard-stats-height, 36px) - 52px); min-height: 0; flex: none; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); grid-template-rows: max-content minmax(0,3fr) minmax(0,2fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 32px); grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"; overflow: visible; }
+    .channel-page-overview .channel-dashboard-layout { height: calc(200dvh - var(--dashboard-stats-height, 36px) - 52px); min-height: 0; flex: none; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); grid-template-rows: max-content minmax(0,3fr) minmax(0,2fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 32px); grid-template-areas: "stats stats" "player queue" "lower lower" "chat chat"; overflow: visible; }
     .channel-page-overview .dashboard-chat-column { display: contents; }
     .channel-page-overview .dashboard-chat-column > .dashboard-header-side { position: sticky; z-index: 20; top: 16px; display: flex; grid-area: stats; min-width: 0; margin-bottom: -6px; padding-bottom: 6px; isolation: isolate; background: var(--background); }
     .channel-page-overview .dashboard-chat-column > .dashboard-header-side::before { position: absolute; z-index: -1; top: -16px; right: -16px; bottom: -6px; left: -16px; background: var(--background); content: ""; pointer-events: none; }
@@ -569,7 +1052,7 @@ button, input { font: inherit; }
     .dashboard-video-header { --metadata-label-width: 100px; }
     .dashboard-activity-grid { grid-template-columns: minmax(0,1fr); }
 }
-.live-chat-message { --chat-edge-color: #9147ff; position: relative; display: flex; flex: 0 0 auto; align-items: flex-start; gap: 9px; overflow: hidden; padding: 10px; border-left: 3px solid var(--chat-edge-color); border-radius: 9px; background: var(--surface-raised); }
+.live-chat-message { --chat-edge-color: #9147ff; position: relative; display: flex; flex: 0 0 auto; align-items: flex-start; gap: 9px; overflow: hidden; padding: 10px; border-left: 3px solid var(--chat-edge-color); border-radius: 0; background: var(--surface-raised); }
 .live-chat-message-actions { position: absolute; z-index: 3; right: 7px; bottom: 5px; display: flex; gap: 2px; opacity: 0; pointer-events: none; transition: opacity .14s ease; }
 .live-chat-message:hover .live-chat-message-actions, .live-chat-message:focus-within .live-chat-message-actions { opacity: 1; pointer-events: auto; }
 .live-chat-message-action { display: grid; width: 25px; height: 25px; padding: 0; place-items: center; border: 0; border-radius: 6px; background: rgba(15,17,21,.86); color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
@@ -588,9 +1071,16 @@ button, input { font: inherit; }
 .live-chat-message.is-deleted .live-chat-name, .live-chat-message.is-deleted .live-chat-text { color: var(--muted) !important; text-decoration: line-through; }
 .live-chat-message.is-bot:not(.is-deleted) .live-chat-message-content { filter: grayscale(.55); opacity: .72; }
 .live-chat-message.platform-youtube { --chat-edge-color: #ff3b3b; }
+.live-chat-message[data-merged-message-id] { --chat-edge-color: #7dd3fc; }
+.live-chat-message.kind-send-error { background: linear-gradient(rgb(239 68 68 / .08), rgb(239 68 68 / .08)), var(--surface-raised); }
+.live-chat-message.kind-send-error .live-chat-name { color: #ff8784; }
+.live-chat-notice { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 4px; font-size: 13px; overflow-wrap: anywhere; }
+.live-chat-notice-label { color: #c4b5fd; font-size: 11px; }
+.live-chat-notice-text { color: var(--text); }
 .live-chat-message.is-mentioned { border: 1px solid rgba(255,255,255,.92); box-shadow: inset 3px 0 0 var(--chat-edge-color); }
 .live-chat-avatar { display: none; }
-.live-chat-message-content { position: relative; z-index: 1; display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: center; gap: 3px 6px; padding-right: 85px; }
+.live-chat-message-content { position: relative; z-index: 1; display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: center; gap: 3px 6px; }
+.live-chat-message-content:has(> .live-chat-time) { padding-right: 48px; }
 .live-chat-message-heading { display: flex; max-width: 100%; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 11px; }
 .live-chat-platform, .live-chat-badge { padding: 2px 5px; border-radius: 4px; background: #6034a5; color: #fff; font-size: 8px; font-weight: 900; letter-spacing: .04em; }
 .live-chat-platform.youtube { background: #c51f2d; }
@@ -620,10 +1110,31 @@ button, input { font: inherit; }
 .chat-reply-context button { display: grid; width: 24px; height: 24px; flex: 0 0 auto; padding: 0; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 17px; line-height: 1; cursor: pointer; }
 .chat-reply-context button:hover, .chat-reply-context button:focus-visible { background: rgba(139,92,246,.22); color: #fff; }
 .chat-message-entry { position: relative; }
+.chat-rich-input { display: block; box-sizing: border-box; width: 100%; min-width: 0; min-height: calc(1.4em + 22px); max-height: min(40dvh, 300px); overflow-y: auto; padding: 10px 50px 10px 12px; border: 1px solid var(--border); border-radius: 9px; outline: 0; background: var(--background); color: var(--text); font: inherit; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; text-indent: var(--chat-target-indent, 0px); }
+.dashboard-chat-composer textarea[data-emote-source][hidden] { display: none; }
+.chat-rich-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,92,246,.14); }
+.chat-rich-input:empty::before { display: inline-block; box-sizing: border-box; max-width: calc(100% - var(--chat-target-indent, 0px)); color: var(--muted); content: attr(aria-placeholder); padding-inline-start: .25em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-indent: 0; vertical-align: top; pointer-events: none; }
+.chat-input-emote { display: inline-block; height: 1.4em; width: auto; max-width: 5em; object-fit: contain; vertical-align: middle; user-select: all; text-indent: 0; }
+.dashboard-chat-compose-row .chat-rich-input { flex: 1; width: 0; margin: 0; border: 0; border-radius: 0; background: transparent; }
+.dashboard-chat-compose-row .chat-rich-input:focus { box-shadow: none; }
+.raid-preview-chat .chat-rich-input { max-height: 110px; }
+@media (max-width: 750px) { .raid-preview-chat .chat-rich-input { max-height: 60px; } }
 .dashboard-chat-composer textarea { width: 100%; height: calc(1.4em + 22px); padding: 10px 50px 10px 12px; border: 1px solid var(--border); border-radius: 9px; outline: 0; resize: none; background: var(--background); color: var(--text); font: inherit; line-height: 1.4; }
 .dashboard-chat-composer textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,92,246,.14); }
 .dashboard-chat-composer textarea { min-height: calc(1.4em + 22px); max-height: min(40dvh, 300px); overflow-y: auto; }
-.dashboard-chat-composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dashboard-chat-composer[data-chat-composer] { position: relative; }
+.dashboard-chat-compose-row { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
+.dashboard-chat-compose-row .chat-message-entry { display: flex; flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 9px; background: var(--background); }
+.dashboard-chat-compose-row .chat-message-entry:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,92,246,.14); }
+.dashboard-chat-compose-row textarea { display: block; flex: 1; min-width: 0; width: 0; box-sizing: border-box; margin: 0; padding-left: 12px; text-indent: var(--chat-target-indent, 9ch); border: 0; border-radius: 0; background: transparent; }
+.dashboard-chat-compose-row textarea:focus { box-shadow: none; }
+.dashboard-chat-compose-row .chat-send-button { display: grid; place-items: center; align-self: center; flex: 0 0 40px; width: 40px; height: 40px; min-height: 40px; padding: 8px; }
+.chat-send-hint { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.3; text-align: right; }
+.chat-send-hint kbd { font: inherit; font-weight: 600; }
+.dashboard-chat-compose-row .chat-send-button svg { display: block; width: 20px; height: 20px; fill: currentColor; }
+.dashboard-chat-compose-row .chat-send-status { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); max-width: min(40%, 120px); }
+.dashboard-chat-compose-row .chat-message-entry:focus-within .chat-send-status { opacity: 0; }
+.dashboard-chat-composer[data-chat-composer] > .chat-emote-picker { box-sizing: border-box; left: 0; right: 0; bottom: 100%; width: auto; }
 .chat-emote-toggle { position: absolute; z-index: 2; top: 50%; right: 9px; transform: translateY(-50%); display: grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 0; border-radius: 50%; outline: 0; background: transparent; color: var(--muted); font: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
 .chat-emote-toggle span { display: block; transform: translateY(-4px); pointer-events: none; }
 .chat-emote-toggle:hover, .chat-emote-toggle:focus-visible, .chat-emote-toggle[aria-expanded="true"] { background: rgba(139,92,246,.18); color: var(--text); }
@@ -654,6 +1165,10 @@ button, input { font: inherit; }
 .chat-emote-option:hover, .chat-emote-option:focus-visible { border-color: rgba(139,92,246,.65); background: rgba(139,92,246,.14); color: var(--text); }
 .chat-emote-option img { width: auto; max-width: 42px; height: 34px; object-fit: contain; }
 .chat-emote-option span { width: 100%; overflow: hidden; font-size: 9px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.raid-preview-chat .chat-emote-section-grid { grid-template-columns: repeat(auto-fill,minmax(44px,1fr)); gap: 2px; }
+.raid-preview-chat .chat-emote-option { height: 50px; padding: 3px; gap: 2px; }
+.raid-preview-chat .chat-emote-option img { height: 28px; max-width: 36px; }
+.raid-preview-chat .chat-emote-option span { font-size: 8px; }
 .chat-emote-picker-note { flex-shrink: 0; margin: 0; padding: 8px 10px; border-top: 1px solid var(--border); color: var(--muted); font-size: 9px; line-height: 1.35; }
 .chat-emote-picker-note a { color: #c7b7ff; font-weight: 800; }
 .chat-emote-picker-note.requires-reconnect { background: rgba(245,196,81,.1); color: #f5d98b; font-size: 10px; }
@@ -665,10 +1180,13 @@ button, input { font: inherit; }
 .chat-completion-icon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 7px; background: rgba(139,92,246,.18); color: #d8bcff; font-size: 16px; font-weight: 900; }
 .chat-emote-suggestion span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-emote-suggestion small { max-width: 120px; overflow: hidden; color: var(--muted); font-size: 8px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.chat-target-selector { display: flex; flex-shrink: 0; gap: 5px; }
-.chat-target { min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
-.chat-target.active { border-color: rgba(139,92,246,.65); background: rgba(139,92,246,.16); color: #d8bcff; }
-.chat-target:disabled { cursor: not-allowed; opacity: .38; }
+.chat-target-cycle { position: absolute; z-index: 2; top: 10px; left: 12px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); font: inherit; font-weight: 700; line-height: 1.4; white-space: nowrap; cursor: pointer; }
+.chat-target-cycle[data-target="twitch"] { color: #c4b5fd; }
+.chat-target-cycle[data-target="youtube"] { color: #ff8986; }
+.chat-target-cycle[data-target="both"] { color: #7dd3fc; }
+.chat-target-cycle:not(:disabled):is(:hover, :focus-visible) { text-decoration: underline; text-underline-offset: 3px; }
+.chat-target-cycle:focus-visible { outline: none; }
+.chat-target-cycle:disabled { cursor: default; }
 .chat-send-button { flex-shrink: 0; min-height: 36px; }
 .chat-send-status { flex: 1 1 0; min-width: 0; min-height: 14px; margin: 0; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.4; text-align: right; text-overflow: ellipsis; white-space: nowrap; opacity: .8; pointer-events: none; transition: opacity .45s ease; }
 .chat-send-status.is-fading { opacity: 0; }
@@ -1070,7 +1588,7 @@ body.landing-page {
     .page-header { flex-direction: column; }
     .status-grid, .channel-summary, .channel-card-grid, .channel-status-grid, .channel-detail-grid, .channel-dashboard-grid, .channel-live-layout, .redemption-panel-grid, .performance-grid, .raid-metric-grid { grid-template-columns: 1fr; }
     .admin-viewer-queue-column, .admin-viewer-queue-column > .panel, .admin-activity-panel, .admin-readonly-chat-panel { min-height: 460px; }
-    .channel-dashboard-layout { grid-template-columns: 1fr; grid-template-rows: none; grid-template-areas: "stats" "player" "queue" "activities" "chat"; }
+    .channel-dashboard-layout { grid-template-columns: 1fr; grid-template-rows: none; grid-template-areas: "stats" "player" "queue" "activities" "actions" "chat"; }
     .channel-page-overview .dashboard-chat-column { display: contents; }
     .channel-page-overview .dashboard-chat-column > .dashboard-header-side { grid-area: stats; padding-bottom: 6px; }
     .dashboard-activity-panel, .viewer-queue-column > [data-viewer-queue-panel] { min-height: 460px; }
@@ -1172,6 +1690,7 @@ body.landing-page {
     .dashboard-chat-expand .chat-collapse-icon, .dashboard-chat-expand[aria-pressed="true"] .chat-expand-icon { display: none; }
     .dashboard-chat-expand[aria-pressed="true"] .chat-collapse-icon { display: block; }
     .channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel { height: auto; min-height: 0; flex: 1 1 0; overflow: hidden; }
+    .channel-page-overview .dashboard-carousel-slide > .dashboard-actions-panel { height: auto; min-height: 0; flex: 0 0 auto; max-height: none; grid-template-columns: repeat(7,minmax(0,1fr)); grid-template-rows: auto; gap: 6px; }
     .channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel > .panel-header,
     .channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel > .activity-tabs { flex: 0 0 auto; }
     .channel-page-overview .dashboard-carousel-slide > .dashboard-activity-panel > [data-activity-panel]:not([hidden]) { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow: hidden; }
@@ -2029,11 +2548,13 @@ html.has-overlay-scrollbars, .has-overlay-scrollbars body, .has-overlay-scrollba
 .overlay-scrollbars { display: contents; }
 .overlay-scrollbar { position: fixed; z-index: 1500; opacity: 0; pointer-events: none; background: transparent; touch-action: none; transition: opacity .15s ease; }
 .overlay-scrollbar[hidden] { display: none; }
-.overlay-scrollbar.axis-y { width: 7px; }
-.overlay-scrollbar.axis-x { height: 7px; }
+.overlay-scrollbar.axis-y { width: 19px; transform: translateX(-6px); }
+.overlay-scrollbar.axis-x { height: 19px; transform: translateY(-6px); }
 .overlay-scrollbar.is-visible { opacity: 1; pointer-events: auto; }
 .overlay-scrollbar-thumb { position: absolute; inset: 0 auto auto 0; width: 100%; height: 100%; border-radius: 999px; background: rgba(139,92,246,.65); }
-.overlay-scrollbar-thumb:hover { background: var(--accent); }
+.overlay-scrollbar.axis-y .overlay-scrollbar-thumb { left: 6px; width: 7px; }
+.overlay-scrollbar.axis-x .overlay-scrollbar-thumb { top: 6px; height: 7px; }
+.overlay-scrollbar:hover .overlay-scrollbar-thumb { background: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .overlay-scrollbar { transition: none; } }
 
 .command-help-summary-grid {

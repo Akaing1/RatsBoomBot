@@ -1,10 +1,15 @@
 from types import SimpleNamespace
+from datetime import UTC, datetime, timedelta
+from collections import defaultdict
+from unittest.mock import AsyncMock
 
 import pytest
+from twitchio.models.eventsub_ import ChannelModerate
 
 from bot.component_loader import GLOBAL_COMPONENTS
 from bot.shared.events.moderation import ModerationEvents
 from config.settings import settings
+from bot.shared.pending_raids import remember_raid
 
 
 class ModerationServiceStub:
@@ -71,3 +76,88 @@ async def test_non_serybot_ban_is_ignored() -> None:
 
     assert moderation.observations == []
     assert stream_logs.entries == []
+
+
+@pytest.mark.asyncio
+async def test_native_twitch_raid_and_unraid_update_popup_without_resetting_countdown():
+    bot = SimpleNamespace(services=SimpleNamespace(broadcasters=SimpleNamespace(
+        get_broadcasters=lambda: {"1": SimpleNamespace(viewer_count=8)})))
+    events = ModerationEvents(bot)
+    target = SimpleNamespace(id="2", name="target", display_name="Target")
+    created = datetime.now(UTC)
+    payload = SimpleNamespace(action="raid", broadcaster=SimpleNamespace(id="1"),
+                              raid=SimpleNamespace(user=target), timestamp=created)
+    await events.event_mod_action(payload)
+    pending = bot._dashboard_pending_raids["1"]
+    assert pending["target_id"] == "2"
+    assert pending["viewer_count"] == 8
+    assert pending["expires_at"] == created.timestamp() + 90
+    payload.timestamp = created + timedelta(seconds=2)
+    await events.event_mod_action(payload)
+    assert bot._dashboard_pending_raids["1"] is pending
+    # The browser/API path arriving after the event also shares the same timer.
+    assert remember_raid(bot, "1", target, created) is pending
+    payload.action = "unraid"
+    payload.unraid = SimpleNamespace(id="3")
+    await events.event_mod_action(payload)
+    assert bot._dashboard_pending_raids["1"] is pending
+    payload.unraid.id = "2"
+    await events.event_mod_action(payload)
+    assert not bot._dashboard_pending_raids
+
+
+@pytest.mark.asyncio
+async def test_native_raid_for_unconnected_channel_is_ignored():
+    bot = SimpleNamespace(services=SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {})))
+    await ModerationEvents(bot).event_mod_action(SimpleNamespace(action="raid", broadcaster=SimpleNamespace(id="other")))
+    assert not hasattr(bot, "_dashboard_pending_raids")
+
+
+@pytest.mark.asyncio
+async def test_shared_chat_raid_does_not_create_a_raid_in_the_wrong_channel():
+    bot = SimpleNamespace(services=SimpleNamespace(broadcasters=SimpleNamespace(
+        get_broadcasters=lambda: {"1": object()})))
+    await ModerationEvents(bot).event_mod_action(SimpleNamespace(
+        action="raid", broadcaster=SimpleNamespace(id="1"), source_broadcaster=SimpleNamespace(id="other"),
+        raid=SimpleNamespace(user=SimpleNamespace(id="2", name="target"))))
+    assert not hasattr(bot, "_dashboard_pending_raids")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source_id", [None, "", "1"])
+async def test_actual_twitchio_raid_payload_accepts_empty_source_channel(source_id, caplog):
+    bot = SimpleNamespace(services=SimpleNamespace(broadcasters=SimpleNamespace(
+        get_broadcasters=lambda: {"1": SimpleNamespace(viewer_count=8)})))
+    data = defaultdict(lambda: None, action="raid", broadcaster_user_id="1",
+                       broadcaster_user_login="sender", broadcaster_user_name="Sender",
+                       source_broadcaster_user_id=source_id,
+                       moderator_user_id="1", moderator_user_login="sender", moderator_user_name="Sender",
+                       raid={"user_id": "2", "user_login": "target", "user_name": "Target", "viewer_count": 8})
+    payload = ChannelModerate(data, http=None)
+    with caplog.at_level("INFO", logger="RatBoomBot"):
+        await ModerationEvents(bot).event_mod_action(payload)
+    assert bot._dashboard_pending_raids["1"]["login"] == "target"
+    assert "Pending raid recorded" in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("lookup_fails", [False, True])
+async def test_native_raid_loads_profile_picture_without_losing_raid_on_lookup_failure(lookup_fails):
+    target = SimpleNamespace(id="2", name="target", display_name="Target")
+    image = "https://static-cdn.jtvnw.net/jtv_user_pictures/target.png"
+    full_target = SimpleNamespace(**vars(target), profile_image=SimpleNamespace(url=image))
+    bot = SimpleNamespace(services=SimpleNamespace(broadcasters=SimpleNamespace(
+        get_broadcasters=lambda: {"1": SimpleNamespace(viewer_count=8)})),
+        fetch_user=AsyncMock(return_value=full_target, side_effect=RuntimeError("unavailable") if lookup_fails else None))
+    created = datetime.now(UTC)
+    pending = remember_raid(bot, "1", target, created)
+    payload = SimpleNamespace(action="raid", broadcaster=SimpleNamespace(id="1"),
+                              raid=SimpleNamespace(user=target), timestamp=created)
+    await ModerationEvents(bot).event_mod_action(payload)
+    bot.fetch_user.assert_awaited_once_with(id="2")
+    assert bot._dashboard_pending_raids["1"] is pending
+    assert pending["created_at"] == created.isoformat()
+    assert pending["profile_image_url"] == ("" if lookup_fails else image)
+    if not lookup_fails:
+        await ModerationEvents(bot).event_mod_action(payload)
+        bot.fetch_user.assert_awaited_once()

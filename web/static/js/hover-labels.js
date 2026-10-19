@@ -11,11 +11,12 @@
     let touchGesture = null;
     let suppressTouchClick = false;
     let lastPointerType = '';
+    let focusedInput = null;
+    let focusedTitle = '';
     const touchMode = () => lastPointerType === 'touch' || window.matchMedia?.('(hover: none)').matches;
     const tooltip = document.createElement('div');
     tooltip.className = 'dashboard-hover-tooltip';
     tooltip.setAttribute('role', 'tooltip');
-    tooltip.setAttribute('popover', 'manual');
     tooltip.hidden = true;
     document.body.appendChild(tooltip);
 
@@ -23,7 +24,6 @@
         window.clearTimeout(hoverTimer);
         window.clearTimeout(touchDismissTimer);
         observer?.disconnect();
-        tooltip.hidePopover?.();
         tooltip.hidden = true;
         if (activeElement && originalTitle && !activeElement.getAttribute('title') && !touchMode()) activeElement.setAttribute('title', originalTitle);
         activeElement = null;
@@ -79,10 +79,13 @@
         if (activeElement === element) { refreshTooltip(); return; }
         hideTooltip();
         activeElement = element;
+        // Keep labels inside a modal's top layer without participating in the
+        // native popover stack, where hiding one can dismiss input suggestions.
+        const host = element.closest('dialog') || document.body;
+        if (tooltip.parentElement !== host) host.appendChild(tooltip);
         hoverTimer = window.setTimeout(() => {
             originalTitle = element.getAttribute('title') || '';
             tooltip.hidden = false;
-            tooltip.showPopover?.();
             refreshTooltip();
             if (touchGesture) suppressTouchClick = true;
             if ('MutationObserver' in window) {
@@ -104,6 +107,7 @@
             const value = text(element.querySelector('[data-dashboard-stat-value]')?.textContent);
             return `${label}: ${value}`;
         }
+        if (element.matches('[data-hover-current-value]')) return text(element.selectedOptions?.[0]?.textContent || element.value);
         const explicit = element.getAttribute('title') || touchTitles.get(element) || (element === activeElement ? originalTitle : '');
         // Keep descriptions supplied by individual controls; refresh only our own titles.
         if (explicit && explicit !== generated.get(element)) return explicit;
@@ -129,7 +133,13 @@
     function update(event) {
         const target = event.target;
         if (!(target instanceof Element)) return;
-        if (target.closest('.dashboard-video-frame, #dashboard-twitch-player, iframe, video')) {
+        if (focusedInput?.contains(target)) {
+            hideTooltip();
+            focusedTitle = focusedInput.getAttribute('title') || focusedTitle;
+            focusedInput.removeAttribute('title');
+            return;
+        }
+        if (target.closest('.dashboard-video-frame, .raid-preview-video, #dashboard-twitch-player, iframe, video')) {
             hideTooltip();
             return;
         }
@@ -140,12 +150,16 @@
         const element = target.closest(values)
             || (attachedCheckbox ? attachedLabel : null)
             || target.closest(interactive) || target.closest('img[alt], [title]');
+        if (element?.matches('.raid-browser-thumbnail')) {
+            hideTooltip();
+            return;
+        }
         if (!element || element.matches('h1, h2, h3, h4, h5, h6')
             || (element.getAttribute('aria-hidden') === 'true' && !element.matches(values))) return;
         const label = labelFor(element);
         if (!label) return;
         const previous = element.getAttribute('title');
-        if (element.matches(values) || element.matches('.chat-filter-row')
+        if (element.matches(values) || element.matches('.chat-filter-row') || element.matches('[data-hover-current-value]')
             || element.dataset.channelField || element.dataset.dashboardStat !== undefined
             || !previous || previous === generated.get(element)) {
             element.setAttribute('title', label);
@@ -165,7 +179,21 @@
         if (event.pointerType) lastPointerType = event.pointerType;
         update(event);
     });
-    document.addEventListener('focusin', update);
+    document.addEventListener('focusin', event => {
+        if (event.target instanceof Element && event.target.matches('[data-hover-pointer-only]')) {
+            hideTooltip();
+            event.target.removeAttribute('title');
+            return;
+        }
+        if (event.target instanceof Element && event.target.matches('input, textarea, [contenteditable]')) {
+            hideTooltip();
+            focusedInput = event.target;
+            focusedTitle = focusedInput.getAttribute('title') || '';
+            focusedInput.removeAttribute('title');
+            return;
+        }
+        update(event);
+    });
     document.addEventListener('input', update);
     document.addEventListener('pointerout', event => {
         if (!activeElement || activeElement.contains(event.relatedTarget)) return;
@@ -176,6 +204,11 @@
         hideTooltip();
     });
     document.addEventListener('focusout', event => {
+        if (event.target === focusedInput) {
+            if (focusedTitle && !focusedInput.getAttribute('title') && !touchMode()) focusedInput.setAttribute('title', focusedTitle);
+            focusedInput = null;
+            focusedTitle = '';
+        }
         if (!activeElement?.contains(event.relatedTarget)) hideTooltip();
     });
     document.addEventListener('pointerdown', event => {

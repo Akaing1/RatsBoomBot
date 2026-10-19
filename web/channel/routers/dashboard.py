@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 import time
+import unicodedata
 
 import httpx
 from datetime import UTC, datetime, timedelta
@@ -14,6 +15,7 @@ from twitchio import HTTPException
 from twitchio.http import Route
 
 from bot.command_registry import build_command_help_groups
+from bot.shared.pending_raids import raid_lock, raid_state, raid_viewer_count, remember_raid
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
 from bot.services.channels.profile_settings import LOYALTY_GROUP
 from bot.services.channels.stream_metadata import (
@@ -24,7 +26,10 @@ from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.shared.common import templates
 from web.shared.category_relevance import low_relevance_category_ids
+from web.shared.raid_suggestions import get_suggested_streamers
+from web.shared.raid_directory import get_sorted_directory
 from web.shared.live_chat import clear_stale_chat_on_refresh, stream_chat_events
+from web.shared.raid_chat import preview_chat_events, preview_emotes
 from web.shared.protected_users import (
     ProtectedUserError,
     add_protected_user,
@@ -33,12 +38,85 @@ from web.shared.protected_users import (
     remove_protected_user
 )
 from web.state import get_bot
+from storage.incoming_raids import recent_incoming_raids
 
 router = APIRouter()
 LOGGER = logging.getLogger("RatBoomBot")
 CHAT_SEND_TARGETS = {"twitch", "youtube", "both"}
 CHAT_MESSAGE_MAX_LENGTH = 500
 TOP_GAMES_CACHE_SECONDS = 300
+RAID_BROWSER_DEV_CHANNELS = {"minamichimaa", "ninjakaing"}
+RAID_BROWSER_METADATA_CACHE_SECONDS = 24 * 60 * 60
+RAID_BROWSER_FOLLOW_CACHE_SECONDS = 60 * 60
+RAID_BROWSER_LIVE_CACHE_SECONDS = 60
+
+
+def raid_channel_search_score(query, login, display_name="", category=""):
+    def normalize(value):
+        return "".join(char for char in unicodedata.normalize("NFKC", str(value)).casefold() if char.isalnum())
+
+    needle = normalize(query)
+    if not needle:
+        return 0
+
+    def match(value):
+        value = normalize(value)[:128]
+        if not value:
+            return 0
+        if needle == value:
+            return 1000
+        if value.startswith(needle):
+            return 900
+        if needle in value:
+            return 800
+        # Avoid broad, accidental matches from one- or two-letter searches.
+        if len(needle) < 4:
+            return 0
+        ratio = SequenceMatcher(None, needle, value).ratio()
+        if len(needle) <= 40 and len(value) > len(needle):
+            for width in (len(needle) - 1, len(needle), len(needle) + 1):
+                for start in range(max(0, len(value) - width + 1)):
+                    ratio = max(ratio, SequenceMatcher(None, needle, value[start:start + width]).ratio())
+        return round(700 * ratio) if ratio >= .75 else 0
+
+    return max(match(login), match(display_name), match(category) * .5)
+
+
+RAID_BROWSER_MUTUAL_BONUS = 80
+
+
+def raid_size_bonus(own, candidate, maximum):
+    # Unknown/zero counts aren't evidence of similar channel size. Ratios make
+    # the bonus scale equally for small and large communities, in either direction.
+    if any(not isinstance(value, int) or isinstance(value, bool) or value <= 0 for value in (own, candidate)):
+        return 0
+    return round(maximum * min(own, candidate) / max(own, candidate))
+
+
+def raid_relevance_breakdown(*, same_category=False, shared_tags=(), same_team=False,
+                         both_vtubers=False, followed=False, mutual=False, suggested=False, same_language=False, recent_raid=0,
+                         own_viewers=None, viewers=None, own_followers=None, followers=None):
+    # Compatibility outweighs simply being followed/suggested. Treat VTuber
+    # separately so it isn't counted again among generic shared tags.
+    other_tags = {str(tag).strip().casefold() for tag in shared_tags} - {"vtuber", ""}
+    return {
+        "Same category": 400 * same_category,
+        "Same team": 200 * same_team,
+        "Both VTubers": 250 * both_vtubers,
+        "Team + VTuber": 50 * (same_team and both_vtubers),
+        "Shared tags": 40 * min(len(other_tags), 5),
+        "Following": 400 * followed,
+        "Mutual following": RAID_BROWSER_MUTUAL_BONUS * (followed and mutual),
+        "Suggested": 120 * suggested,
+        "Same language": 20 * same_language,
+        "Recent raid": round(300 * max(0, min(1, recent_raid))),
+        "Similar viewer count": raid_size_bonus(own_viewers, viewers, 180),
+        "Similar channel size": raid_size_bonus(own_followers, followers, 120),
+    }
+
+
+def raid_relevance_score(**matches):
+    return sum(raid_relevance_breakdown(**matches).values())
 
 
 def protected_users_redirect(result: str, message: str) -> RedirectResponse:
@@ -118,11 +196,15 @@ async def execute_twitch_slash_command(runtime_bot, broadcaster_id: str, message
     elif command in {"raid", "shoutout"}:
         user = await resolve_user(require_argument("a channel username"))
         if command == "raid":
-            await broadcaster.start_raid(str(user.id))
+            async with raid_lock(runtime_bot, broadcaster_id):
+                result = await broadcaster.start_raid(str(user.id))
+                remember_raid(runtime_bot, broadcaster_id, user, getattr(result, "created_at", None))
         else:
             await broadcaster.send_shoutout(to_broadcaster=str(user.id), moderator=moderator_id)
     elif command == "unraid":
-        await broadcaster.cancel_raid()
+        async with raid_lock(runtime_bot, broadcaster_id):
+            await broadcaster.cancel_raid()
+            raid_state(runtime_bot).pop(str(broadcaster_id), None)
     elif command == "warn":
         username, _, reason = require_argument("a username and reason").partition(" ")
         if not reason:
@@ -544,6 +626,838 @@ async def channel_viewer_queue_action(
     })
 
 
+@router.get("/channel/api/raid-browser/pending", response_class=JSONResponse)
+async def channel_pending_raid(request: Request):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    if str(broadcaster_id) not in runtime_bot.services.broadcasters.get_broadcasters():
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    raid = getattr(runtime_bot, "_dashboard_pending_raids", {}).get(str(broadcaster_id))
+    if raid and not raid.get("completed"):
+        raid["viewer_count"] = raid_viewer_count(runtime_bot, broadcaster_id)
+    return JSONResponse({"raid": raid})
+
+
+@router.post("/channel/api/raid-browser/action", response_class=JSONResponse)
+async def channel_raid_action(request: Request, action: str = Form(...),
+                              target_id: str = Form(""), csrf_token: str = Form(...)):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    validate_csrf_token(request, csrf_token)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster_id = str(broadcaster_id)
+    if broadcaster_id not in runtime_bot.services.broadcasters.get_broadcasters():
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    if action not in {"start", "cancel"}:
+        return JSONResponse({"detail": "Unknown raid action."}, status_code=400)
+    if action == "start" and (not re.fullmatch(r"\d{1,25}", target_id) or target_id == broadcaster_id):
+        return JSONResponse({"detail": "Select another channel to raid."}, status_code=400)
+    lock = raid_lock(runtime_bot, broadcaster_id)
+    async with lock:
+        pending = runtime_bot._dashboard_pending_raids.get(broadcaster_id)
+        if action == "start" and pending and pending["expires_at"] > time.time():
+            return JSONResponse({"detail": "A raid is already pending. Cancel it before starting another."}, status_code=409)
+        try:
+            broadcaster = runtime_bot.create_partialuser(broadcaster_id)
+            if action == "cancel":
+                if not pending:
+                    return JSONResponse({"detail": "No dashboard raid is pending."}, status_code=404)
+                await broadcaster.cancel_raid()
+                runtime_bot._dashboard_pending_raids.pop(broadcaster_id, None)
+                return JSONResponse({"raid": None, "detail": "Raid cancelled."})
+            target = await runtime_bot.fetch_user(id=target_id)
+            if target is None:
+                return JSONResponse({"detail": "Twitch could not find that channel."}, status_code=404)
+            result = await broadcaster.start_raid(target_id)
+            raid = remember_raid(runtime_bot, broadcaster_id, target, getattr(result, "created_at", None))
+            return JSONResponse({"raid": raid})
+        except Exception as error:
+            status = getattr(error, "status", None)
+            if action == "cancel" and status == 404:
+                runtime_bot._dashboard_pending_raids.pop(broadcaster_id, None)
+                return JSONResponse({"raid": None, "detail": "Twitch has no pending raid to cancel."})
+            if status in {401, 403}:
+                detail = "Reconnect Twitch to grant permission to manage raids."
+            elif status == 409:
+                detail = "Twitch already has a raid in progress. Check Twitch chat before trying again."
+            elif status == 429:
+                detail = "Twitch's raid limit was reached. Try again later."
+            elif status == 400:
+                detail = "Twitch rejected the raid. The target may not accept raids from this channel."
+            else:
+                detail = "Could not confirm the raid action. Check Twitch chat before trying again."
+            LOGGER.warning("[Dashboard] Raid action %s failed for %s (status %s).", action, broadcaster_id, status)
+            return JSONResponse({"detail": detail}, status_code=status if status in {400, 401, 403, 409, 429} else 502)
+
+
+@router.get("/channel/api/raid-browser/preview", response_class=JSONResponse)
+async def channel_raid_preview(request: Request, target_id: str = ""):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster_id = str(broadcaster_id)
+    if broadcaster_id not in runtime_bot.services.broadcasters.get_broadcasters():
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    if not re.fullmatch(r"\d{1,25}", target_id):
+        return JSONResponse({"detail": "Invalid channel."}, status_code=400)
+    try:
+        followers = await raid_browser_cached_request(runtime_bot, broadcaster_id, "channels/followers",
+            {"broadcaster_id": target_id, "first": 1})
+        total = followers.get("total")
+        count = total if isinstance(total, int) and not isinstance(total, bool) and total >= 0 else None
+        return JSONResponse({"follower_count": count})
+    except Exception:
+        LOGGER.warning("[Dashboard] Raid preview follower count unavailable for %s.", target_id)
+        return JSONResponse({"follower_count": None})
+
+
+@router.get("/channel/api/raid-browser", response_class=JSONResponse)
+async def channel_raid_browser(
+    request: Request, query: str = "", after: str = "", same_category: bool = False,
+    same_tags: bool = False, tags: str = "", tag_match: str = "all", language: str = "", following: bool = False, not_following: bool = False,
+    mutual: bool = False, recommended: bool = False, same_team: bool = False, team: str = "", favorites: str = "",
+    favorites_only: bool = False, blocked: str = "", category_id: str = "", suggested: bool = False, sort: str = "", event: str = "", developer_only: bool = False, defer_profiles: bool = False,
+):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster_id = str(broadcaster_id)
+    if broadcaster_id not in runtime_bot.services.broadcasters.get_broadcasters():
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    query = query.strip()
+    language = language.strip().lower()
+    if event not in {"", "drops_enabled"}:
+        return JSONResponse({"detail": "Select a valid event."}, status_code=400)
+    raw_tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
+    if any(len(tag) > 25 for tag in raw_tags):
+        return JSONResponse({"detail": "Each tag must be 25 characters or fewer."}, status_code=400)
+    selected_tags = {tag.casefold() for tag in raw_tags}
+    if tag_match not in {"any", "all"}:
+        return JSONResponse({"detail": "Select a valid tag matching mode."}, status_code=400)
+    favorite_ids = list(dict.fromkeys(part.strip() for part in favorites.split(",") if part.strip()))
+    blocked_ids = {part.strip() for part in blocked.split(",") if part.strip()}
+    if len(blocked) > 2000 or len(blocked_ids) > 100 or any(not re.fullmatch(r"\d{1,25}", item) for item in blocked_ids):
+        return JSONResponse({"detail": "Invalid recommendation blacklist."}, status_code=400)
+    if len(favorites) > 2000 or len(favorite_ids) > 100 or any(not re.fullmatch(r"\d{1,25}", item) for item in favorite_ids):
+        return JSONResponse({"detail": "Invalid favorite channel list."}, status_code=400)
+    if len(query) > 100 or len(after) > 500 or len(tags) > 250 or len(selected_tags) > 10:
+        return JSONResponse({"detail": "The search or page cursor is too long."}, status_code=400)
+    if language and not re.fullmatch(r"[a-z]{2}|other", language):
+        return JSONResponse({"detail": "Select a valid stream language."}, status_code=400)
+    sort = sort or ("for_you" if recommended else "viewers_desc")
+    if sort not in {"for_you", "viewers_asc", "viewers_desc", "name_asc", "name_desc", "uptime_asc", "uptime_desc"}:
+        return JSONResponse({"detail": "Select a valid sorting option."}, status_code=400)
+    if sort == "for_you":
+        recommended = True
+    if favorites_only:
+        recommended = sort == "for_you"
+        suggested = False
+    if len(team) > 200:
+        return JSONResponse({"detail": "Invalid stream team."}, status_code=400)
+    if not_following and (following or mutual):
+        return JSONResponse({"detail": "Select either Following or Not following."}, status_code=400)
+    params = {"first": 20}
+    if after:
+        params["after"] = after
+    try:
+        if category_id and (not category_id.isdigit() or len(category_id) > 25):
+            return JSONResponse({"detail": "Invalid category."}, status_code=400)
+        if mutual:
+            validation = await raid_browser_cached_request(runtime_bot, broadcaster_id, "oauth2/validate", {})
+            if not {"user:read:follows", "moderator:read:followers"}.issubset(set(validation.get("scopes", []))):
+                return JSONResponse({"detail": "Reconnect Twitch to enable mutual-following filters."}, status_code=403)
+        own_category = ""
+        own_tags = set()
+        channel_tags = None
+        own_language = ""
+        if same_category or same_tags or recommended:
+            info = await raid_browser_cached_request(runtime_bot, broadcaster_id, "channels", {"broadcaster_id": broadcaster_id})
+            own = next(iter(info.get("data", [])), {})
+            channel_tags = own.get("tags") or []
+            own_category = str(own.get("game_id") or "")
+            own_tags = {str(tag).strip().casefold() for tag in channel_tags}
+            own_language = str(own.get("broadcaster_language") or "").lower()
+            if same_category and not own_category:
+                return JSONResponse({"detail": "Set your channel category before using Same category."}, status_code=400)
+            if same_tags and not own_tags:
+                return JSONResponse({"detail": "Your channel has no tags to match yet."}, status_code=400)
+        async def load_suggested():
+            if not (recommended or suggested):
+                return [], set(), None
+            broadcaster = runtime_bot.services.broadcasters.get_broadcasters()[broadcaster_id]
+            shelf, suggested_status = await get_suggested_streamers(runtime_bot, broadcaster_id, getattr(broadcaster, "login", None))
+            suggested_ids = {channel["id"] for channel in shelf}
+            suggested_streams = []
+            if (suggested or not after) and suggested_ids and not favorites_only:
+                ids = sorted(suggested_ids)
+                for offset in range(0, len(ids), 100):
+                    live = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": ids[offset:offset + 100], "first": 100})
+                    suggested_streams.extend(live.get("data", []))
+            return suggested_streams, suggested_ids, suggested_status
+
+        async def load_teams():
+            return await raid_browser_team_streams(runtime_bot, broadcaster_id) if recommended or same_team else ([], {})
+
+        async def load_followed():
+            if not (((recommended or not_following) and not (following or mutual)) or ((favorites_only or same_team) and (following or mutual))):
+                return []
+            try:
+                return await raid_browser_followed_streams(runtime_bot, broadcaster_id)
+            except HTTPException as error:
+                # Favorites remain usable without follow scopes; compatibility
+                # scores still apply even when following bonuses are unknown.
+                if not favorites_only or following or mutual or not_following or error.status not in {401, 403}:
+                    raise
+                LOGGER.warning("[Dashboard] Following bonuses unavailable for favorites in %s.", broadcaster_id)
+                return []
+
+        sources = await asyncio.gather(load_suggested(), load_teams(), load_followed(), return_exceptions=True)
+        for source in sources:
+            if isinstance(source, BaseException):
+                raise source
+        (suggested_streams, suggested_ids, suggested_status), (team_streams, team_members), followed_streams = sources
+        favorite_availability = None
+        recent_raiders = {}
+        if recommended:
+            try:
+                recent_raiders = await recent_incoming_raids(getattr(runtime_bot.services, "db", None), broadcaster_id)
+            except Exception:
+                LOGGER.warning("[Dashboard] Recent incoming raids unavailable for %s.", broadcaster_id)
+        recent_raid_streams = []
+        if recent_raiders and not after and not (following or mutual or same_team or suggested or favorites_only):
+            recent_page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {
+                "user_id": list(recent_raiders), "first": 100})
+            recent_raid_streams = recent_page.get("data", [])
+        discovery_prefix = "fy-discovery:"
+        dev_streams = await raid_browser_dev_streams(runtime_bot, broadcaster_id) if not after else []
+        broad_for_you = (sort == "for_you" and not (developer_only or favorites_only or following or mutual or same_team or suggested or query or category_id or same_category)
+                        and bool(own_category) and bool(language or own_language or raw_tags or own_tags))
+        tag_discovery = (sort == "for_you" and bool(raw_tags)
+                         and not (developer_only or favorites_only or following or mutual or same_team or suggested or query))
+        discovery_page = ((broad_for_you or tag_discovery) and after.startswith(discovery_prefix)) or (tag_discovery and not after)
+        if developer_only:
+            page = {"data": dev_streams, "pagination": {}}
+            streams = page
+        elif favorites_only:
+            page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100}) if favorite_ids else {"data": [], "pagination": {}}
+            streams = page
+            favorite_availability = page.get("data", [])
+        elif same_team:
+            page = {"data": team_streams, "pagination": {}}
+            streams = page
+        elif following or mutual:
+            if sort in {"viewers_asc", "uptime_asc", "uptime_desc", "name_asc", "name_desc"}:
+                followed_streams = await raid_browser_followed_streams(runtime_bot, broadcaster_id)
+                page = {"data": followed_streams, "pagination": {}}
+            else:
+                params["user_id"] = broadcaster_id
+                page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams/followed", params)
+            streams = page
+        elif suggested:
+            page = {"data": suggested_streams, "pagination": {}}
+            streams = page
+        elif discovery_page:
+            discovery_cursor = after[len(discovery_prefix):] if after else ""
+            discovery_category = category_id or (own_category if same_category else "")
+            if raw_tags and not discovery_cursor:
+                try:
+                    streams = await raid_browser_tag_directory(runtime_bot, broadcaster_id,
+                        tags=raw_tags, tag_match=tag_match, category_id=discovery_category, language=language)
+                    next_cursor = "official-start" if streams.pop("has_more", False) else ""
+                except (httpx.HTTPError, ValueError, TypeError, KeyError):
+                    streams = await raid_browser_official_directory(runtime_bot, broadcaster_id,
+                        category_id=discovery_category, language=language)
+                    next_cursor = streams.get("pagination", {}).get("cursor", "")
+            else:
+                streams = await raid_browser_official_directory(runtime_bot, broadcaster_id,
+                    after="" if discovery_cursor == "official-start" else discovery_cursor,
+                    category_id=discovery_category, language=language or ("" if raw_tags else own_language))
+                next_cursor = streams.get("pagination", {}).get("cursor", "")
+            page = {**streams, "pagination": {"cursor": discovery_prefix + next_cursor if next_cursor else ""}}
+        elif query:
+            fuzzy_prefix = "fuzzy-search:"
+            fuzzy_page = after.startswith(fuzzy_prefix) and len(query) >= 4
+            search_query = query[:max(2, min(5, len(query) // 2))] if fuzzy_page else query
+            if fuzzy_page:
+                params["after"] = after[len(fuzzy_prefix):]
+            params.update(query=search_query, live_only="true")
+            page = await runtime_bot._http.request_json(Route(
+                "GET", "search/channels", params=params, token_for=broadcaster_id))
+            if not page.get("data") and not after and len(query) >= 4:
+                # A bounded broader lookup supplies candidates when Twitch's
+                # literal search cannot find the misspelled channel name.
+                fuzzy_page = True
+                params["query"] = query[:max(2, min(5, len(query) // 2))]
+                page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "search/channels", params)
+            if fuzzy_page:
+                next_page = page.get("pagination", {}).get("cursor", "")
+                page = {**page, "pagination": {"cursor": fuzzy_prefix + next_page if next_page else ""}}
+            ids = [str(item["id"]) for item in page.get("data", [])
+                   if item.get("is_live") and str(item.get("id", "")) != broadcaster_id]
+            streams = await runtime_bot._http.request_json(Route(
+                "GET", "streams", params={"user_id": ids, "first": 20}, token_for=broadcaster_id)) if ids else {"data": []}
+        elif sort in {"viewers_asc", "uptime_asc"} or (recommended and sort == "viewers_desc") or event == "drops_enabled":
+            discovery_category = category_id or (own_category if recommended or same_category else "")
+            discovery_language = language or (own_language if recommended else "")
+            preferred_tags = [tag for tag in (channel_tags or []) if isinstance(tag, str) and 0 < len(tag) <= 25]
+            if "vtuber" in own_tags:
+                preferred_tags = ["VTuber"]
+            discovery_tags = raw_tags or (preferred_tags[:1] if recommended else [])
+            if event == "drops_enabled":
+                discovery_tags = ["DropsEnabled"]
+            directory_sort = sort if sort in {"viewers_asc", "viewers_desc", "uptime_asc"} else "viewers_desc"
+            official_fallback = after.startswith("official:")
+            try:
+                if official_fallback:
+                    directory = None
+                elif recommended and not (discovery_category or discovery_language or discovery_tags):
+                    directory = {"ids": [], "cursor": ""}
+                else:
+                    directory = await get_sorted_directory(runtime_bot, sort=directory_sort, after=after,
+                        category_id=discovery_category, language=discovery_language, tags=discovery_tags, tag_match=tag_match)
+                    # Implicit preferences should not turn a quiet category
+                    # into an empty browser; explicit user filters stay strict.
+                    if not directory["ids"] and not after and not raw_tags and discovery_tags and not event:
+                        directory = await get_sorted_directory(runtime_bot, sort=directory_sort,
+                            category_id=discovery_category, language=discovery_language)
+            except (httpx.HTTPError, ValueError, TypeError, KeyError):
+                LOGGER.warning("[Dashboard] Raid directory unavailable; using official stream lookup for %s.", broadcaster_id)
+                official_fallback = True
+            if official_fallback:
+                streams = await raid_browser_official_directory(runtime_bot, broadcaster_id,
+                    after=after if after.startswith("official:") else "",
+                    category_id=discovery_category, language=discovery_language)
+                page = {**streams, "sort_scope": "fetched"}
+            else:
+                streams = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {
+                    "user_id": directory["ids"], "first": 100}) if directory["ids"] else {"data": []}
+                page = {"pagination": {"cursor": directory["cursor"]}}
+        else:
+            if category_id or same_category or (recommended and own_category):
+                params["game_id"] = category_id or own_category
+            if language or (recommended and not own_category and own_language):
+                params["language"] = language or own_language
+            # Do not substitute a generic top-stream list when there is no
+            # channel context: followed channels are still meaningful candidates.
+            page = await runtime_bot._http.request_json(Route(
+                "GET", "streams", params=params, token_for=broadcaster_id)) if category_id or not recommended or own_category or own_language else {"data": [], "pagination": {}}
+            streams = page
+        if broad_for_you and not discovery_page and not page.get("pagination", {}).get("cursor"):
+            # Exhausting the current category is not the end of recommendations.
+            # Continue with compatible channels outside that narrow candidate pool.
+            page = {**page, "pagination": {"cursor": discovery_prefix}}
+        followed_ids = {str(stream.get("user_id", "")) for stream in followed_streams}
+        if (following or mutual) and not (favorites_only or same_team):
+            followed_ids.update(str(stream.get("user_id", "")) for stream in streams.get("data", []))
+        favorite_streams = []
+        if favorite_ids and not after and not favorites_only and (recommended or sort not in {"viewers_asc", "uptime_asc"}):
+            favorite_page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100})
+            favorite_streams = favorite_page.get("data", [])
+            favorite_availability = favorite_streams
+        candidates = [*dev_streams, *favorite_streams, *recent_raid_streams, *(followed_streams if not after else []),
+                      *(suggested_streams if recommended and not after else []),
+                      *(team_streams if recommended and not after and not (following or mutual) else []), *streams.get("data", [])]
+        if favorites_only:
+            candidates = streams.get("data", [])
+        channels = []
+        emitted = set()
+        for stream in candidates:
+            user_id = str(stream.get("user_id", ""))
+            login = str(stream.get("user_login", ""))
+            dev_priority = login.casefold() in RAID_BROWSER_DEV_CHANNELS
+            if developer_only and not dev_priority:
+                continue
+            if (user_id == broadcaster_id and not dev_priority) or user_id in blocked_ids or user_id in emitted or not re.fullmatch(r"[A-Za-z0-9_]{1,25}", login):
+                continue
+            if favorites_only and user_id not in favorite_ids:
+                continue
+            stream_tags = {str(tag).strip().casefold() for tag in (stream.get("tags") or [])}
+            if event == "drops_enabled" and "dropsenabled" not in stream_tags:
+                continue
+            if (following or mutual) and user_id not in followed_ids:
+                continue
+            if not_following and user_id in followed_ids:
+                continue
+            if suggested and user_id not in suggested_ids:
+                continue
+            if (category_id or same_category) and str(stream.get("game_id", "")) != (category_id or own_category):
+                continue
+            if same_tags and not own_tags.intersection(stream_tags):
+                continue
+            if selected_tags and not (selected_tags.issubset(stream_tags) if tag_match == "all"
+                                      else selected_tags.intersection(stream_tags)):
+                continue
+            if language and str(stream.get("language", "")).lower() != language:
+                continue
+            if same_team and user_id not in team_members:
+                continue
+            if same_team and team and team not in team_members.get(user_id, []):
+                continue
+            search_score = raid_channel_search_score(query, login, stream.get("user_name") or "", stream.get("game_name") or "") if query else 0
+            if query and not search_score:
+                continue
+            if mutual:
+                follower = await raid_browser_cached_request(runtime_bot, broadcaster_id, "channels/followers", {
+                    "broadcaster_id": broadcaster_id, "user_id": str(stream.get("user_id", ""))})
+                if not follower.get("data"):
+                    continue
+            emitted.add(user_id)
+            is_followed = user_id in followed_ids
+            teams = team_members.get(user_id, [])
+            category_match = bool(own_category and str(stream.get("game_id", "")) == own_category)
+            language_match = bool(own_language and str(stream.get("language", "")).lower() == own_language)
+            shared_tags = own_tags.intersection(stream_tags)
+            both_vtubers = "vtuber" in shared_tags
+            match_breakdown = raid_relevance_breakdown(same_category=category_match, shared_tags=shared_tags,
+                same_team=bool(teams), both_vtubers=both_vtubers, followed=is_followed,
+                suggested=user_id in suggested_ids, same_language=language_match,
+                recent_raid=recent_raiders.get(user_id, 0)) if recommended else {}
+            channels.append({
+                "id": str(stream.get("user_id", "")), "login": login,
+                "display_name": str(stream.get("user_name") or login),
+                "title": str(stream.get("title") or ""),
+                "category": str(stream.get("game_name") or ""),
+                "search_score": search_score,
+                "dev_priority": dev_priority,
+                "is_self": user_id == broadcaster_id,
+                "events": ["Drops Enabled"] if "dropsenabled" in stream_tags else [],
+                "viewers": int(stream.get("viewer_count") or 0),
+                "started_at": str(stream.get("started_at") or ""),
+                "followed": is_followed,
+                "suggested": user_id in suggested_ids,
+                "recent_raider": user_id in recent_raiders,
+                "teams": teams,
+                "relevance": sum(match_breakdown.values()),
+                "match_breakdown": match_breakdown,
+                "reasons": [label for active, label in ((category_match, "Same category"), (both_vtubers, "Both VTubers"),
+                           (bool(teams), "Same stream team"), (bool(shared_tags), "Shared tags"),
+                           (is_followed, "Following"), (user_id in suggested_ids, "Suggested streamer"),
+                           (user_id in recent_raiders, "Raided you recently"), (language_match, "Same language")) if active],
+                "language": str(stream.get("language") or ""),
+                "tags": sorted((str(tag) for tag in (stream.get("tags") or [])),
+                               key=lambda tag: (tag.casefold() != "vtuber", tag.casefold())),
+                "thumbnail_url": str(stream.get("thumbnail_url") or "").replace("{width}", "320").replace("{height}", "180"),
+                "thumbnail_url_medium": str(stream.get("thumbnail_url") or "").replace("{width}", "640").replace("{height}", "360"),
+                "thumbnail_url_large": str(stream.get("thumbnail_url") or "").replace("{width}", "1280").replace("{height}", "720"),
+            })
+        async def load_sizes():
+            return await raid_browser_channel_sizes(runtime_bot, broadcaster_id, [channel["id"] for channel in channels]) if sort == "for_you" and channels else {}
+
+        async def load_collections():
+            return await raid_browser_collection_visibility(runtime_bot, broadcaster_id, favorite_ids, blocked_ids,
+                team_streams=team_streams if recommended or same_team else None,
+                favorite_streams=favorite_availability) if not after else {}
+
+        profile_pending_ids = []
+        async def load_profiles():
+            if not defer_profiles:
+                return await raid_browser_profiles(runtime_bot, broadcaster_id, channels)
+            profiles, missing = raid_browser_cached_profiles(runtime_bot, broadcaster_id, channels)
+            profile_pending_ids.extend(missing)
+            return profiles
+
+        # Ranking still completes before rendering, but uncached pictures
+        # can be filled in afterward without changing card order.
+        relationships, sizes, profiles, collection_visibility = await asyncio.gather(
+            raid_browser_relationships(runtime_bot, broadcaster_id, channels,
+                followed_ids if recommended or following or mutual or not_following else None),
+            load_sizes(), load_profiles(), load_collections())
+        own_viewers = getattr(runtime_bot.services.broadcasters.get_broadcasters()[broadcaster_id], "viewer_count", None)
+        for channel in channels:
+            channel.update(relationships.get(channel["id"], {}))
+            if recommended and channel.get("followed") and channel.get("mutual") is True:
+                channel["match_breakdown"]["Mutual following"] = RAID_BROWSER_MUTUAL_BONUS
+            if sort == "for_you":
+                channel["match_breakdown"]["Similar viewer count"] = raid_size_bonus(own_viewers, channel["viewers"], 180)
+                channel["match_breakdown"]["Similar channel size"] = raid_size_bonus(sizes.get(broadcaster_id), sizes.get(channel["id"]), 120)
+            if recommended:
+                channel["relevance"] = sum(channel["match_breakdown"].values())
+        if sort == "for_you":
+            channels.sort(key=lambda item: (item["search_score"], item["relevance"], item["viewers"]), reverse=True)
+        elif sort == "viewers_asc":
+            channels.sort(key=lambda item: (item["viewers"], item["login"]))
+        elif sort in {"name_asc", "name_desc"}:
+            channels.sort(key=lambda item: (item["display_name"].casefold(), item["login"]), reverse=sort == "name_desc")
+        elif sort in {"uptime_asc", "uptime_desc"}:
+            def started_at(item):
+                try:
+                    return datetime.fromisoformat(item["started_at"].replace("Z", "+00:00")).timestamp()
+                except (ValueError, TypeError, OverflowError):
+                    return 0
+            channels.sort(key=lambda item: (started_at(item) == 0,
+                started_at(item) if sort == "uptime_desc" else -started_at(item)))
+        else:
+            channels.sort(key=lambda item: item["viewers"], reverse=True)
+        channels.sort(key=lambda item: (item["id"] not in favorite_ids, not item["dev_priority"]))
+        for channel in channels:
+            profile = profiles.get(channel["id"])
+            channel["verified"] = profile.get("broadcaster_type") == "partner" if profile else None
+            channel["profile_image_url"] = str(profile.get("profile_image_url") or "") if profile else ""
+            channel["description"] = str(profile.get("description") or "") if profile else ""
+        return JSONResponse({"channels": channels, "cursor": page.get("pagination", {}).get("cursor", ""), "suggested_status": suggested_status,
+                             **({"profile_pending_ids": profile_pending_ids} if profile_pending_ids else {}),
+                             **({"teams": sorted({label for labels in team_members.values() for label in labels}, key=str.casefold)} if same_team else {}),
+                             "sort_scope": page.get("sort_scope", ""), "search_limited": page.get("search_limited", False),
+                             **collection_visibility,
+                             **({"developers_live": bool(dev_streams)} if not after else {}),
+                             **({"channel_tags": channel_tags} if channel_tags is not None else {})})
+    except HTTPException as error:
+        detail = ("Reconnect Twitch to enable following and mutual-following filters."
+                  if error.status in (401, 403) and (following or not_following or mutual or recommended) else
+                  "Reconnect Twitch to browse live channels." if error.status == 401 else
+                  "Twitch could not load live channels. Try again shortly.")
+        return JSONResponse({"detail": detail}, status_code=error.status if error.status in (401, 403, 429) else 502)
+    except Exception:
+        LOGGER.exception("[Dashboard] Could not load raid browser for %s.", broadcaster_id)
+        return JSONResponse({"detail": "Live channels could not be loaded. Try again."}, status_code=502)
+
+
+async def raid_browser_tag_directory(runtime_bot, broadcaster_id, *, tags, tag_match, category_id="", language=""):
+    """One public first page per ANY tag, or one page requiring ALL tags."""
+    groups = [list(dict.fromkeys(tags))] if tag_match == "all" else [[tag] for tag in dict.fromkeys(tags)]
+    semaphore = asyncio.Semaphore(3)
+
+    async def lookup(group):
+        async with semaphore:
+            return await get_sorted_directory(runtime_bot, sort="viewers_desc", tags=group,
+                tag_match="all", category_id=category_id, language=language)
+
+    pages = await asyncio.gather(*(lookup(group) for group in groups))
+    ids = list(dict.fromkeys(id_ for page in pages for id_ in page["ids"]))
+    streams = []
+    for offset in range(0, len(ids), 100):
+        page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": ids[offset:offset + 100], "first": 100})
+        streams.extend(page.get("data", []))
+    return {"data": streams, "has_more": any(page["cursor"] for page in pages)}
+
+
+async def raid_browser_official_directory(runtime_bot, broadcaster_id, *, after="", category_id="", language=""):
+    """Bound discovery to five cached Helix pages (at most 500 candidates)."""
+    checked = 0
+    cursor = ""
+    if after:
+        prefix, count, cursor = after.split(":", 2)
+        if prefix != "official" or not count.isdigit() or not 1 <= int(count) < 5 or not cursor:
+            raise ValueError("Invalid official directory cursor.")
+        checked = int(count)
+    params = {"first": 100}
+    if cursor:
+        params["after"] = cursor
+    if category_id:
+        params["game_id"] = category_id
+    if language:
+        params["language"] = language
+    response = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", params)
+    next_cursor = response.get("pagination", {}).get("cursor", "")
+    checked += 1
+    return {"data": response.get("data", []),
+            "pagination": {"cursor": f"official:{checked}:{next_cursor}" if next_cursor and checked < 5 else ""},
+            "search_limited": bool(next_cursor and checked >= 5)}
+
+
+async def raid_browser_collection_visibility(runtime_bot, broadcaster_id, favorite_ids, blocked_ids, *, team_streams=None, favorite_streams=None):
+    def has_visible_stream(streams):
+        return any(str(stream.get("user_id", "")) not in blocked_ids
+                   and (str(stream.get("user_id", "")) != broadcaster_id or str(stream.get("user_login", "")).casefold() in RAID_BROWSER_DEV_CHANNELS)
+                   for stream in streams)
+
+    visibility = {}
+    try:
+        if favorite_streams is None:
+            favorites = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100}) if favorite_ids else {"data": []}
+            favorite_streams = favorites.get("data", [])
+        visibility["favorites_live"] = has_visible_stream(favorite_streams)
+        visibility["live_favorite_ids"] = [str(stream.get("user_id", "")) for stream in favorite_streams if has_visible_stream([stream])]
+    except Exception:
+        LOGGER.warning("[Dashboard] Live favorites availability could not be checked.")
+    try:
+        if team_streams is None:
+            team_streams, _ = await raid_browser_team_streams(runtime_bot, broadcaster_id)
+        visibility["team_live"] = has_visible_stream(team_streams)
+    except Exception:
+        LOGGER.warning("[Dashboard] Live stream-team availability could not be checked.")
+    return visibility
+
+
+async def raid_browser_dev_streams(runtime_bot, broadcaster_id):
+    try:
+        users = await raid_browser_cached_request(runtime_bot, broadcaster_id, "users", {"login": sorted(RAID_BROWSER_DEV_CHANNELS)})
+        ids = [str(user["id"]) for user in users.get("data", [])
+               if str(user.get("login", "")).casefold() in RAID_BROWSER_DEV_CHANNELS and re.fullmatch(r"\d{1,25}", str(user.get("id", "")))]
+        if not ids:
+            return []
+        streams = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": ids, "first": 100})
+        return streams.get("data", [])
+    except Exception:
+        LOGGER.warning("[Dashboard] Development raid-browser channels unavailable.")
+        return []
+
+
+async def raid_browser_relationships(runtime_bot, broadcaster_id, channels, followed_ids=None):
+    """Decorate visible candidates without making missing follow scopes fatal."""
+    if not channels:
+        return {}
+    try:
+        if followed_ids is None:
+            followed_ids = {str(item.get("user_id", "")) for item in await raid_browser_followed_streams(runtime_bot, broadcaster_id)}
+        relationships = {channel["id"]: {"followed": channel["id"] in followed_ids, "mutual": None} for channel in channels}
+        candidates = [channel["id"] for channel in channels if channel["id"] in followed_ids]
+        if not candidates:
+            return relationships
+        validation = await raid_browser_cached_request(runtime_bot, broadcaster_id, "oauth2/validate", {})
+        if "moderator:read:followers" not in validation.get("scopes", []):
+            return relationships
+        semaphore = asyncio.Semaphore(5)
+
+        async def check(user_id):
+            async with semaphore:
+                try:
+                    follower = await raid_browser_cached_request(runtime_bot, broadcaster_id, "channels/followers", {
+                        "broadcaster_id": broadcaster_id, "user_id": user_id})
+                    relationships[user_id]["mutual"] = bool(follower.get("data"))
+                except Exception:
+                    # Unknown isn't evidence that a channel follows you.
+                    pass
+
+        await asyncio.gather(*(check(user_id) for user_id in candidates))
+        return relationships
+    except Exception:
+        LOGGER.warning("[Dashboard] Follow badges could not be fully verified for %s.", broadcaster_id)
+        return {}
+
+
+@router.get("/channel/api/raid-browser/profiles", response_class=JSONResponse)
+async def channel_raid_browser_profiles(request: Request, ids: str = ""):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster_id = str(broadcaster_id)
+    if broadcaster_id not in runtime_bot.services.broadcasters.get_broadcasters():
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    user_ids = list(dict.fromkeys(ids.split(","))) if ids else []
+    if len(ids) > 2600 or len(user_ids) > 100 or any(not re.fullmatch(r"\d{1,25}", item) for item in user_ids):
+        return JSONResponse({"detail": "Invalid channel IDs."}, status_code=400)
+    profiles = await raid_browser_profiles(runtime_bot, broadcaster_id, [{"id": user_id} for user_id in user_ids])
+    return JSONResponse({"profiles": [{"id": user_id,
+        "profile_image_url": str(profile.get("profile_image_url") or ""),
+        "description": str(profile.get("description") or ""),
+        "verified": profile.get("broadcaster_type") == "partner"} for user_id, profile in profiles.items()]})
+
+
+def raid_browser_cached_profiles(runtime_bot, broadcaster_id, channels):
+    """Read daily profile entries, including cached missing profiles."""
+    profiles = {}
+    cache = getattr(runtime_bot, "_raid_browser_profile_cache", {})
+    now = time.monotonic()
+    missing = []
+    for user_id in sorted({channel["id"] for channel in channels}):
+        cached = cache.get((broadcaster_id, user_id))
+        if cached and now - cached[0] < RAID_BROWSER_METADATA_CACHE_SECONDS:
+            if cached[1] is not None:
+                profiles[user_id] = cached[1]
+        else:
+            missing.append(user_id)
+    return profiles, missing
+
+
+async def raid_browser_profiles(runtime_bot, broadcaster_id, channels):
+    """Fetch authoritative profile data independently of ranking lookups."""
+    profiles, missing = raid_browser_cached_profiles(runtime_bot, broadcaster_id, channels)
+    cache = getattr(runtime_bot, "_raid_browser_profile_cache", None)
+    if cache is None:
+        cache = runtime_bot._raid_browser_profile_cache = {}
+    try:
+        for offset in range(0, len(missing), 100):
+            batch = missing[offset:offset + 100]
+            users = await raid_browser_cached_request(runtime_bot, broadcaster_id, "users", {"id": batch})
+            found = {str(user["id"]): user for user in users.get("data", [])}
+            profiles.update(found)
+            for user_id in batch:
+                key = (broadcaster_id, user_id)
+                if len(cache) >= 1000 and key not in cache:
+                    cache.pop(next(iter(cache)))
+                cache[key] = (time.monotonic(), found.get(user_id))
+    except Exception:
+        LOGGER.warning("[Dashboard] Partner status unavailable for raid-browser channels.")
+    return profiles
+
+
+async def raid_browser_channel_sizes(runtime_bot, reader, targets):
+    """Public follower totals, cached for an hour, with a short discovery budget."""
+    cache = getattr(runtime_bot, "_raid_browser_size_cache", None)
+    if cache is None:
+        cache = runtime_bot._raid_browser_size_cache = {}
+    totals = {}
+    semaphore = asyncio.Semaphore(6)
+    limited = False
+
+    async def load(target):
+        nonlocal limited
+        key = (reader, target)
+        cached = cache.get(key)
+        if cached and cached[0] > time.monotonic():
+            totals[target] = cached[1]
+            return
+        async with semaphore:
+            if limited:
+                return
+            try:
+                payload = await asyncio.wait_for(runtime_bot._http.request_json(Route("GET", "channels/followers",
+                    token_for=reader, params={"broadcaster_id": target, "first": 1})), 1)
+                total = payload.get("total")
+                total = total if isinstance(total, int) and not isinstance(total, bool) and total >= 0 else None
+            except Exception as error:
+                if getattr(error, "status", None) in {401, 403, 429}:
+                    limited = True
+                total = None
+            if len(cache) >= 1000 and key not in cache:
+                cache.pop(next(iter(cache)))
+            cache[key] = (time.monotonic() + (RAID_BROWSER_FOLLOW_CACHE_SECONDS if total is not None else RAID_BROWSER_LIVE_CACHE_SECONDS), total)
+            totals[target] = total
+
+    tasks = [asyncio.create_task(load(target)) for target in dict.fromkeys([reader, *targets])]
+    try:
+        await asyncio.wait(tasks, timeout=2)
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+    return totals
+
+
+async def raid_browser_cached_request(runtime_bot, broadcaster_id: str, path: str, params: dict, *, refresh: bool = False):
+    """Cache stable metadata for a day, but keep live results short-lived."""
+    cache = getattr(runtime_bot, "_raid_browser_cache", None)
+    if cache is None:
+        cache = runtime_bot._raid_browser_cache = {}
+    # Repeated ID/login query parameters are sets, not ordering instructions.
+    params = {name: sorted(set(value)) if name in {"id", "user_id", "login", "broadcaster_id"} and isinstance(value, list)
+              else value for name, value in params.items()}
+    key = (broadcaster_id, path, tuple((name, tuple(value) if isinstance(value, list) else value)
+                                    for name, value in sorted(params.items())))
+    cached = cache.get(key)
+    if path in {"users", "teams", "teams/channel"}:
+        ttl = RAID_BROWSER_METADATA_CACHE_SECONDS
+    elif path in {"channels/followed", "channels/followers"}:
+        ttl = RAID_BROWSER_FOLLOW_CACHE_SECONDS
+    else:
+        ttl = RAID_BROWSER_LIVE_CACHE_SECONDS
+    if not refresh and cached and time.monotonic() - cached[0] < ttl:
+        return cached[1]
+    inflight = getattr(runtime_bot, "_raid_browser_inflight", None)
+    if inflight is None:
+        inflight = runtime_bot._raid_browser_inflight = {}
+    task = None if refresh else inflight.get(key)
+    if task is None:
+        async def load():
+            payload = await runtime_bot._http.request_json(Route(
+                "GET", path, use_id=path == "oauth2/validate", params=params, token_for=broadcaster_id))
+            # An older lookup must not overwrite an explicit refresh.
+            if inflight.get(key) is asyncio.current_task():
+                if len(cache) >= 500 and key not in cache:
+                    cache.pop(next(iter(cache)))
+                cache[key] = (time.monotonic(), payload)
+            return payload
+
+        task = asyncio.create_task(load())
+        inflight[key] = task
+
+        def finished(completed):
+            if inflight.get(key) is completed:
+                inflight.pop(key, None)
+            if not completed.cancelled():
+                completed.exception()  # Observe failures even if every caller left.
+
+        task.add_done_callback(finished)
+    # Changing a filter can cancel its request without cancelling a lookup
+    # another request is already sharing.
+    return await asyncio.shield(task)
+
+
+async def raid_browser_followed_streams(runtime_bot, broadcaster_id: str):
+    streams = []
+    cursor = ""
+    cursors = set()
+    while True:
+        params = {"user_id": broadcaster_id, "first": 100}
+        if cursor:
+            params["after"] = cursor
+        page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams/followed", params)
+        streams.extend(page.get("data", []))
+        cursor = page.get("pagination", {}).get("cursor", "")
+        if not cursor or cursor in cursors:
+            return streams
+        cursors.add(cursor)
+
+
+async def raid_browser_team_streams(runtime_bot, broadcaster_id: str):
+    teams = await raid_browser_cached_request(runtime_bot, broadcaster_id, "teams/channel", {"broadcaster_id": broadcaster_id})
+    members = {}
+    for team in teams.get("data", []):
+        team_id = str(team.get("team_id") or team.get("id") or "")
+        if not team_id:
+            continue
+        details = await raid_browser_cached_request(runtime_bot, broadcaster_id, "teams", {"id": team_id})
+        for detail in details.get("data", []):
+            label = str(detail.get("team_display_name") or detail.get("team_name") or team_id)
+            for user in detail.get("users", []):
+                user_id = str(user.get("user_id", ""))
+                if user_id and user_id != broadcaster_id:
+                    labels = members.setdefault(user_id, [])
+                    if label not in labels:
+                        labels.append(label)
+    streams = []
+    ids = sorted(members)
+    for offset in range(0, len(ids), 100):
+        page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {
+            "user_id": ids[offset:offset + 100], "first": 100})
+        streams.extend(page.get("data", []))
+    return streams, members
+
+
+@router.get("/channel/api/raid-browser/lists", response_class=JSONResponse)
+async def channel_raid_browser_lists(request: Request, ids: str = ""):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster_id = str(broadcaster_id)
+    if broadcaster_id not in runtime_bot.services.broadcasters.get_broadcasters():
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    user_ids = list(dict.fromkeys(item.strip() for item in ids.split(",") if item.strip()))
+    if len(ids) > 4000 or len(user_ids) > 200 or any(not re.fullmatch(r"\d{1,25}", item) for item in user_ids):
+        return JSONResponse({"detail": "Invalid saved channel list."}, status_code=400)
+    try:
+        users = []
+        for offset in range(0, len(user_ids), 100):
+            page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "users", {"id": user_ids[offset:offset + 100]})
+            users.extend({"id": str(user["id"]), "login": str(user["login"]),
+                          "display_name": str(user.get("display_name") or user["login"])} for user in page.get("data", []))
+        return JSONResponse({"channels": users})
+    except Exception:
+        LOGGER.warning("[Dashboard] Saved raid-browser channel names could not be loaded.")
+        return JSONResponse({"detail": "Saved channel names could not be loaded. Try again."}, status_code=502)
+
+
 @router.post("/channel/api/channel-metadata", response_class=JSONResponse)
 async def update_twitch_channel_metadata(
     request: Request,
@@ -796,7 +1710,7 @@ async def moderate_automod_message(
 
 
 @router.get("/channel/api/games", response_class=JSONResponse)
-async def search_twitch_games(request: Request, query: str = ""):
+async def search_twitch_games(request: Request, query: str = "", current_first: bool = False):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
@@ -808,7 +1722,10 @@ async def search_twitch_games(request: Request, query: str = ""):
         normalized_query = query.strip()
         if not normalized_query:
             games = (await get_top_games_for_search(runtime_bot, broadcaster_id))[:50]
-            return JSONResponse(await category_picker_results(runtime_bot, broadcaster_id, games))
+            payload = await category_picker_results(runtime_bot, broadcaster_id, games)
+            if current_first:
+                payload = await prioritize_raid_current_category(runtime_bot, broadcaster_id, payload)
+            return JSONResponse(payload)
 
         iterator = runtime_bot.search_categories(
             normalized_query, token_for=str(broadcaster_id), first=50, max_results=50
@@ -828,10 +1745,33 @@ async def search_twitch_games(request: Request, query: str = ""):
                 games.append(game)
                 existing_ids.add(game["id"])
         games = sort_twitch_games_by_match(games, normalized_query, popular_games)[:50]
-        return JSONResponse(await category_picker_results(runtime_bot, broadcaster_id, games))
+        payload = await category_picker_results(runtime_bot, broadcaster_id, games)
+        if current_first:
+            payload = await prioritize_raid_current_category(runtime_bot, broadcaster_id, payload)
+        return JSONResponse(payload)
     except Exception:
         LOGGER.exception("[Dashboard] Failed to search Twitch games for broadcaster %s.", broadcaster_id)
         return JSONResponse({"detail": "Twitch game search is temporarily unavailable."}, status_code=502)
+
+
+async def prioritize_raid_current_category(runtime_bot, broadcaster_id, payload):
+    try:
+        # The picker must reflect category changes immediately, including
+        # changes made outside this dashboard, rather than reuse the 60s cache.
+        info = await raid_browser_cached_request(runtime_bot, str(broadcaster_id), "channels", {"broadcaster_id": str(broadcaster_id)}, refresh=True)
+        own = next(iter(info.get("data", [])), {})
+        game_id, name = str(own.get("game_id") or ""), str(own.get("game_name") or "")
+        if not game_id or game_id == "0" or not name:
+            return payload
+        candidates = [*payload.get("games", []), *payload.get("more_games", [])]
+        current = next((game for game in candidates if str(game["id"]) == game_id), None)
+        if current is None:
+            current = {"id": game_id, "name": name, "box_art_url": await get_category_artwork(runtime_bot, broadcaster_id, game_id)}
+        return {**payload, "games": [current, *[game for game in payload.get("games", []) if str(game["id"]) != game_id]],
+                "more_games": [game for game in payload.get("more_games", []) if str(game["id"]) != game_id]}
+    except Exception:
+        LOGGER.warning("[Dashboard] Current raid-browser category unavailable.")
+        return payload
 
 
 @router.get("/channel/api/chat/stream")
@@ -855,6 +1795,67 @@ async def channel_chat_stream(request: Request, view: str = "both"):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
     )
+
+
+def preview_chat_runtime(request, target_id):
+    reader = request.session.get(CHANNEL_USER_ID_KEY)
+    if not reader:
+        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
+    if not re.fullmatch(r"\d{1,25}", target_id):
+        return JSONResponse({"detail": "Invalid channel."}, status_code=400)
+    bot = get_bot()
+    if bot is None or bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    if str(reader) not in bot.services.broadcasters.get_broadcasters():
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    return bot, str(reader)
+
+
+@router.get("/channel/api/raid-browser/chat/stream")
+async def channel_raid_chat_stream(request: Request, target_id: str = ""):
+    runtime = preview_chat_runtime(request, target_id)
+    if isinstance(runtime, JSONResponse):
+        return runtime
+    bot, reader = runtime
+    return StreamingResponse(preview_chat_events(request, bot, reader, target_id), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+
+
+@router.post("/channel/api/raid-browser/chat/send")
+async def channel_raid_chat_send(request: Request, target_id: str = Form(""), message: str = Form(""),
+                                 csrf_token: str = Form("")):
+    runtime = preview_chat_runtime(request, target_id)
+    if isinstance(runtime, JSONResponse):
+        return runtime
+    validate_csrf_token(request, csrf_token)
+    bot, reader = runtime
+    message = message.strip()
+    if not message or len(message) > CHAT_MESSAGE_MAX_LENGTH or message.startswith(("/", ".")):
+        return JSONResponse({"detail": "Enter a message up to 500 characters. Commands aren't supported here."}, status_code=400)
+    try:
+        result = await bot.create_partialuser(target_id).send_message(sender=reader, token_for=reader, message=message)
+        if not result.sent:
+            return JSONResponse({"detail": "Twitch didn't send this message. Check the channel's chat restrictions."}, status_code=409)
+        return JSONResponse({"sent": True})
+    except HTTPException as error:
+        return JSONResponse({"detail": "Twitch couldn't send this message. Check your connection and chat permissions."},
+                            status_code=429 if error.status == 429 else 502)
+
+
+@router.get("/channel/api/raid-browser/chat/emotes")
+async def channel_raid_chat_emotes(request: Request, target_id: str = ""):
+    runtime = preview_chat_runtime(request, target_id)
+    if isinstance(runtime, JSONResponse):
+        return runtime
+    bot, reader = runtime
+    catalog, channel_emotes = await asyncio.gather(bot.services.live_chat.get_emote_catalog(reader), preview_emotes(bot, target_id))
+    # The user's available Twitch emotes apply everywhere. 7TV names must come
+    # from the channel being previewed, not the user's own channel catalog.
+    emotes = [emote for emote in catalog.get("emotes", []) if emote.get("provider") != "7tv"]
+    emotes.extend({"name": name, "url": segment.url, "provider": "7tv", "group": "7TV", "group_key": "7tv"}
+                  for name, segment in channel_emotes.items())
+    return JSONResponse({"emotes": emotes, "personal_group_key": catalog.get("personal_group_key", "")},
+                        headers={"Cache-Control": "no-store"})
 
 
 @router.get("/channel/api/chat/emotes", response_class=JSONResponse)
@@ -1031,6 +2032,7 @@ async def channel_send_chat_message(
     sent = []
     errors = {}
     command_status = None
+    message_ids = {}
     is_twitch_command = message.startswith("/")
 
     if is_twitch_command and target == "youtube":
@@ -1056,6 +2058,8 @@ async def channel_send_chat_message(
                 result = await twitch_channel.send_message(**send_options)
                 if getattr(result, "sent", False):
                     sent.append("twitch")
+                    if isinstance(getattr(result, "id", None), str) and result.id:
+                        message_ids["twitch"] = f"twitch:{result.id}"
                 else:
                     errors["twitch"] = getattr(result, "dropped_message", None) or "Twitch did not send the message."
         except ValueError as error:
@@ -1069,8 +2073,10 @@ async def channel_send_chat_message(
 
     if target in {"youtube", "both"} and not is_twitch_command:
         try:
-            await services.live_chat.send_youtube_message(str(broadcaster_id), message)
+            youtube_result = await services.live_chat.send_youtube_message(str(broadcaster_id), message)
             sent.append("youtube")
+            if isinstance(youtube_result, dict) and isinstance(youtube_result.get("id"), str) and youtube_result["id"]:
+                message_ids["youtube"] = f"youtube:{youtube_result['id']}"
         except ValueError as error:
             youtube_error = str(error)
 
@@ -1104,6 +2110,8 @@ async def channel_send_chat_message(
 
     status_code = 207 if errors else 200
     payload = {"sent": sent, "errors": errors}
+    if message_ids:
+        payload["message_ids"] = message_ids
     if command_status is not None:
         payload["message"] = command_status
     return JSONResponse(payload, status_code=status_code)
@@ -1480,7 +2488,12 @@ async def update_channel_customization(request: Request, setting_name: str = For
     try:
         if destination == "/channel/loyalty" and services.profile_settings.get_definition(setting_name).group != LOYALTY_GROUP:
             raise ValueError("Only loyalty point names and responses can be edited here.")
-        if setting_name == "social.discord_url":
+        if setting_name == "dashboard.follow_raid":
+            if action != "save" or value not in {"0", "1"}:
+                raise ValueError("Choose On or Off.")
+            await services.broadcaster_settings.set_follow_raid(broadcaster_id, value == "1")
+            message = "Follow raid preference saved."
+        elif setting_name == "social.discord_url":
             await services.broadcaster_settings.set_discord_url(broadcaster_id, value.strip())
             message = "Discord URL was updated."
         elif setting_name == "social.youtube_url":
