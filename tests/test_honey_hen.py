@@ -5,7 +5,7 @@ from pets.passives import LOYALTY_GAIN
 from pets.service import PetService
 from storage import migration_runner
 from storage.migrations import Migration
-from storage.migrations.v065_incoming_raid_recency import migrate as migrate_incoming_raids
+from storage.migrations.core.v065_incoming_raid_recency import migrate as migrate_incoming_raids
 
 
 @pytest.mark.asyncio

@@ -5,7 +5,7 @@ import asqlite
 import pytest
 
 from storage import incoming_raids
-from storage.migrations.v065_incoming_raid_recency import migrate
+from storage.migrations.core.v065_incoming_raid_recency import migrate
 from bot.shared.events.raids import RaidEvents
 
 

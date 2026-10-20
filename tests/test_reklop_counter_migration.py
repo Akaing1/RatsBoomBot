@@ -1,7 +1,7 @@
 import asqlite
 import pytest
 
-from storage.migrations.v009_reklop_counter_700 import migrate
+from storage.migrations.core.v009_reklop_counter_700 import migrate
 
 
 @pytest.mark.asyncio

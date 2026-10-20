@@ -1,8 +1,8 @@
 import asqlite
 import pytest
 
-from storage.migrations.v021_patch_notes import migrate as create_patch_notes
-from storage.migrations.v045_unpublish_test_patch_note import migrate as unpublish_test_patch_note
+from storage.migrations.core.v021_patch_notes import migrate as create_patch_notes
+from storage.migrations.core.v045_unpublish_test_patch_note import migrate as unpublish_test_patch_note
 
 
 @pytest.mark.asyncio

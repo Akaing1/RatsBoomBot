@@ -1,9 +1,9 @@
 import asqlite
 import pytest
 
-from storage.migrations.v011_raid_boss_persistence import migrate as migrate_raid_boss_persistence
-from storage.migrations.v014_remove_test_raid_records import migrate as migrate_remove_test_raid_records
-from storage.migrations.v018_remove_ahriman_test_run import migrate as migrate_remove_ahriman_test_run
+from storage.migrations.boss_hunts.v011_raid_boss_persistence import migrate as migrate_raid_boss_persistence
+from storage.migrations.boss_hunts.v014_remove_test_raid_records import migrate as migrate_remove_test_raid_records
+from storage.migrations.boss_hunts.v018_remove_ahriman_test_run import migrate as migrate_remove_ahriman_test_run
 
 
 async def seed_event(connection, event_id: int, boss_name: str, spawned_at: str, damage: int) -> None:

@@ -2,7 +2,7 @@ import asqlite
 import pytest
 
 from bot.services.channels.broadcaster_settings import BroadcasterSettingsService
-from storage.migrations.v067_follow_raid import migrate
+from storage.migrations.core.v067_follow_raid import migrate
 
 
 @pytest.mark.asyncio

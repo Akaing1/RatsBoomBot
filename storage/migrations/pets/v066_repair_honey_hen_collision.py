@@ -1,6 +1,6 @@
 """Recover Honey Hen when the development raid migration occupied version 64."""
 
-from storage.migrations.v064_honey_hen import migrate as migrate_honey_hen
+from storage.migrations.pets.v064_honey_hen import migrate as migrate_honey_hen
 
 
 async def migrate(connection) -> None:
