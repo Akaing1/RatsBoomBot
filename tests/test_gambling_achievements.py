@@ -2,7 +2,7 @@ import asqlite
 import pytest
 
 from bot.services.channels.achievements import AchievementService
-from bot.services.engagement.points import PointsService
+from loyalty.service import PointsService
 from storage.migration_runner import run_migrations
 
 

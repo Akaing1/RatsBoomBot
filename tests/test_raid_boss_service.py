@@ -6,7 +6,7 @@ import asqlite
 import pytest
 
 from bot.profiles import ChannelProfile, RaidBossConfig, RaidBossNames, activate_profile, clear_profiles, get_active_profile
-from bot.services.engagement.points import PointsService
+from loyalty.service import PointsService
 from bot.services.engagement.raid_boss import RaidBossEvent, RaidBossService
 from storage.migration_runner import run_migrations
 

@@ -8,7 +8,7 @@ import pytest
 
 from bot.profiles import ChannelProfile, FeatureDefaults, FeatureName, RaidBossConfig, activate_profile, clear_profiles
 from bot.services.engagement.raid_boss import RaidBossService
-from bot.services.engagement.points import PointsService
+from loyalty.service import PointsService
 from storage.migration_runner import run_migrations
 from storage.viewer_sessions import claim_viewer_action, create_viewer_session, revoke_viewer_session, valid_viewer_session
 from web.app import app
