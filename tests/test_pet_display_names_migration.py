@@ -14,7 +14,7 @@ async def test_existing_equipped_pets_keep_ownership_after_rename(tmp_path, monk
         monkeypatch.setattr(migration_runner, "MIGRATIONS", tuple(m for m in migrations if m.version < 54))
         await migration_runner.run_migrations(database)
         pets = PetService(database)
-        bat_before = await pets.grant_poc_bat("bat-owner")
+        bat_before = await pets.grant_bat("bat-owner")
         rat_before = await pets.grant_rat("rat-owner")
 
         monkeypatch.setattr(migration_runner, "MIGRATIONS", migrations)

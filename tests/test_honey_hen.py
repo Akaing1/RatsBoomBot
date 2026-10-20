@@ -22,7 +22,7 @@ async def test_repair_development_migration_collision(tmp_path, monkeypatch, alr
         monkeypatch.setattr(migration_runner, 'MIGRATIONS', old_migrations)
         await migration_runner.run_migrations(database)
         pets = PetService(database)
-        bat = await pets.grant_poc_bat('viewer')
+        bat = await pets.grant_bat('viewer')
         async with database.acquire() as connection:
             await connection.execute(
                 'INSERT INTO incoming_raid_recency VALUES (?, ?, ?)', ('channel', 'raider', 123.0)
@@ -57,7 +57,7 @@ async def test_honey_hen_upgrade_and_repeat_grant_preserve_existing_loadout(tmp_
         monkeypatch.setattr(migration_runner, 'MIGRATIONS', tuple(m for m in migrations if m.version < 64))
         await migration_runner.run_migrations(database)
         pets = PetService(database)
-        bat = await pets.grant_poc_bat('viewer')
+        bat = await pets.grant_bat('viewer')
         monkeypatch.setattr(migration_runner, 'MIGRATIONS', migrations)
         await migration_runner.run_migrations(database)
         await migration_runner.run_migrations(database)

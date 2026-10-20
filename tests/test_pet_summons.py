@@ -77,7 +77,7 @@ async def test_global_collection_equip_and_concurrent_summons(tmp_path, monkeypa
         await run_migrations(database)
         await fund(database)
         pets = PetService(database)
-        bat = await pets.grant_poc_bat('viewer')
+        bat = await pets.grant_bat('viewer')
         await pets.buy_ticket('source', 'viewer')
         results = await asyncio.gather(pets.summon('viewer', 'viewer'), pets.summon('viewer', 'viewer'), return_exceptions=True)
         assert sum(isinstance(result, ValueError) for result in results) == 1

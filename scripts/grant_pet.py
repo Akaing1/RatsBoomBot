@@ -43,7 +43,7 @@ async def grant_pet(chatter: str, pet_id: str = "bat", passive_type: str | None 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Grant and equip a test pet on the selected environment.")
+    parser = argparse.ArgumentParser(description="Grant and equip a pet on the selected environment.")
     parser.add_argument("chatter", help="Twitch login, display name, or user ID")
     parser.add_argument("--pet", choices=("bat", "rat", "fox", "wolf", "raven", "cat", "dog", "hen"), default="bat")
     parser.add_argument("--passive", choices=tuple(PASSIVES), default=None, help="Override the pet's fixed passive for testing")
@@ -53,3 +53,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
