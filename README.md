@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current application version: **14.2.3** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
+Current application version: **15.0.0** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
 
 ## Highlights
 
@@ -226,7 +226,7 @@ Migrations run automatically during startup. The authoritative ordered registry 
 
 Recent migrations add incoming-raid recency (65), repair the development migration-number collision that could omit Honey Hen (66), and persist Follow raid (67). Applied migration versions and names are recorded in `schema_migrations`.
 
-Use a new migration for schema changes instead of rebuilding the production database.
+Migrations are grouped into core, loyalty, achievements, Boss Hunts, and pets while retaining one global version sequence. See the [migration contributor guide](docs/migrations.md) for numbering, registration, upgrade tests, and recovery. Use a new migration for schema changes instead of rebuilding the production database.
 
 ## Historical Redeem Imports
 

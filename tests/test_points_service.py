@@ -79,7 +79,7 @@ async def test_settle_wager_rejects_insufficient_balance_without_changing_points
 @pytest.mark.asyncio
 async def test_settle_wager_tracks_and_credits_gambling_losses(tmp_path, monkeypatch) -> None:
     from config.settings import settings
-    from storage.migrations.v023_gambling_loss_totals import migrate
+    from storage.migrations.loyalty.v023_gambling_loss_totals import migrate
 
     monkeypatch.setattr(settings, "BOT_ID", "ratsboombot")
     async with asqlite.create_pool(str(tmp_path / "points.db")) as database:
@@ -100,7 +100,7 @@ async def test_settle_wager_tracks_and_credits_gambling_losses(tmp_path, monkeyp
 @pytest.mark.asyncio
 async def test_settle_wager_does_not_track_winning_wagers_as_losses(tmp_path, monkeypatch) -> None:
     from config.settings import settings
-    from storage.migrations.v023_gambling_loss_totals import migrate
+    from storage.migrations.loyalty.v023_gambling_loss_totals import migrate
 
     monkeypatch.setattr(settings, "BOT_ID", "ratsboombot")
     async with asqlite.create_pool(str(tmp_path / "points.db")) as database:

@@ -4,7 +4,7 @@ import asqlite
 import pytest
 
 from bot.services.channels.chatter_identity import ChatterIdentityService
-from storage.migrations.v008_chatter_identities import migrate
+from storage.migrations.core.v008_chatter_identities import migrate
 
 
 class FakeBot:
