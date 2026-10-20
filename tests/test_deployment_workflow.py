@@ -59,3 +59,17 @@ def test_uat_deploy_script_only_targets_uat_instance() -> None:
     assert 'git checkout --detach "$NEW_COMMIT"' in script
     assert 'HEALTH_URL="http://127.0.0.1:4346/health"' in script
     assert 'systemctl restart "$SERVICE_NAME"' in script
+
+
+def test_validation_commands_cover_feature_packages() -> None:
+    repository_root = Path(__file__).resolve().parents[1]
+    for relative_path in (
+        ".github/workflows/uat.yml",
+        "deploy/linux/deploy.sh",
+        "deploy/linux/deploy-uat.sh",
+    ):
+        source = (repository_root / relative_path).read_text(encoding="utf-8")
+        commands = [line.split("-m compileall", 1)[1].split() for line in source.splitlines() if "-m compileall" in line]
+        assert commands, relative_path
+        for command in commands:
+            assert {"loyalty", "viewer_queue", "pets", "rpg_minigame"} <= set(command), relative_path

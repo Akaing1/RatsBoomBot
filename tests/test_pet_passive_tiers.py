@@ -2,7 +2,7 @@ import asqlite
 import pytest
 
 from bot.profiles import RaidBossConfig
-from bot.services.engagement.points import PointsService
+from loyalty.service import PointsService
 from pets import PetService
 from pets.passives import (
     GAMBLE_LOSS_REFUND, GAMBLE_ODDS, KAMIKAZE_ODDS, PASSIVES,

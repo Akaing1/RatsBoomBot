@@ -5,7 +5,7 @@ import pytest
 
 from bot.profiles import RaidBossConfig
 from bot.services.channels.achievements import AchievementService
-from bot.services.engagement.points import PointsService
+from loyalty.service import PointsService
 from bot.services.engagement.raid_boss import RaidBossService
 from storage.migrations import MIGRATIONS
 from storage.migration_runner import run_migrations

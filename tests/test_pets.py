@@ -2,7 +2,7 @@ import asqlite
 import pytest
 
 from pets import LOYALTY_GAIN_PASSIVE, PetService
-from bot.services.engagement.points import PointsService
+from loyalty.service import PointsService
 from storage.migration_runner import run_migrations
 from storage.migrations.pets.v049_pet_asset_path import migrate as migrate_pet_asset_path
 

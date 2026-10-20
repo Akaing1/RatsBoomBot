@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import asqlite
 import pytest
 
-from bot.services.engagement.points import PointsService
+from loyalty.service import PointsService
 
 
 @pytest.mark.asyncio
@@ -168,7 +168,7 @@ async def test_add_points_once_deduplicates_reward_events(tmp_path) -> None:
 
 @pytest.mark.asyncio
 async def test_concurrent_message_tracking_waits_for_in_progress_award(monkeypatch) -> None:
-    import bot.services.engagement.points as points_module
+    import loyalty.service as points_module
 
     started = asyncio.Event()
     release = asyncio.Event()

@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current application version: **15.0.0** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
+Current application version: **15.0.1** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
 
 ## Highlights
 
@@ -52,13 +52,15 @@ RatsBoomBot
 │   ├── channels/           Broadcaster profiles, commands, and game modules
 │   ├── services/
 │   │   ├── channels/       Broadcaster state, settings, and feature overrides
-│   │   ├── engagement/     Points, redeems, clips, and queues
+│   │   ├── engagement/     Redeems, counters, clips, and game lookups
 │   │   ├── stream/         Timers, ads, shoutouts, and stream logs
 │   │   └── support/        Help and moderation services
 │   └── shared/             Reusable commands and EventSub listeners
 ├── config/                 Environment settings and application version
 ├── deploy/                 Linux, systemd, backup, and Windows deployment tools
 ├── docs/                   Project documentation and style guide
+├── loyalty/                Loyalty balances, gambling, duels, and passive payouts
+├── viewer_queue/           Persistent viewer queues and queue moderation
 ├── pets/                   Pet ownership and passive bonuses
 ├── rpg_minigame/           Boss encounters, inventory, loot, and RPG settings
 ├── scripts/                Administration and data-import utilities
@@ -74,6 +76,8 @@ RatsBoomBot
 │   └── static/             Styles and assets
 └── main.py                 Application entry point
 ```
+
+Feature services live in `loyalty/`, `viewer_queue/`, `pets/`, and `rpg_minigame/`. Commands, stream events, and web routes connect these packages through the service container. See [feature package boundaries](docs/feature-packages.md) for ownership and dependencies.
 
 Commands validate chat input, services own shared behavior and persistence, and profiles define broadcaster-specific configuration. The runtime starts and stops the Twitch bot and FastAPI application together.
 
