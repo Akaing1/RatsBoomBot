@@ -6,7 +6,7 @@ Only published releases receive dated version headings. Intermediate development
 
 ## Unreleased — release/15.0.0
 
-The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot/releases/tag/v14.2.2). The current working application version is 15.0.1; it is not yet a published release.
+The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot/releases/tag/v14.2.2). The current working application version is 15.1.0; it is not yet a published release.
 
 - Raid browser with discovery filters, compatibility ranking, favorites and team views, stream/video previews, and shared preview chat ([PR #387](https://github.com/Akaing1/RatsBoomBot/pull/387), merged into the release branch).
 - Reusable chat composer, autocomplete, emote picker/input, cross-platform message merging, platform-specific delivery errors, and dashboard controls ([PR #387](https://github.com/Akaing1/RatsBoomBot/pull/387)).
@@ -17,6 +17,8 @@ The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot
 - Group migrations by feature, validate registry and applied history, cover cancellation rollback, and document the migration workflow; application version bumped to 15.0.0. Historical migration versions and behavior are preserved.
 
 - Extract loyalty balances, gambling, duels, and passive payouts into `loyalty/`, and persistent viewer queues into `viewer_queue/`; update service wiring and imports without changing behavior or database history. Application version bumped to 15.0.1.
+
+- Add the Moderation card’s **For You** flip side with private saved notes and persistent personal reminder timers, including overdue popups on return; migration 68 and application version 15.1.0.
 
 For future releases, summarize changes here as they merge. When publishing, move the applicable notes under the actual released version and publication date, retaining source links. Do not create release entries from branch names or version bumps alone.
 
