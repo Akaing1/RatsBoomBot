@@ -14,7 +14,7 @@ This pass compared Python function bodies for exact duplication (functions of at
 | --- | --- | --- |
 | `web/channel/routers/dashboard.py`, `channel_raid_browser` | Roughly 400 lines combining discovery, filtering, ranking, caching, and response assembly | Extract discovery/ranking helpers with fixtures for the current ordering and pagination behavior |
 | `rpg_minigame/service.py`, `_attack` | Roughly 280 lines combining combat calculation, persistence, rewards, and messages | Separate pure combat calculations first; retain transaction boundaries and payout tests |
-| `bot/shared/commands/mod_actions.py`, `kamikaze` | Roughly 200 lines mixing permissions, protection rules, random outcomes, and moderation calls | Extract outcome/rule evaluation without changing moderator restoration behavior |
+| `bot/shared/commands/utility/kamikaze.py`, `kamikaze` | Roughly 200 lines mixing permissions, protection rules, random outcomes, and moderation calls | Extract outcome/rule evaluation without changing moderator restoration behavior |
 | `loyalty/service.py`, `setup` and `_migrate_viewers_table_if_needed` | Service startup still owns schema creation and legacy conversion | Move to numbered migrations after testing legacy/current shapes and balance preservation |
 | Remaining dashboard write and streaming routes | Similar-looking guards have different CSRF, logout, and response behavior | Migrate only after documenting each contract; do not mechanically replace all guards |
 

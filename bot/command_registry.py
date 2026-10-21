@@ -98,6 +98,12 @@ UTILITY_COMMANDS = CommandGroupDefinition(
     name="Utility",
     description="Quick chat interactions and random community commands.",
     commands=(
+        CommandDefinition(
+            "!kamikaze [username]",
+            "Play a timeout game: hit another chatter or blow yourself up.",
+            global_command=GlobalCommandName.KAMIKAZE,
+            slowmode=CommandSlowmode.EXEMPT
+        ),
         CommandDefinition("!hi [username]", "Say hello to yourself or another chatter.", global_command=GlobalCommandName.HI),
         CommandDefinition("!choice <options>", "Randomly choose from the supplied space-separated options.", global_command=GlobalCommandName.CHOICE),
         CommandDefinition("!kaboom [username]", "Blow yourself or another chatter up.", global_command=GlobalCommandName.KABOOM),
@@ -231,19 +237,6 @@ RAID_BOSS_COMMANDS = CommandGroupDefinition(
     )
 )
 
-MODERATION_COMMANDS = CommandGroupDefinition(
-    name="Moderation",
-    description="Community moderation games and actions.",
-    commands=(
-        CommandDefinition(
-            "!kamikaze <username>",
-            "Time out yourself and a selected chatter.",
-            global_command=GlobalCommandName.KAMIKAZE,
-            slowmode=CommandSlowmode.EXEMPT
-        ),
-    )
-)
-
 OVERWATCH_COMMANDS = CommandGroupDefinition(
     name="Overwatch",
     description="Live Overwatch rank and competitive session tracking commands.",
@@ -294,7 +287,6 @@ BASE_COMMAND_GROUPS = (
     CLIP_COMMANDS,
     RAID_COMMANDS,
     RAID_BOSS_COMMANDS,
-    MODERATION_COMMANDS
 )
 
 

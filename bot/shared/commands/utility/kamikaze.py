@@ -12,7 +12,7 @@ from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_co
 LOGGER = logging.getLogger("RatBoomBot")
 
 
-class ModActionCommands(commands.Component):
+class KamikazeCommands(commands.Component):
     KAMIKAZE_DURATION_SECONDS = 10
     KAMIKAZE_SUCCESS_THRESHOLD = 90
     REMOD_DELAY_SECONDS = 12
@@ -103,14 +103,14 @@ class ModActionCommands(commands.Component):
             async for moderator in moderators:
                 if str(moderator.id) == target_id:
                     LOGGER.debug(
-                        "[Mod Actions] Confirmed %s is a moderator in broadcaster %s.",
+                        "[Kamikaze] Confirmed %s is a moderator in broadcaster %s.",
                         target_name,
                         broadcaster_id
                     )
                     return True
         except Exception:
             LOGGER.exception(
-                "[Mod Actions] Failed to check moderator status for %s in broadcaster %s.",
+                "[Kamikaze] Failed to check moderator status for %s in broadcaster %s.",
                 target_name,
                 broadcaster_id
             )
@@ -127,7 +127,7 @@ class ModActionCommands(commands.Component):
             )
         except Exception:
             LOGGER.exception(
-                "[Mod Actions] Failed to time out user %s in broadcaster %s.",
+                "[Kamikaze] Failed to time out user %s in broadcaster %s.",
                 username,
                 broadcaster_id
             )
@@ -141,21 +141,21 @@ class ModActionCommands(commands.Component):
             await channel.add_moderator(user=target_id)
         except asyncio.CancelledError:
             LOGGER.debug(
-                "[Mod Actions] Moderator restoration was cancelled for %s in broadcaster %s.",
+                "[Kamikaze] Moderator restoration was cancelled for %s in broadcaster %s.",
                 target_name,
                 broadcaster_id
             )
             raise
         except Exception:
             LOGGER.exception(
-                "[Mod Actions] Failed to restore moderator status for %s in broadcaster %s.",
+                "[Kamikaze] Failed to restore moderator status for %s in broadcaster %s.",
                 target_name,
                 broadcaster_id
             )
             return
 
         LOGGER.info(
-            "[Mod Actions] Restored moderator status for %s in broadcaster %s.",
+            "[Kamikaze] Restored moderator status for %s in broadcaster %s.",
             target_name,
             broadcaster_id
         )
@@ -170,7 +170,7 @@ class ModActionCommands(commands.Component):
         task.add_done_callback(self._remod_tasks.discard)
 
         LOGGER.info(
-            "[Mod Actions] Scheduled moderator restoration for %s in broadcaster %s.",
+            "[Kamikaze] Scheduled moderator restoration for %s in broadcaster %s.",
             target_name,
             broadcaster_id
         )
@@ -207,7 +207,7 @@ class ModActionCommands(commands.Component):
 
         if not is_global_command_enabled(self.bot, ctx, GlobalCommandName.KAMIKAZE):
             LOGGER.debug(
-                "[Mod Actions] Kamikaze is disabled for broadcaster %s.",
+                "[Kamikaze] Kamikaze is disabled for broadcaster %s.",
                 broadcaster_id
             )
             return
@@ -250,7 +250,7 @@ class ModActionCommands(commands.Component):
         if target is None or caller_id == str(target.id):
             if self.is_protected_target(caller_id, broadcaster_id):
                 LOGGER.info(
-                    "[Mod Actions] Protected user %s attempted to target themselves with !kamikaze in broadcaster %s.",
+                    "[Kamikaze] Protected user %s attempted to target themselves with !kamikaze in broadcaster %s.",
                     caller.name,
                     broadcaster_id
                 )
@@ -268,7 +268,7 @@ class ModActionCommands(commands.Component):
                 return
 
             LOGGER.info(
-                "[Mod Actions] User %s timed themselves out for %d seconds in broadcaster %s.",
+                "[Kamikaze] User %s timed themselves out for %d seconds in broadcaster %s.",
                 caller.name,
                 self.KAMIKAZE_DURATION_SECONDS,
                 broadcaster_id
@@ -281,7 +281,7 @@ class ModActionCommands(commands.Component):
 
         if caller_is_protected and target_is_protected:
             LOGGER.info(
-                "[Mod Actions] Protected user %s attempted to target protected user %s with !kamikaze in broadcaster %s.",
+                "[Kamikaze] Protected user %s attempted to target protected user %s with !kamikaze in broadcaster %s.",
                 caller.name,
                 target.name,
                 broadcaster_id
@@ -301,7 +301,7 @@ class ModActionCommands(commands.Component):
                 return
 
             LOGGER.info(
-                "[Mod Actions] User %s targeted protected user %s with !kamikaze and was timed out in broadcaster %s.",
+                "[Kamikaze] User %s targeted protected user %s with !kamikaze and was timed out in broadcaster %s.",
                 caller.name,
                 target.name,
                 broadcaster_id
@@ -319,7 +319,7 @@ class ModActionCommands(commands.Component):
             await services.achievements.record_kamikaze_success(broadcaster_id, ctx.payload.id, caller_id, target_id)
 
             LOGGER.info(
-                "[Mod Actions] Protected user %s guaranteed a !kamikaze hit against %s in broadcaster %s.",
+                "[Kamikaze] Protected user %s guaranteed a !kamikaze hit against %s in broadcaster %s.",
                 caller.name,
                 target.name,
                 broadcaster_id
@@ -355,7 +355,7 @@ class ModActionCommands(commands.Component):
             await services.achievements.record_kamikaze_success(broadcaster_id, ctx.payload.id, caller_id, target_id)
 
             LOGGER.info(
-                "[Mod Actions] User %s successfully timed out %s for %d seconds in broadcaster %s.",
+                "[Kamikaze] User %s successfully timed out %s for %d seconds in broadcaster %s.",
                 caller.name,
                 target.name,
                 self.KAMIKAZE_DURATION_SECONDS,
@@ -376,7 +376,7 @@ class ModActionCommands(commands.Component):
         await services.achievements.record_kamikaze_failure(broadcaster_id, ctx.payload.id, caller_id)
 
         LOGGER.info(
-            "[Mod Actions] User %s missed !kamikaze and was timed out for %d seconds in broadcaster %s.",
+            "[Kamikaze] User %s missed !kamikaze and was timed out for %d seconds in broadcaster %s.",
             caller.name,
             self.KAMIKAZE_DURATION_SECONDS,
             broadcaster_id

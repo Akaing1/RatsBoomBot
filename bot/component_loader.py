@@ -8,7 +8,6 @@ from bot.profiles import ACTIVE_CHANNEL_PROFILES, CHANNEL_PROFILES, activate_pro
 from bot.shared.commands.counters import CounterCommands
 from bot.shared.commands.league import LeagueCommands
 from bot.shared.commands.clips import ClipCommands
-from bot.shared.commands.mod_actions import ModActionCommands
 from bot.shared.commands.overwatch import OverwatchCommands
 from bot.shared.commands.points import PointsCommands
 from bot.shared.commands.pets import PetsCommands
@@ -18,7 +17,7 @@ from bot.shared.commands.settings import SettingsCommands
 from bot.shared.commands.shoutout import ShoutoutCommands
 from bot.shared.commands.socials import SocialCommands
 from bot.shared.commands.stats import StatsCommands
-from bot.shared.commands.utility import UtilityCommands
+from bot.shared.commands.utility import KamikazeCommands, UtilityCommands
 from bot.shared.commands.quotes import QuoteCommands
 from bot.shared.commands.viewer_queue import ViewerQueueCommands
 from bot.shared.events.chat import ChatEvents
@@ -32,6 +31,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 GLOBAL_COMPONENTS: tuple[type[commands.Component], ...] = (
     UtilityCommands,
+    KamikazeCommands,
     QuoteCommands,
     ClipCommands,
     SocialCommands,
@@ -40,7 +40,6 @@ GLOBAL_COMPONENTS: tuple[type[commands.Component], ...] = (
     PetsCommands,
     RaidBossCommands,
     RaidCommands,
-    ModActionCommands,
     OverwatchCommands,
     CounterCommands,
     LeagueCommands,

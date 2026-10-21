@@ -7,6 +7,8 @@ from bot.profiles import GlobalCommandName, get_active_profile, render_profile_m
 from bot.shared.commands.converters import LocalizedUser
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_command_enabled
 
+from .kamikaze import KamikazeCommands
+
 LOGGER = logging.getLogger("RatBoomBot")
 
 
