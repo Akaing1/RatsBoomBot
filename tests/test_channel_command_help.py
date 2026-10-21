@@ -244,7 +244,7 @@ def test_command_registry_records_operational_policies() -> None:
     assert definitions["!clip"].availability is CommandAvailability.LIVE_ONLY
     assert definitions["!gamble [amount|all]"].visibility is CommandVisibility.HIDDEN
     assert definitions["!startraid <channel>"].permission is CommandPermission.BROADCASTER
-    assert definitions["!kamikaze <username>"].slowmode is CommandSlowmode.EXEMPT
+    assert definitions["!kamikaze [username]"].slowmode is CommandSlowmode.EXEMPT
     assert definitions["!explode"].visibility is CommandVisibility.HIDDEN
 
 

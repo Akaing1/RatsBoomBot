@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current application version: **15.1.1** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
+Current application version: **15.1.3** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
 
 ## Highlights
 
@@ -162,7 +162,7 @@ Boss Hunt is the separate RPG minigame with scheduled bosses, attacks, weapons, 
 
 ### Moderation
 
-Moderation support includes protected users, timeout actions, `!kamikaze`, and configurable bot-detection modes:
+Moderation support includes protected users, timeout actions, and configurable bot-detection modes:
 
 - `learning` records observations without action.
 - `shadow` records what would have happened.
@@ -251,14 +251,13 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 | Group | Commands |
 | --- | --- |
-| Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats`, `!me` |
+| Utility | `!kamikaze [username]`, `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats`, `!me` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube` |
 | Settings | `!set discord <url>`, `!set youtube <url>`, `!set game <game name>`, `!set title <stream title>`, `!timers`, `!timers on`, `!timers off` |
 | Shoutouts | `!so <username>` |
 | Clips | `!clip`, `!clip short` |
 | Raids | `!startraid <channel>` |
-| Moderation | `!kamikaze <username>` |
 | Points | `!points` or the profile currency command with `leaderboard`, `give`, `gamble`, `roulette` / `spin`, `duel`, `add`, and `reset` subcommands |
 | Pets | `!pets`, `!pets buy ticket`, `!pets summon`, `!pets equip <full pet name>` |
 | Quotes | `!quote`, `!quote <number>`, `!quote add <message>`, `!quote remove <number>` |

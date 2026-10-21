@@ -3,23 +3,23 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from bot.shared.commands.mod_actions import ModActionCommands
+from bot.shared.commands.utility.kamikaze import KamikazeCommands
 
 
-def create_commands() -> ModActionCommands:
-    return ModActionCommands(SimpleNamespace())
+def create_commands() -> KamikazeCommands:
+    return KamikazeCommands(SimpleNamespace())
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('protected,roll,timed_out,expected', [(True,1,True,1),(False,100,True,1),(False,1,True,0),(False,100,False,0),(True,100,False,0)])
 async def test_kamikaze_achievement_counts_only_confirmed_target_hits(monkeypatch, protected, roll, timed_out, expected):
     bot = FakeKamikazeBot()
-    command = ModActionCommands(bot)
+    command = KamikazeCommands(bot)
     context = FakeContext('caller')
     target = SimpleNamespace(id='target', name='target')
     monkeypatch.setattr(command, 'is_protected_target', lambda user, channel: protected and user == 'caller')
     monkeypatch.setattr(command, 'timeout_with_moderator_restore', AsyncMock(return_value=timed_out))
-    monkeypatch.setattr('bot.shared.commands.mod_actions.random.randint', lambda *_: roll)
+    monkeypatch.setattr('bot.shared.commands.utility.kamikaze.random.randint', lambda *_: roll)
     await command.kamikaze.callback(command, context, target)
     recorder = bot.services.achievements.record_kamikaze_success
     assert recorder.await_count == expected
@@ -31,12 +31,12 @@ async def test_kamikaze_achievement_counts_only_confirmed_target_hits(monkeypatc
 async def test_kamikaze_pet_adds_five_percentage_points_to_hit_chance(monkeypatch):
     bot = FakeKamikazeBot()
     bot.services.pets = SimpleNamespace(bonus_bps=AsyncMock(return_value=500))
-    command = ModActionCommands(bot)
+    command = KamikazeCommands(bot)
     context = FakeContext('caller')
     target = SimpleNamespace(id='target', name='target')
     monkeypatch.setattr(command, 'is_protected_target', lambda *_: False)
     monkeypatch.setattr(command, 'timeout_with_moderator_restore', AsyncMock(return_value=True))
-    monkeypatch.setattr('bot.shared.commands.mod_actions.random.randint', lambda *_: command.KAMIKAZE_SUCCESS_THRESHOLD - 4)
+    monkeypatch.setattr('bot.shared.commands.utility.kamikaze.random.randint', lambda *_: command.KAMIKAZE_SUCCESS_THRESHOLD - 4)
 
     await command.kamikaze.callback(command, context, target)
 
@@ -110,7 +110,7 @@ class FakeContext:
 @pytest.mark.asyncio
 async def test_protected_kamikaze_user_guarantees_hit_on_unprotected_target(monkeypatch) -> None:
     bot = FakeKamikazeBot()
-    command = ModActionCommands(bot)
+    command = KamikazeCommands(bot)
     context = FakeContext()
     target = SimpleNamespace(id="target-user", name="target")
     timeout_requests = []
@@ -122,7 +122,7 @@ async def test_protected_kamikaze_user_guarantees_hit_on_unprotected_target(monk
         return True
 
     monkeypatch.setattr(command, "timeout_with_moderator_restore", timeout_target)
-    monkeypatch.setattr("bot.shared.commands.mod_actions.random.randint", lambda start, end: pytest.fail("Protected user rolled randomly."))
+    monkeypatch.setattr("bot.shared.commands.utility.kamikaze.random.randint", lambda start, end: pytest.fail("Protected user rolled randomly."))
 
     await command.kamikaze.callback(command, context, target)
 
@@ -133,7 +133,7 @@ async def test_protected_kamikaze_user_guarantees_hit_on_unprotected_target(monk
 
 @pytest.mark.asyncio
 async def test_protected_kamikaze_user_cannot_target_themselves(monkeypatch) -> None:
-    command = ModActionCommands(FakeKamikazeBot())
+    command = KamikazeCommands(FakeKamikazeBot())
     context = FakeContext()
 
     monkeypatch.setattr(command, "is_protected_target", lambda user_id, broadcaster_id: user_id == "protected-user")
@@ -146,7 +146,7 @@ async def test_protected_kamikaze_user_cannot_target_themselves(monkeypatch) -> 
 
 @pytest.mark.asyncio
 async def test_protected_kamikaze_users_cannot_target_each_other(monkeypatch) -> None:
-    command = ModActionCommands(FakeKamikazeBot())
+    command = KamikazeCommands(FakeKamikazeBot())
     context = FakeContext()
     target = SimpleNamespace(id="protected-target", name="protected_target")
 
@@ -161,3 +161,31 @@ async def test_protected_kamikaze_users_cannot_target_each_other(monkeypatch) ->
 
     assert command.get_kamikaze_cooldown_remaining("channel-1", "protected-user") == 0
     assert context.replies == ["Protected users cannot use !kamikaze on each other."]
+
+
+def test_kamikaze_is_registered_once_as_utility():
+    from bot.command_registry import BASE_COMMAND_GROUPS, CommandSlowmode
+    from bot.component_loader import GLOBAL_COMPONENTS
+    from bot.profiles import GlobalCommandName
+
+    entries = [(group.name, command) for group in BASE_COMMAND_GROUPS
+               for command in group.commands if command.name == 'kamikaze']
+    assert len(entries) == 1
+    category, definition = entries[0]
+    assert category == 'Utility'
+    assert definition.global_command == GlobalCommandName.KAMIKAZE
+    assert definition.slowmode == CommandSlowmode.EXEMPT
+    assert GLOBAL_COMPONENTS.count(KamikazeCommands) == 1
+    assert all(group.name != 'Moderation' for group in BASE_COMMAND_GROUPS)
+
+
+@pytest.mark.asyncio
+async def test_kamikaze_respects_individual_command_toggle(monkeypatch):
+    bot = FakeKamikazeBot()
+    command = KamikazeCommands(bot)
+    monkeypatch.setattr(bot.services.features, 'is_global_command_enabled', lambda *_: False)
+    timeout = AsyncMock()
+    monkeypatch.setattr(command, 'timeout_with_moderator_restore', timeout)
+    await command.kamikaze.callback(command, FakeContext(), None)
+    timeout.assert_not_awaited()
+    bot.services.achievements.record_kamikaze_success.assert_not_awaited()
