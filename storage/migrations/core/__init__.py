@@ -33,6 +33,8 @@ from .v065_incoming_raid_recency import migrate as migrate_065
 from .v067_follow_raid import migrate as migrate_067
 
 
+from .v068_streamer_workspace import migrate as migrate_068
+
 MIGRATIONS = (
     Migration(1, "initial_schema", migrate_001),
     Migration(2, "redeem_stats", migrate_002),
@@ -63,4 +65,5 @@ MIGRATIONS = (
     Migration(50, "viewer_sessions", migrate_050),
     Migration(65, "incoming_raid_recency", migrate_065),
     Migration(67, "follow_raid", migrate_067),
+    Migration(68, "streamer_workspace", migrate_068),
 )

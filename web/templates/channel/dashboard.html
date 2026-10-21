@@ -5,6 +5,13 @@
 {% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard-for-you.css') }}?v={{ deployment_stamp() }}">
+<dialog class="for-you-dialog" data-fy-dialog aria-labelledby="for-you-alert-title">
+    <h3 id="for-you-alert-title">Time’s up!</h3>
+    <p data-fy-alert-label></p>
+    <p data-fy-alert-error role="status"></p>
+    <button type="button" data-fy-dismiss autofocus>Got it</button>
+</dialog>
 <div class="channel-dashboard-layout" data-dashboard-carousel>
 <header class="page-header dashboard-channel-profile" hidden>
     <div class="channel-heading dashboard-channel-heading">
@@ -260,22 +267,8 @@
 
     <div class="dashboard-lower-panels">
     <div class="dashboard-activity-grid">
-    <section class="panel activity-panel dashboard-activity-panel dashboard-moderation-panel" data-activity-group>
-        <div class="panel-header"><h3>Moderation</h3></div>
-        <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Moderation activity">
-            <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-activity-tab="mod-actions">Mod actions</button>
-            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="automod">AutoMod</button>
-        </div>
-        <div data-activity-panel="mod-actions">
-            <div id="mod-action-activity-content" class="activity-scroll">
-                <div class="compact-empty-state"><h4>No moderation actions yet</h4><p>Moderator actions will appear here.</p></div>
-            </div>
-        </div>
-        <div data-activity-panel="automod" hidden>
-            <div id="automod-activity-content" class="activity-scroll">
-                <div class="compact-empty-state"><h4>AutoMod queue is clear</h4><p>Held messages will appear here for review.</p></div>
-            </div>
-        </div>
+    <section class="panel activity-panel dashboard-activity-panel dashboard-moderation-panel for-you-card" data-activity-group data-for-you data-csrf-token="{{ csrf_token }}">
+        {% include "channel/for_you.html" %}
     </section>
 
     <section class="panel activity-panel dashboard-activity-panel dashboard-community-panel" data-activity-group>
@@ -986,6 +979,7 @@
 {% endblock %}
 
 {% block page_scripts %}
+<script src="{{ url_for('static', path='/js/dashboard-for-you.js') }}?v={{ deployment_stamp() }}" defer></script>
     <dialog id="dashboard-raid-browser" class="raid-browser-dialog" aria-labelledby="raid-browser-title" data-raid-browser data-browser-url="/channel/api/raid-browser" data-raid-action-url="/channel/api/raid-browser/action" data-csrf-token="{{ csrf_token }}" data-channel-id="{{ broadcaster.id }}">
         <div class="raid-browser-header">
             <label class="raid-browser-search-heading" for="raid-browser-channel-search">Search</label>
