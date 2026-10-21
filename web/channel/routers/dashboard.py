@@ -24,6 +24,7 @@ from bot.services.channels.stream_metadata import (
 from config.settings import settings
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
+from web.channel.api_context import resolve_channel_api_context
 from web.shared.common import templates
 from web.shared.category_relevance import low_relevance_category_ids
 from web.shared.raid_suggestions import get_suggested_streamers
@@ -459,43 +460,23 @@ async def get_ad_status(broadcaster, twitch_user=None) -> dict[str, object]:
 
 @router.get("/channel/api/raid-contributors", response_class=JSONResponse)
 async def channel_raid_contributors(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
-
-    if not broadcaster_id:
-        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
-
-    runtime_bot = get_bot()
-
-    if runtime_bot is None or runtime_bot.services is None:
-        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
-
-    services = runtime_bot.services
-    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
-
-    if broadcaster is None:
-        logout_channel_user(request)
-        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    broadcaster_id = context.broadcaster_id
+    services = context.services
 
     return JSONResponse(await get_raid_contributor_data(services, broadcaster_id))
 
 
 @router.get("/channel/api/dashboard-stats", response_class=JSONResponse)
 async def channel_dashboard_stats(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
-
-    if not broadcaster_id:
-        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
-
-    runtime_bot = get_bot()
-
-    if runtime_bot is None or runtime_bot.services is None:
-        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
-
-    broadcaster = runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id))
-
-    if broadcaster is None:
-        logout_channel_user(request)
-        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    broadcaster_id = context.broadcaster_id
+    runtime_bot = context.runtime_bot
+    broadcaster = context.broadcaster
 
     points_lost = await runtime_bot.services.points.get_gambling_loss_total(broadcaster_id)
     stats = await get_dashboard_header_stats(runtime_bot, broadcaster, refresh_viewers=True, points_lost=points_lost)
@@ -509,44 +490,22 @@ async def channel_dashboard_stats(request: Request):
 
 @router.get("/channel/api/redemptions", response_class=JSONResponse)
 async def channel_redemption_activity(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
-
-    if not broadcaster_id:
-        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
-
-    runtime_bot = get_bot()
-
-    if runtime_bot is None or runtime_bot.services is None:
-        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
-
-    services = runtime_bot.services
-    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
-
-    if broadcaster is None:
-        logout_channel_user(request)
-        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    broadcaster_id = context.broadcaster_id
+    services = context.services
 
     return JSONResponse(await get_redemption_dashboard_data(services, broadcaster_id))
 
 
 @router.get("/channel/api/viewer-queue", response_class=JSONResponse)
 async def channel_viewer_queue_state(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
-
-    if not broadcaster_id:
-        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
-
-    runtime_bot = get_bot()
-
-    if runtime_bot is None or runtime_bot.services is None:
-        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
-
-    services = runtime_bot.services
-    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
-
-    if broadcaster is None:
-        logout_channel_user(request)
-        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    broadcaster_id = context.broadcaster_id
+    services = context.services
 
     viewer_queue = services.viewer_queue
     queue_users = viewer_queue.list_queue(broadcaster_id)
@@ -1860,38 +1819,22 @@ async def channel_raid_chat_emotes(request: Request, target_id: str = ""):
 
 @router.get("/channel/api/chat/emotes", response_class=JSONResponse)
 async def channel_chat_emotes(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
-
-    if not broadcaster_id:
-        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
-
-    runtime_bot = get_bot()
-
-    if runtime_bot is None or runtime_bot.services is None:
-        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
-
-    if runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id)) is None:
-        logout_channel_user(request)
-        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    broadcaster_id = context.broadcaster_id
+    runtime_bot = context.runtime_bot
 
     return JSONResponse(await runtime_bot.services.live_chat.get_emote_catalog(str(broadcaster_id)))
 
 
 @router.get("/channel/api/chat/users", response_class=JSONResponse)
 async def channel_chat_users(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
-
-    if not broadcaster_id:
-        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
-
-    runtime_bot = get_bot()
-
-    if runtime_bot is None or runtime_bot.services is None:
-        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
-
-    if runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id)) is None:
-        logout_channel_user(request)
-        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    broadcaster_id = context.broadcaster_id
+    runtime_bot = context.runtime_bot
 
     return JSONResponse({
         "users": runtime_bot.services.chatters.list_channel_identities(str(broadcaster_id))
@@ -1900,21 +1843,12 @@ async def channel_chat_users(request: Request):
 
 @router.get("/channel/api/ad-status", response_class=JSONResponse)
 async def channel_ad_status(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
-
-    if not broadcaster_id:
-        return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
-
-    runtime_bot = get_bot()
-
-    if runtime_bot is None or runtime_bot.services is None:
-        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
-
-    broadcaster = runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id))
-
-    if broadcaster is None:
-        logout_channel_user(request)
-        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    broadcaster_id = context.broadcaster_id
+    runtime_bot = context.runtime_bot
+    broadcaster = context.broadcaster
 
     twitch_user = runtime_bot.create_partialuser(str(broadcaster_id))
     return JSONResponse(await get_ad_status(broadcaster, twitch_user))

@@ -22,6 +22,8 @@ The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot
 
 - Refine the For You card: add the tab divider, simplify timers to Minutes : Seconds with themed step controls, and remove redundant labels/footer; application version 15.1.1.
 
+- Consolidate duplicated command context/permission helpers and seven dashboard read-endpoint guards, preserving authentication and session behavior; add contract tests and a focused maintenance review. Application version 15.1.2.
+
 - Move kamikaze into the utility command package and category, update help and public documentation, and preserve its existing cooldowns, protection rules, pet bonuses, and achievements; application version 15.1.3.
 
 For future releases, summarize changes here as they merge. When publishing, move the applicable notes under the actual released version and publication date, retaining source links. Do not create release entries from branch names or version bumps alone.
