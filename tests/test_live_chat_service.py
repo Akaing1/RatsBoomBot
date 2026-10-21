@@ -1942,8 +1942,14 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'activity: "redeems"' in dashboard
     assert '<h4>No commands yet</h4>' in dashboard
     assert '<p>Chat commands will appear here.</p>' in dashboard
-    assert 'data-activity-tab="mod-actions"' in dashboard
-    assert 'data-activity-tab="automod"' in dashboard
+    assert '{% include "channel/for_you.html" %}' in dashboard
+    for_you = open("web/templates/channel/for_you.html", encoding="utf-8").read()
+    assert 'data-activity-tab="mod-actions"' in for_you
+    assert 'data-activity-tab="automod"' in for_you
+    assert 'id="mod-action-activity-content"' in for_you
+    assert 'id="automod-activity-content"' in for_you
+    assert 'data-fy-tab="notes"' in for_you
+    assert 'data-fy-tab="timer"' in for_you
     assert 'data-newest-first="true"' in dashboard
     assert dashboard.count('data-newest-first="true"') == 1
     assert 'const feedScroller = createTopScroller(feedContent);' in dashboard
@@ -1960,7 +1966,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.dashboard-tabs.activity-tabs .dashboard-tab { min-width: max-content; min-height: 34px; flex: 1 0 auto;' in dashboard_styles
     assert '.queue-toolbar button, .queue-toolbar a { display: inline-flex; width: 100%;' in dashboard_styles
     assert '@container (max-width: 500px)' not in dashboard_styles
-    assert dashboard.count('data-activity-group>') == 2
+    assert dashboard.count(' data-activity-group') == 2
     assert 'selectActivity(group, selected)' in dashboard
     assert 'tab.closest("[data-activity-group]")' in dashboard
     assert '.queue-toolbar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr));' in dashboard_styles
