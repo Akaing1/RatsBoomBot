@@ -35,18 +35,19 @@ async def save_workspace(
     revision: int = Form(0, ge=0),
     label: str = Form("", max_length=200),
     minutes: int = Form(0, ge=0, le=10080),
+    seconds: int = Form(0, ge=0, le=59),
     timer_id: str = Form("", max_length=32),
 ):
     db, broadcaster_id = workspace_context(request)
     validate_csrf_token(request, csrf_token)
     if action not in {"notes", "start", "clear"}:
         raise HTTPException(status_code=400, detail="Unknown workspace action.")
-    if action == "start" and (minutes < 1 or not label.strip()):
-        raise HTTPException(status_code=400, detail="Enter a reminder and a duration from 1 minute to 7 days.")
+    if action == "start" and not 1 <= minutes * 60 + seconds <= 604800:
+        raise HTTPException(status_code=400, detail="Set a timer between 1 second and 7 days.")
     try:
         state = await update_workspace(
             db, broadcaster_id, action, notes=notes, revision=revision,
-            label=label.strip(), minutes=minutes, timer_id=timer_id,
+            label=label.strip() or "Timer", minutes=minutes, seconds=seconds, timer_id=timer_id,
         )
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error

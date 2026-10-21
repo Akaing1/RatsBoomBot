@@ -20,7 +20,7 @@ async def get_workspace(db, broadcaster_id):
         return await read(connection, broadcaster_id)
 
 
-async def update_workspace(db, broadcaster_id, action, *, notes="", revision=0, label="", minutes=0, timer_id=""):
+async def update_workspace(db, broadcaster_id, action, *, notes="", revision=0, label="", minutes=0, seconds=0, timer_id=""):
     async with db.acquire() as connection:
         async with immediate_transaction(connection):
             await connection.execute(
@@ -39,7 +39,7 @@ async def update_workspace(db, broadcaster_id, action, *, notes="", revision=0, 
                     raise ValueError("The timer changed in another tab. Review it and try again.")
                 await connection.execute(
                     "UPDATE streamer_workspace SET timer_id = ?, timer_label = ?, timer_due_at = ? WHERE broadcaster_id = ?",
-                    (uuid.uuid4().hex, label, int(time.time()) + minutes * 60, str(broadcaster_id)),
+                    (uuid.uuid4().hex, label, int(time.time()) + minutes * 60 + seconds, str(broadcaster_id)),
                 )
             elif action == "clear":
                 if current["timer_id"] != timer_id:
