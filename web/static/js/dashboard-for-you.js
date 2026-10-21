@@ -65,7 +65,7 @@
         });
         let payload;
         try { payload = await response.json(); } catch { throw new Error('Could not reach your workspace. Please try again.'); }
-        if (!response.ok) throw new Error(typeof payload.detail === 'string' ? payload.detail : 'Please check the reminder, duration, or note length.');
+        if (!response.ok) throw new Error(typeof payload.detail === 'string' ? payload.detail : 'Please check the duration or note length.');
         return payload;
     }
     function adopt(data) {
@@ -114,12 +114,24 @@
         const submitted = notes.value;
         mutate({ action: 'notes', notes: submitted, revision: notesRevision }, submitted);
     });
+    root.querySelectorAll('[data-fy-step]').forEach(button => button.addEventListener('click', () => {
+        const [name, direction] = button.dataset.fyStep.split(':');
+        const input = form.elements.namedItem(name);
+        const current = Number(input.value) || 0;
+        input.value = String(Math.max(Number(input.min), Math.min(Number(input.max), current + Number(direction))));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }));
     form.addEventListener('submit', async event => {
         event.preventDefault();
         if (!state || busy || !form.reportValidity()) return;
-        if (state.timer_id && !window.confirm('Replace your current timer?')) return;
         const values = new FormData(form);
-        await mutate({ action: 'start', label: values.get('label'), minutes: values.get('minutes'), timer_id: state.timer_id || '' });
+        const totalSeconds = Number(values.get('minutes')) * 60 + Number(values.get('seconds'));
+        if (totalSeconds < 1 || totalSeconds > 604800) {
+            error.textContent = 'Set a timer between 1 second and 7 days.';
+            return;
+        }
+        if (state.timer_id && !window.confirm('Replace your current timer?')) return;
+        await mutate({ action: 'start', minutes: values.get('minutes'), seconds: values.get('seconds'), timer_id: state.timer_id || '' });
         // Refresh after a conflict so a stale tab can retry against the current timer.
         pull();
     });

@@ -52,9 +52,9 @@ async def test_auth_csrf_and_validation(workspace_client):
     assert (await client.post('/channel/api/for-you', data={'csrf_token': 'secret', 'action': 'notes'})).status_code == 401
     session.update(channel_user_id='alice', csrf_token='secret')
     assert (await client.post('/channel/api/for-you', data={'csrf_token': 'wrong', 'action': 'notes'})).status_code == 403
-    for data in [dict(action='start', minutes=0, label='pizza'), dict(action='start', minutes=1, label='   '), dict(action='bad')]:
+    for data in [dict(action='start', minutes=0, label='pizza'), dict(action='start', minutes=10080, seconds=1), dict(action='bad')]:
         assert (await client.post('/channel/api/for-you', data={'csrf_token': 'secret', **data})).status_code == 400
-    for data in [dict(action='start', minutes=10081, label='pizza'), dict(action='start', minutes='1.5', label='pizza'), dict(action='notes', notes='a' * 20001)]:
+    for data in [dict(action='start', minutes=10081, label='pizza'), dict(action='start', minutes='1.5', label='pizza'), dict(action='start', minutes=0, seconds=60), dict(action='start', seconds=-1), dict(action='notes', notes='a' * 20001)]:
         assert (await client.post('/channel/api/for-you', data={'csrf_token': 'secret', **data})).status_code == 422
     assert (await repository.get_workspace(db, 'alice'))['timer_id'] is None
 
@@ -93,3 +93,17 @@ async def test_state_survives_database_reopen(tmp_path):
         assert actual['notes'] == 'Next stream'
         assert actual['timer_id'] == timer['timer_id']
         assert actual['timer_due_at'] == timer['timer_due_at']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('minutes, seconds, duration', [(0, 1, 1), (0, 45, 45), (1, 30, 90), (10080, 0, 604800)])
+async def test_timer_supports_minutes_seconds_without_a_reason(workspace_client, monkeypatch, minutes, seconds, duration):
+    client, session, db = workspace_client
+    monkeypatch.setattr(repository.time, 'time', lambda: 1000)
+    response = await client.post('/channel/api/for-you', data={
+        'csrf_token': 'secret', 'action': 'start', 'minutes': minutes, 'seconds': seconds,
+    })
+    assert response.status_code == 200
+    assert response.json()['timer_due_at'] == 1000 + duration
+    assert response.json()['timer_label'] == 'Timer'
+    assert (await client.get('/channel/api/for-you')).json()['timer_due_at'] == 1000 + duration

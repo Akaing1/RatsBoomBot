@@ -14,16 +14,15 @@
 .for-you-content label { font-size: .85rem; }
 .for-you-content textarea, .for-you-content input { box-sizing: border-box; width: 100%; border: 1px solid #414451; border-radius: 9px; background: #11151c; color: #f1eff8; padding: 10px; font: inherit; }
 .for-you-content textarea { flex: 1; resize: vertical; min-height: 105px; }
-.for-you-actions, .for-you-timer-controls { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.for-you-actions { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
 .for-you-actions span { font-size: .8rem; color: #aaa7b9; }
-.for-you-timer-controls input { min-width: 65px; flex: 1; }
 .for-you-content button, .for-you-dialog button { padding: 8px 12px; border: 1px solid #9364ff; background: #2a2140; color: #fff; border-radius: 9px; white-space: nowrap; }
 .for-you-content button:disabled { opacity: .5; cursor: not-allowed; }
 .for-you-content form { display: grid; gap: 8px; }
 .for-you-running { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .for-you-running p { width: 100%; margin: 4px 0; overflow-wrap: anywhere; }
 .for-you-running strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; margin-right: auto; }
-.for-you-summary, .for-you-content .muted-text { font-size: .8rem; color: #b9b4c9; }
+.for-you-summary { font-size: .8rem; color: #b9b4c9; }
 .for-you-summary { margin: 0 0 8px; }
 .for-you-error { font-size: .8rem; color: #ffc6b8; overflow-wrap: anywhere; margin: 4px 0 0; }
 .for-you-dialog { background: #181c23; color: #f1eff8; border: 1px solid #9364ff; border-radius: 18px; padding: 28px; width: min(400px, calc(100vw - 40px)); box-sizing: border-box; }
@@ -32,3 +31,18 @@
 .for-you-dialog p { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .for-you-flipper { transition: none; } }
 .for-you-running[hidden], .for-you-summary[hidden] { display: none; }
+
+.for-you-back .dashboard-tabs.activity-tabs { padding-bottom: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border, #414451); }
+.for-you-duration { display: flex; gap: 12px; align-items: flex-end; }
+.for-you-duration-field { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.for-you-colon { padding-bottom: 10px; font-size: 1.5rem; color: var(--muted, #aaa7b9); }
+.for-you-number { display: flex; border: 1px solid var(--border, #414451); border-radius: 9px; background: #11151c; overflow: hidden; }
+.for-you-number input { flex: 1; min-width: 0; width: 0; border: 0; border-radius: 0; background: transparent; appearance: textfield; -moz-appearance: textfield; font-variant-numeric: tabular-nums; }
+.for-you-number input::-webkit-inner-spin-button, .for-you-number input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.for-you-number:focus-within { outline: 2px solid var(--accent, #b390ff); outline-offset: 2px; }
+.for-you-number input:focus-visible { outline: none; }
+.for-you-steppers { display: flex; flex-direction: column; border-left: 1px solid var(--border, #414451); }
+.for-you-steppers button { min-width: 32px; min-height: 22px; padding: 0 8px; border: 0; border-radius: 0; background: transparent; color: var(--muted, #aaa7b9); line-height: 1; }
+.for-you-steppers button + button { border-top: 1px solid var(--border, #414451); }
+.for-you-steppers button:hover { background: rgba(139,92,246,.16); color: var(--text, #fff); }
+.for-you-start { justify-self: end; margin-top: 4px; }

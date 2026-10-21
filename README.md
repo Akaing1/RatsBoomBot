@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current application version: **15.1.0** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
+Current application version: **15.1.1** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
 
 ## Highlights
 
@@ -357,4 +357,4 @@ This is a statement of the current licensing status, not a new open-source licen
 
 ### Personal dashboard tools
 
-Flip the Moderation card to **For You** for private, account-saved stream notes and a personal reminder timer. Save notes explicitly; timers support 1 minute to 7 days and survive refreshes. Keep the dashboard open for the popup; overdue timers appear when you return. These tools do not post messages to chat.
+Flip the Moderation card to **For You** for private, account-saved stream notes and a personal reminder timer. Save notes explicitly; timers use Minutes : Seconds and support 1 second to 7 days and survive refreshes. Keep the dashboard open for the popup; overdue timers appear when you return. These tools do not post messages to chat.
