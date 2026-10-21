@@ -5,7 +5,9 @@ from twitchio.ext import commands
 
 from bot.profiles import GlobalCommandGroup
 from bot.shared.commands.converters import LocalizedUser
-from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
+from bot.shared.commands.helpers import (
+    get_context_broadcaster_id, is_global_group_enabled, is_mod_or_broadcaster,
+)
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -14,22 +16,6 @@ USERNAME_PATTERN = re.compile(r"[^a-zA-Z0-9_]")
 
 def clean_username(username: str) -> str:
     return USERNAME_PATTERN.sub("", username.replace("@", "").strip())
-
-
-def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
-    chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
-    broadcaster_id = get_context_broadcaster_id(ctx)
-
-    if chatter is None:
-        return False
-
-    if broadcaster_id is None:
-        return False
-
-    is_moderator = getattr(chatter, "moderator", False)
-    is_broadcaster = str(chatter.id) == broadcaster_id
-
-    return is_moderator or is_broadcaster
 
 
 async def send_shoutout_message(bot, broadcaster_id: str, username: str) -> bool:

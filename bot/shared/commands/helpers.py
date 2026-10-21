@@ -1,8 +1,11 @@
+import logging
 from typing import Any
 
 from twitchio.ext import commands
 
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName
+
+LOGGER = logging.getLogger("RatBoomBot")
 
 
 def get_context_broadcaster_id(ctx: Any) -> str | None:
@@ -66,3 +69,30 @@ def is_global_command_enabled(bot, ctx: commands.Context, command: GlobalCommand
         return False
 
     return services.features.is_global_command_enabled(broadcaster_id, command)
+
+
+def get_chatter(ctx):
+    return getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
+
+
+def get_chatter_name(ctx) -> str:
+    chatter = get_chatter(ctx)
+    return "unknown" if chatter is None else chatter.name
+
+
+def is_mod_or_broadcaster(ctx) -> bool:
+    chatter = get_chatter(ctx)
+    broadcaster_id = get_context_broadcaster_id(ctx)
+    if chatter is None or broadcaster_id is None:
+        return False
+    return getattr(chatter, "moderator", False) or str(chatter.id) == broadcaster_id
+
+
+def has_moderator_permission(ctx, command_name: str) -> bool:
+    if is_mod_or_broadcaster(ctx):
+        return True
+    LOGGER.info(
+        "[Commands] User %s was denied permission to run !%s in broadcaster %s.",
+        get_chatter_name(ctx), command_name, get_context_broadcaster_id(ctx) or "unknown",
+    )
+    return False
