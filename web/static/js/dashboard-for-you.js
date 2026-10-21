@@ -18,7 +18,6 @@
     const error = find('[data-fy-error]');
     const form = find('[data-fy-timer-form]');
     const dialog = document.querySelector('[data-fy-dialog]');
-    const alertLabel = dialog.querySelector('[data-fy-alert-label]');
     const alertError = dialog.querySelector('[data-fy-alert-error]');
     const dismiss = dialog.querySelector('[data-fy-dismiss]');
     let state = null, dirty = false, notesRevision = 0, busy = false, pulling = false;
@@ -55,7 +54,11 @@
         save.disabled = !state || busy || !dirty;
         notes.disabled = !state;
         [...form.elements].forEach(input => { input.disabled = !state || busy; });
-        find('[data-fy-cancel]').disabled = busy;
+        const action = find('[data-fy-timer-action]');
+        const active = Boolean(state?.timer_id);
+        action.textContent = active ? 'Cancel' : 'Start timer';
+        action.classList.toggle('is-cancel', active);
+        action.formNoValidate = active;
         dismiss.disabled = busy;
     }
     async function request(data) {
@@ -76,7 +79,6 @@
         controls(); tick(false);
         if (data.timer_id && remaining(data.timer_due_at, data.server_now) === 0 && popupId !== data.timer_id) {
             popupId = data.timer_id;
-            alertLabel.textContent = data.timer_label;
             alertError.textContent = '';
             if (!dialog.open) dialog.showModal();
         }
@@ -123,20 +125,22 @@
     }));
     form.addEventListener('submit', async event => {
         event.preventDefault();
-        if (!state || busy || !form.reportValidity()) return;
+        if (!state || busy) return;
+        if (state.timer_id) {
+            await mutate({ action: 'clear', timer_id: state.timer_id });
+            pull();
+            return;
+        }
+        if (!form.reportValidity()) return;
         const values = new FormData(form);
         const totalSeconds = Number(values.get('minutes')) * 60 + Number(values.get('seconds'));
         if (totalSeconds < 1 || totalSeconds > 604800) {
             error.textContent = 'Set a timer between 1 second and 7 days.';
             return;
         }
-        if (state.timer_id && !window.confirm('Replace your current timer?')) return;
         await mutate({ action: 'start', minutes: values.get('minutes'), seconds: values.get('seconds'), timer_id: state.timer_id || '' });
         // Refresh after a conflict so a stale tab can retry against the current timer.
         pull();
-    });
-    find('[data-fy-cancel]').addEventListener('click', async () => {
-        if (state?.timer_id) { await mutate({ action: 'clear', timer_id: state.timer_id }); pull(); }
     });
     async function acknowledge() {
         if (!popupId || busy) return;
@@ -151,8 +155,7 @@
         find('[data-fy-summary]').hidden = !active;
         if (!active) return;
         const seconds = remaining(state.timer_due_at, Date.now() / 1000 + offset);
-        find('[data-fy-reminder]').textContent = state.timer_label;
-        find('[data-fy-countdown]').textContent = seconds ? formatTime(seconds) : 'Time’s up!';
+        find('[data-fy-countdown]').textContent = formatTime(seconds);
         find('[data-fy-summary]').textContent = seconds ? `Your timer · ${formatTime(seconds)}` : 'Your timer is ready';
         if (checkDue && seconds === 0 && !popupId && Date.now() >= nextDueCheck) {
             nextDueCheck = Date.now() + 10000;
