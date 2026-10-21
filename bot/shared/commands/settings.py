@@ -6,7 +6,10 @@ from bot.profiles import GlobalCommandGroup
 from bot.services.channels.stream_metadata import (
     StreamCategoryLookupError, StreamCategoryNotFoundError, update_stream_game, update_stream_title
 )
-from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
+from bot.shared.commands.helpers import (
+    get_context_broadcaster_id, is_global_group_enabled, is_mod_or_broadcaster,
+    get_chatter, get_chatter_name, has_moderator_permission,
+)
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -24,35 +27,6 @@ ENABLED_TIMER_STATUSES = {
     "enable",
     "enabled"
 }
-
-
-def get_chatter(ctx: commands.Context):
-    return getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
-
-
-def get_chatter_name(ctx: commands.Context) -> str:
-    chatter = get_chatter(ctx)
-
-    if chatter is None:
-        return "unknown"
-
-    return chatter.name
-
-
-def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
-    chatter = get_chatter(ctx)
-    broadcaster_id = get_context_broadcaster_id(ctx)
-
-    if chatter is None:
-        return False
-
-    if broadcaster_id is None:
-        return False
-
-    is_moderator = getattr(chatter, "moderator", False)
-    is_broadcaster = str(chatter.id) == broadcaster_id
-
-    return is_moderator or is_broadcaster
 
 
 class SettingsCommands(commands.Component):
@@ -87,17 +61,7 @@ class SettingsCommands(commands.Component):
         return broadcaster_id
 
     def has_permission(self, ctx: commands.Context, command_name: str) -> bool:
-        if is_mod_or_broadcaster(ctx):
-            return True
-
-        LOGGER.info(
-            "[Commands] User %s was denied permission to run !%s in broadcaster %s.",
-            get_chatter_name(ctx),
-            command_name,
-            get_context_broadcaster_id(ctx) or "unknown"
-        )
-
-        return False
+        return has_moderator_permission(ctx, command_name)
 
     @commands.group(name="set", invoke_fallback=True)
     async def set_channel(self, ctx: commands.Context) -> None:

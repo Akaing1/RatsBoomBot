@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING
 from twitchio.ext import commands
 
 from bot.profiles import GlobalCommandGroup
-from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
+from bot.shared.commands.helpers import (
+    get_context_broadcaster_id, is_global_group_enabled, is_mod_or_broadcaster,
+    get_chatter_name, has_moderator_permission,
+)
 
 if TYPE_CHECKING:
     from bot.services.container import ServiceContainer
@@ -12,34 +15,9 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger("RatBoomBot")
 
 
-def get_chatter_name(ctx: commands.Context) -> str:
-    chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
-
-    if chatter is None:
-        return "unknown"
-
-    return chatter.name
-
-
 def get_chatter_display_name(ctx: commands.Context) -> str:
     chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
     return str(getattr(chatter, "display_name", None) or get_chatter_name(ctx))
-
-
-def is_mod_or_broadcaster(ctx: commands.Context) -> bool:
-    chatter = getattr(ctx, "chatter", None) or getattr(ctx, "author", None)
-    broadcaster_id = get_context_broadcaster_id(ctx)
-
-    if chatter is None:
-        return False
-
-    if broadcaster_id is None:
-        return False
-
-    is_moderator = getattr(chatter, "moderator", False)
-    is_broadcaster = str(chatter.id) == broadcaster_id
-
-    return is_moderator or is_broadcaster
 
 
 class ViewerQueueCommands(commands.Component):
@@ -102,17 +80,7 @@ class ViewerQueueCommands(commands.Component):
 
     @staticmethod
     def has_permission(ctx: commands.Context, command_name: str) -> bool:
-        if is_mod_or_broadcaster(ctx):
-            return True
-
-        LOGGER.info(
-            "[Commands] User %s was denied permission to run !%s in broadcaster %s.",
-            get_chatter_name(ctx),
-            command_name,
-            get_context_broadcaster_id(ctx) or "unknown"
-        )
-
-        return False
+        return has_moderator_permission(ctx, command_name)
 
     @staticmethod
     def log_command(ctx: commands.Context, command_name: str) -> None:
