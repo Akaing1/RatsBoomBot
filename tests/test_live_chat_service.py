@@ -540,7 +540,7 @@ def test_clear_chat_removes_twitch_history_and_notifies_subscribers():
 
 
 @pytest.mark.parametrize("platform,connected,url", [
-    ("twitch", False, "/connect"), ("youtube", False, "/channel/customization?social_tab=youtube#youtube-integration"),
+    ("twitch", False, "/connect"), ("youtube", False, "/channel/settings?section=general&social_tab=youtube#youtube-integration"),
     ("twitch", True, None), ("youtube", True, None)])
 def test_platform_filter_connection_links(platform, connected, url):
     from pathlib import Path
@@ -1914,7 +1914,7 @@ def test_dashboard_mobile_activity_panels_keep_tabs_above_scrollable_events():
 
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
-    features = open("web/templates/channel/features.html", encoding="utf-8").read()
+    features = open("web/templates/channel/settings.html", encoding="utf-8").read()
     channel_layout = open("web/templates/channel/layout.html", encoding="utf-8").read()
     customization = open("web/templates/shared/profile_inputs.html", encoding="utf-8").read()
     youtube_settings = open("web/templates/shared/youtube_settings.html", encoding="utf-8").read()

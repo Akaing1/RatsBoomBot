@@ -50,7 +50,6 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
         ('feature', 'timers'): 'Timers', ('feature', 'raid_bosses'): 'Raid boss names',
         ('feature', 'redeems'): 'Redeems', ('feature', 'raid_responses'): 'Raid messages',
         ('global_group', 'shoutouts'): 'Shoutouts', ('global_command', 'lurk'): 'Commands',
-        ('profile_feature', 'league'): 'League of Legends', ('profile_feature', 'overwatch'): 'Overwatch',
         **{('feature', name): 'Community messages' for name in (
             'follow_responses', 'subscription_responses', 'resubscription_responses', 'gifted_subscription_responses')},
     }

@@ -123,7 +123,7 @@ def raid_relevance_score(**matches):
 
 def protected_users_redirect(result: str, message: str) -> RedirectResponse:
     return RedirectResponse(
-        url=f"/channel/customization?protected_result={result}&protected_message={quote_plus(message)}&command_tab=protected#protected-users",
+        url=f"/channel/settings?section=general&protected_result={result}&protected_message={quote_plus(message)}&command_tab=protected#protected-users",
         status_code=303
     )
 
@@ -2308,14 +2308,20 @@ async def channel_help_page(request: Request):
     )
 
 
-@router.get("/channel/features", response_class=HTMLResponse)
-async def channel_features_page(request: Request):
-    return await channel_customization_page(request)
+@router.get("/channel/features", response_class=RedirectResponse)
+@router.get("/channel/customization", response_class=RedirectResponse)
+@router.get("/channel/loyalty", response_class=RedirectResponse)
+async def legacy_channel_settings_page(request: Request):
+    """Keep bookmarked settings URLs working without duplicate page renderers."""
+    if not request.session.get(CHANNEL_USER_ID_KEY):
+        return RedirectResponse(url="/connect", status_code=303)
+    target = request.url.replace(path="/channel/settings")
+    if request.url.path == "/channel/loyalty":
+        target = target.include_query_params(section="loyalty")
+    return RedirectResponse(url=target.path + ("?" + target.query if target.query else ""), status_code=303)
 
 
 @router.get("/channel/settings", response_class=HTMLResponse)
-@router.get("/channel/loyalty", response_class=HTMLResponse)
-@router.get("/channel/customization", response_class=HTMLResponse)
 async def channel_customization_page(request: Request):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
 
@@ -2334,34 +2340,28 @@ async def channel_customization_page(request: Request):
         logout_channel_user(request)
         return RedirectResponse(url="/connect", status_code=303)
 
-    loyalty_page = request.url.path == "/channel/loyalty"
     groups = services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)})
-    widget_urls = {}
-
-    if not loyalty_page:
-        widget_token = await services.live_chat.get_or_create_widget_token(broadcaster_id)
-        widget_base_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/widgets/chat/{widget_token}"
-        widget_urls = {view: f"{widget_base_url}?view={view}" for view in ("chat", "commands", "both")}
+    widget_token = await services.live_chat.get_or_create_widget_token(broadcaster_id)
+    widget_base_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/widgets/chat/{widget_token}"
+    widget_urls = {view: f"{widget_base_url}?view={view}" for view in ("chat", "commands", "both")}
 
     return templates.TemplateResponse(
         request=request,
-        name="channel/loyalty.html" if loyalty_page else "channel/settings.html",
+        name="channel/settings.html",
         context={
-            "active_page": "loyalty" if loyalty_page else "settings",
-            "customization_action": "/channel/loyalty" if loyalty_page else "/channel/customization",
+            "active_page": "settings",
+            "customization_action": "/channel/customization",
             "settings_sections": build_settings_sections(
                 groups, services.features.get_channel_features(broadcaster_id),
                 services.features.get_profile_features(broadcaster_id),
                 services.features.get_global_groups(broadcaster_id),
                 services.features.get_global_commands(broadcaster_id),
-            ) if not loyalty_page else [],
+            ),
             "toggle_result": request.query_params.get("toggle_result"),
             "toggle_message": request.query_params.get("toggle_message"),
-            "show_social_links": not loyalty_page,
             "loyalty_alias": get_active_profile(broadcaster_id).points.command_alias,
             "broadcaster": broadcaster,
             "channel_settings": await services.broadcaster_settings.get_settings(broadcaster_id),
-            "setting_groups": {name: entries for name, entries in groups.items() if (name == LOYALTY_GROUP) == loyalty_page},
             "chat_identity": services.chat_identity.get_state(broadcaster_id),
             "youtube_chat": services.live_chat.get_youtube_state(broadcaster_id),
             "widget_urls": widget_urls,
@@ -2373,7 +2373,7 @@ async def channel_customization_page(request: Request):
             "youtube_message": request.query_params.get("youtube_message"),
             "social_tab": request.query_params.get("social_tab", "links"),
             "command_tab": request.query_params.get("command_tab", "responses"),
-            "protected_users": await get_protected_user_rows(runtime_bot, str(broadcaster_id)) if not loyalty_page else [],
+            "protected_users": await get_protected_user_rows(runtime_bot, str(broadcaster_id)),
             "protected_result": request.query_params.get("protected_result"),
             "protected_message": request.query_params.get("protected_message"),
             "csrf_token": get_csrf_token(request)
@@ -2384,7 +2384,8 @@ async def channel_customization_page(request: Request):
 @router.post("/channel/loyalty")
 @router.post("/channel/customization")
 async def update_channel_customization(request: Request, setting_name: str = Form(...), value: str = Form(""), action: str = Form(...), csrf_token: str = Form(...)):
-    destination = "/channel/loyalty" if request.url.path == "/channel/loyalty" else "/channel/customization"
+    legacy_loyalty = request.url.path == "/channel/loyalty"
+    destination = "/channel/settings?section=loyalty&" if legacy_loyalty else "/channel/settings?"
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
 
     if not broadcaster_id:
@@ -2394,12 +2395,12 @@ async def update_channel_customization(request: Request, setting_name: str = For
     runtime_bot = get_bot()
 
     if runtime_bot is None or runtime_bot.services is None:
-        return RedirectResponse(url=f"{destination}?setting_result=error&setting_message=Runtime+unavailable.", status_code=303)
+        return RedirectResponse(url=f"{destination}setting_result=error&setting_message=Runtime+unavailable.", status_code=303)
 
     services = runtime_bot.services
 
     try:
-        if destination == "/channel/loyalty" and services.profile_settings.get_definition(setting_name).group != LOYALTY_GROUP:
+        if legacy_loyalty and services.profile_settings.get_definition(setting_name).group != LOYALTY_GROUP:
             raise ValueError("Only loyalty point names and responses can be edited here.")
         if setting_name == "dashboard.follow_raid":
             if action != "save" or value not in {"0", "1"}:
@@ -2424,9 +2425,9 @@ async def update_channel_customization(request: Request, setting_name: str = For
             else:
                 raise ValueError("Unknown customization action.")
     except (TypeError, ValueError) as error:
-        return RedirectResponse(url=f"{destination}?setting_result=error&setting_message={quote_plus(str(error))}", status_code=303)
+        return RedirectResponse(url=f"{destination}setting_result=error&setting_message={quote_plus(str(error))}", status_code=303)
 
-    return RedirectResponse(url=f"{destination}?setting_result=success&setting_message={quote_plus(message)}", status_code=303)
+    return RedirectResponse(url=f"{destination}setting_result=success&setting_message={quote_plus(message)}", status_code=303)
 
 
 @router.get("/channel/protected-users/search")
@@ -2503,7 +2504,7 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
     runtime_bot = get_bot()
 
     if runtime_bot is None or runtime_bot.services is None:
-        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Runtime+unavailable.", status_code=303)
+        return RedirectResponse(url="/channel/settings?toggle_result=error&toggle_message=Runtime+unavailable.", status_code=303)
 
     services = runtime_bot.services
     broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
@@ -2513,7 +2514,7 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
         return RedirectResponse(url="/connect", status_code=303)
 
     if action not in {"enable", "disable", "reset"}:
-        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Unknown+toggle+action.", status_code=303)
+        return RedirectResponse(url="/channel/settings?toggle_result=error&toggle_message=Unknown+toggle+action.", status_code=303)
 
     enabled = action == "enable"
     updated_by = f"streamer:{broadcaster_id}"
@@ -2560,12 +2561,12 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
             display_name = f"!{toggle.value}"
 
         else:
-            return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Unknown+toggle+type.", status_code=303)
+            return RedirectResponse(url="/channel/settings?toggle_result=error&toggle_message=Unknown+toggle+type.", status_code=303)
 
     except ValueError:
-        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=Unknown+toggle.", status_code=303)
+        return RedirectResponse(url="/channel/settings?toggle_result=error&toggle_message=Unknown+toggle.", status_code=303)
     except Exception:
-        return RedirectResponse(url="/channel/features?toggle_result=error&toggle_message=The+toggle+could+not+be+updated.", status_code=303)
+        return RedirectResponse(url="/channel/settings?toggle_result=error&toggle_message=The+toggle+could+not+be+updated.", status_code=303)
 
     if action == "reset":
         message = f"{display_name} was reset to its profile default."
@@ -2573,7 +2574,7 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
         effective_state = "enabled" if state.effective_enabled else "disabled"
         message = f"{display_name} is now {effective_state}."
 
-    return RedirectResponse(url=f"/channel/features?toggle_result=success&toggle_message={quote_plus(message)}", status_code=303)
+    return RedirectResponse(url=f"/channel/settings?toggle_result=success&toggle_message={quote_plus(message)}", status_code=303)
 
 
 @router.post("/channel/viewer-queue/remove")
