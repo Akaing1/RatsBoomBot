@@ -22,7 +22,7 @@ router = APIRouter()
 
 
 def customization_redirect(result: str, message: str) -> RedirectResponse:
-    return RedirectResponse(url=f"/channel/customization?identity_result={result}&identity_message={quote_plus(message)}", status_code=303)
+    return RedirectResponse(url=f"/channel/settings?section=connections&identity_result={result}&identity_message={quote_plus(message)}", status_code=303)
 
 
 def render_custom_bot_result(request: Request, title: str, message: str, *, success: bool = False, status_code: int = 200) -> HTMLResponse:
@@ -42,7 +42,7 @@ async def public_connect_twitch(request: Request):
 
 @router.get("/channel/custom-bot/connect")
 async def connect_channel_custom_bot(request: Request):
-    return RedirectResponse(url="/channel/customization", status_code=303)
+    return RedirectResponse(url="/channel/settings?section=connections", status_code=303)
 
 
 @router.post("/channel/custom-bot/connect", response_class=HTMLResponse)

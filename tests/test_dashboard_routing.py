@@ -1,3 +1,5 @@
+import pytest
+
 from fastapi.testclient import TestClient
 from urllib.parse import parse_qs, urlparse
 
@@ -114,31 +116,13 @@ def test_loyalty_tab_requires_channel_authentication() -> None:
     assert response.headers["location"] == "/connect"
 
 
-def test_loyalty_template_only_shows_names_and_responses() -> None:
-    from bot.profiles import ChannelProfile, activate_profile, clear_profiles
-    from bot.services.channels.profile_settings import LOYALTY_GROUP, ProfileSettingsService
-    from web.shared.common import templates
-
-    activate_profile("loyalty-test", ChannelProfile(channel_name="example"))
-    try:
-        service = ProfileSettingsService(None)
-        groups = service.get_setting_groups("loyalty-test")
-        html = templates.env.get_template("channel/loyalty.html").render(
-            active_page="loyalty", csrf_token="test", show_social_links=False,
-            setting_groups={LOYALTY_GROUP: groups[LOYALTY_GROUP]},
-            customization_action="/channel/loyalty", url_for=lambda *args, **kwargs: "/static",
-            deployment_stamp=lambda: "test"
-        )
-        assert 'name="setting_name" value="points.display_name"' in html
-        assert 'name="setting_name" value="points.messages.gamble_win"' not in html
-        assert html.index('href="/channel/loyalty"') < html.index('href="/channel/help"')
-        assert 'action="/channel/loyalty"' in html
-        assert "Income amounts are fixed" in html
-        assert 'type="number"' not in html
-        assert 'social.discord_url' not in html
-        assert 'redeems.daily_amount' not in html
-    finally:
-        clear_profiles()
+def test_sidebar_uses_settings_instead_of_duplicate_loyalty_page() -> None:
+    html = templates.env.get_template("channel/layout.html").render(
+        active_page="settings", url_for=lambda *args, **kwargs: "/static",
+        deployment_stamp=lambda: "test",
+    )
+    assert 'href="/channel/settings"' in html
+    assert 'href="/channel/loyalty"' not in html
 
 
 def test_commands_card_contains_protected_user_management() -> None:
@@ -172,3 +156,21 @@ def test_commands_card_contains_protected_user_management() -> None:
         assert "Viewer <span>(123)</span>" in html
     finally:
         clear_profiles()
+
+
+@pytest.mark.asyncio
+async def test_legacy_settings_redirects_preserve_feedback_and_select_loyalty():
+    from fastapi import Request
+    from web.channel.routers.dashboard import legacy_channel_settings_page
+    from web.channel.auth import CHANNEL_USER_ID_KEY
+    for path in ('/channel/features', '/channel/customization', '/channel/loyalty'):
+        request = Request({'type': 'http', 'scheme': 'https', 'server': ('example.com', 443),
+                           'path': path, 'query_string': b'setting_result=success&setting_message=Saved',
+                           'headers': [], 'session': {CHANNEL_USER_ID_KEY: '123'}})
+        response = await legacy_channel_settings_page(request)
+        target = urlparse(response.headers['location'])
+        assert target.path == '/channel/settings'
+        query = parse_qs(target.query)
+        assert query['setting_message'] == ['Saved']
+        if path.endswith('/loyalty'):
+            assert query['section'] == ['loyalty']
