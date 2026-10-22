@@ -1,0 +1,57 @@
+{% extends "channel/layout.html" %}
+{% from "shared/feature_toggle.html" import toggle_card with context %}
+{% block title %}Settings | RatsBoomBot{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}">
+<header class="page-header"><div><p class="eyebrow">Your channel, your way</p><h2>Settings</h2><p class="page-description">Choose a section to manage its features and personalize how they work.</p></div></header>
+{% for result, message in [(toggle_result, toggle_message), (setting_result, setting_message)] %}
+{% if message %}<div class="toggle-feedback {{ 'success' if result == 'success' else 'error' }}" role="status">{{ message }}</div>{% endif %}
+{% endfor %}
+{% set selected = request.query_params.get('section', '') %}
+{% if selected not in settings_sections | map(attribute='key') | list %}
+{% set selected = 'connections' if social_tab == 'youtube' or youtube_message or identity_message else 'chat' if command_tab == 'protected' or protected_message else 'general' %}
+{% endif %}
+<div class="settings-book" data-settings-book data-channel="{{ broadcaster.id }}" data-selected="{{ selected }}">
+    <div class="settings-pages">
+        {% for section in settings_sections %}
+        <section class="settings-page" id="settings-{{ section.key }}" role="tabpanel" aria-labelledby="settings-tab-{{ section.key }}" tabindex="0" data-settings-page="{{ section.key }}"{% if section.key != selected %} hidden{% endif %}>
+            <header class="settings-page-heading"><div><p class="eyebrow">Channel settings</p><h3>{{ section.label }}</h3><p>{{ section.description }}</p></div><span class="settings-page-number" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span></header>
+            {% if section.toggles %}
+            {% if section.toggles | length > 6 %}<details class="settings-group"><summary>Feature and command switches <span>{{ section.toggles | length }}</span></summary>{% endif %}
+            <div class="toggle-grid settings-toggles">
+                {% for toggle in section.toggles %}
+                {{ toggle_card(toggle.kind, toggle.name, toggle.label, toggle.state) }}
+                {% endfor %}
+            </div>
+            {% if section.toggles | length > 6 %}</details>{% endif %}
+            {% endif %}
+            {% with setting_groups=section.groups, show_social_links=section.key == 'connections', setting_message=none, settings_notebook=true %}
+                {% include "shared/profile_inputs.html" %}
+            {% endwith %}
+            {% if section.key == 'general' %}{% include "channel/settings_dashboard.html" %}{% endif %}
+            {% if section.key == 'events' %}{% include "channel/settings_redeems.html" %}{% endif %}
+            {% if section.key == 'connections' %}{% include "channel/settings_identity.html" %}{% endif %}
+            {% if section.key == 'queue' %}
+            <section class="panel profile-settings-panel"><h3>Queue blacklist</h3><p>Manage viewers who cannot join your channel’s queue.</p><a class="button secondary" href="/channel/viewer-queue/blacklist">Manage blacklist</a></section>
+            {% endif %}
+            {% if section.key == 'loyalty' %}<p class="settings-hint">Currency command: <strong>!{{ loyalty_alias }}</strong>. You can also use !points. Income amounts use your channel’s configured defaults.</p>{% endif %}
+        </section>
+        {% endfor %}
+    </div>
+    <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+        {% for section in settings_sections %}
+        <a class="settings-tab" id="settings-tab-{{ section.key }}" href="/channel/settings?section={{ section.key }}" role="tab" aria-controls="settings-{{ section.key }}" aria-selected="{{ 'true' if section.key == selected else 'false' }}" tabindex="{{ '0' if section.key == selected else '-1' }}" data-settings-tab="{{ section.key }}" title="{{ section.label }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ section.icon }}"/></svg>
+            <span>{{ section.label }}</span><span class="settings-dirty-dot" hidden aria-label="Unsaved changes">●</span>
+        </a>
+        {% endfor %}
+    </nav>
+</div>
+{% include "shared/timer_editor.html" %}
+{% endblock %}
+{% block page_scripts %}
+{{ super() }}
+<script src="/static/js/social-integrations.js" defer></script>
+<script src="/static/js/protected-users.js" defer></script>
+<script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}" defer></script>
+{% endblock %}
