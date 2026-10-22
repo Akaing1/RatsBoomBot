@@ -36,7 +36,7 @@ def test_every_setting_and_toggle_is_assigned_exactly_once():
     try:
         context, groups, states = settings_context()
         sections = context['settings_sections']
-        assert Counter(key for section in sections for key in section['groups']) == Counter(groups.keys())
+        assert Counter(entry.definition.key for section in sections for entries in section['groups'].values() for entry in entries) == Counter(entry.definition.key for name, entries in groups.items() if name not in ('League of Legends', 'Overwatch') for entry in entries)
         assert sum(len(section['toggles']) for section in sections) == sum(map(len, states))
         chat = next(s for s in sections if s['key'] == 'chat')
         assert any(t['name'] == 'kamikaze' for t in chat['toggles'])
@@ -60,7 +60,9 @@ def test_notebook_renders_existing_forms_once_and_honors_deep_link():
         assert 'action="/channel/customization"' in html
         assert 'action="/channel/custom-bot/connect"' in html
         assert 'name="csrf_token"' in html
-        for entries in groups.values():
+        for name, entries in groups.items():
+            if name in ('League of Legends', 'Overwatch'):
+                continue
             for entry in entries:
                 assert html.count(f'name="setting_name" value="{entry.definition.key}"') == 1
     finally:
@@ -90,5 +92,41 @@ def test_header_controls_are_not_duplicated_in_standalone_rows():
         assert 'form="settings-toggle-feature-timers"' in html
         assert 'id="settings-toggle-feature-timers"' in html
         assert '>Enable\n' not in html
+    finally:
+        clear_profiles()
+
+
+def test_reorganized_sections_and_forms():
+    try:
+        context, _, _ = settings_context()
+        assert [s['label'] for s in context['settings_sections']] == ['General', 'Chat', 'Stream Events', 'Timers', 'Connections', 'Loyalty Points', 'Viewer Queue', 'Pets and Boss Hunt']
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        general = html.split('id="settings-general"')[1].split('id="settings-chat"')[0]
+        events = html.split('id="settings-events"')[1].split('id="settings-timers"')[0]
+        assert 'id="protected-users"' in general
+        assert 'id="youtube-integration"' in general
+        assert 'dashboard.follow_raid' not in general
+        assert 'dashboard.follow_raid' in events
+        for key, next_key in [('timers', 'connections'), ('loyalty', 'queue')]:
+            page = html.split(f'id="settings-{key}"')[1].split(f'id="settings-{next_key}"')[0]
+            assert '<details' not in page
+    finally:
+        clear_profiles()
+
+
+def test_games_only_contains_enabled_integrations():
+    from bot.profiles import ProfileFeatureName
+    try:
+        _, groups, states = settings_context()
+        profile_states = states[1]
+        profile_states[ProfileFeatureName.LEAGUE] = SimpleNamespace(effective_enabled=True)
+        profile_states[ProfileFeatureName.OVERWATCH] = SimpleNamespace(effective_enabled=False)
+        groups.update({'League of Legends': [], 'Overwatch': []})
+        sections = build_settings_sections(groups, *states)
+        games = next(s for s in sections if s['key'] == 'games')
+        assert 'League of Legends' in games['groups']
+        assert 'Overwatch' not in games['groups']
+        general = next(s for s in sections if s['key'] == 'general')
+        assert any(t['name'] == 'league' for t in general['toggles'])
     finally:
         clear_profiles()

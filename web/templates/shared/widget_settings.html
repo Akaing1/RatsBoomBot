@@ -1,0 +1,27 @@
+            <article class="youtube-integration-card widget-url-card">
+                <div class="toggle-card-heading">
+                    <div>
+                        <h4>OBS browser sources</h4>
+                        <p>Add any of these URLs to an OBS Browser Source. Treat them like private stream keys.</p>
+                    </div>
+                </div>
+
+                {% for key, label, description in [
+                    ('chat', 'Chat', 'Twitch and YouTube messages, excluding commands.'),
+                    ('commands', 'Commands', 'Command messages only.'),
+                    ('both', 'Both', 'All chat messages and commands.')
+                ] %}
+                    <label class="widget-url-field">
+                        <span><strong>{{ label }}</strong> &middot; {{ description }}</span>
+                        <div class="widget-url-controls">
+                            <input class="profile-setting-input" type="text" value="{{ widget_urls[key] }}" readonly data-widget-url="{{ key }}">
+                            <button class="button secondary" type="button" data-copy-widget-url="{{ key }}">Copy URL</button>
+                        </div>
+                    </label>
+                {% endfor %}
+
+                <form class="widget-regenerate-form" method="post" action="/channel/widgets/regenerate" onsubmit="return confirm('Generate new URLs? Existing OBS browser-source URLs will stop working.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="button danger" type="submit">Regenerate URLs</button>
+                </form>
+            </article>

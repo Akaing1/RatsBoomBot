@@ -9,7 +9,7 @@
 {% endfor %}
 {% set selected = request.query_params.get('section', '') %}
 {% if selected not in settings_sections | map(attribute='key') | list %}
-{% set selected = 'connections' if social_tab == 'youtube' or youtube_message or identity_message else 'chat' if command_tab == 'protected' or protected_message else 'general' %}
+{% set selected = 'connections' if identity_message else 'general' %}
 {% endif %}
 <div class="settings-book" data-settings-book data-channel="{{ broadcaster.id }}" data-selected="{{ selected }}">
     <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="horizontal">
@@ -30,12 +30,15 @@
                 {% for toggle in section.standalone_toggles %}<div class="settings-switch-row"><span>{{ toggle.label }}</span>{{ status_switch(toggle) }}</div>{% endfor %}
             </div>
             {% endif %}
-            {% with setting_groups=section.groups, show_social_links=section.key == 'connections', setting_message=none, settings_notebook=true, group_toggles=section.group_toggles %}
+            {% with setting_groups=section.groups, show_social_links=section.key == 'connections', setting_message=none, settings_notebook=true, group_toggles=section.group_toggles, flat_settings=section.key in ['timers', 'loyalty'] %}
                 {% include "shared/profile_inputs.html" %}
             {% endwith %}
-            {% if section.key == 'general' %}{% include "channel/settings_dashboard.html" %}{% endif %}
+            {% if section.key == 'general' %}
+            <details class="settings-group"{% if command_tab == 'protected' or protected_message %} open{% endif %}><summary>Protected users</summary><div class="panel">{% include "shared/protected_settings.html" %}</div></details>
+            <details class="settings-group"{% if social_tab == 'youtube' or youtube_message %} open{% endif %}><summary>YouTube chat connection</summary><div class="panel" id="youtube-integration">{% with settings_notebook=true %}{% include "shared/youtube_settings.html" %}{% endwith %}</div></details>
+            {% endif %}
             {% if section.key == 'events' %}{% include "channel/settings_redeems.html" %}{% endif %}
-            {% if section.key == 'connections' %}{% include "channel/settings_identity.html" %}{% endif %}
+            {% if section.key == 'connections' %}{% include "channel/settings_identity.html" %}{% include "shared/widget_settings.html" %}{% endif %}
             {% if section.key == 'queue' %}
             <section class="panel profile-settings-panel"><h3>Queue blacklist</h3><p>Manage viewers who cannot join your channel’s queue.</p><a class="button secondary" href="/channel/viewer-queue/blacklist">Manage blacklist</a></section>
             {% endif %}
