@@ -20,8 +20,7 @@
 .for-you-content button:disabled { opacity: .5; cursor: not-allowed; }
 .for-you-content form { display: grid; gap: 8px; }
 .for-you-running { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-.for-you-running p { width: 100%; margin: 4px 0; overflow-wrap: anywhere; }
-.for-you-running strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; margin-right: auto; }
+.for-you-running strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
 .for-you-summary { font-size: .8rem; color: #b9b4c9; }
 .for-you-summary { margin: 0 0 8px; }
 .for-you-error { font-size: .8rem; color: #ffc6b8; overflow-wrap: anywhere; margin: 4px 0 0; }
@@ -46,3 +45,8 @@
 .for-you-steppers button + button { border-top: 1px solid var(--border, #414451); }
 .for-you-steppers button:hover { background: rgba(139,92,246,.16); color: var(--text, #fff); }
 .for-you-start { justify-self: end; margin-top: 4px; }
+
+.for-you-timer-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.for-you-timer-actions .for-you-start { margin-left: auto; }
+.for-you-content .for-you-start.is-cancel { background: #802d38; border-color: #d65b68; color: #fff; }
+.for-you-content .for-you-start.is-cancel:hover { background: #983744; }

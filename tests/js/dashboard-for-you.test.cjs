@@ -68,7 +68,7 @@ test('overdue timer opens safely on load and can be acknowledged from front side
     const s = initial(); Object.assign(s, {timer_id: 'timer', timer_due_at: s.server_now - 1, timer_label: '<img src=x onerror=alert(1)>'});
     const h = harness(s); await flush();
     assert.equal(h.node('[data-fy-dialog]').open, true);
-    assert.equal(h.node('[data-fy-alert-label]').textContent, s.timer_label);
+    assert.equal(h.node('[data-fy-timer-action]').textContent, 'Cancel');
     h.node('[data-fy-dismiss]').events.click(); await flush();
     assert.equal(h.node('[data-fy-dialog]').open, false);
     assert.equal(h.state.timer_id, null);
@@ -83,4 +83,29 @@ test('a timer cancelled in another tab does not show an expired popup', async ()
     h.intervals[1](); await flush();
     assert.equal(h.node('[data-fy-dialog]').open, false);
     assert.equal(h.node('[data-fy-running]').hidden, true);
+});
+
+
+test('single timer action cancels without validating duration and restores start state', async () => {
+    const s = initial(); Object.assign(s, {timer_id: 'timer', timer_due_at: s.server_now + 60});
+    const h = harness(s); await flush();
+    const action = h.node('[data-fy-timer-action]');
+    assert.equal(action.textContent, 'Cancel');
+    assert.equal(action.formNoValidate, true);
+    await h.node('[data-fy-timer-form]').events.submit({preventDefault() {}});
+    await flush();
+    assert.equal(h.state.timer_id, null);
+    assert.equal(action.textContent, 'Start timer');
+    assert.equal(action.formNoValidate, false);
+    assert.equal(h.node('[data-fy-running]').hidden, true);
+});
+
+test('failed cancellation keeps the active timer available to retry', async () => {
+    const s = initial(); Object.assign(s, {timer_id: 'timer', timer_due_at: s.server_now + 60});
+    const h = harness(s); await flush(); h.fail();
+    await h.node('[data-fy-timer-form]').events.submit({preventDefault() {}});
+    await flush();
+    assert.equal(h.state.timer_id, 'timer');
+    assert.equal(h.node('[data-fy-timer-action]').textContent, 'Cancel');
+    assert.equal(h.node('[data-fy-error]').textContent, 'Save failed');
 });
