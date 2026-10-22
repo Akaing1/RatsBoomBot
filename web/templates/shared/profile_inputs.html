@@ -113,6 +113,7 @@
 {% endif %}
 
 {% for group_name, settings in setting_groups.items() %}
+    {% if settings_notebook | default(false) %}<details class="settings-group"{% if loop.first %} open{% endif %}><summary>{{ group_name }}</summary>{% endif %}
     <section class="panel toggle-management-panel profile-settings-panel">
         <div class="panel-header">
             <div>
@@ -246,4 +247,5 @@
             </div>
         {% endif %}
     </section>
+    {% if settings_notebook | default(false) %}</details>{% endif %}
 {% endfor %}

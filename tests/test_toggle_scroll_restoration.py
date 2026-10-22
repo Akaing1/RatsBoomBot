@@ -89,8 +89,10 @@ def test_streamer_dashboard_has_profile_customization_page() -> None:
     template = (PROJECT_ROOT / "web/templates/channel/customization.html").read_text(encoding="utf-8")
     template += (PROJECT_ROOT / "web/templates/shared/profile_inputs.html").read_text(encoding="utf-8")
     template += (PROJECT_ROOT / "web/templates/shared/timer_editor.html").read_text(encoding="utf-8")
+    for section in ("dashboard", "redeems", "identity"):
+        template += (PROJECT_ROOT / f"web/templates/channel/settings_{section}.html").read_text(encoding="utf-8")
 
-    assert "/channel/customization" in layout
+    assert "/channel/settings" in layout
     assert "Save Changes" in template
     assert "Use Default" in template
     assert "Social links" in template

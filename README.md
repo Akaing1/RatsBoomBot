@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current application version: **15.1.5** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
+Current application version: **15.2.0** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
 
 ## Highlights
 
@@ -202,7 +202,7 @@ Forms use CSRF protection, and sessions are signed with `SESSION_SECRET`.
 
 ### Premium Custom Bot Identities
 
-An owner can grant a connected channel access to a dedicated Twitch chat identity from its administrator page. Once enabled, the streamer enters the dedicated bot's Twitch username from the Customization page in Streamer Control. RatsBoomBot verifies the account and generates a single-use authorization link that expires after 15 minutes. The link can be opened in a private window, another browser, or another device without the broadcaster's dashboard session.
+An owner can grant a connected channel access to a dedicated Twitch chat identity from its administrator page. Once enabled, the streamer enters the dedicated bot's Twitch username from Settings → Connections in Streamer Control. RatsBoomBot verifies the account and generates a single-use authorization link that expires after 15 minutes. The link can be opened in a private window, another browser, or another device without the broadcaster's dashboard session.
 
 The custom account authorizes through the existing public channel OAuth callback. The account returned by Twitch must exactly match the username selected by the broadcaster before it can be connected. The bot is then used for command responses, timers, community events, redeems, raids, shoutouts, ad warnings, and announcements in that channel only. No additional environment variable or Twitch Developer Console redirect URI is required for this self-service flow.
 
@@ -357,3 +357,7 @@ This is a statement of the current licensing status, not a new open-source licen
 ### Personal dashboard tools
 
 Flip the Moderation card to **For You** for private, account-saved stream notes and a personal reminder timer. Save notes explicitly; timers use Minutes : Seconds and support 1 second to 7 days and survive refreshes. Keep the dashboard open for the popup; overdue timers appear when you return. These tools do not post messages to chat.
+
+### Channel settings notebook
+
+Settings combines feature switches and customization into eight categories. SVG tabs sit on the right on desktop and move above the page on mobile. Switch tabs without losing form drafts; a dot marks sections with unsaved edits. Save controls apply to their individual forms. Saving one form warns before discarding drafts in other forms. Expand detailed groups as needed. Existing Features and Customization links remain supported, and `/channel/settings?section=loyalty` opens a category directly.

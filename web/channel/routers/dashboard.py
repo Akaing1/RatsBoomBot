@@ -22,6 +22,7 @@ from bot.services.channels.stream_metadata import (
     StreamCategoryNotFoundError, clear_stream_category, update_stream_game, update_stream_title
 )
 from config.settings import settings
+from web.channel.settings_book import build_settings_sections
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.channel.api_context import resolve_channel_api_context
@@ -2309,40 +2310,10 @@ async def channel_help_page(request: Request):
 
 @router.get("/channel/features", response_class=HTMLResponse)
 async def channel_features_page(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
-
-    if not broadcaster_id:
-        return RedirectResponse(url="/connect", status_code=303)
-
-    runtime_bot = get_bot()
-
-    if runtime_bot is None or runtime_bot.services is None:
-        return RedirectResponse(url="/channel", status_code=303)
-
-    services = runtime_bot.services
-    broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
-
-    if broadcaster is None:
-        logout_channel_user(request)
-        return RedirectResponse(url="/connect", status_code=303)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="channel/features.html",
-        context={
-            "active_page": "features",
-            "broadcaster": broadcaster,
-            "channel_features": services.features.get_channel_features(broadcaster_id),
-            "profile_features": services.features.get_profile_features(broadcaster_id),
-            "global_groups": services.features.get_global_groups(broadcaster_id),
-            "global_commands": services.features.get_global_commands(broadcaster_id),
-            "toggle_result": request.query_params.get("toggle_result"),
-            "toggle_message": request.query_params.get("toggle_message"),
-            "csrf_token": get_csrf_token(request)
-        }
-    )
+    return await channel_customization_page(request)
 
 
+@router.get("/channel/settings", response_class=HTMLResponse)
 @router.get("/channel/loyalty", response_class=HTMLResponse)
 @router.get("/channel/customization", response_class=HTMLResponse)
 async def channel_customization_page(request: Request):
@@ -2374,10 +2345,18 @@ async def channel_customization_page(request: Request):
 
     return templates.TemplateResponse(
         request=request,
-        name="channel/loyalty.html" if loyalty_page else "channel/customization.html",
+        name="channel/loyalty.html" if loyalty_page else "channel/settings.html",
         context={
-            "active_page": "loyalty" if loyalty_page else "customization",
+            "active_page": "loyalty" if loyalty_page else "settings",
             "customization_action": "/channel/loyalty" if loyalty_page else "/channel/customization",
+            "settings_sections": build_settings_sections(
+                groups, services.features.get_channel_features(broadcaster_id),
+                services.features.get_profile_features(broadcaster_id),
+                services.features.get_global_groups(broadcaster_id),
+                services.features.get_global_commands(broadcaster_id),
+            ) if not loyalty_page else [],
+            "toggle_result": request.query_params.get("toggle_result"),
+            "toggle_message": request.query_params.get("toggle_message"),
             "show_social_links": not loyalty_page,
             "loyalty_alias": get_active_profile(broadcaster_id).points.command_alias,
             "broadcaster": broadcaster,

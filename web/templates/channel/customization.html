@@ -13,81 +13,9 @@
 
 {% include "shared/profile_inputs.html" %}
 
-<section class="panel profile-settings-panel" id="dashboard-settings">
-    <h3>Dashboard</h3>
-    <form method="post" action="/channel/customization">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="setting_name" value="dashboard.follow_raid">
-        <label for="follow-raid-default">Follow raids by default</label>
-        <select id="follow-raid-default" name="value">
-            <option value="1"{% if channel_settings.follow_raid %} selected{% endif %}>On</option>
-            <option value="0"{% if not channel_settings.follow_raid %} selected{% endif %}>Off</option>
-        </select>
-        <button class="button primary" type="submit" name="action" value="save">Save Changes</button>
-    </form>
-</section>
-
-<section class="panel toggle-management-panel profile-settings-panel">
-    <div class="panel-header">
-        <div>
-            <p class="eyebrow">Custom redeems</p>
-            <h3>Need another redeem?</h3>
-            <p>Daily and First are the recurring redeem types available for self-service customization. Please contact the developer to add or change other custom redeems for your channel.</p>
-        </div>
-    </div>
-</section>
-
-{% if chat_identity.premium_enabled %}
-    {% if identity_message %}
-        <div class="toggle-feedback {% if identity_result == 'success' %}success{% else %}error{% endif %}" role="status">
-            <span class="toggle-feedback-icon">{% if identity_result == "success" %}&#10003;{% else %}!{% endif %}</span>
-            <span>{{ identity_message }}</span>
-        </div>
-    {% endif %}
-
-    <section class="panel toggle-management-panel profile-settings-panel custom-bot-panel">
-        <div class="panel-header">
-            <div>
-                <p class="eyebrow">Premium feature</p>
-                <h3>Custom bot identity</h3>
-                <p class="panel-description">Connect a dedicated Twitch account that will speak for the bot in your channel.</p>
-            </div>
-            <span class="toggle-status {% if chat_identity.connected %}enabled{% endif %}">{% if chat_identity.connected %}Connected{% else %}Ready to connect{% endif %}</span>
-        </div>
-
-        {% if chat_identity.connected %}
-            <div class="channel-user-details">
-                <div><span>Active identity</span><strong>{{ chat_identity.bot_display_name }} (@{{ chat_identity.bot_login }})</strong></div>
-                <div><span>Twitch user ID</span><strong>{{ chat_identity.bot_user_id }}</strong></div>
-            </div>
-            <p class="panel-description">Messages and announcements use this account when possible. RatsBoomBot remains the automatic fallback if it cannot send.</p>
-        {% else %}
-            <div class="premium-connect-notice">
-                <strong>Generate a secure authorization link for the dedicated bot account.</strong>
-                <p>The link can be opened in a private window, another browser, or another device. RatsBoomBot never receives the account password.</p>
-            </div>
-        {% endif %}
-
-        <div class="toggle-actions profile-setting-actions custom-bot-actions">
-            <form class="custom-bot-link-form" method="post" action="/channel/custom-bot/connect">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <label for="custom-bot-login">Dedicated bot Twitch username</label>
-                <div class="custom-bot-link-controls">
-                    <input id="custom-bot-login" class="profile-setting-input" type="text" name="bot_login" value="{{ chat_identity.bot_login or '' }}" placeholder="characterbot" maxlength="25" required>
-                    <button class="button primary" type="submit">{% if chat_identity.connected %}Generate Reconnect Link{% else %}Generate Authorization Link{% endif %}</button>
-                </div>
-            </form>
-
-            {% if chat_identity.connected %}
-                <form method="post" action="/channel/custom-bot/disconnect" onsubmit="return confirm('Disconnect @{{ chat_identity.bot_login }} from your channel?');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button class="button danger" type="submit">Disconnect Account</button>
-                </form>
-            {% endif %}
-        </div>
-    </section>
-{% endif %}
-
+{% include "channel/settings_dashboard.html" %}
+{% include "channel/settings_redeems.html" %}
+{% include "channel/settings_identity.html" %}
 {% include "shared/timer_editor.html" %}
 {% endblock %}
 
