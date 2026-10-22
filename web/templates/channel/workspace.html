@@ -1,0 +1,21 @@
+{% extends "channel/layout.html" %}
+{% block title %}For You | RatsBoomBot{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/css/for-you-workspace.css?v={{ deployment_stamp() }}">
+<header class="page-header"><div><p class="eyebrow">Your stream workspace</p><h2>For You</h2><p class="page-description">Keep your stream notes and manage your channel’s quotes.</p></div></header>
+<div class="fy-workspace" data-workspace-page data-csrf="{{ csrf_token }}">
+<nav class="dashboard-tabs" aria-label="For You sections"><button class="dashboard-tab active" type="button" data-workspace-tab="notes" aria-pressed="true">Notes</button><button class="dashboard-tab" type="button" data-workspace-tab="quotes" aria-pressed="false">Quotes</button></nav>
+<p data-workspace-status role="status" aria-live="polite"></p>
+<section data-workspace-panel="notes">
+<div class="panel"><header class="panel-header"><div><h3 data-note-title>Current note</h3><p>Shared with Overview. Saves update this entry. Offline days use UTC.</p></div></header>
+<label class="sr-only" for="workspace-note">Current stream or daily note</label><textarea id="workspace-note" maxlength="20000" rows="9" placeholder="Ideas, moments to clip, things to remember…" disabled></textarea>
+<div class="fy-actions"><span data-note-state>Loading…</span><button class="button primary" data-note-save disabled>Save notes</button><button class="button secondary" data-note-refresh>Reload note</button></div></div>
+<div class="panel"><header class="panel-header"><div><h3>Saved notes</h3><p>One entry per stream or offline day. Existing notes are preserved under Previous notes.</p></div><button class="button secondary" data-archive-refresh>Refresh</button></header><div data-notes-list></div><div class="fy-actions"><button class="button secondary" data-notes-prev>Previous</button><button class="button secondary" data-notes-next>Next</button></div></div>
+</section>
+<section data-workspace-panel="quotes" hidden>
+<div class="panel"><h3>Add a quote</h3><form data-quote-add><label for="new-quote">Quote text</label><textarea id="new-quote" name="message" maxlength="350" rows="3" required></textarea><button class="button primary" type="submit">Add quote</button></form></div>
+<div class="panel"><form data-quote-search class="fy-actions"><label for="quote-search">Find a quote</label><input id="quote-search" name="search" type="search" maxlength="500" placeholder="Search quote text"><button class="button secondary" type="submit">Search</button></form><p>These are the quotes used by chat commands. Deleting a quote renumbers the remaining quotes.</p><div data-quotes-list></div><div class="fy-actions"><button class="button secondary" data-quotes-prev>Previous</button><button class="button secondary" data-quotes-next>Next</button></div></div>
+</section>
+</div>
+{% endblock %}
+{% block page_scripts %}{{ super() }}<script src="/static/js/for-you-workspace.js?v={{ deployment_stamp() }}" defer></script>{% endblock %}

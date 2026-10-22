@@ -1,0 +1,17 @@
+.fy-workspace { width: 100%; min-width: 0; }
+.fy-workspace [hidden] { display: none !important; }
+.fy-workspace .dashboard-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.fy-workspace .dashboard-tab { padding: 12px 24px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; cursor: pointer; }
+.fy-workspace .dashboard-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.fy-workspace .panel { margin-bottom: 20px; border: 1px solid var(--border); border-radius: 14px; padding: 22px; background: var(--surface); }
+.fy-workspace textarea, .fy-workspace input { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+.fy-workspace textarea { resize: vertical; margin: 8px 0 12px; }
+.fy-workspace p, .fy-workspace time { color: var(--muted); }
+.fy-workspace .fy-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.fy-workspace .fy-actions input { flex: 1; min-width: 140px; }
+.fy-workspace details, .fy-workspace .fy-quote { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.fy-workspace summary { cursor: pointer; color: var(--text); padding: 8px 0; }
+.fy-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.6; }
+.fy-workspace button:disabled { opacity: .5; cursor: not-allowed; }
+.fy-workspace .fy-error { color: #fca5a5; }
+@media (max-width: 600px) { .fy-workspace .panel { padding: 14px; } }
