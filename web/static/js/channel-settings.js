@@ -4,6 +4,9 @@
     if (!book) return;
     const tabs = [...book.querySelectorAll('[data-settings-tab]')];
     const pages = [...book.querySelectorAll('[data-settings-page]')];
+    const scroller = book.querySelector('.settings-pages');
+    const scrollPositions = new Map();
+    let activeSection = book.dataset.selected;
     const tablist = book.querySelector('.settings-tabs');
     const storageKey = `ratsboombot-settings:${book.dataset.channel}`;
     const mobile = window.matchMedia('(max-width: 768px)');
@@ -11,12 +14,15 @@
     orient(); mobile.addEventListener('change', orient);
     function select(key, updateURL = true) {
         if (!tabs.some(tab => tab.dataset.settingsTab === key)) return;
+        scrollPositions.set(activeSection, scroller.scrollTop);
+        activeSection = key;
         tabs.forEach(tab => {
             const active = tab.dataset.settingsTab === key;
             tab.setAttribute('aria-selected', String(active));
             tab.tabIndex = active ? 0 : -1;
         });
         pages.forEach(page => { page.hidden = page.dataset.settingsPage !== key; });
+        scroller.scrollTop = scrollPositions.get(key) || 0;
         try { sessionStorage.setItem(storageKey, key); } catch { /* Storage may be disabled. */ }
         if (updateURL) {
             const url = new URL(window.location.href);
@@ -47,7 +53,7 @@
     try {
         const saved = JSON.parse(sessionStorage.getItem(`${storageKey}:scroll`) || 'null');
         sessionStorage.removeItem(`${storageKey}:scroll`);
-        if (saved && saved.section === selected && Number.isFinite(saved.y)) requestAnimationFrame(() => window.scrollTo(0, saved.y));
+        if (saved && saved.section === selected && Number.isFinite(saved.y)) requestAnimationFrame(() => { window.scrollTo(0, saved.y); scroller.scrollTop = saved.panelY || 0; });
     } catch { /* Scroll restoration is optional. */ }
     // Sections stay mounted, so moving between tabs never discards form drafts.
     const dirtyForms = new Set();
@@ -75,7 +81,7 @@
                 event.preventDefault(); return;
             }
             if (!event.defaultPrevented) {
-                try { sessionStorage.setItem(`${storageKey}:scroll`, JSON.stringify({section: tabs.find(tab => tab.getAttribute('aria-selected') === 'true').dataset.settingsTab, y: window.scrollY})); } catch { /* Storage may be disabled. */ }
+                try { sessionStorage.setItem(`${storageKey}:scroll`, JSON.stringify({section: tabs.find(tab => tab.getAttribute('aria-selected') === 'true').dataset.settingsTab, y: window.scrollY, panelY: scroller.scrollTop})); } catch { /* Storage may be disabled. */ }
                 dirtyForms.clear();
             }
         });
