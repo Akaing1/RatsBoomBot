@@ -1,5 +1,5 @@
 {% extends "channel/layout.html" %}
-{% from "shared/feature_toggle.html" import toggle_card with context %}
+{% from "channel/settings_switch.html" import status_switch %}
 {% block title %}Settings | RatsBoomBot{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}">
@@ -12,20 +12,25 @@
 {% set selected = 'connections' if social_tab == 'youtube' or youtube_message or identity_message else 'chat' if command_tab == 'protected' or protected_message else 'general' %}
 {% endif %}
 <div class="settings-book" data-settings-book data-channel="{{ broadcaster.id }}" data-selected="{{ selected }}">
+    <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="horizontal">
+        {% for section in settings_sections %}
+        <a class="settings-tab" id="settings-tab-{{ section.key }}" href="/channel/settings?section={{ section.key }}" role="tab" aria-controls="settings-{{ section.key }}" aria-selected="{{ 'true' if section.key == selected else 'false' }}" tabindex="{{ '0' if section.key == selected else '-1' }}" data-settings-tab="{{ section.key }}" title="{{ section.label }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ section.icon }}"/></svg>
+            <span>{{ section.label }}</span><span class="settings-dirty-dot" hidden aria-label="Unsaved changes">●</span>
+        </a>
+        {% endfor %}
+    </nav>
     <div class="settings-pages">
         {% for section in settings_sections %}
         <section class="settings-page" id="settings-{{ section.key }}" role="tabpanel" aria-labelledby="settings-tab-{{ section.key }}" tabindex="0" data-settings-page="{{ section.key }}"{% if section.key != selected %} hidden{% endif %}>
             <header class="settings-page-heading"><div><p class="eyebrow">Channel settings</p><h3>{{ section.label }}</h3><p>{{ section.description }}</p></div><span class="settings-page-number" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span></header>
-            {% if section.toggles %}
-            {% if section.toggles | length > 6 %}<details class="settings-group"><summary>Feature and command switches <span>{{ section.toggles | length }}</span></summary>{% endif %}
-            <div class="toggle-grid settings-toggles">
-                {% for toggle in section.toggles %}
-                {{ toggle_card(toggle.kind, toggle.name, toggle.label, toggle.state) }}
-                {% endfor %}
+            {% if section.blocked %}<p class="settings-blocked-notice">Some features are inactive because a parent switch is off. Enable the channel profile or global commands in <a href="/channel/settings?section=general">General</a>.</p>{% endif %}
+            {% if section.standalone_toggles %}
+            <div class="settings-switch-list">
+                {% for toggle in section.standalone_toggles %}<div class="settings-switch-row"><span>{{ toggle.label }}</span>{{ status_switch(toggle) }}</div>{% endfor %}
             </div>
-            {% if section.toggles | length > 6 %}</details>{% endif %}
             {% endif %}
-            {% with setting_groups=section.groups, show_social_links=section.key == 'connections', setting_message=none, settings_notebook=true %}
+            {% with setting_groups=section.groups, show_social_links=section.key == 'connections', setting_message=none, settings_notebook=true, group_toggles=section.group_toggles %}
                 {% include "shared/profile_inputs.html" %}
             {% endwith %}
             {% if section.key == 'general' %}{% include "channel/settings_dashboard.html" %}{% endif %}
@@ -35,17 +40,15 @@
             <section class="panel profile-settings-panel"><h3>Queue blacklist</h3><p>Manage viewers who cannot join your channel’s queue.</p><a class="button secondary" href="/channel/viewer-queue/blacklist">Manage blacklist</a></section>
             {% endif %}
             {% if section.key == 'loyalty' %}<p class="settings-hint">Currency command: <strong>!{{ loyalty_alias }}</strong>. You can also use !points. Income amounts use your channel’s configured defaults.</p>{% endif %}
+            {% for toggle in section.toggles %}
+            <form id="settings-toggle-{{ toggle.kind }}-{{ toggle.name }}" method="post" action="/channel/features/toggles" class="settings-toggle-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="toggle_type" value="{{ toggle.kind }}"><input type="hidden" name="toggle_name" value="{{ toggle.name }}">
+            </form>
+            {% endfor %}
         </section>
         {% endfor %}
     </div>
-    <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
-        {% for section in settings_sections %}
-        <a class="settings-tab" id="settings-tab-{{ section.key }}" href="/channel/settings?section={{ section.key }}" role="tab" aria-controls="settings-{{ section.key }}" aria-selected="{{ 'true' if section.key == selected else 'false' }}" tabindex="{{ '0' if section.key == selected else '-1' }}" data-settings-tab="{{ section.key }}" title="{{ section.label }}">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ section.icon }}"/></svg>
-            <span>{{ section.label }}</span><span class="settings-dirty-dot" hidden aria-label="Unsaved changes">●</span>
-        </a>
-        {% endfor %}
-    </nav>
+
 </div>
 {% include "shared/timer_editor.html" %}
 {% endblock %}

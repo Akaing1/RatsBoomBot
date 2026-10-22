@@ -6,7 +6,7 @@ Only published releases receive dated version headings. Intermediate development
 
 ## Unreleased — release/15.0.0
 
-The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot/releases/tag/v14.2.2). The current working application version is 15.2.1; it is not yet a published release.
+The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot/releases/tag/v14.2.2). The current working application version is 15.2.2; it is not yet a published release.
 
 - Raid browser with discovery filters, compatibility ranking, favorites and team views, stream/video previews, and shared preview chat ([PR #387](https://github.com/Akaing1/RatsBoomBot/pull/387), merged into the release branch).
 - Reusable chat composer, autocomplete, emote picker/input, cross-platform message merging, platform-specific delivery errors, and dashboard controls ([PR #387](https://github.com/Akaing1/RatsBoomBot/pull/387)).
@@ -33,6 +33,8 @@ The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot
 - Combine Features and Customization into a settings notebook with eight categories, right-side SVG tabs, mobile navigation, expandable groups, and unsaved-change indicators. Existing save endpoints and legacy links remain supported; application version 15.2.0.
 
 - Expand Settings to the full dashboard workspace, align form and card styling with Overview, and arrange timer messages into responsive cards; application version 15.2.1.
+
+- Move Settings category tabs to the top and replace separate enable buttons with status switches beside their related settings; application version 15.2.2.
 
 For future releases, summarize changes here as they merge. When publishing, move the applicable notes under the actual released version and publication date, retaining source links. Do not create release entries from branch names or version bumps alone.
 

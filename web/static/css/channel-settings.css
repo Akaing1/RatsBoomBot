@@ -116,3 +116,34 @@
     .settings-page .timer-remove-button { grid-column: 1 / -1; justify-self: end; }
 }
 @media (prefers-reduced-motion: reduce) { .settings-group > summary::before { transition: none; } }
+
+/* Category navigation and feature state live above their settings. */
+.settings-book { display: flex; flex-direction: column; gap: 0; }
+.settings-tabs { order: -1; position: static; display: flex; flex-direction: row; flex-shrink: 0; align-items: stretch; width: 100%; max-width: 100%; overflow-x: auto; overflow-y: hidden; gap: 6px; padding: 0; min-height: 50px; }
+.settings-tab { flex: 1 0 auto; justify-content: center; min-height: 48px; border: 1px solid var(--border); border-bottom: 0; border-radius: 10px 10px 0 0; white-space: nowrap; }
+.settings-tab[aria-selected="true"] { box-shadow: inset 0 3px var(--accent); }
+.settings-tab[aria-selected="true"]::before { display: none; }
+.settings-pages { flex: 1; width: 100%; border-radius: 0 0 14px 14px; }
+.settings-switch-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 0 24px; margin-bottom: 16px; }
+.settings-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.settings-inline-switch { display: inline-flex; align-items: center; gap: 7px; }
+.settings-page .settings-status-switch { cursor: pointer; min-height: 30px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-raised); font-size: 11px; font-weight: 700; }
+.settings-page .settings-status-switch.enabled { color: var(--success); border-color: rgba(53,196,106,.35); }
+.settings-page .settings-status-switch.disabled { color: #fca5a5; border-color: rgba(239,83,80,.4); }
+.settings-page .settings-status-switch:hover:not(:disabled) { border-color: var(--accent); background: rgba(139,92,246,.12); }
+.settings-page .settings-status-switch:disabled { cursor: not-allowed; opacity: .65; }
+.settings-page .settings-switch-reset { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 5px; }
+.settings-header-switches { display: inline-flex; align-items: center; justify-content: flex-end; gap: 10px 18px; flex-wrap: wrap; margin-left: auto; }
+.settings-switch-label { font-size: 11px; font-weight: 400; color: var(--muted); }
+.settings-group > summary { flex-wrap: wrap; }
+.settings-group > summary .settings-group-title { margin-left: 0; color: #c4b5fd; }
+.settings-group > summary .settings-header-switches { margin-left: auto; }
+.settings-group > summary .settings-inline-switch, .settings-group > summary .settings-switch-label { margin-left: 0; }
+.settings-blocked-notice { color: var(--muted); font-size: 12px; padding: 10px 12px; border-left: 2px solid var(--accent); background: rgba(139,92,246,.06); }
+.settings-blocked-notice a { color: #c4b5fd; text-decoration: underline; }
+.settings-toggle-form { display: none; }
+@media (max-width: 768px) {
+    .settings-tab { flex: 0 0 auto; }
+    .settings-header-switches { flex-basis: 100%; justify-content: flex-start; padding-left: 18px; }
+    .settings-page .settings-status-switch { min-height: 36px; }
+}

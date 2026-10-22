@@ -40,4 +40,23 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
             if kind == "global_group" and value != "globals":
                 label += " commands"
             sections[section]["toggles"].append(dict(kind=kind, name=value, label=label, state=state))
+    group_controls = {
+        ('feature', 'points'): 'Loyalty points', ('global_group', 'points'): 'Loyalty points',
+        ('feature', 'timers'): 'Timers', ('feature', 'raid_bosses'): 'Raid boss names',
+        ('feature', 'redeems'): 'Redeems', ('feature', 'raid_responses'): 'Raid messages',
+        ('global_group', 'shoutouts'): 'Shoutouts', ('global_command', 'lurk'): 'Commands',
+        ('profile_feature', 'league'): 'League of Legends', ('profile_feature', 'overwatch'): 'Overwatch',
+        **{('feature', name): 'Community messages' for name in (
+            'follow_responses', 'subscription_responses', 'resubscription_responses', 'gifted_subscription_responses')},
+    }
+    for section in sections.values():
+        section['group_toggles'] = {}
+        section['standalone_toggles'] = []
+        section['blocked'] = any(getattr(t['state'], 'blocked_by_profile', False) or getattr(t['state'], 'blocked_by_globals', False) for t in section['toggles'])
+        for toggle in section['toggles']:
+            group = group_controls.get((toggle['kind'], toggle['name']))
+            if group in section['groups']:
+                section['group_toggles'].setdefault(group, []).append(toggle)
+            else:
+                section['standalone_toggles'].append(toggle)
     return list(sections.values())
