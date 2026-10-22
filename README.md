@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current application version: **15.2.1** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
+Current application version: **15.2.2** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
 
 ## Highlights
 
@@ -360,4 +360,4 @@ Flip the Moderation card to **For You** for private, account-saved stream notes 
 
 ### Channel settings notebook
 
-Settings combines feature switches and customization into eight categories. SVG tabs sit on the right on desktop and move above the page on mobile. Switch tabs without losing form drafts; a dot marks sections with unsaved edits. Save controls apply to their individual forms. Saving one form warns before discarding drafts in other forms. Expand detailed groups as needed. Existing Features and Customization links remain supported, and `/channel/settings?section=loyalty` opens a category directly.
+Settings combines feature switches and customization into eight categories. SVG tabs sit above the settings on desktop and mobile. Feature status buttons live in the relevant expandable group headers; standalone commands use compact rows. Switch tabs without losing form drafts; a dot marks sections with unsaved edits. Save controls apply to their individual forms. Saving one form warns before discarding drafts in other forms. Expand detailed groups as needed. Existing Features and Customization links remain supported, and `/channel/settings?section=loyalty` opens a category directly.

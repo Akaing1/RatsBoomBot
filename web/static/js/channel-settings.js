@@ -9,9 +9,7 @@
     let activeSection = book.dataset.selected;
     const tablist = book.querySelector('.settings-tabs');
     const storageKey = `ratsboombot-settings:${book.dataset.channel}`;
-    const mobile = window.matchMedia('(max-width: 768px)');
-    const orient = () => tablist.setAttribute('aria-orientation', mobile.matches ? 'horizontal' : 'vertical');
-    orient(); mobile.addEventListener('change', orient);
+    tablist.setAttribute('aria-orientation', 'horizontal');
     function select(key, updateURL = true) {
         if (!tabs.some(tab => tab.dataset.settingsTab === key)) return;
         scrollPositions.set(activeSection, scroller.scrollTop);
@@ -37,12 +35,13 @@
             if (book.getBoundingClientRect().top < 0) book.scrollIntoView({block: 'start'});
         });
         tab.addEventListener('keydown', event => {
-            const previous = mobile.matches ? 'ArrowLeft' : 'ArrowUp';
-            const next = mobile.matches ? 'ArrowRight' : 'ArrowDown';
+            const previous = 'ArrowLeft';
+            const next = 'ArrowRight';
             if (![previous, next, 'Home', 'End'].includes(event.key)) return;
             event.preventDefault();
             const target = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs.at(-1) : tabs[(index + (event.key === next ? 1 : tabs.length - 1)) % tabs.length];
             select(target.dataset.settingsTab); target.focus();
+            target.scrollIntoView({block: 'nearest', inline: 'nearest'});
         });
     });
     const url = new URL(window.location.href);

@@ -1,3 +1,4 @@
+{% from "channel/settings_switch.html" import status_switch %}
 {% if setting_message %}
     <div class="toggle-feedback {% if setting_result == 'success' %}success{% else %}error{% endif %}" role="status">
         <span class="toggle-feedback-icon">{% if setting_result == "success" %}&#10003;{% else %}!{% endif %}</span>
@@ -113,7 +114,7 @@
 {% endif %}
 
 {% for group_name, settings in setting_groups.items() %}
-    {% if settings_notebook | default(false) %}<details class="settings-group"{% if loop.first %} open{% endif %}><summary>{{ group_name }}</summary>{% endif %}
+    {% if settings_notebook | default(false) %}<details class="settings-group"{% if loop.first %} open{% endif %}><summary><span class="settings-group-title">{{ group_name }}</span>{% set controls = (group_toggles | default({})).get(group_name, []) %}<span class="settings-header-switches">{% for toggle in controls %}{{ status_switch(toggle, controls | length > 1) }}{% endfor %}</span></summary>{% endif %}
     <section class="panel toggle-management-panel profile-settings-panel">
         <div class="panel-header">
             <div>

@@ -74,3 +74,21 @@ def test_settings_and_legacy_routes_require_authentication(path):
         response = client.get(path, follow_redirects=False)
     assert response.status_code == 303
     assert response.headers['location'] == '/connect'
+
+
+def test_header_controls_are_not_duplicated_in_standalone_rows():
+    try:
+        context, _, _ = settings_context()
+        for section in context['settings_sections']:
+            assigned = section['standalone_toggles'] + [t for group in section['group_toggles'].values() for t in group]
+            assert Counter((t['kind'], t['name']) for t in assigned) == Counter((t['kind'], t['name']) for t in section['toggles'])
+        timers = next(s for s in context['settings_sections'] if s['key'] == 'timers')
+        assert timers['standalone_toggles'] == []
+        assert timers['group_toggles']['Timers'][0]['name'] == 'timers'
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        assert html.index('<nav class="settings-tabs"') < html.index('<div class="settings-pages"')
+        assert 'form="settings-toggle-feature-timers"' in html
+        assert 'id="settings-toggle-feature-timers"' in html
+        assert '>Enable\n' not in html
+    finally:
+        clear_profiles()
