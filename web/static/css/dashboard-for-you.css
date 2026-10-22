@@ -24,7 +24,7 @@
 .for-you-summary { font-size: .8rem; color: #b9b4c9; }
 .for-you-summary { margin: 0 0 8px; }
 .for-you-error { font-size: .8rem; color: #ffc6b8; overflow-wrap: anywhere; margin: 4px 0 0; }
-.for-you-dialog { background: #181c23; color: #f1eff8; border: 1px solid #9364ff; border-radius: 18px; padding: 28px; width: min(400px, calc(100vw - 40px)); box-sizing: border-box; }
+.for-you-dialog { text-align: center; background: #181c23; color: #f1eff8; border: 1px solid #9364ff; border-radius: 18px; padding: 28px; width: min(400px, calc(100vw - 40px)); box-sizing: border-box; }
 .for-you-dialog::backdrop { background: #0009; }
 .for-you-dialog h3 { color: #c4acff; }
 .for-you-dialog p { overflow-wrap: anywhere; }
