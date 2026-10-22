@@ -1917,6 +1917,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     features = open("web/templates/channel/features.html", encoding="utf-8").read()
     channel_layout = open("web/templates/channel/layout.html", encoding="utf-8").read()
     customization = open("web/templates/shared/profile_inputs.html", encoding="utf-8").read()
+    youtube_settings = open("web/templates/shared/youtube_settings.html", encoding="utf-8").read()
+    widget_settings = open("web/templates/shared/widget_settings.html", encoding="utf-8").read()
     dashboard_styles = open("web/static/css/style.css", encoding="utf-8").read()
     widget_styles = open("web/static/css/chat-widget.css", encoding="utf-8").read()
     chat_script = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
@@ -2210,10 +2212,12 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'dashboard-activity-unread' in dashboard
     assert 'dashboard-activity-unread' in chat_script
     assert '.dashboard-tab.has-unseen:not(.active)' in dashboard_styles
-    assert "Connect YouTube Channel" in customization
-    assert "('chat', 'Chat'" in customization
-    assert "('commands', 'Commands'" in customization
-    assert "('both', 'Both'" in customization
+    assert '{% include "shared/youtube_settings.html" %}' in customization
+    assert '{% include "shared/widget_settings.html" %}' in youtube_settings
+    assert "Connect YouTube Channel" in youtube_settings
+    assert "('chat', 'Chat'" in widget_settings
+    assert "('commands', 'Commands'" in widget_settings
+    assert "('both', 'Both'" in widget_settings
     assert ".live-chat-feed::-webkit-scrollbar" in dashboard_styles
     assert "#viewer-queue-content::-webkit-scrollbar" in dashboard_styles
     assert "padding-right: 8px; overflow-y: auto; scrollbar-gutter: stable;" in dashboard_styles

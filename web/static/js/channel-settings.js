@@ -48,6 +48,7 @@
     let selected = book.dataset.selected;
     const explicit = url.searchParams.has('section') || url.searchParams.has('social_tab') || url.searchParams.has('command_tab') || url.hash || url.searchParams.has('youtube_result') || url.searchParams.has('identity_result') || url.searchParams.has('protected_result');
     if (!explicit) { try { selected = sessionStorage.getItem(storageKey) || selected; } catch { /* Use server default. */ } }
+    if (!tabs.some(tab => tab.dataset.settingsTab === selected)) selected = book.dataset.selected;
     select(selected);
     try {
         const saved = JSON.parse(sessionStorage.getItem(`${storageKey}:scroll`) || 'null');

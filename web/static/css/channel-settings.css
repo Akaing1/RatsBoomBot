@@ -147,3 +147,24 @@
     .settings-header-switches { flex-basis: 100%; justify-content: flex-start; padding-left: 18px; }
     .settings-page .settings-status-switch { min-height: 36px; }
 }
+
+/* Keep related controls aligned and form fields consistent across categories. */
+.settings-page .profile-setting-input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 40px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--text); font: inherit; }
+.settings-page textarea.profile-setting-input { min-height: 100px; resize: vertical; }
+.settings-page .profile-setting-card form { display: flex; flex-direction: column; height: 100%; gap: 10px; }
+.settings-page .profile-setting-actions { margin-top: auto; }
+.settings-page .profile-setting-card .toggle-card-heading { min-height: 66px; }
+.settings-page .profile-setting-card textarea { flex: 1; }
+.settings-page .settings-switch-list .settings-inline-switch { flex-shrink: 0; }
+#settings-timers .profile-settings-panel > .panel-header,
+#settings-loyalty .profile-settings-panel > .panel-header { display: none; }
+#settings-timers .profile-setting-card { border: 0; padding: 0; background: transparent; }
+.settings-page #dashboard-settings form { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.settings-page #dashboard-settings select { width: 120px; }
+
+.settings-page .toggle-meta[hidden] { display: none; }
+.settings-page .settings-group .settings-switch-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.settings-page .profile-setting-card .toggle-card-heading { min-height: 95px; }
+@media (max-width: 900px) {
+    .settings-page .settings-group .settings-switch-list { grid-template-columns: minmax(0, 1fr); }
+}
