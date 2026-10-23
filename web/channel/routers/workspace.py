@@ -7,7 +7,7 @@ from web.admin.auth import validate_csrf_token, get_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY
 from web.state import get_db, get_bot
 from web.shared.common import templates
-from storage.for_you import notes_page, quotes_page, change_quote
+from storage.for_you import notes_page, quotes_page, change_quote, manage_note
 from bot.services.channels.quotes import QuoteService
 
 router = APIRouter()
@@ -35,6 +35,7 @@ async def save_workspace(
     csrf_token: str = Form(...),
     action: str = Form(...),
     notes: str = Form("", max_length=20000),
+    title: str | None = Form(None, max_length=120),
     revision: int = Form(0, ge=0),
     label: str = Form("", max_length=200),
     minutes: int = Form(0, ge=0, le=10080),
@@ -47,9 +48,11 @@ async def save_workspace(
         raise HTTPException(status_code=400, detail="Unknown workspace action.")
     if action == "start" and not 1 <= minutes * 60 + seconds <= 604800:
         raise HTTPException(status_code=400, detail="Set a timer between 1 second and 7 days.")
+    if "title" in await request.form() and title is None:
+        title = ""
     try:
         state = await update_workspace(
-            db, broadcaster_id, action, notes=notes, revision=revision,
+            db, broadcaster_id, action, notes=notes, title=title, revision=revision,
             note_key=current_note_key(broadcaster_id), label=label.strip() or "Timer", minutes=minutes, seconds=seconds, timer_id=timer_id,
         )
     except ValueError as error:
@@ -111,3 +114,29 @@ async def save_quote(request: Request, csrf_token: str = Form(...), action: str 
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     return JSONResponse({'saved': True}, headers={'Cache-Control': 'no-store'})
+
+
+@router.post('/channel/api/for-you/notes')
+async def save_note(request: Request, csrf_token: str = Form(...), action: str = Form(...),
+                    identity: str = Form('', max_length=32), revision: int = Form(0, ge=0),
+                    title: str = Form('', max_length=120), notes: str = Form('', max_length=20000)):
+    db, channel = workspace_context(request)
+    validate_csrf_token(request, csrf_token)
+    if action not in ('create', 'save', 'delete', 'up', 'down'):
+        raise HTTPException(status_code=400, detail='Unknown note action.')
+    try:
+        result = await manage_note(db, channel, action, identity, revision, title, notes)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return JSONResponse({'item': result}, headers={'Cache-Control': 'no-store'})
+
+
+@router.get('/channel/api/for-you/notes/{identity}')
+async def get_note(request: Request, identity: str):
+    from storage.for_you import NOTE_SELECT
+    db, channel = workspace_context(request)
+    async with db.acquire() as connection:
+        row = await connection.fetchone(NOTE_SELECT + " WHERE n.broadcaster_id = ? AND n.note_id = ?", (channel, identity))
+    if row is None:
+        raise HTTPException(status_code=404, detail='This note was deleted. Refresh the note list.')
+    return JSONResponse(dict(row), headers={'Cache-Control': 'no-store'})

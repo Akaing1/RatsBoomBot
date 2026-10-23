@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current application version: **15.3.0** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
+Current application version: **15.3.1** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
 
 ## Highlights
 
@@ -364,4 +364,4 @@ Settings combines feature switches and customization into General, Chat, Stream 
 
 ### For You
 
-The For You sidebar page contains Notes and Quotes. Notes share the Overview editor: saves update one entry per stream, including streams crossing midnight, or one entry per offline UTC day. Previous notes remain in the read-only archive. Existing notes are preserved as Previous notes on upgrade. Quote search, addition, editing, and deletion use the same channel quotes as chat commands. Lists paginate in groups of 20; deletion renumbers quotes as usual.
+The For You sidebar page contains Notes and Quotes. Notes share the Overview editor: saves update one entry per stream, including streams crossing midnight, or one entry per offline UTC day. Notes can be created, titled, edited, deleted, and reordered using the note list. Untitled entries are displayed as Unnamed note 1, Unnamed note 2, etc., in list order; deleting or titling one closes numbering gaps. Stream/day grouping stays internal. Existing note content is preserved on upgrade. Quote search, addition, editing, and deletion use the same channel quotes as chat commands. Lists paginate in groups of 20; deletion renumbers quotes as usual.

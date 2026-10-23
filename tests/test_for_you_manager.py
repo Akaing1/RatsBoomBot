@@ -66,6 +66,7 @@ async def test_migration_preserves_existing_notes_and_quotes(tmp_path):
     from storage.migrations.core.v046_channel_quotes import migrate as quotes
     from storage.migrations.core.v068_streamer_workspace import migrate as workspace
     from storage.migrations.core.v069_for_you_archive import migrate as archive
+    from storage.migrations.core.v070_note_management import migrate as management
     async with asqlite.create_pool(str(tmp_path / 'upgrade.db')) as db:
         async with db.acquire() as connection:
             await quotes(connection)
@@ -73,6 +74,7 @@ async def test_migration_preserves_existing_notes_and_quotes(tmp_path):
             await connection.execute("INSERT INTO streamer_workspace (broadcaster_id, notes, notes_revision) VALUES ('alice', 'Keep this', 4)")
             await connection.execute("INSERT INTO channel_quotes (broadcaster_id, number, message, added_by) VALUES ('alice', 1, 'Original', 'mod')")
             await archive(connection)
+            await management(connection)
         assert (await notes_page(db, 'alice'))['items'][0]['notes'] == 'Keep this'
         assert (await quotes_page(db, 'alice'))['items'][0]['manager_id']
         state = await repository.get_workspace(db, 'alice', 'stream:new')
@@ -106,3 +108,44 @@ async def test_manager_requires_authentication(workspace_client):
         assert (await client.get('/channel/api/for-you/' + path)).status_code == 401
     assert (await client.post('/channel/api/for-you/quotes', data=dict(csrf_token='secret', action='add', message='No'))).status_code == 401
     assert (await client.get('/channel/for-you')).status_code == 303
+
+
+@pytest.mark.asyncio
+async def test_note_titles_order_delete_and_channel_scope(workspace_client):
+    from storage.for_you import manage_note
+    client, session, db = workspace_client
+    first = await manage_note(db, 'alice', 'create', notes='First')
+    second = await manage_note(db, 'alice', 'create', notes='Second')
+    third = await manage_note(db, 'alice', 'create', notes='Third')
+    assert [n['display_name'] for n in (await notes_page(db, 'alice'))['items']] == ['Unnamed note 1', 'Unnamed note 2', 'Unnamed note 3']
+    await manage_note(db, 'alice', 'up', third['note_id'], third['revision'])
+    assert [n['notes'] for n in (await notes_page(db, 'alice'))['items']] == ['First', 'Third', 'Second']
+    renamed = await manage_note(db, 'alice', 'save', first['note_id'], first['revision'], 'Clips', 'Edited')
+    assert [n['display_name'] for n in (await notes_page(db, 'alice'))['items']] == ['Clips', 'Unnamed note 1', 'Unnamed note 2']
+    with pytest.raises(ValueError):
+        await manage_note(db, 'alice', 'delete', first['note_id'], first['revision'])
+    session['channel_user_id'] = 'bob'
+    assert (await client.get('/channel/api/for-you/notes/' + first['note_id'])).status_code == 404
+    assert (await client.post('/channel/api/for-you/notes', data=dict(csrf_token='secret', action='delete', identity=first['note_id'], revision=renamed['revision']))).status_code == 409
+    await manage_note(db, 'alice', 'delete', third['note_id'], third['revision'])
+    assert [n['display_name'] for n in (await notes_page(db, 'alice'))['items']] == ['Clips', 'Unnamed note 1']
+    assert [n['position'] for n in (await notes_page(db, 'alice'))['items']] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_manager_and_overview_edits_stay_in_sync(workspace_client):
+    from storage.for_you import manage_note
+    client, _, db = workspace_client
+    state = (await client.get('/channel/api/for-you')).json()
+    saved = (await client.post('/channel/api/for-you', data=dict(csrf_token='secret', action='notes', notes='From overview', title='My title', revision=state['notes_revision']))).json()
+    item = (await notes_page(db, 'alice'))['items'][0]
+    edited = await manage_note(db, 'alice', 'save', item['note_id'], item['revision'], 'Renamed', 'From manager')
+    current = (await client.get('/channel/api/for-you')).json()
+    assert current['notes'] == 'From manager' and current['title'] == 'Renamed'
+    assert (await client.post('/channel/api/for-you', data=dict(csrf_token='secret', action='notes', notes='Stale', revision=saved['notes_revision']))).status_code == 409
+    blank = (await client.post('/channel/api/for-you', data=dict(csrf_token='secret', action='notes', title='', notes='From manager', revision=current['notes_revision']))).json()
+    assert blank['display_name'] == 'Unnamed note 1'
+    await manage_note(db, 'alice', 'delete', item['note_id'], blank['archive_revision'])
+    assert (await client.get('/channel/api/for-you')).json()['notes'] == ''
+    assert (await client.post('/channel/api/for-you', data=dict(csrf_token='secret', action='notes', notes='Resurrect', revision=blank['notes_revision']))).status_code == 409
+    assert (await client.post('/channel/api/for-you/notes', data=dict(csrf_token='wrong', action='create'))).status_code == 403

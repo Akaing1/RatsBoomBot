@@ -37,6 +37,8 @@ from .v068_streamer_workspace import migrate as migrate_068
 
 from .v069_for_you_archive import migrate as migrate_069
 
+from .v070_note_management import migrate as migrate_070
+
 MIGRATIONS = (
     Migration(1, "initial_schema", migrate_001),
     Migration(2, "redeem_stats", migrate_002),
@@ -69,4 +71,5 @@ MIGRATIONS = (
     Migration(67, "follow_raid", migrate_067),
     Migration(68, "streamer_workspace", migrate_068),
     Migration(69, "for_you_archive", migrate_069),
+    Migration(70, "note_management", migrate_070),
 )
