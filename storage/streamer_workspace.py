@@ -12,6 +12,11 @@ async def read(connection, broadcaster_id):
         (str(broadcaster_id),),
     )
     state = dict(row) if row else dict(note_key="legacy", notes="", notes_revision=0, timer_id=None, timer_label="", timer_due_at=None)
+    from storage.for_you import NOTE_SELECT
+    entry = await connection.fetchone(NOTE_SELECT + " WHERE n.broadcaster_id = ? AND n.note_key = ?", (str(broadcaster_id), state['note_key']))
+    count = await connection.fetchone("SELECT COUNT(*) AS n FROM streamer_notes WHERE broadcaster_id = ? AND title = ''", (str(broadcaster_id),))
+    state.update(archive_revision=entry['revision'] if entry else 0, title=entry['title'] if entry else '', note_id=entry['note_id'] if entry else None,
+                 display_name=entry['display_name'] if entry else f"Unnamed note {count['n'] + 1}")
     state["server_now"] = int(time.time())
     return state
 
@@ -35,7 +40,7 @@ async def get_workspace(db, broadcaster_id, note_key=None):
             return await read(connection, broadcaster_id)
 
 
-async def update_workspace(db, broadcaster_id, action, *, notes="", revision=0, label="", minutes=0, seconds=0, timer_id="", note_key=None):
+async def update_workspace(db, broadcaster_id, action, *, notes="", revision=0, label="", minutes=0, seconds=0, timer_id="", note_key=None, title=None):
     async with db.acquire() as connection:
         async with immediate_transaction(connection):
             await select_note(connection, broadcaster_id, note_key or daily_key())
@@ -51,6 +56,8 @@ async def update_workspace(db, broadcaster_id, action, *, notes="", revision=0, 
                     VALUES (?, ?, ?, 1) ON CONFLICT (broadcaster_id, note_key) DO UPDATE SET
                     notes = excluded.notes, revision = revision + 1, updated_at = CURRENT_TIMESTAMP""",
                     (str(broadcaster_id), current['note_key'], notes))
+                if title is not None:
+                    await connection.execute("UPDATE streamer_notes SET title = ? WHERE broadcaster_id = ? AND note_key = ?", (title.strip(), str(broadcaster_id), current['note_key']))
             elif action == "start":
                 if (current["timer_id"] or "") != timer_id:
                     raise ValueError("The timer changed in another tab. Review it and try again.")

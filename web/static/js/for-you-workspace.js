@@ -6,7 +6,9 @@
     const status = find('[data-workspace-status]'), note = find('#workspace-note'), save = find('[data-note-save]');
     let revision = null, dirty = false, saving = false, quoteBusy = false, noteOffset = 0, quoteOffset = 0, search = '', quoteGeneration = 0, noteGeneration = 0;
     const notify = (text, error = false) => { status.textContent = text; status.classList.toggle('fy-error', error); };
-    const title = key => key === 'legacy' ? 'Previous notes' : key.startsWith('day:') ? `Offline · ${key.slice(4)} (UTC)` : `Stream #${key.slice(7)}`;
+    const titleInput = find('#workspace-title');
+    let selected = null, currentMode = true, noteBusy = false;
+    const canLeave = () => !dirty || confirm('Discard your unsaved note changes?');
     async function request(path = '', data) {
         const response = await fetch('/channel/api/for-you' + path, {credentials: 'same-origin', cache: 'no-store', method: data ? 'POST' : 'GET', ...(data ? {body: new URLSearchParams({csrf_token: root.dataset.csrf, ...data})} : {})});
         let result;
@@ -14,34 +16,82 @@
         if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Please check your input and try again.');
         return result;
     }
+    function adoptNote(entry, current) {
+        selected = entry; currentMode = current;
+        revision = current ? entry.notes_revision : entry.revision;
+        note.value = entry.notes; titleInput.value = entry.title;
+        titleInput.placeholder = entry.display_name; find('[data-note-title]').textContent = entry.display_name;
+        dirty = false; note.disabled = false; titleInput.disabled = false; save.disabled = true;
+        find('[data-note-delete]').disabled = !entry.note_id;
+        find('[data-note-state]').textContent = '';
+    }
     async function loadNote(force = false) {
-        if (saving || (dirty && !force)) return;
-        if (dirty && !confirm('Discard your unsaved note edits and reload?')) return;
+        if (saving || noteBusy || (!currentMode && !force) || (dirty && !force)) return;
+        if (dirty && !canLeave()) return;
         const generation = ++noteGeneration;
-        const result = await request();
-        if (generation !== noteGeneration || saving || (dirty && !force)) return;
-        note.value = result.notes; revision = result.notes_revision; dirty = false; note.disabled = false; save.disabled = true;
-        find('[data-note-title]').textContent = title(result.note_key);
-        find('[data-note-state]').textContent = 'Saved';
+        if (!currentMode && selected?.note_id) {
+            const entry = await request('/notes/' + selected.note_id);
+            if (generation === noteGeneration) adoptNote(entry, false);
+        } else {
+            const entry = await request();
+            if (generation === noteGeneration) adoptNote(entry, true);
+        }
     }
     const run = fn => Promise.resolve().then(fn).catch(e => notify(e.message, true));
-    note.addEventListener('input', () => { ++noteGeneration; dirty = true; save.disabled = saving; find('[data-note-state]').textContent = 'Unsaved changes'; });
+    for (const field of [note, titleInput]) field.addEventListener('input', () => { ++noteGeneration; dirty = true; save.disabled = saving; find('[data-note-state]').textContent = 'Unsaved changes'; });
     save.addEventListener('click', () => run(async () => {
-        if (saving || revision === null) return;
+        if (saving || noteBusy || revision === null) return;
         saving = true; save.disabled = true; ++noteGeneration;
-        const submitted = note.value;
+        const submitted = note.value, submittedTitle = titleInput.value;
         try {
-            const result = await request('', {action: 'notes', notes: submitted, revision});
-            revision = result.notes_revision; dirty = note.value !== submitted;
-            find('[data-note-state]').textContent = dirty ? 'Unsaved changes' : 'Saved'; notify('Note saved.'); await loadArchive();
+            const result = currentMode
+                ? await request('', {action: 'notes', notes: submitted, title: submittedTitle, revision})
+                : (await request('/notes', {action: 'save', identity: selected.note_id, revision, notes: submitted, title: submittedTitle})).item;
+            selected = result; revision = currentMode ? result.notes_revision : result.revision;
+            dirty = note.value !== submitted || titleInput.value !== submittedTitle;
+            titleInput.placeholder = result.display_name; find('[data-note-title]').textContent = result.display_name;
+            find('[data-note-delete]').disabled = !result.note_id;
+            find('[data-note-state]').textContent = dirty ? 'Unsaved changes' : '';
+            notify('Note saved.'); await loadArchive();
         } finally { saving = false; save.disabled = !dirty; }
     }));
     find('[data-note-refresh]').addEventListener('click', () => run(() => loadNote(true)));
     function button(label, callback) { const b = document.createElement('button'); b.type = 'button'; b.className = 'button secondary'; b.textContent = label; b.addEventListener('click', () => run(callback)); return b; }
+    async function noteAction(action, entry) {
+        if (noteBusy || saving) return;
+        if (action === 'delete' && !confirm('Delete this note?')) return;
+        if ((action === 'delete' || action === 'create') && !canLeave()) return;
+        noteBusy = true; ++noteGeneration; note.disabled = true; titleInput.disabled = true;
+        try {
+            const result = await request('/notes', {action, identity: entry?.note_id || '', revision: entry?.revision || 0});
+            if (action === 'create') { adoptNote(result.item, false); noteOffset = 0; }
+            if (action === 'delete') { selected = null; currentMode = true; dirty = false; adoptNote(await request(), true); }
+            await loadArchive(); notify(action === 'delete' ? 'Note deleted.' : action === 'create' ? 'Note created.' : 'Note moved.');
+        } finally { noteBusy = false; note.disabled = false; titleInput.disabled = false; }
+    }
+    find('[data-note-current]').addEventListener('click', () => run(async () => { if (saving || noteBusy || !canLeave()) return; dirty = false; currentMode = true; await loadNote(true); await loadArchive(); }));
+    find('[data-note-new]').addEventListener('click', () => run(() => noteAction('create')));
+    find('[data-note-delete]').addEventListener('click', () => run(async () => {
+        if (!selected?.note_id || saving || noteBusy) return;
+        // The Overview and archive have separate revision counters.
+        const entry = currentMode ? {...selected, revision: selected.archive_revision} : selected;
+        await noteAction('delete', entry);
+    }));
     async function loadArchive() {
         const result = await request('/notes?offset=' + noteOffset), list = find('[data-notes-list]'); list.replaceChildren();
-        for (const entry of result.items) { const details = document.createElement('details'), summary = document.createElement('summary'), text = document.createElement('pre'); summary.textContent = title(entry.note_key) + " · " + entry.updated_at + " UTC"; text.textContent = entry.notes || '(Empty note)'; details.append(summary, text); list.append(details); }
-        if (!result.items.length) list.textContent = 'No saved notes yet.';
+        if (!result.items.length && noteOffset > 0) { noteOffset = Math.max(0, noteOffset - 20); return loadArchive(); }
+        for (const entry of result.items) {
+            const row = document.createElement('div'); row.className = 'fy-note-row';
+            const open = button(entry.display_name, async () => { if (saving || noteBusy || !canLeave()) return; const generation = ++noteGeneration; const item = await request('/notes/' + entry.note_id); if (generation !== noteGeneration) return; adoptNote(item, false); await loadArchive(); });
+            open.className = 'fy-note-open'; open.setAttribute('aria-current', String(selected?.note_id === entry.note_id));
+            const up = button('↑', () => noteAction('up', entry)), down = button('↓', () => noteAction('down', entry));
+            up.setAttribute('aria-label', 'Move ' + entry.display_name + ' up'); down.setAttribute('aria-label', 'Move ' + entry.display_name + ' down');
+            up.disabled = entry.position === 1;
+            down.disabled = !result.more && entry === result.items.at(-1);
+            row.append(open, up, down); list.append(row);
+            if (selected?.note_id === entry.note_id && !dirty) { find('[data-note-title]').textContent = entry.display_name; titleInput.placeholder = entry.display_name; }
+        }
+        if (!result.items.length) list.textContent = 'No saved notes.';
         find('[data-notes-prev]').disabled = noteOffset === 0; find('[data-notes-next]').disabled = !result.more;
     }
     async function loadQuotes() {
