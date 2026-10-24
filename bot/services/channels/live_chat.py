@@ -467,6 +467,9 @@ class LiveChatService:
                 await self._refresh_seventv_global()
             except asyncio.CancelledError:
                 raise
+            except httpx.TransportError as error:
+                LOGGER.warning("[Live Chat] 7TV global emote refresh failed (%s); retrying in %ss.",
+                               type(error).__name__, SEVENTV_REFRESH_SECONDS)
             except Exception:
                 LOGGER.warning("[Live Chat] Unable to refresh 7TV global emotes.", exc_info=True)
 
@@ -790,18 +793,28 @@ class LiveChatService:
         }
 
     async def _watch_seventv_channel(self, broadcaster_id: str) -> None:
+        retry_delay = SEVENTV_RECONNECT_SECONDS
         try:
             while self.started:
                 try:
                     set_id = await self._refresh_seventv_channel(broadcaster_id)
 
                     if set_id is None:
+                        retry_delay = SEVENTV_RECONNECT_SECONDS
                         await asyncio.sleep(SEVENTV_REFRESH_SECONDS)
                         continue
 
                     await self._watch_seventv_set(broadcaster_id, set_id)
+                    retry_delay = SEVENTV_RECONNECT_SECONDS
                 except asyncio.CancelledError:
                     raise
+                except httpx.TransportError as error:
+                    LOGGER.warning(
+                        "[Live Chat] 7TV connection failed for broadcaster %s (%s); retrying in %ss.",
+                        broadcaster_id, type(error).__name__, retry_delay
+                    )
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(300, retry_delay * 2)
                 except Exception:
                     LOGGER.warning(
                         "[Live Chat] 7TV emote updates failed for broadcaster %s; retrying.",
