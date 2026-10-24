@@ -1,3 +1,4 @@
+{% from "channel/settings_switch.html" import status_switch %}
 {% if setting_message %}
     <div class="toggle-feedback {% if setting_result == 'success' %}success{% else %}error{% endif %}" role="status">
         <span class="toggle-feedback-icon">{% if setting_result == "success" %}&#10003;{% else %}!{% endif %}</span>
@@ -6,7 +7,7 @@
 {% endif %}
 
 {% if show_social_links | default(true) %}
-<section id="youtube-integration" class="panel toggle-management-panel profile-settings-panel{% if youtube_chat is defined %} social-integrations-panel{% endif %}">
+<section id="{{ 'social-links' if settings_notebook | default(false) else 'youtube-integration' }}" class="panel toggle-management-panel profile-settings-panel{% if youtube_chat is defined and not settings_notebook | default(false) %} social-integrations-panel{% endif %}">
     <div class="panel-header">
         <div>
             <p class="eyebrow">Editable profile details</p>
@@ -14,14 +15,14 @@
         </div>
     </div>
 
-    {% if youtube_chat is defined %}
+    {% if youtube_chat is defined and not settings_notebook | default(false) %}
         <div class="dashboard-tabs social-integration-tabs" role="tablist" aria-label="Social settings">
             <button class="dashboard-tab{% if social_tab != 'youtube' %} active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if social_tab != 'youtube' else 'false' }}" data-social-tab="links">Social links</button>
             <button class="dashboard-tab{% if social_tab == 'youtube' %} active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if social_tab == 'youtube' else 'false' }}" data-social-tab="youtube">YouTube chat</button>
         </div>
     {% endif %}
 
-    <div{% if youtube_chat is defined %} data-social-panel="links"{% endif %}{% if youtube_chat is defined and social_tab == 'youtube' %} hidden{% endif %}>
+    <div{% if youtube_chat is defined and not settings_notebook | default(false) %} data-social-panel="links"{% endif %}{% if youtube_chat is defined and not settings_notebook | default(false) and social_tab == 'youtube' %} hidden{% endif %}>
     <div class="profile-settings-grid">
         {% for key, label, description, current_value in [
             ("social.discord_url", "Discord URL", "Used by the channel's Discord and social commands.", channel_settings.discord_url),
@@ -40,72 +41,9 @@
     </div>
     </div>
 
-    {% if youtube_chat is defined %}
+    {% if youtube_chat is defined and not settings_notebook | default(false) %}
         <div data-social-panel="youtube"{% if social_tab != 'youtube' %} hidden{% endif %}>
-            {% if youtube_message %}
-                <div class="toggle-feedback {% if youtube_result == 'success' %}success{% else %}error{% endif %}" role="status">
-                    <span class="toggle-feedback-icon">{% if youtube_result == "success" %}&#10003;{% else %}!{% endif %}</span>
-                    <span>{{ youtube_message }}</span>
-                </div>
-            {% endif %}
-
-            <article class="youtube-integration-card">
-                <div class="toggle-card-heading">
-                    <div>
-                        <h4>YouTube live chat</h4>
-                        <p>Connect the YouTube channel that should appear beside Twitch chat and send dashboard replies.</p>
-                    </div>
-                    <span class="toggle-status {% if youtube_chat.connected %}enabled{% endif %}">{% if youtube_chat.connected %}Connected{% elif youtube_chat.configured %}Not connected{% else %}Unavailable{% endif %}</span>
-                </div>
-
-                {% if youtube_chat.connected %}
-                    <div class="channel-user-details youtube-channel-details">
-                        <div><span>Connected channel</span><strong>{{ youtube_chat.channel_title }}</strong></div>
-                        <div><span>YouTube channel ID</span><strong>{{ youtube_chat.channel_id }}</strong></div>
-                        <div><span>Chat status</span><strong>{{ youtube_chat.detail }}</strong></div>
-                    </div>
-                    <div class="toggle-actions">
-                        <a class="button secondary" href="/channel/youtube/connect">Reconnect YouTube</a>
-                        <form method="post" action="/channel/youtube/disconnect" onsubmit="return confirm('Disconnect {{ youtube_chat.channel_title }} from combined chat?');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button class="button danger" type="submit">Disconnect YouTube</button>
-                        </form>
-                    </div>
-                {% elif youtube_chat.configured %}
-                    <p class="panel-description">Authorization lets RatsBoomBot discover your active livestream, display its chat, and send messages you submit from the dashboard.</p>
-                    <a class="button primary" href="/channel/youtube/connect">Connect YouTube Channel</a>
-                {% else %}
-                    <p class="panel-description">YouTube integration has not been configured on this deployment yet.</p>
-                {% endif %}
-            </article>
-
-            <article class="youtube-integration-card widget-url-card">
-                <div class="toggle-card-heading">
-                    <div>
-                        <h4>OBS browser sources</h4>
-                        <p>Add any of these URLs to an OBS Browser Source. Treat them like private stream keys.</p>
-                    </div>
-                </div>
-
-                {% for key, label, description in [
-                    ('chat', 'Chat', 'Twitch and YouTube messages, excluding commands.'),
-                    ('commands', 'Commands', 'Command messages only.'),
-                    ('both', 'Both', 'All chat messages and commands.')
-                ] %}
-                    <label class="widget-url-field">
-                        <span><strong>{{ label }}</strong> &middot; {{ description }}</span>
-                        <div class="widget-url-controls">
-                            <input class="profile-setting-input" type="text" value="{{ widget_urls[key] }}" readonly data-widget-url="{{ key }}">
-                            <button class="button secondary" type="button" data-copy-widget-url="{{ key }}">Copy URL</button>
-                        </div>
-                    </label>
-                {% endfor %}
-
-                <form class="widget-regenerate-form" method="post" action="/channel/widgets/regenerate" onsubmit="return confirm('Generate new URLs? Existing OBS browser-source URLs will stop working.');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button class="button danger" type="submit">Regenerate URLs</button>
-                </form>
-            </article>
+            {% include "shared/youtube_settings.html" %}
         </div>
     {% endif %}
 </section>
@@ -113,7 +51,11 @@
 {% endif %}
 
 {% for group_name, settings in setting_groups.items() %}
+    {% set flat = flat_settings | default(false) %}
+    {% if settings_notebook | default(false) and not flat %}<details class="settings-group"{% if loop.first %} open{% endif %}><summary><span class="settings-group-title">{{ group_name }}</span>{% set controls = (group_toggles | default({})).get(group_name, []) %}<span class="settings-header-switches">{% if controls | length == 1 %}{{ status_switch(controls[0]) }}{% endif %}</span></summary>{% endif %}
     <section class="panel toggle-management-panel profile-settings-panel">
+        {% set controls = (group_toggles | default({})).get(group_name, []) %}
+        {% if controls | length > 1 or flat %}<div class="settings-switch-list">{% for toggle in controls %}<div class="settings-switch-row"><span>{{ toggle.label }}</span>{{ status_switch(toggle) }}</div>{% endfor %}</div>{% endif %}
         <div class="panel-header">
             <div>
                 <p class="eyebrow">Editable profile details</p>
@@ -121,14 +63,14 @@
             </div>
         </div>
 
-        {% if group_name == "Commands" %}
+        {% if group_name == "Commands" and not settings_notebook | default(false) %}
             <div class="dashboard-tabs command-customization-tabs" role="tablist" aria-label="Command customization">
                 <button class="dashboard-tab{% if command_tab | default('responses') != 'protected' %} active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if command_tab | default('responses') != 'protected' else 'false' }}" data-command-tab="responses">Command responses</button>
                 <button class="dashboard-tab{% if command_tab | default('responses') == 'protected' %} active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if command_tab | default('responses') == 'protected' else 'false' }}" data-command-tab="protected">Protected users</button>
             </div>
         {% endif %}
 
-        <div{% if group_name == "Commands" %} data-command-panel="responses"{% if command_tab | default('responses') == 'protected' %} hidden{% endif %}{% endif %}>
+        <div{% if group_name == "Commands" and not settings_notebook | default(false) %} data-command-panel="responses"{% if command_tab | default('responses') == 'protected' %} hidden{% endif %}{% endif %}>
         <div class="profile-settings-grid">
             {% for setting in settings %}
                 <article class="toggle-card profile-setting-card{% if setting.definition.key == 'timer_messages' %} full-width{% endif %}">
@@ -166,11 +108,13 @@
                             </div>
                         {% elif setting.definition.value_type == "integer" %}
                             <input class="profile-setting-input" type="number" name="value" value="{{ setting.effective_value }}" min="{{ setting.definition.minimum }}" max="{{ setting.definition.maximum }}">
+                        {% elif setting.definition.rows == 1 %}
+                            <input class="profile-setting-input" type="text" name="value" value="{{ setting.effective_value }}" maxlength="{{ setting.definition.maximum_length }}">
                         {% else %}
                             <textarea class="profile-setting-input" name="value" rows="{{ setting.definition.rows }}" maxlength="{{ setting.definition.maximum_length }}">{{ setting.effective_value }}</textarea>
                         {% endif %}
 
-                        <p class="toggle-meta">Channel default: {{ setting.default_value if setting.default_value != "" else "Not configured" }}</p>
+                        <p class="toggle-meta"{% if settings_notebook | default(false) and setting.override_value is none %} hidden{% endif %}>Channel default: {{ setting.default_value if setting.default_value != "" else "Not configured" }}</p>
 
                         <div class="toggle-actions profile-setting-actions">
                             <button class="button primary" type="submit" name="action" value="save">Save Changes</button>
@@ -185,65 +129,12 @@
         </div>
         </div>
 
-        {% if group_name == "Commands" %}
-            <div id="protected-users" data-command-panel="protected"{% if command_tab | default('responses') != 'protected' %} hidden{% endif %}>
-                {% if protected_message %}
-                    <div class="toggle-feedback {% if protected_result == 'success' %}success{% else %}error{% endif %}" role="status">
-                        <span class="toggle-feedback-icon">{% if protected_result == "success" %}&#10003;{% else %}!{% endif %}</span>
-                        <span>{{ protected_message }}</span>
-                    </div>
-                {% endif %}
-
-                <article class="protected-users-card">
-                    <div class="toggle-card-heading">
-                        <div>
-                            <h4>Add a protected Twitch user</h4>
-                            <p>Protected users cannot be targeted by !kamikaze or automated moderation. Their own !kamikaze attacks against unprotected users are guaranteed to hit.</p>
-                        </div>
-                    </div>
-
-                    <form class="protected-user-search" data-protected-user-search data-search-url="{{ protected_search_url | default('/channel/protected-users/search') }}">
-                        <label for="protected-user-query">Twitch username</label>
-                        <div class="protected-user-search-controls">
-                            <input id="protected-user-query" class="profile-setting-input" type="text" name="query" placeholder="Enter username" maxlength="25" autocomplete="off" required>
-                            <button class="button secondary" type="submit">Search</button>
-                        </div>
-                        <p class="protected-user-search-message" data-protected-search-message aria-live="polite"></p>
-                    </form>
-
-                    <form class="protected-user-result" method="post" action="{{ protected_add_url | default('/channel/protected-users/add') }}" data-protected-user-result hidden>
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <input type="hidden" name="user_id" data-protected-result-id>
-                        <div>
-                            <span>Verified Twitch user</span>
-                            <strong data-protected-result-label></strong>
-                        </div>
-                        <button class="button primary" type="submit" data-protected-add>Add User</button>
-                    </form>
-                </article>
-
-                <div class="protected-user-list">
-                    {% for user in protected_users | default([]) %}
-                        <article class="protected-user-row">
-                            <div>
-                                <strong>{{ user.display_name }} <span>({{ user.user_id }})</span></strong>
-                                {% if user.login %}<small>@{{ user.login }}</small>{% endif %}
-                            </div>
-                            {% if user.is_default %}
-                                <span class="toggle-status">Channel default</span>
-                            {% elif user.removable %}
-                                <form method="post" action="{{ protected_remove_url | default('/channel/protected-users/remove') }}" onsubmit="return confirm('Remove {{ user.display_name }} from protected users?');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                    <input type="hidden" name="user_id" value="{{ user.user_id }}">
-                                    <button class="button danger" type="submit">Remove</button>
-                                </form>
-                            {% endif %}
-                        </article>
-                    {% else %}
-                        <div class="protected-user-empty">No protected users have been added.</div>
-                    {% endfor %}
-                </div>
+        {% if group_name == "Commands" and not settings_notebook | default(false) %}
+            <div data-command-panel="protected"{% if command_tab | default('responses') != 'protected' %} hidden{% endif %}>
+                {% include "shared/protected_settings.html" %}
             </div>
         {% endif %}
+        {% if settings_notebook | default(false) and group_name == "Raid messages" %}{% include "channel/settings_dashboard.html" %}{% endif %}
     </section>
+    {% if settings_notebook | default(false) and not flat %}</details>{% endif %}
 {% endfor %}

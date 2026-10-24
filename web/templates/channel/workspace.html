@@ -1,0 +1,27 @@
+{% extends "channel/layout.html" %}
+{% block title %}For You | RatsBoomBot{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}">
+<link rel="stylesheet" href="/static/css/for-you-workspace.css?v={{ deployment_stamp() }}">
+<header class="page-header"><h2>For You</h2></header>
+<div class="fy-workspace settings-book" data-workspace-page data-csrf="{{ csrf_token }}">
+<nav class="settings-tabs" aria-label="For You sections"><button class="settings-tab active" type="button" data-workspace-tab="notes" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4h10M4 4v16h16V10M10 14l2-5 7-7 3 3-7 7-5 2Z"/></svg>Notes</button><button class="settings-tab" type="button" data-workspace-tab="quotes" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 5h16v12H9l-5 4V5Zm4 4h3v4H8zm6 0h3v4h-3z"/></svg>Quotes</button></nav>
+<div class="settings-pages">
+<p data-workspace-status role="status" aria-live="polite"></p>
+<section class="settings-page" data-workspace-panel="notes">
+<div class="fy-note-layout">
+<aside class="fy-note-list"><div class="fy-actions"><button class="button primary" data-note-new>New note</button><button class="button secondary" data-note-current>Current note</button><button class="button secondary" data-archive-refresh>Refresh</button></div><div data-notes-list></div><div class="fy-actions"><button class="button secondary" data-notes-prev>Previous</button><button class="button secondary" data-notes-next>Next</button></div></aside>
+<div class="fy-note-editor"><h3 data-note-title>Notes</h3>
+<label for="workspace-title">Title</label><input id="workspace-title" maxlength="120" placeholder="Unnamed note" disabled>
+<label class="sr-only" for="workspace-note">Note content</label><textarea id="workspace-note" maxlength="20000" rows="12" disabled></textarea>
+<div class="fy-actions"><button class="button primary" data-note-save disabled>Save</button><button class="button secondary" data-note-refresh>Reload</button><button class="button danger" data-note-delete disabled>Delete</button><span data-note-state></span></div></div>
+</div>
+</section>
+<section class="settings-page" data-workspace-panel="quotes" hidden>
+<div class="panel"><h3>Add a quote</h3><form data-quote-add><label for="new-quote">Quote text</label><textarea id="new-quote" name="message" maxlength="350" rows="3" required></textarea><button class="button primary" type="submit">Add quote</button></form></div>
+<div class="panel"><form data-quote-search class="fy-actions"><label for="quote-search">Find a quote</label><input id="quote-search" name="search" type="search" maxlength="500" placeholder="Search quote text"><button class="button secondary" type="submit">Search</button></form><div data-quotes-list></div><div class="fy-actions"><button class="button secondary" data-quotes-prev>Previous</button><button class="button secondary" data-quotes-next>Next</button></div></div>
+</section>
+</div>
+</div>
+{% endblock %}
+{% block page_scripts %}{{ super() }}<script src="/static/js/for-you-workspace.js?v={{ deployment_stamp() }}" defer></script>{% endblock %}

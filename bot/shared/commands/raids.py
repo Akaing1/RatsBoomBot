@@ -5,6 +5,7 @@ from twitchio.ext import commands
 from bot.profiles import FeatureName, get_active_profile, render_profile_message
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_feature_enabled
 from bot.shared.commands.shoutout import clean_username
+from bot.shared.pending_raids import raid_lock, remember_raid
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -68,7 +69,9 @@ class RaidCommands(commands.Component):
         broadcaster = self.bot.create_partialuser(broadcaster_id)
 
         try:
-            await broadcaster.start_raid(target)
+            async with raid_lock(self.bot, broadcaster_id):
+                result = await broadcaster.start_raid(target)
+                remember_raid(self.bot, broadcaster_id, target, getattr(result, "created_at", None))
         except Exception as error:
             LOGGER.exception("[Raids] Failed to start raid from broadcaster %s to %s (%s).", broadcaster_id, target.name, target.id)
 

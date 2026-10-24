@@ -1,0 +1,31 @@
+.fy-workspace { width: 100%; min-width: 0; }
+.fy-workspace [hidden] { display: none !important; }
+.fy-workspace .settings-tab { cursor: pointer; color: var(--muted); background: var(--surface); font: inherit; }
+.fy-workspace .settings-tab.active { color: #c4b5fd; box-shadow: inset 0 3px var(--accent); }
+.fy-workspace [data-workspace-status]:empty { display: none; }
+.fy-workspace .panel { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--surface); }
+.fy-workspace textarea, .fy-workspace input { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--text); font: inherit; }
+.fy-workspace textarea { resize: vertical; margin: 12px 0; min-height: 100px; }
+.fy-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.fy-actions input { flex: 1; min-width: 140px; }
+.fy-note-layout { display: grid; grid-template-columns: minmax(220px, 28%) minmax(0, 1fr); gap: 24px; }
+.fy-note-list { border-right: 1px solid var(--border); padding-right: 20px; min-width: 0; }
+.fy-note-row { display: flex; align-items: center; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.fy-note-row .fy-note-open { flex: 1; min-width: 0; overflow-wrap: anywhere; text-align: left; border: 0; background: transparent; color: var(--text); cursor: pointer; padding: 10px 6px; }
+.fy-note-row .fy-note-open[aria-current="true"] { color: #c4b5fd; background: rgba(139,92,246,.12); border-radius: 8px; }
+.fy-note-editor { min-width: 0; }
+.fy-note-editor h3 { overflow-wrap: anywhere; }
+.fy-quote { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.fy-workspace button:disabled { opacity: .5; cursor: not-allowed; }
+.fy-workspace .fy-error { color: #fca5a5; }
+@media (max-width: 768px) { .fy-note-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; } .fy-note-list { border-right: 0; padding-right: 0; } }
+.dashboard-page.channel-page-for-you .app-shell .main-content.streamer-main-content,
+.dashboard-page.channel-page-for-you .app-shell.sidebar-collapsed .main-content.streamer-main-content { position: static; left: auto; width: 100%; max-width: none; min-width: 0; margin: 0; padding: 16px; }
+@media (min-width: 769px) {
+    .channel-page-for-you, .channel-page-for-you .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
+    .dashboard-page.channel-page-for-you .app-shell .main-content.streamer-main-content { height: 100dvh; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .channel-page-for-you .page-header { flex-shrink: 0; }
+}
+
+.channel-page-for-you .page-header { margin-bottom: 14px; }
+.channel-page-for-you .page-header h2 { margin: 0; font-size: 22px; }

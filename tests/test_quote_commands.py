@@ -7,8 +7,8 @@ import pytest
 from bot.services.channels.quotes import QuoteService
 from bot.shared.commands.quotes import QuoteCommands
 from storage.migration_runner import run_migrations
-from storage.migrations.v046_channel_quotes import migrate as create_quote_tables
-from storage.migrations.v047_compact_channel_quotes import migrate as compact_quotes
+from storage.migrations.core.v046_channel_quotes import migrate as create_quote_tables
+from storage.migrations.core.v047_compact_channel_quotes import migrate as compact_quotes
 
 
 class EnabledFeatures:

@@ -15,7 +15,7 @@
     statsRow?.before(statsMarker);
     const groups = [
         {name: "Stream and Chat", selectors: [".dashboard-video-card", ".live-chat-panel"]},
-        {name: "Ads and Viewer Queue", selectors: [".dashboard-ads-panel", "[data-viewer-queue-panel]"]},
+        {name: "Ads, Viewer Queue and Actions", selectors: [".dashboard-ads-panel", "[data-viewer-queue-panel]", ".dashboard-actions-panel"]},
         {name: "Moderation and Activity", selectors: [".dashboard-moderation-panel", ".dashboard-community-panel"]}
     ];
     const cards = groups.map(group => ({
@@ -240,6 +240,7 @@
     }
 
     previous.addEventListener("click", () => showCard(activeIndex - 1, true));
+    document.addEventListener("dashboard-raid-started", () => { if (media.matches) showCard(0); });
     next.addEventListener("click", () => showCard(activeIndex + 1, true));
     deck.addEventListener("keydown", event => {
         if (!media.matches || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;

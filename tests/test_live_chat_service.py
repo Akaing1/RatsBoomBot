@@ -40,6 +40,19 @@ def twitch_payload(text: str, message_id: str = "message-1"):
     )
 
 
+def test_twitch_name_colors_use_html_format():
+    from twitchio import Colour
+
+    service = LiveChatService(None)
+    payload = twitch_payload("hello")
+    payload.color = Colour.from_hex("#7800A0")
+    assert service.publish_twitch(payload).as_dict()["color"] == "#7800A0"
+    payload.color = "#12ab34"
+    assert service.publish_twitch(payload).color == "#12ab34"
+    payload.color = None
+    assert service.publish_twitch(payload).color is None
+
+
 def test_twitch_messages_are_split_between_chat_and_commands():
     bot = SimpleNamespace(get_command=lambda name: object() if name == "points" else None)
     service = LiveChatService(None, bot=bot)
@@ -96,7 +109,8 @@ def test_chat_filters_replace_command_toggle_and_only_apply_to_combined_chat():
     assert "dashboard-chat-filters.js" in dashboard
     assert dashboard.index('data-chat-filter-toggle') < dashboard.index('data-chat-lock')
     assert 'row.hidden = feed.filters ? !feed.filters.allows(category) : false;' in script
-    assert 'element.querySelectorAll(".live-chat-message").forEach(row => {' in script
+    assert 'const rows = [...element.querySelectorAll(".live-chat-message")];' in script
+    assert 'rows.forEach(row => {' in script
     assert 'if (!row.hidden) feed.hasUnseenMessages = true;' in script
 
 
@@ -526,7 +540,7 @@ def test_clear_chat_removes_twitch_history_and_notifies_subscribers():
 
 
 @pytest.mark.parametrize("platform,connected,url", [
-    ("twitch", False, "/connect"), ("youtube", False, "/channel/customization?social_tab=youtube#youtube-integration"),
+    ("twitch", False, "/connect"), ("youtube", False, "/channel/settings?section=general&social_tab=youtube#youtube-integration"),
     ("twitch", True, None), ("youtube", True, None)])
 def test_platform_filter_connection_links(platform, connected, url):
     from pathlib import Path
@@ -1020,7 +1034,7 @@ async def test_dashboard_ad_action_snoozes_next_ad(monkeypatch):
 @pytest.mark.asyncio
 async def test_dashboard_can_send_to_twitch_and_youtube(monkeypatch):
     broadcaster = SimpleNamespace(id="channel-1")
-    twitch_channel = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True)))
+    twitch_channel = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True, id="twitch-message")))
     live_chat = SimpleNamespace(send_youtube_message=AsyncMock(return_value={"id": "youtube-message"}))
     services = SimpleNamespace(
         broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
@@ -1039,6 +1053,7 @@ async def test_dashboard_can_send_to_twitch_and_youtube(monkeypatch):
 
     assert response.status_code == 200
     assert payload["sent"] == ["twitch", "youtube"]
+    assert payload["message_ids"] == {"twitch": "twitch:twitch-message", "youtube": "youtube:youtube-message"}
     twitch_channel.send_message.assert_awaited_once_with(sender="channel-1", token_for="channel-1", message="Hello both chats")
     live_chat.send_youtube_message.assert_awaited_once_with("channel-1", "Hello both chats")
 
@@ -1899,9 +1914,11 @@ def test_dashboard_mobile_activity_panels_keep_tabs_above_scrollable_events():
 
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
-    features = open("web/templates/channel/features.html", encoding="utf-8").read()
+    features = open("web/templates/channel/settings.html", encoding="utf-8").read()
     channel_layout = open("web/templates/channel/layout.html", encoding="utf-8").read()
     customization = open("web/templates/shared/profile_inputs.html", encoding="utf-8").read()
+    youtube_settings = open("web/templates/shared/youtube_settings.html", encoding="utf-8").read()
+    widget_settings = open("web/templates/shared/widget_settings.html", encoding="utf-8").read()
     dashboard_styles = open("web/static/css/style.css", encoding="utf-8").read()
     widget_styles = open("web/static/css/chat-widget.css", encoding="utf-8").read()
     chat_script = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
@@ -1927,8 +1944,14 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'activity: "redeems"' in dashboard
     assert '<h4>No commands yet</h4>' in dashboard
     assert '<p>Chat commands will appear here.</p>' in dashboard
-    assert 'data-activity-tab="mod-actions"' in dashboard
-    assert 'data-activity-tab="automod"' in dashboard
+    assert '{% include "channel/for_you.html" %}' in dashboard
+    for_you = open("web/templates/channel/for_you.html", encoding="utf-8").read()
+    assert 'data-activity-tab="mod-actions"' in for_you
+    assert 'data-activity-tab="automod"' in for_you
+    assert 'id="mod-action-activity-content"' in for_you
+    assert 'id="automod-activity-content"' in for_you
+    assert 'data-fy-tab="notes"' in for_you
+    assert 'data-fy-tab="timer"' in for_you
     assert 'data-newest-first="true"' in dashboard
     assert dashboard.count('data-newest-first="true"') == 1
     assert 'const feedScroller = createTopScroller(feedContent);' in dashboard
@@ -1945,7 +1968,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.dashboard-tabs.activity-tabs .dashboard-tab { min-width: max-content; min-height: 34px; flex: 1 0 auto;' in dashboard_styles
     assert '.queue-toolbar button, .queue-toolbar a { display: inline-flex; width: 100%;' in dashboard_styles
     assert '@container (max-width: 500px)' not in dashboard_styles
-    assert dashboard.count('data-activity-group>') == 2
+    assert dashboard.count(' data-activity-group') == 2
     assert 'selectActivity(group, selected)' in dashboard
     assert 'tab.closest("[data-activity-group]")' in dashboard
     assert '.queue-toolbar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr));' in dashboard_styles
@@ -1960,9 +1983,11 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'data-channel-id="{{ broadcaster.id }}"' in dashboard
     assert 'data-reply-context' in dashboard
     assert 'data-reply-cancel' in dashboard
-    assert 'data-chat-target="twitch"' in dashboard
-    assert 'data-chat-target="youtube"' in dashboard
-    assert 'data-chat-target="both"' in dashboard
+    assert 'data-chat-target-cycle' in dashboard
+    assert 'data-youtube-connected=' in dashboard
+    assert 'data-chat-target="twitch"' not in dashboard
+    assert 'data-chat-target="youtube"' not in dashboard
+    assert 'data-chat-target="both"' not in dashboard
     assert "data-emote-picker" in dashboard
     assert "data-emote-toggle" in dashboard
     assert "data-dashboard-header-stats" in dashboard
@@ -2011,16 +2036,22 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "Viewer games" not in dashboard
     assert 'data-refresh-url="/channel/api/dashboard-stats"' in dashboard
     assert "Back to Overview" not in features
-    assert dashboard.index("dashboard-chat-composer-actions") < dashboard.index("data-chat-send-status") < dashboard.index("chat-send-button")
+    assert dashboard.index("dashboard-chat-compose-row") < dashboard.index("data-chat-target-cycle") < dashboard.index("data-chat-send-status") < dashboard.index("chat-send-button")
+    assert "dashboard-chat-composer-actions" not in dashboard
     assert 'fetch("/channel/api/chat/emotes")' in composer_script
     assert 'fetch("/channel/api/chat/users"' in composer_script
     assert 'const twitchCommands = [' in composer_script
-    assert 'value: `@${user.username}`' in composer_script
-    assert 'user.display_name.toLocaleLowerCase().includes(query)' in composer_script
-    assert 'command.name.includes(query)' in composer_script
-    assert '!key.includes(query)' in composer_script
-    assert 'inputBeforeCursor.match(/^\\/([A-Za-z]*)$/)' in composer_script
-    assert 'event.key === "Tab"' in composer_script
+    autocomplete_script = open("web/static/js/chat-autocomplete.js", encoding="utf-8").read()
+    shared_composer_script = open("web/static/js/chat-composer.js", encoding="utf-8").read()
+    assert 'window.createChatComposer' in composer_script
+    assert 'window.createChatAutocomplete' in shared_composer_script
+    assert '/js/chat-composer.js' in dashboard
+    assert 'value: `@${user.username}`' in autocomplete_script
+    assert "(user.display_name || '').toLocaleLowerCase().includes(match.query)" in autocomplete_script
+    assert 'command.name.includes(match.query)' in autocomplete_script
+    assert '!emote.name.toLocaleLowerCase().includes(match.query)' in autocomplete_script
+    assert 'before.match(/^\\/([A-Za-z]*)$/)' in autocomplete_script
+    assert "event.key === 'Tab'" in autocomplete_script
     assert "navigateMessageHistory(direction)" in composer_script
     assert "caretAtStart" in composer_script
     assert "caretAtEnd" in composer_script
@@ -2031,11 +2062,12 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '"pin-duration"' in live_chat_script
     assert '"live-chat-pinned-action live-chat-unpin"' in live_chat_script
     assert '["", "∞"]' in live_chat_script
-    assert 'window.requestAnimationFrame(finishScroll)' in live_chat_script
+    assert 'if (feed.scrollFrame) return;' in live_chat_script
+    assert 'feed.scrollFrame = window.requestAnimationFrame' in live_chat_script
     assert 'if (feed.followNewest) scrollToNewest(feed)' in live_chat_script
     assert 'return feed.newestFirst ? feed.element.scrollTop <= 24 : distanceFromBottom(feed.element) <= 24;' in live_chat_script
     assert 'if (feed.newestFirst) feed.element.prepend(row);' in live_chat_script
-    assert 'const oldest = feed.newestFirst ? messages[messages.length - 1] : messages[0];' in live_chat_script
+    assert 'const oldest = feed.newestFirst ? messages.pop() : messages.shift();' in live_chat_script
     assert 'const shouldFollowNewest = feed.followNewest && distanceFromBottom(feed.element) <= 24' in live_chat_script
     assert '["wheel", "touchmove"]' in live_chat_script
     assert 'feed.followRowObserver = new ResizeObserver' in live_chat_script
@@ -2180,10 +2212,12 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'dashboard-activity-unread' in dashboard
     assert 'dashboard-activity-unread' in chat_script
     assert '.dashboard-tab.has-unseen:not(.active)' in dashboard_styles
-    assert "Connect YouTube Channel" in customization
-    assert "('chat', 'Chat'" in customization
-    assert "('commands', 'Commands'" in customization
-    assert "('both', 'Both'" in customization
+    assert '{% include "shared/youtube_settings.html" %}' in customization
+    assert '{% include "shared/widget_settings.html" %}' in youtube_settings
+    assert "Connect YouTube Channel" in youtube_settings
+    assert "('chat', 'Chat'" in widget_settings
+    assert "('commands', 'Commands'" in widget_settings
+    assert "('both', 'Both'" in widget_settings
     assert ".live-chat-feed::-webkit-scrollbar" in dashboard_styles
     assert "#viewer-queue-content::-webkit-scrollbar" in dashboard_styles
     assert "padding-right: 8px; overflow-y: auto; scrollbar-gutter: stable;" in dashboard_styles
@@ -2198,8 +2232,9 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "overflow-y: auto" in widget_styles
     assert "shouldFollowNewest" in chat_script
     assert "if (shouldFollowNewest)" in chat_script
-    assert 'const jumpPath = feed.newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";' in chat_script
-    assert 'feed.jumpButton.title = "Jump to present";' in chat_script
+    assert 'function createJumpButton(newestFirst = false)' in chat_script
+    assert 'const path = newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";' in chat_script
+    assert 'button.title = "Jump to present";' in chat_script
     assert 'jumpButton.title = "Jump to present";' in dashboard
     assert 'makeElement("div", "live-chat-feed-shell")' in chat_script
     assert 'element.addEventListener("scroll", () => {' in chat_script
@@ -2224,13 +2259,15 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "66.666%, 100% { background-color: var(--jump-fill); }" in dashboard_styles
     assert chat_script.index("heading.appendChild(platform)") < chat_script.index("heading.appendChild(name)")
     assert 'emote.srcset = emoteSrcset(url)' in chat_script
-    assert 'image.srcset = emoteSrcset(emote.url)' in composer_script
-    assert 'replace(/\\/2x\\.webp$/, "/3x.webp")' in composer_script
+    picker_script = open("web/static/js/chat-emote-picker.js", encoding="utf-8").read()
+    assert 'image.srcset = emoteSrcset(emote.url)' in picker_script
+    assert 'replace(/\\/2x\\.webp$/, "/3x.webp")' in picker_script
+    assert "window.createChatEmotePicker" in composer_script
     assert "data-emote-group" in dashboard
     assert "renderGroupOptions" in composer_script
     assert "matches.slice(0, 300)" not in composer_script
     assert "overflow-y: auto; overscroll-behavior: contain;" in dashboard_styles
-    assert "seen.has(emote.name)" in composer_script
+    assert "seen.has(emote.name)" in autocomplete_script
     assert ".chat-emote-picker[hidden], .chat-emote-suggestions[hidden] { display: none; }" in dashboard_styles
     assert ".chat-send-status { flex: 1 1 0; min-width: 0;" in dashboard_styles
     assert "text-align: right; text-overflow: ellipsis;" in dashboard_styles
@@ -2238,13 +2275,13 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert ".chat-send-status.is-fading { opacity: 0; }" in dashboard_styles
     assert "height: calc(1.4em + 22px);" in dashboard_styles
     assert "resize: none;" in dashboard_styles
-    assert 'status.dataset.connectionState === "disconnected"' in composer_script
-    assert 'status.classList.add("is-fading")' in composer_script
-    assert 'grid-template-areas: "player queue chat" "activities activities chat"' in dashboard_styles
+    assert 'status.dataset.connectionState === "disconnected"' in shared_composer_script
+    assert 'status.classList.add("is-fading")' in shared_composer_script
+    assert 'grid-template-areas: "player queue chat" "lower lower chat"' in dashboard_styles
     assert "grid-template-rows: max-content minmax(540px,1fr)" in dashboard_styles
     assert '.channel-dashboard-layout > .dashboard-channel-profile[hidden] { display: none; }' in dashboard_styles
-    assert 'grid-template-areas: "stats" "player" "queue" "activities" "chat"' in dashboard_styles
-    assert 'grid-template-areas: "stats stats" "player queue" "activities activities" "chat chat"' in dashboard_styles
+    assert 'grid-template-areas: "stats" "player" "queue" "activities" "actions" "chat"' in dashboard_styles
+    assert 'grid-template-areas: "stats stats" "player queue" "lower lower" "chat chat"' in dashboard_styles
     assert '@media (min-width: 769px) and (max-width: 1100px)' in dashboard_styles
     assert '@media (max-width: 600px) {\n    .channel-page-overview .dashboard-header-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }' in dashboard_styles
     assert 'height: calc(200dvh - var(--dashboard-stats-height, 36px) - 52px)' in dashboard_styles
@@ -2381,7 +2418,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert ".dashboard-channel-copy .page-description { margin-top: 1px; line-height: 1.15; }" in dashboard_styles
     assert ".channel-page-overview { height: 100dvh; overflow: hidden; }" in dashboard_styles
     assert ".channel-page-overview .dashboard-chat-column { grid-row: 1 / -1; }" in dashboard_styles
-    assert 'grid-template-areas: "player queue chat" "activities activities chat";' in dashboard_styles
+    assert 'grid-template-areas: "player queue chat" "lower lower chat";' in dashboard_styles
     assert '.dashboard-chat-column > .dashboard-header-side { flex: 0 0 auto; margin-bottom: 12px; }' in dashboard_styles
     assert 'grid-template-rows: max-content max-content minmax(0,1fr) calc(100dvh - var(--dashboard-stats-height, 36px) - 16px)' not in dashboard_styles
     assert '.channel-page-overview .dashboard-video-frame { flex: 0 0 auto; aspect-ratio: 16 / 9; container-type: normal; }' in dashboard_styles

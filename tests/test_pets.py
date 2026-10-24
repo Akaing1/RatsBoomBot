@@ -1,21 +1,21 @@
 import asqlite
 import pytest
 
-from bot.services.engagement.pets import LOYALTY_GAIN_PASSIVE, PetService
-from bot.services.engagement.points import PointsService
+from pets import LOYALTY_GAIN_PASSIVE, PetService
+from loyalty.service import PointsService
 from storage.migration_runner import run_migrations
-from storage.migrations.v049_pet_asset_path import migrate as migrate_pet_asset_path
+from storage.migrations.pets.v049_pet_asset_path import migrate as migrate_pet_asset_path
 
 
 @pytest.mark.asyncio
-async def test_poc_bat_is_global_and_buffs_earned_points_only(tmp_path) -> None:
+async def test_loyalty_pet_is_global_and_buffs_earned_points_only(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "pets.db")) as database:
         await run_migrations(database)
         pets = PetService(database)
         points = PointsService(bot=None, db=database, pets=pets)
-        pet = await pets.grant_pet("viewer-1", "dungeon_bat", LOYALTY_GAIN_PASSIVE)
+        pet = await pets.grant_rat("viewer-1")
 
-        assert pet.pet_id == "dungeon_bat"
+        assert pet.pet_id == "explosive_rat"
         assert pet.passive_type == LOYALTY_GAIN_PASSIVE
         assert pet.passive_percent == 10
 
@@ -28,13 +28,13 @@ async def test_poc_bat_is_global_and_buffs_earned_points_only(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_granting_poc_bat_twice_keeps_one_global_pet_and_loadout(tmp_path) -> None:
+async def test_granting_bat_twice_keeps_one_global_pet_and_loadout(tmp_path) -> None:
     async with asqlite.create_pool(str(tmp_path / "pets.db")) as database:
         await run_migrations(database)
         pets = PetService(database)
 
-        first = await pets.grant_poc_bat("viewer-1")
-        second = await pets.grant_poc_bat("viewer-1")
+        first = await pets.grant_bat("viewer-1")
+        second = await pets.grant_bat("viewer-1")
 
         async with database.acquire() as connection:
             owned = await connection.fetchone(
@@ -57,7 +57,7 @@ async def test_transfers_and_gambling_payouts_do_not_receive_pet_bonus(tmp_path)
         await run_migrations(database)
         pets = PetService(database)
         points = PointsService(bot=None, db=database, pets=pets)
-        await pets.grant_pet("viewer-1", "dungeon_bat", LOYALTY_GAIN_PASSIVE)
+        await pets.grant_rat("viewer-1")
 
         await points.add_points("channel-1", "viewer-1", "viewer", 100, earned=False)
         await points.add_points("channel-1", "sender-1", "sender", 50, earned=False)
@@ -115,7 +115,7 @@ async def test_horned_wolf_upgrade_and_repeat_grant_preserve_existing_pets(tmp_p
         monkeypatch.setattr(migration_runner, 'MIGRATIONS', tuple(m for m in migrations if m.version < 59))
         await run_migrations(database)
         pets = PetService(database)
-        bat = await pets.grant_poc_bat('viewer')
+        bat = await pets.grant_bat('viewer')
         monkeypatch.setattr(migration_runner, 'MIGRATIONS', migrations)
         await run_migrations(database)
         await run_migrations(database)

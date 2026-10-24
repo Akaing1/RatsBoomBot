@@ -101,10 +101,24 @@ test('messages have independent user and type classifications', () => {
     assert.equal(category({badges: ['founder']}).user, 'subs');
     assert.equal(category({}).user, 'non_subs');
     assert.equal(category({kind: 'system'}).type, 'messages');
+    for (const notice_type of ['sub', 'resub', 'sub_gift', 'community_sub_gift', 'gift_paid_upgrade',
+        'prime_paid_upgrade', 'watch_streak', 'redemption', 'raid']) {
+        assert.equal(category({platform: 'twitch', kind: 'chat', notice_type}).type, 'redeems');
+        assert.equal(category({platform: 'twitch', kind: 'chat', notice_type, badges: ['subscriber']}).user, 'bots');
+        assert.equal(category({platform: 'youtube', kind: 'chat', notice_type}).user, 'youtube_bots');
+    }
+    assert.equal(category({platform: 'twitch', kind: 'send-error', local_only: true, is_bot: true}).type, 'messages');
     assert.equal(category({platform: 'youtube', badges: ['Mod']}).user, 'youtube_mods');
     assert.equal(category({platform: 'youtube', badges: ['Member']}).user, 'youtube_members');
     assert.equal(category({platform: 'youtube'}).user, 'youtube_non_members');
     assert.equal(category({platform: 'youtube', is_bot: true}).user, 'youtube_bots');
+});
+
+test('bot and notice classification skips badge scanning', () => {
+    const {category} = setup().api;
+    const badges = {map() { throw new Error('Bot and notice roles do not need badges'); }};
+    assert.equal(category({badges, is_bot: true}).user, 'bots');
+    assert.equal(category({badges, platform: 'youtube', notice_type: 'sub'}).user, 'youtube_bots');
 });
 
 test('each platform can be disabled, and only disabling both resets all users', () => {

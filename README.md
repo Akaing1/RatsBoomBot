@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current version: **9.1.0**
+Current application version: **15.3.2** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
 
 ## Highlights
 
@@ -13,7 +13,11 @@ Current version: **9.1.0**
 - Twitch OAuth for the bot account and connected broadcasters
 - Optional premium per-channel Twitch bot identities with automatic fallback
 - Public global and per-channel chatter profiles with searchable community statistics
-- Persistent points, counters, redeem history, settings, and moderation data
+- Persistent loyalty points, achievements, counters, redeem history, settings, and moderation data
+- Global pet collections, summon tickets, equipment, and passive bonuses
+- Boss Hunt encounters with weapons, crafting, consumables, loot, and adaptive mini-boss difficulty
+- Combined Twitch/YouTube chat with platform-aware sending and emotes
+- Twitch raid browser with recommendations, favorites, stream previews, and raid countdowns
 - Daily, first, second, self-timeout, and targeted-timeout redeems
 - Streamer.bot and Mix It Up redeem-history import tools
 - Viewer queues managed through chat or either dashboard
@@ -29,7 +33,7 @@ Current version: **9.1.0**
 
 ## Tech Stack
 
-- Python 3.11+
+- Python 3.13 for CI and deployment
 - TwitchIO 3.2
 - FastAPI and Uvicorn
 - SQLite and asqlite
@@ -37,7 +41,7 @@ Current version: **9.1.0**
 - HTTPX
 - Argon2 password hashing
 - Rich logging
-- pytest and pytest-asyncio
+- pytest and pytest-asyncio; Node.js built-in test runner for frontend tests
 
 ## Project Structure
 
@@ -48,13 +52,15 @@ RatsBoomBot
 │   ├── channels/           Broadcaster profiles, commands, and game modules
 │   ├── services/
 │   │   ├── channels/       Broadcaster state, settings, and feature overrides
-│   │   ├── engagement/     Points, redeems, clips, and queues
+│   │   ├── engagement/     Redeems, counters, clips, and game lookups
 │   │   ├── stream/         Timers, ads, shoutouts, and stream logs
 │   │   └── support/        Help and moderation services
 │   └── shared/             Reusable commands and EventSub listeners
 ├── config/                 Environment settings and application version
 ├── deploy/                 Linux, systemd, backup, and Windows deployment tools
 ├── docs/                   Project documentation and style guide
+├── loyalty/                Loyalty balances, gambling, duels, and passive payouts
+├── viewer_queue/           Persistent viewer queues and queue moderation
 ├── pets/                   Pet ownership and passive bonuses
 ├── rpg_minigame/           Boss encounters, inventory, loot, and RPG settings
 ├── scripts/                Administration and data-import utilities
@@ -63,11 +69,15 @@ RatsBoomBot
 ├── web/
 │   ├── admin/              Administrator authentication and routes
 │   ├── channel/            Broadcaster authentication and routes
-│   ├── shared/             Shared web helpers and health routes
+│   ├── public/             Public profiles, guides, and patch notes
+│   ├── viewer/             Chatter sign-in and account actions
+│   ├── shared/             Shared web helpers, raid discovery, and preview chat
 │   ├── templates/          Dashboard pages
 │   └── static/             Styles and assets
 └── main.py                 Application entry point
 ```
+
+Feature services live in `loyalty/`, `viewer_queue/`, `pets/`, and `rpg_minigame/`. Commands, stream events, and web routes connect these packages through the service container. See [feature package boundaries](docs/feature-packages.md) for ownership and dependencies.
 
 Commands validate chat input, services own shared behavior and persistence, and profiles define broadcaster-specific configuration. The runtime starts and stops the Twitch bot and FastAPI application together.
 
@@ -96,9 +106,27 @@ Points can remain disabled without disabling unrelated redeem tracking. Meinya s
 
 ### Chatter Profiles
 
-`!stats` opens the invoking viewer's public chatter profile, while `!stats <username>` opens another chatter's profile. Global profiles summarize exact tracked messages, channels visited, raid damage, boss participation, final hits, and bot-earned loyalty rewards. Each connected channel links to a detail page with the chatter's current balance, lifetime earnings, redeems, raid record, and inventory.
+`!stats` links to the invoking chatter's profile for the current channel; `!me` links to their global profile. Chatter sign-in provides account actions, including channel-specific shopping, crafting, selling, and gambling. Global profiles summarize exact tracked messages, channels visited, raid damage, boss participation, final hits, and bot-earned loyalty rewards. Each connected channel links to a detail page with the chatter's current balance, lifetime earnings, redeems, raid record, and inventory.
 
 Historical message totals are seeded from the previous point-eligible message count. After migration 13, every non-bot message is counted independently of the loyalty cooldown. Historical lifetime earnings begin with the balance present at migration; future totals include chat, redeem, raid, gamble, and other bot rewards while excluding moderator grants and viewer transfers.
+
+### Pets
+
+The `pets/` package owns global pet collections, summon tickets, equipment, and passive bonuses. One pet is equipped across all channels. `!pets buy ticket` costs 50,000 loyalty points in the current channel; `!pets summon` consumes a ticket, and `!pets equip <full pet name>` changes the equipped pet. Duplicate refunds return to the ticket's purchase channel.
+
+The eight current Common pets each have a 12.5% summon chance. Their fixed passives cover Loyalty Gain, Gamble Luck, Boss Hunt Damage, and Boss Hunt Profit. Leveling and feeding are not implemented yet. See [`docs/pets.md`](docs/pets.md) for rates, passives, and the asset workflow.
+
+Administrators can grant a pet to an existing chatter identity using the selected environment's database:
+
+```bash
+python -m scripts.grant_pet chatter_name --pet rat
+```
+
+Selectors are `bat`, `rat`, `fox`, `wolf`, `raven`, `cat`, `dog`, and `hen`. Grants equip the pet and preserve an existing copy's level and passive. `--passive` is a testing override. The grant script is an administrator utility; chatters acquire pets through tickets.
+
+### Achievements
+
+Achievements track chat, loyalty, gambling, community, channel-specific, and Boss Hunt milestones. Their service currently lives in `bot/services/channels/achievements.py`; Loyalty Points and Achievements have not yet been extracted into standalone packages. See [`docs/achievements.md`](docs/achievements.md) and the related achievement guides.
 
 ### Redeems and Stream Activity
 
@@ -120,6 +148,10 @@ Profiles can automatically shout out selected users when they send their first m
 
 Incoming raids can trigger chat and shoutout behavior. Broadcasters can also start outgoing raids with subscriber and non-subscriber messages configured by profile.
 
+The channel dashboard's raid browser includes Browse, Favorites, and Stream team views; category, language, tag, and relationship filters; compatibility ranking; and video/chat previews. Shared pending-raid state keeps browser actions, `/raid`, `/unraid`, and `!startraid` synchronized with the countdown banner. Follow raid is a persisted channel preference. Favorites and excluded channels are stored locally in each browser.
+
+Some directory sorting and suggested-streamer lookups use Twitch's unsupported public website GraphQL interface, isolated from the official Helix lookups. Existing accounts may need to reconnect Twitch for the newly requested chat-reading, following, and raid-management scopes.
+
 ### Boss Hunt
 
 Boss Hunt is the separate RPG minigame with scheduled bosses, attacks, weapons, and loyalty point rewards. Streamers can monitor and manage encounters from the Boss Hunt sidebar page. Viewers use the existing `!raid` commands and `/raid/{channel}` guide; those names remain valid so saved commands and links continue to work. This feature is distinct from Twitch raids.
@@ -130,7 +162,7 @@ Boss Hunt is the separate RPG minigame with scheduled bosses, attacks, weapons, 
 
 ### Moderation
 
-Moderation support includes protected users, timeout actions, `!kamikaze`, and configurable bot-detection modes:
+Moderation support includes protected users, timeout actions, and configurable bot-detection modes:
 
 - `learning` records observations without action.
 - `shadow` records what would have happened.
@@ -148,7 +180,7 @@ Third-party game APIs may require public player profiles and do not expose every
 
 ### Streamer Dashboard
 
-The root URL is the broadcaster-facing entry point. Twitch-authenticated connected broadcasters can view stream status, viewer queues, check-ins, other redeems, and social links; remove viewers; and manage supported feature and command overrides.
+The root URL is the public landing page with chatter sign-in. Connected broadcasters use `/channel` for stream status, combined Twitch/YouTube chat, viewer queues, check-ins, redeems, raid discovery, and feature/customization controls.
 
 Channel sessions are isolated by Twitch user ID and persist for the configured session lifetime.
 
@@ -170,7 +202,7 @@ Forms use CSRF protection, and sessions are signed with `SESSION_SECRET`.
 
 ### Premium Custom Bot Identities
 
-An owner can grant a connected channel access to a dedicated Twitch chat identity from its administrator page. Once enabled, the streamer enters the dedicated bot's Twitch username from the Customization page in Streamer Control. RatsBoomBot verifies the account and generates a single-use authorization link that expires after 15 minutes. The link can be opened in a private window, another browser, or another device without the broadcaster's dashboard session.
+An owner can grant a connected channel access to a dedicated Twitch chat identity from its administrator page. Once enabled, the streamer enters the dedicated bot's Twitch username from Settings → Connections in Streamer Control. RatsBoomBot verifies the account and generates a single-use authorization link that expires after 15 minutes. The link can be opened in a private window, another browser, or another device without the broadcaster's dashboard session.
 
 The custom account authorizes through the existing public channel OAuth callback. The account returned by Twitch must exactly match the username selected by the broadcaster before it can be connected. The bot is then used for command responses, timers, community events, redeems, raids, shoutouts, ad warnings, and announcements in that channel only. No additional environment variable or Twitch Developer Console redirect URI is required for this self-service flow.
 
@@ -194,29 +226,11 @@ The default SQLite database is `.data/tokens.db`. It stores OAuth tokens, broadc
 
 League statistics are stored separately in `.data/league.db`. This database contains replaceable external cache data, including seasonal champion summaries, recent ranked matches, and item metadata.
 
-Migrations run automatically during startup:
+Migrations run automatically during startup. The authoritative ordered registry is [`storage/migrations/__init__.py`](storage/migrations/__init__.py). It includes the original engagement schema, Boss Hunt progression, achievements, YouTube chat, viewer sessions, quotes, global pets, and raid-browser settings.
 
-1. Initial application schema
-2. Redeem statistics
-3. Administrator accounts
-4. Imported redeem totals
-5. Redemption activity
-6. Second-redeem constraints
-7. First-chat shoutout history
-8. Chatter identity cache
-9. Reklop counter seed
-10. Persistent viewer queues
-11. Persistent raid bosses and scheduler state
-12. Premium custom bot identities
-13. Public chatter profile statistics
-14. Removal of the three pre-release raid test encounters
-15. Passive point payout history
-16. Removal of the remaining pre-release Ahirman test encounter
-17. Removal of the complete failed Ahirman test encounter
-18. Removal of the correctly spelled Ahriman test encounter
-19. Single-use custom bot authorization links
+Recent migrations add incoming-raid recency (65), repair the development migration-number collision that could omit Honey Hen (66), and persist Follow raid (67). Applied migration versions and names are recorded in `schema_migrations`.
 
-Use a new migration for schema changes instead of rebuilding the production database.
+Migrations are grouped into core, loyalty, achievements, Boss Hunts, and pets while retaining one global version sequence. See the [migration contributor guide](docs/migrations.md) for numbering, registration, upgrade tests, and recovery. Use a new migration for schema changes instead of rebuilding the production database.
 
 ## Historical Redeem Imports
 
@@ -227,89 +241,9 @@ Two preview-first tools are included:
 
 Both require a broadcaster ID and only write when `--apply` is supplied. Imports replace the corresponding totals for that broadcaster, so create a backup first.
 
-## Local Setup
+## Local Development
 
-### 1. Clone and create a virtual environment
-
-```bash
-git clone https://github.com/Akaing1/RatsBoomBot.git
-cd RatsBoomBot
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Windows PowerShell activation:
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-
-### 2. Install dependencies
-
-```bash
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### 3. Configure the environment
-
-Copy `.env.example` to `.env` and configure the Twitch application, account IDs, callbacks, session secret, and scopes.
-
-```env
-CLIENT_ID=
-CLIENT_SECRET=
-BOT_ID=
-OWNER_ID=
-
-DATABASE_PATH=.data/tokens.db
-LEAGUE_DATABASE_PATH=.data/league.db
-STREAM_LOGS_PATH=.data/logs
-
-ADMIN_HOST=127.0.0.1
-ADMIN_PORT=4345
-ADMIN_BASE_URL=http://127.0.0.1:4345
-PUBLIC_BASE_URL=http://127.0.0.1:4345
-DASHBOARD_BASE_URL=http://127.0.0.1:4345
-
-SESSION_SECRET=
-SESSION_COOKIE_DOMAIN=
-ENVIRONMENT=local
-SESSION_HTTPS_ONLY=false
-TRUST_PROXY_HEADERS=false
-
-BOT_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/bot
-CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/admin/oauth/channel
-PUBLIC_CHANNEL_REDIRECT_URI=http://127.0.0.1:4345/oauth/channel/connect
-
-YOUTUBE_CLIENT_ID=
-YOUTUBE_CLIENT_SECRET=
-YOUTUBE_REDIRECT_URI=http://127.0.0.1:4345/oauth/youtube/connect
-YOUTUBE_CHAT_DISCOVERY_SECONDS=30
-```
-
-Keep `SESSION_SECRET` stable across deployments or existing browser sessions will become invalid. Administrator sessions default to eight hours; broadcaster sessions default to 30 days. In production, set `SESSION_COOKIE_DOMAIN=.ratsboombot.com` so an authenticated session is available to both the public site and dashboard subdomain.
-
-Register each callback exactly in the Twitch developer application. Changing scopes requires the affected account to reconnect.
-
-To enable combined Twitch and YouTube chat, enable the YouTube Data API v3 in a Google Cloud project and create an OAuth 2.0 Web application. Add `YOUTUBE_REDIRECT_URI` as an exact authorized redirect URI, then set its client ID and secret in `.env`. The integration requests only `youtube.readonly`, polls the connected channel's active livestream chat, and does not send messages or perform moderation. If the OAuth consent screen is still in Testing, add each broadcaster as a test user.
-
-Connected broadcasters receive three private OBS Browser Source URLs under **Customization → Socials → YouTube chat**: chat without commands, commands only, and both. Regenerating these URLs invalidates the previous set.
-
-### 4. Run
-
-```bash
-python main.py
-```
-
-```text
-Public landing page: http://127.0.0.1:4345/
-Streamer dashboard:  http://127.0.0.1:4345/channel
-Admin dashboard:    http://127.0.0.1:4345/admin
-Health endpoint:    http://127.0.0.1:4345/health
-```
-
-Create the first owner account with the administration script before opening the admin dashboard. Administrator passwords must contain at least 12 characters.
+Streamers and chatters use the hosted website; no desktop installation is required. Maintainers can run the Python service and dashboard locally for development and testing. See [the local-development guide](docs/development.md) for environment setup, OAuth callbacks, and test commands.
 
 ## Commands
 
@@ -317,15 +251,16 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 | Group | Commands |
 | --- | --- |
-| Utility | `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats`, `!me` |
+| Utility | `!kamikaze [username]`, `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats`, `!me` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube` |
 | Settings | `!set discord <url>`, `!set youtube <url>`, `!set game <game name>`, `!set title <stream title>`, `!timers`, `!timers on`, `!timers off` |
 | Shoutouts | `!so <username>` |
 | Clips | `!clip`, `!clip short` |
 | Raids | `!startraid <channel>` |
-| Moderation | `!kamikaze <username>` |
-| Points | Profile currency command with `leaderboard`, `gamble`, `duel`, `add`, and `reset` subcommands; Meinya also supports `!petals roulette` / `!petals spin` |
+| Points | `!points` or the profile currency command with `leaderboard`, `give`, `gamble`, `roulette` / `spin`, `duel`, `add`, and `reset` subcommands |
+| Pets | `!pets`, `!pets buy ticket`, `!pets summon`, `!pets equip <full pet name>` |
+| Quotes | `!quote`, `!quote <number>`, `!quote add <message>`, `!quote remove <number>` |
 | Overwatch | `!ow`, `!owrank`, `!owrecord`, `!owreset` |
 | League of Legends | `!champs`, `!champs <champion>`, `!register <Riot ID> [region]`, `!unregister`, `!rank [chatter]`, `!ladder` |
 
@@ -333,15 +268,15 @@ While a channel is live, connected logged-in chatters earn 15 passive points eve
 
 Bits spent through native Cheers earn the configured channel reward directly. Sound Alerts Bits purchases use the same reward ratio when the official `soundalerts` chatbot posts its purchase confirmation; anonymous or unresolvable purchasers are skipped, and processed chat-message IDs are persisted to prevent duplicate payouts.
 
-Meinya's roulette uses a standard single-zero wheel: 18 red, 18 black, and one green. Red and black return 2× the wager, green returns 5×, and bets are capped at 1,000 petals. Green is intentionally a high-risk novelty bet rather than an equal-odds choice. Wagers and payouts settle atomically to prevent concurrent commands from overspending a balance.
+Roulette uses a standard single-zero wheel: 18 red, 18 black, and one green. Red and black return 2× the wager, green returns 5×, and the default cap is 1,000 units of the channel's loyalty currency. Green is intentionally a high-risk novelty bet rather than an equal-odds choice. Wagers and payouts settle atomically to prevent concurrent commands from overspending a balance.
 
-Point commands use the profile's currency command and provide `leaderboard`, `reset`, `add`, `gamble`, and `duel` subcommands. Permission-sensitive actions are restricted to moderators or the broadcaster where appropriate.
+Point commands use the profile's currency command and provide `leaderboard`, `reset`, `add`, `give`, `gamble`, `roulette` / `spin`, and `duel` subcommands. Permission-sensitive actions are restricted to moderators or the broadcaster where appropriate.
 
 ## Production Deployment
 
 The production instance runs on a Raspberry Pi under systemd and HTTPS. Assets under `deploy/` include the service unit, Linux deployment with pre-deployment backup, scheduled SQLite backups with integrity checks and retention, a Windows PowerShell deployment wrapper, and Cloudflare tunnel support.
 
-Merges and direct pushes to `master` publish the configured application version and then deploy production through a self-hosted GitHub Actions runner on the Raspberry Pi. Register the runner with the custom label `ratsboombot` and run its service as the `rats-bot` user. The runner invokes `/opt/ratsboombot/deploy/linux/deploy.sh`, which retains the existing backup, compile check, systemd restart, health check, and automatic rollback behavior.
+Merges and direct pushes to `master` publish the configured application version and then deploy production through a self-hosted GitHub Actions runner on the Raspberry Pi. Register the runner with the custom label `ratsboombot` and run its service as the `rats-bot` user. The runner invokes `/opt/ratsboombot/deploy/linux/deploy.sh`, which retains the existing backup, compile check, systemd restart, health check, and rollback after failed health polling. Earlier script failures can exit before rollback; consult the deployment logs if a job fails.
 
 The runner host must allow the `rats-bot` user to run the two systemd commands used by the deployment script without an interactive password:
 
@@ -349,7 +284,7 @@ The runner host must allow the `rats-bot` user to run the two systemd commands u
 rats-bot ALL=(root) NOPASSWD: /usr/bin/systemctl restart ratsboombot, /usr/bin/systemctl is-active --quiet ratsboombot
 ```
 
-Keep the production runner restricted to the `ratsboombot` label. The deployment job runs only after the GitHub release job succeeds on `master`; pull requests never execute code on the Pi.
+Keep the production runner restricted to the `ratsboombot` label. The deployment job runs only after the GitHub release job succeeds on `master`; production pull requests do not deploy production. Eligible release-branch pull requests can deploy the separate UAT instance.
 
 Production should configure:
 
@@ -363,87 +298,46 @@ Use public HTTPS callback URLs, restrict `.env` and database permissions, retain
 
 ## UAT Deployment
 
-The UAT instance runs independently beside production from the permanent `uat` branch:
+The UAT instance runs independently beside production and can deploy validated commits from `uat` and `release/**` branches:
 
 - Production: `/opt/ratsboombot`, port `4345`, `ratsboombot.service`, production Twitch accounts and databases
 - UAT: `/opt/ratsboombot-uat`, port `4346`, `ratsboombot-uat.service`, test Twitch accounts and separate databases
 
-UAT uses `https://uat.ratsboombot.com`, an independent Twitch application, the `akaing1` test bot, and the `developer_ninjakaing` broadcaster. Never copy the production `.env` or SQLite databases into UAT.
+UAT uses `https://uat.ratsboombot.com`, an independent Twitch application, and the test bot/broadcaster accounts configured in its own `.env`. Never copy the production `.env` or SQLite databases into UAT.
 
-Pull requests targeting `uat` run the complete test suite. Pushes and merges to `uat` deploy automatically after validation when the repository variable `UAT_DEPLOY_ENABLED` is set to `true`. UAT deployments do not publish GitHub releases or restart the production service.
+Pull requests targeting `uat` or `release/**`, and pushes to those branches, run Python compilation and pytest. When `UAT_DEPLOY_ENABLED` is `true`, eligible pushes and same-repository, non-draft PRs targeting `release/**` deploy UAT after validation. The workflow also supports manual dispatch. UAT deployments do not publish GitHub releases or restart the production service.
 
-Complete the one-time Raspberry Pi, Twitch, Cloudflare, and GitHub setup in [`deploy/linux/UAT.md`](deploy/linux/UAT.md). Develop features against `uat`, verify them with the test accounts, and then open the final release pull request from `uat` into `master`.
+Complete the one-time Raspberry Pi, Twitch, Cloudflare, and GitHub setup in [`deploy/linux/UAT.md`](deploy/linux/UAT.md). Open feature and fix PRs against the active release branch (`release/15.0.0`), verify them in UAT, and merge the release branch into `master` when ready to ship.
 
 ## Testing
 
 Run the suite from the repository root:
 
 ```bash
-pytest
+python -m pytest
+node --test tests/js/*.test.cjs
 ```
+
+The current UAT workflow runs Python tests; run the JavaScript suite explicitly for frontend changes.
 
 New behavior should include tests for the affected service and, when relevant, authentication, authorization, CSRF, persistence, and channel isolation.
 
 ## Versioning
 
-Version **14.2.1** covers the pets system and eight-pet Common collection, dashboard enhancements (visible version, improved labels and metadata editing, overlay scrollbars, and offline chat cleanup), YouTube streaming/token/reconnect recovery and account-safety fixes, and pet display/UAT deployment corrections. The major identifies the pets milestone; two grouped minor increments account for the pet collection expansion and dashboard enhancements; the patch increment groups the accumulated corrections. Development remains on `release/14.0.0`.
+The application version is defined in [`config/version.py`](config/version.py). Published release history and unreleased changes live in [`CHANGELOG.md`](CHANGELOG.md), with links to GitHub releases and pull requests.
 
 RatsBoomBot uses a practical three-part version number:
 
-- Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes
-- Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement
-- Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone
+- Patch (`X.Y.Z`) — bug fixes, copy updates, and very small changes.
+- Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement.
+- Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone.
 
-The home page’s **What’s New** panel is intentionally updated only for minor and major releases. Patch releases remain available in the full GitHub release history.
-
-Version **9.1.0** adds an isolated UAT deployment environment for testing changes before production.
-
-Version **9.0.5** adds independent 5% Basic weapon drops for every successful raid participant and fixed 50% resale values for standard and Overclocked weapons.
-
-Version **8.10.3** improves the Patch Notes composer layout.
-
-Version **8.10.2** fixes Discord deployment-status updates on Raspberry Pi runners without `jq`.
-
-Version **8.10.1** adds follow-up Discord status and patch-notes setup fixes.
-
-Version **8.10.0** adds dashboard-managed public patch notes with Discord announcements.
-
-Version **8.9.3** adds a persistent Discord status card that updates during and after production deployments.
-
-Version **8.9.0** adds a curated home-page **What’s New** panel for meaningful feature-release highlights.
-
-Version **8.8.3** simplifies raid crafting to weapon-family commands that automatically choose the highest available next tier.
-
-Version **8.8.2** moves loot lookup into the raid command group as `!raid loot`.
-
-Version **8.8.1** adds raid weapon unequipping and consolidates raid help on the dedicated raid page.
-
-Version **8.8.0** adds raid weapon crafting, expanded consumables, second attacks, stream-wide Blessings, and stronger mythical weapons.
-
-Version **8.7.1** replaces session-bound custom bot authorization with username-verified, single-use links that can be opened in a separate browser or device.
-
-Version **8.7.0** adds streamer-managed OAuth onboarding for premium custom bot identities. Administrators grant access, while streamers securely connect and manage their own dedicated Twitch bot accounts from Streamer Control.
-
-Version **8.6.1** fixes the public raid page's recent-history query against the production raid schema.
-
-Version **8.6.0** adds public `/raid/{channel}` guides with live encounter progress, contributor rankings, shop details, mechanics, rewards, commands, and recent raid history.
-
-Version **8.5.3** moves public channel command references to `/help/{channel}` and collapses active raid leaderboards after the top ten contributors.
-
-Version **8.5.2** corrects the Ahriman test-run cleanup and converts the public command Help page to full-width dropdown sections with an active raid contributor leaderboard.
-
-Version **8.5.0** adds standard single-zero roulette as a Meinya loyalty-points game.
-
-Version **8.4.1** removes the remaining pre-release Ahirman test encounter from raid history.
-
-Version **8.4.0** adds persistent passive point earnings for connected live chatters.
-
-Version **6.0.0** marks the checkpoint where RatsBoomBot became a structured multi-channel platform with profile-specific engagement, streamer dashboards, migration tools, clips, raids, first-chat shoutouts, and production-oriented stream logging.
+The active release branch is `release/15.0.0`. Branch names denote planned milestones; only published GitHub releases belong in the dated changelog. The home page's **What's New** panel is updated for minor and major releases; patch history remains in the changelog and GitHub releases.
 
 ## Current Limitations
 
 - Broadcaster onboarding is intended for invited channels and is not invitation-gated in the application.
-- New channels require a registered profile for complete behavior.
+- Connected channels without a registered profile receive a generic profile; custom behavior still uses explicit profiles and overrides.
 - Some game data depends on third-party services and public player profiles.
 - Production deployment requires a registered self-hosted Raspberry Pi runner.
 - Not every profile-specific message and redeem has a dashboard editor.
@@ -452,6 +346,30 @@ Version **6.0.0** marks the checkpoint where RatsBoomBot became a structured mul
 
 Follow `docs/styling_guide.md`. Keep commands thin, put shared behavior in services, keep broadcaster customization in profiles, and use migrations for persistent schema changes.
 
-## License
+## Licensing Status
 
-RatsBoomBot is a personal project without a formal open-source license. Add a license before public distribution or accepting outside contributions.
+RatsBoomBot is a privately operated project and is not currently offered under an open-source license. No general source-code license is granted by this repository. All rights in copyrightable original contributions are reserved by their respective copyright holders, except where permission has already been granted or applicable law provides otherwise.
+
+This notice does not revoke existing permissions, override GitHub's terms (including viewing and forking rights for public repositories), or replace the licenses of third-party dependencies and assets. Permission to use the hosted service is separate from permission to reuse its source code. Contact the maintainers about source-code licensing; any future project-wide license must account for contributor and third-party rights.
+
+This is a statement of the current licensing status, not a new open-source license or a transfer of contributors' copyright. See [GitHub's licensing guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository) and [the no-license explanation](https://choosealicense.com/no-permission/).
+
+### Personal dashboard tools
+
+Flip the Moderation card to **For You** for private, account-saved stream notes and a personal reminder timer. Save notes explicitly; timers use Minutes : Seconds and support 1 second to 7 days and survive refreshes. Keep the dashboard open for the popup; overdue timers appear when you return. These tools do not post messages to chat.
+
+### Channel settings notebook
+
+Settings combines feature switches and customization into General, Chat, Stream Events, Timers, Connections, Loyalty Points, Viewer Queue, and Pets and Boss Hunt. Games appears when a channel has an enabled game integration, and contains only enabled game data. General contains protected users, YouTube chat, and game enable switches. Raid preferences live under Stream Events. SVG tabs sit above the settings on desktop and mobile. Single feature status buttons live in expandable group headers; multi-feature controls use aligned rows inside the group. Timers and Loyalty Points show their forms directly, without extra accordions; standalone commands use compact rows. Switch tabs without losing form drafts; a dot marks sections with unsaved edits. Save controls apply to their individual forms. Saving one form warns before discarding drafts in other forms. Expand detailed groups as needed. Loyalty Points is managed inside Settings rather than a separate sidebar page. Old Features, Customization, and Loyalty Points URLs redirect to Settings, and `/channel/settings?section=loyalty` opens a category directly.
+
+### For You
+
+The For You sidebar page contains Notes and Quotes. Notes share the Overview editor: saves update one entry per stream, including streams crossing midnight, or one entry per offline UTC day. Notes can be created, titled, edited, deleted, and reordered using the note list. Untitled entries are displayed as Unnamed note 1, Unnamed note 2, etc., in list order; deleting or titling one closes numbering gaps. Stream/day grouping stays internal. Existing note content is preserved on upgrade. Quote search, addition, editing, and deletion use the same channel quotes as chat commands. Lists paginate in groups of 20; deletion renumbers quotes as usual.
+
+## Unattended performance history
+
+Each bot process records one JSON sample every 60 seconds in `performance.jsonl` beside its configured database. The dashboard does not need to be open. The file and three rotated backups (`.1` through `.3`) use approximately 8 MiB maximum per deployment and survive restarts. Production and UAT databases should live in separate directories.
+
+Samples contain a Unix timestamp, PID, application version, process resident memory, host memory, swap usage, CPU usage/temperature, load, active stream-log session count, async task count, and Raspberry Pi throttling flags. Unsupported measurements are `null`; the initial CPU sample is also `null`. Stream-session count reflects the bot's tracked sessions, not an independent Twitch poll. Throttling flags include historical flags since boot. No chat content or tokens are recorded.
+
+To inspect history, run `tail -n 10 /path/to/database-directory/performance.jsonl`. Copy the current file and rotated backups when investigating an incident. Samples flush after each write; a stalled process may leave a gap, and this logger cannot diagnose an outage before it was deployed. File/firmware reads run off the chat event loop, with a two-second firmware command timeout.

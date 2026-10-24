@@ -15,6 +15,7 @@ from twitchio.exceptions import InvalidTokenException
 
 from bot.bot import TwitchBot
 from app.runtime_logs import runtime_log_buffer
+from app.performance_log import record_performance
 from config.settings import settings
 from config.version import APP_NAME, APP_VERSION
 from storage.database import delete_token, setup_database
@@ -29,6 +30,7 @@ async def run_services(bot: TwitchBot, admin_server: uvicorn.Server) -> None:
     bot_task = asyncio.create_task(bot.start(load_tokens=False), name="twitch-bot")
     admin_task = asyncio.create_task(admin_server.serve(), name="admin-dashboard")
     tasks = {bot_task, admin_task}
+    performance_task = asyncio.create_task(record_performance(bot), name="performance-log")
 
     try:
         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -50,6 +52,8 @@ async def run_services(bot: TwitchBot, admin_server: uvicorn.Server) -> None:
         if pending:
             await asyncio.gather(*pending)
     finally:
+        performance_task.cancel()
+        await asyncio.gather(performance_task, return_exceptions=True)
         admin_server.should_exit = True
 
         if not bot_task.done():

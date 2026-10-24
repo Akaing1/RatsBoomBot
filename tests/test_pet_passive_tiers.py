@@ -2,7 +2,7 @@ import asqlite
 import pytest
 
 from bot.profiles import RaidBossConfig
-from bot.services.engagement.points import PointsService
+from loyalty.service import PointsService
 from pets import PetService
 from pets.passives import (
     GAMBLE_LOSS_REFUND, GAMBLE_ODDS, KAMIKAZE_ODDS, PASSIVES,
@@ -43,7 +43,7 @@ async def test_rat_passives_follow_equipped_pet_and_preserve_bat(tmp_path):
         await pets.grant_rat('viewer', GAMBLE_ODDS)
         assert await pets.gamble_win_chance('viewer', .5) == .55
         assert await pets.bonus_bps('viewer', RAID_DAMAGE) == 0
-        await pets.grant_poc_bat('viewer')
+        await pets.grant_bat('viewer')
         assert (await pets.get_equipped_pet('viewer')).user_pet_id == bat.user_pet_id
         assert await pets.gamble_win_chance('viewer', .5) == .5
         assert await pets.bonus_bps('viewer', 'loyalty_gain') == 1000

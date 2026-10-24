@@ -4,7 +4,7 @@ from typing import Any
 
 import asqlite
 
-from storage.migrations import MIGRATIONS, Migration
+from storage.migrations import MIGRATIONS, Migration, validate_migrations
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -58,7 +58,7 @@ async def run_migration(connection: Any, migration: Migration) -> None:
         await migration.run(connection)
         await record_migration(connection, migration)
         await connection.commit()
-    except Exception:
+    except BaseException:
         await connection.rollback()
 
         LOGGER.exception(
@@ -77,6 +77,7 @@ async def run_migration(connection: Any, migration: Migration) -> None:
 
 
 async def run_migrations(db: asqlite.Pool) -> None:
+    validate_migrations(MIGRATIONS)
     started_at = perf_counter()
 
     LOGGER.debug("[Database] Ensuring the migration history table exists.")
@@ -85,7 +86,27 @@ async def run_migrations(db: asqlite.Pool) -> None:
         await create_migration_table(connection)
         await connection.commit()
 
-        applied_versions = await get_applied_versions(connection)
+        history = await connection.fetchall(
+            "SELECT version, name FROM schema_migrations ORDER BY version"
+        )
+        registered = {migration.version: migration for migration in MIGRATIONS}
+        for expected_version, row in enumerate(history, start=1):
+            version, name = int(row["version"]), row["name"]
+            migration = registered.get(version)
+            if migration is None:
+                raise ValueError(f"Database migration {version} is unknown to this application; use a compatible release.")
+            if version != expected_version:
+                raise ValueError(f"Database migration history is missing version {expected_version}; restore or repair it before upgrading.")
+            # A shipped development collision is repaired by migration 66;
+            # its original history row intentionally remains unchanged.
+            known_collision = (
+                version == 64
+                and migration.name == "honey_hen"
+                and name == "incoming_raid_recency"
+            )
+            if name != migration.name and not known_collision:
+                raise ValueError(f"Database migration {version} is named {name!r}, expected {migration.name!r}.")
+        applied_versions = {int(row["version"]) for row in history}
         pending_migrations = [migration for migration in MIGRATIONS if migration.version not in applied_versions]
 
         LOGGER.info(

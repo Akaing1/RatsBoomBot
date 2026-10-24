@@ -14,6 +14,7 @@ import httpx
 import grpc
 
 from bot.profiles import get_active_profile
+from bot.services.channels.chat_notices import notification_details
 from bot.services.channels import youtube_live_chat_pb2
 from config.settings import settings
 from web.shared.youtube_oauth import YOUTUBE_API_URL, YOUTUBE_TOKEN_URL, YouTubeChannel, YouTubeTokenResponse
@@ -66,6 +67,10 @@ class UnifiedChatMessage:
     mentioned: bool = False
     is_bot: bool = False
     is_redeem: bool = False
+    user_id: str = ""
+    notice: str = ""
+    notice_type: str = ""
+    notice_label: str = ""
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
@@ -215,28 +220,33 @@ class LiveChatService:
             await self.client.aclose()
             self.client = None
 
-    def publish_twitch(self, payload) -> UnifiedChatMessage:
+    def publish_twitch(self, payload, *, notice=None) -> UnifiedChatMessage:
         broadcaster_id = str(payload.broadcaster.id)
         self._ensure_seventv_watcher(broadcaster_id)
         chatter = payload.chatter
         message_text = str(payload.text)
         username = str(getattr(chatter, "name", None) or "unknown")
         display_name = str(getattr(chatter, "display_name", None) or username)
+        if getattr(payload, "anonymous", False):
+            username = display_name = "Anonymous"
         self._ensure_twitch_badge_loader(broadcaster_id)
         badges = self._twitch_message_badges(broadcaster_id, payload)
 
         timestamp = getattr(payload, "timestamp", None)
         timestamp_value = timestamp.isoformat() if hasattr(timestamp, "isoformat") else datetime.now(UTC).isoformat()
         message_id = str(getattr(payload, "id", None) or secrets.token_urlsafe(12))
+        color = getattr(payload, "color", None)
         message = UnifiedChatMessage(
             id=f"twitch:{message_id}",
             platform="twitch",
-            kind="command" if self._consume_command_response(broadcaster_id, message_id) else self._classify(broadcaster_id, message_text),
+            kind="chat" if notice else "command" if self._consume_command_response(broadcaster_id, message_id) else self._classify(broadcaster_id, message_text),
             username=username,
             display_name=display_name,
             message=message_text,
             timestamp=timestamp_value,
-            color=str(getattr(payload, "color", None) or "") or None,
+            color=str(getattr(color, "html", color) or "") or None,
+            user_id="" if getattr(payload, "anonymous", False) else str(getattr(chatter, "id", "") or ""),
+            **(notice or {}),
             badges=badges,
             segments=self._twitch_message_segments(broadcaster_id, payload, message_text),
             accent=self._twitch_message_accent(payload),
@@ -250,6 +260,29 @@ class LiveChatService:
             or str(getattr(payload, "type", "")) in {"channel_points_highlighted", "channel_points_sub_only"}
         )
         self.publish(broadcaster_id, message)
+        return message
+
+    def publish_twitch_notification(self, payload):
+        kind = str(getattr(payload, "notice_type", ""))
+        data = getattr(payload, kind, None)
+        if data is None and kind.startswith("shared_chat_"):
+            data = getattr(payload, kind.replace("shared_chat_", "shared_", 1), None)
+        details = notification_details(kind, getattr(payload, "system_message", ""), data)
+        if details is None:
+            return None
+        return self.publish_twitch(payload, notice=details)
+
+    def publish_redemption(self, *, broadcaster_id, redemption_id, user_id, username,
+                           reward_title, user_input=None, redeemed_at=None, cost=None):
+        cost_text = f" · {cost:,} points" if isinstance(cost, int) else ""
+        message = UnifiedChatMessage(
+            id=f"twitch:redeem:{redemption_id or secrets.token_urlsafe(12)}", platform="twitch", kind="chat",
+            user_id=str(user_id), username=str(username), display_name=str(username),
+            message=str(user_input or ""), is_redeem=True,
+            notice=f"Redeemed {reward_title}{cost_text}", notice_type="redemption", notice_label="Redeem",
+            timestamp=redeemed_at.isoformat() if hasattr(redeemed_at, "isoformat") else datetime.now(UTC).isoformat()
+        )
+        self.publish(str(broadcaster_id), message)
         return message
 
     @staticmethod
@@ -363,6 +396,8 @@ class LiveChatService:
         fragments = getattr(payload, "fragments", None)
 
         if not fragments:
+            if not message_text:
+                return ()
             return self._apply_seventv_emotes(broadcaster_id, (ChatSegment("text", message_text),))
 
         segments: list[ChatSegment] = []
@@ -391,9 +426,14 @@ class LiveChatService:
         return self._apply_seventv_emotes(broadcaster_id, tuple(segments))
 
     def _apply_seventv_emotes(self, broadcaster_id: str, segments: tuple[ChatSegment, ...]) -> tuple[ChatSegment, ...]:
+        if not segments:
+            return segments
         emotes = dict(self.seventv_global_emotes)
         emotes.update(self.seventv_channel_emotes.get(str(broadcaster_id), {}))
+        return self.apply_emote_catalog(segments, emotes)
 
+    @staticmethod
+    def apply_emote_catalog(segments: tuple[ChatSegment, ...], emotes: dict[str, ChatSegment]) -> tuple[ChatSegment, ...]:
         if not emotes:
             return segments
 
@@ -408,7 +448,7 @@ class LiveChatService:
                 if not token:
                     continue
 
-                rendered.append(emotes.get(token, ChatSegment("text", token)))
+                rendered.append(emotes.get(token) or ChatSegment("text", token))
 
         return tuple(rendered)
 

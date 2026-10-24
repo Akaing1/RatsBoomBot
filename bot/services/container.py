@@ -2,7 +2,9 @@ import logging
 
 from bot.profiles import FeatureName, get_active_profile
 from bot.services.channels import BroadcasterService, BroadcasterSettingsService, ChatIdentityService, ChatterIdentityService, ChatterStatsService, FeatureToggleService, LiveChatService, ProfileSettingsService
-from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, PassivePointsService, PointsService, RedeemService, ViewerQueueService
+from bot.services.engagement import ClipService, CounterService, LeagueService, OverwatchService, RedeemService
+from loyalty import PassivePointsService, PointsService
+from viewer_queue import ViewerQueueService
 from pets import PetService
 from rpg_minigame import RaidBossService
 from bot.services.stream import AdAnnouncementService, FirstChatShoutoutService, ShoutoutService, StreamLogService, TimerService

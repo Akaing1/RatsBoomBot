@@ -5,6 +5,12 @@
 {% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard-for-you.css') }}?v={{ deployment_stamp() }}">
+<dialog class="for-you-dialog" data-fy-dialog aria-labelledby="for-you-alert-title">
+    <h3 id="for-you-alert-title">Dink Donk - Pizza's Ready!</h3>
+    <p data-fy-alert-error role="status"></p>
+    <button type="button" data-fy-dismiss autofocus>Got it</button>
+</dialog>
 <div class="channel-dashboard-layout" data-dashboard-carousel>
 <header class="page-header dashboard-channel-profile" hidden>
     <div class="channel-heading dashboard-channel-heading">
@@ -163,7 +169,7 @@
                             <div class="chat-filter-platform-section" role="group" aria-label="{{ platform_label }} users">
                                 <div class="chat-filter-platform-heading">
                                     <label class="chat-filter-row chat-filter-platform-title" title="{{ platform_label }}"><input type="checkbox" data-chat-filter-platform="{{ platform_key }}" {% if not connected %}disabled{% endif %} {% if not (twitch_connected and youtube_chat.connected) %}hidden{% endif %}> <span>{{ platform_label }}</span></label>
-                                    <a class="chat-filter-connection{% if connected %} is-connected{% endif %}" data-chat-filter-connection data-connected="{{ 'true' if connected else 'false' }}" href="{{ '/connect' if platform_key == 'twitch' else '/channel/customization?social_tab=youtube#youtube-integration' }}" title="{{ 'Edit' if connected else 'Connect' }} {{ platform_label }} connection" aria-label="{{ platform_label }} {{ 'connected' if connected else 'not connected' }}. Open channel connection settings.">{{ 'Connected' if connected else 'Not connected' }}</a>
+                                    <a class="chat-filter-connection{% if connected %} is-connected{% endif %}" data-chat-filter-connection data-connected="{{ 'true' if connected else 'false' }}" href="{{ '/connect' if platform_key == 'twitch' else '/channel/settings?section=general&social_tab=youtube#youtube-integration' }}" title="{{ 'Edit' if connected else 'Connect' }} {{ platform_label }} connection" aria-label="{{ platform_label }} {{ 'connected' if connected else 'not connected' }}. Open channel connection settings.">{{ 'Connected' if connected else 'Not connected' }}</a>
                                 </div>
                                 <div {% if not connected %}hidden{% endif %}>
                                 {% for key, label in platform_entries %}
@@ -193,6 +199,17 @@
             </div>
         </div>
 
+        <div class="dashboard-pending-raid" data-pending-raid data-pending-url="/channel/api/raid-browser/pending" data-action-url="/channel/api/raid-browser/action" data-csrf-token="{{ csrf_token }}" hidden role="status" aria-live="polite" tabindex="-1">
+            <img class="dashboard-pending-raid-avatar" data-pending-raid-avatar alt="" width="32" height="32" hidden>
+            <div class="dashboard-pending-raid-info"><a data-pending-raid-channel target="_blank" rel="noopener noreferrer"></a><span data-pending-raid-description></span><span data-pending-raid-text></span></div>
+            <label class="dashboard-follow-raid"><input type="checkbox" data-pending-raid-follow {% if channel_settings.follow_raid | default(true) %}checked{% endif %}> Follow raid</label>
+            <button type="button" data-pending-raid-cancel>Cancel raid</button>
+            <div class="dashboard-raid-countdown" data-pending-raid-countdown role="timer" aria-live="off">
+                <svg viewBox="0 0 40 40" aria-hidden="true"><circle class="dashboard-raid-countdown-track" cx="20" cy="20" r="17"/><circle class="dashboard-raid-countdown-ring" data-pending-raid-ring cx="20" cy="20" r="17" pathLength="1"/></svg>
+                <span data-pending-raid-seconds></span>
+            </div>
+            <div class="dashboard-raid-progress" data-pending-raid-progress aria-hidden="true"></div>
+        </div>
         <div
                 class="live-chat-feed dashboard-chat-feed"
                 data-live-chat-feed
@@ -204,7 +221,7 @@
             data-max-messages="150"
         ></div>
 
-        <form class="dashboard-chat-composer" data-chat-composer data-channel-id="{{ broadcaster.id }}">
+        <form class="dashboard-chat-composer" data-chat-composer data-channel-id="{{ broadcaster.id }}" data-youtube-connected="{{ 'true' if youtube_chat.connected else 'false' }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="reply_parent_message_id" value="" data-reply-message-id>
             <div class="chat-reply-context" data-reply-context hidden>
@@ -215,12 +232,19 @@
                 <button type="button" data-reply-cancel aria-label="Cancel reply" title="Cancel reply">×</button>
             </div>
             <label class="sr-only" for="dashboard-chat-message">Send a chat message</label>
+            <div class="dashboard-chat-compose-row">
             <div class="chat-message-entry">
-                <textarea id="dashboard-chat-message" name="message" rows="1" maxlength="500" placeholder="Send a message... (supports autocomplete)" required autocomplete="off"></textarea>
+                <button class="chat-target-cycle" type="button" data-chat-target-cycle aria-label="Send to Twitch. Click or press Tab to change." title="Twitch">[Twitch]</button>
+                <textarea id="dashboard-chat-message" name="message" rows="1" maxlength="500" placeholder="Send a message…" aria-describedby="dashboard-chat-send-hint" aria-keyshortcuts="Shift+Enter" required autocomplete="off"></textarea>
                 <button class="chat-emote-toggle" type="button" data-emote-toggle aria-expanded="false" aria-label="Open emote picker" title="Emotes">
                     <span aria-hidden="true">☺</span>
                 </button>
+                <p id="chat-send-status" class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
                 <div class="chat-emote-suggestions" data-emote-suggestions role="listbox" hidden></div>
+            </div>
+            <button class="button primary chat-send-button" type="submit" aria-label="Send message" title="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3 21 12 4 21 8 12Z"/></svg></button>
+            </div>
+            <p id="dashboard-chat-send-hint" class="chat-send-hint"><kbd>Shift</kbd> + <kbd>Enter</kbd> sends to all connected platforms</p>
                 <div class="chat-emote-picker" data-emote-picker hidden>
                     <div class="chat-emote-picker-header">
                         <label class="sr-only" for="dashboard-emote-search">Search emotes</label>
@@ -236,37 +260,14 @@
                     </div>
                     <p class="chat-emote-picker-note" data-emote-note></p>
                 </div>
-            </div>
-            <div class="dashboard-chat-composer-actions">
-                <div class="chat-target-selector" role="group" aria-label="Send message to">
-                    <button class="chat-target active" type="button" data-chat-target="twitch" aria-pressed="true">Twitch</button>
-                    <button class="chat-target" type="button" data-chat-target="youtube" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>YouTube</button>
-                    <button class="chat-target" type="button" data-chat-target="both" aria-pressed="false" {% if not youtube_chat.connected %}disabled{% endif %}>Both</button>
-                </div>
-                <p id="chat-send-status" class="chat-send-status" data-chat-send-status role="status" aria-live="polite"></p>
-                <button class="button primary chat-send-button" type="submit">Send</button>
-            </div>
         </form>
     </section>
     </div>
 
+    <div class="dashboard-lower-panels">
     <div class="dashboard-activity-grid">
-    <section class="panel activity-panel dashboard-activity-panel dashboard-moderation-panel" data-activity-group>
-        <div class="panel-header"><h3>Moderation</h3></div>
-        <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Moderation activity">
-            <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-activity-tab="mod-actions">Mod actions</button>
-            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="automod">AutoMod</button>
-        </div>
-        <div data-activity-panel="mod-actions">
-            <div id="mod-action-activity-content" class="activity-scroll">
-                <div class="compact-empty-state"><h4>No moderation actions yet</h4><p>Moderator actions will appear here.</p></div>
-            </div>
-        </div>
-        <div data-activity-panel="automod" hidden>
-            <div id="automod-activity-content" class="activity-scroll">
-                <div class="compact-empty-state"><h4>AutoMod queue is clear</h4><p>Held messages will appear here for review.</p></div>
-            </div>
-        </div>
+    <section class="panel activity-panel dashboard-activity-panel dashboard-moderation-panel for-you-card" data-activity-group data-for-you data-csrf-token="{{ csrf_token }}">
+        {% include "channel/for_you.html" %}
     </section>
 
     <section class="panel activity-panel dashboard-activity-panel dashboard-community-panel" data-activity-group>
@@ -344,6 +345,17 @@
         </div>
 
     </section>
+    </div>
+
+        <section class="dashboard-actions-panel" role="group" aria-label="Dashboard actions">
+            <button class="dashboard-action-placeholder" type="button" data-raid-browser-open aria-haspopup="dialog" aria-controls="dashboard-raid-browser" title="Raid browser" aria-label="Raid browser"><svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(40 12 12)"><path d="M12 1c.5 2.5 3.5 3 4 5.5.3 1.5-.5 3-2 3.5.5-1.5-.5-2.5-1.5-3.5 0 1.5-.5 2.5-2 3.5C8 9 7.5 7 8.5 5.5c.5 1 1 1.5 1.5 1.5-1-2 0-4.5 2-6ZM8 11h8l-2.5 2h-3L8 11Zm2.5 2h3L13 23h-2l-.5-10Z"/></g></svg><span class="sr-only">Raid browser</span></button>
+            <button class="dashboard-action-placeholder" type="button" disabled title="Polls — coming soon" aria-label="Polls — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10h3v10m3 0V4h3v16m3 0v-7h3v7M3 20h19"/></svg><span class="sr-only">Polls</span></button>
+            <button class="dashboard-action-placeholder" type="button" disabled title="Predictions — coming soon" aria-label="Predictions — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="8"/><path d="m7 17-2 5h14l-2-5M9.5 8a2.5 2.5 0 0 1 5 0c0 1.5-2.5 1.5-2.5 3"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg><span class="sr-only">Predictions</span></button>
+            <button class="dashboard-action-placeholder" type="button" disabled title="Stream Together — coming soon" aria-label="Stream Together — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m1-17a3 3 0 0 1 0 6m3 11v-3a6 6 0 0 0-3-5"/></svg><span class="sr-only">Stream Together</span></button>
+            <button class="dashboard-action-placeholder" type="button" disabled title="Shouts — coming soon" aria-label="Shouts — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 6-3v18l-6-3H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h9V5Zm-7 12 2 5h4l-2-5M14 7v10"/></svg><span class="sr-only">Shouts</span></button>
+            <button class="dashboard-action-placeholder" type="button" disabled title="Whispers — coming soon" aria-label="Whispers — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v9ZM7 8h10M7 12h7"/></svg><span class="sr-only">Whispers</span></button>
+            <button class="dashboard-action-placeholder" type="button" disabled title="Points redeems — coming soon" aria-label="Points redeems — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z"/></svg><span class="sr-only">Points redeems</span></button>
+        </section>
     </div>
 
     <div class="channel-dashboard-side viewer-queue-column">
@@ -966,12 +978,158 @@
 {% endblock %}
 
 {% block page_scripts %}
+<script src="{{ url_for('static', path='/js/dashboard-for-you.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <dialog id="dashboard-raid-browser" class="raid-browser-dialog" aria-labelledby="raid-browser-title" data-raid-browser data-browser-url="/channel/api/raid-browser" data-raid-action-url="/channel/api/raid-browser/action" data-csrf-token="{{ csrf_token }}" data-channel-id="{{ broadcaster.id }}">
+        <div class="raid-browser-header">
+            <label class="raid-browser-search-heading" for="raid-browser-channel-search">Search</label>
+            <button class="button raid-browser-reset" type="reset" form="raid-browser-filters">Reset</button>
+            <button class="button raid-browser-mobile-filter-button" type="button" data-raid-filters-toggle aria-label="Filters" aria-controls="raid-browser-filters" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z"/></svg><span class="raid-browser-filter-label">Filters</span></button>
+            <button class="raid-browser-manage-lists" type="button" data-raid-lists-open aria-label="Manage favorites and blacklist" title="Manage lists" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
+            <button type="button" class="raid-browser-close" data-raid-browser-close aria-label="Close raid browser" title="Close raid browser"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        </div>
+        <div class="raid-browser-body">
+            <div class="raid-browser-collection">
+                    <div class="raid-browser-results-toolbar">
+                        <div class="raid-browser-heading-group">
+                            <h3 id="raid-browser-title">Raid browser</h3>
+                            <div class="raid-browser-tab-scroll">
+                            <div class="raid-browser-tabs" data-raid-collection-tabs role="group" aria-label="Channel collection">
+                                <button type="button" data-raid-browser-tab="browse" aria-pressed="true">Browse</button>
+                                <button type="button" data-raid-browser-tab="favorites" aria-pressed="false" hidden>Favorites</button>
+                                <button type="button" data-raid-browser-tab="team" aria-pressed="false" hidden>Stream team</button>
+                                <button type="button" data-raid-browser-tab="developer" aria-pressed="false" hidden>Developer</button>
+                            </div>
+                            </div>
+                            <select class="raid-browser-collection-select" data-raid-collection-select aria-label="Channel collection"><option value="browse">Browse</option></select>
+                        </div>
+                <div class="raid-browser-result-controls">
+                    <label class="raid-browser-size-control"><span class="raid-browser-size-small" aria-hidden="true">Small</span>
+                        <input type="range" min="0" max="2" step="1" value="1" data-raid-browser-size aria-label="Card and row size" aria-valuetext="Medium">
+                        <span class="raid-browser-size-large" aria-hidden="true">Large</span>
+                    </label>
+                    <div class="raid-browser-view-toggle" role="group" aria-label="Result layout">
+                        <button type="button" data-raid-browser-view="list" aria-pressed="false" aria-label="List view" title="List view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h3v3H3zm0 7h3v3H3zm0 7h3v3H3zm6-14h12v3H9zm0 7h12v3H9zm0 7h12v3H9z"/></svg></button>
+                        <button type="button" data-raid-browser-view="cards" aria-pressed="true" aria-label="Card view" title="Card view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg></button>
+                    </div>
+                </div>
+                    </div>
+                <div class="raid-browser-results-shell">
+                    <div class="raid-browser-results" data-raid-browser-results role="list" tabindex="0" aria-label="Live channels"></div>
+                </div>
+            </div>
+            <form id="raid-browser-filters" class="raid-browser-filters" data-raid-browser-search role="search" aria-label="Raid browser filters">
+                <div class="raid-browser-filter-fields">
+                <label><span class="raid-browser-search-caption">Search</span><input id="raid-browser-channel-search" type="search" name="query" aria-label="Search" title="Search" maxlength="100" placeholder="Search channels..." autocomplete="off"></label>
+                <label>Sort by<select name="sort" title="Sort by">
+                    <option value="for_you">For You</option>
+                    <option value="viewers_asc">Viewers (low to high)</option>
+                    <option value="viewers_desc">Viewers (high to low)</option>
+                    <option value="name_asc">Channel Name (A to Z)</option>
+                    <option value="name_desc">Channel Name (Z to A)</option>
+                    <option value="uptime_asc">Uptime (low to high)</option>
+                    <option value="uptime_desc">Uptime (high to low)</option>
+                </select></label>
+                <label>Following<select name="follow_status" data-hover-current-value><option value="">Any</option><option value="not_following">Not following</option><option value="following">Following</option><option value="mutual">Mutual following</option></select></label>
+                <label data-raid-team-filter hidden>Stream team<select name="team" data-hover-current-value><option value="">All teams</option></select></label>
+                <label>Category<input type="search" data-raid-category-search placeholder="Search categories..." autocomplete="off" maxlength="100" aria-controls="raid-browser-category-options" aria-expanded="false"></label>
+                <input type="hidden" name="category_id" value="">
+                <div id="raid-browser-category-options" class="raid-browser-tag-dropdown raid-browser-category-options" popover="manual" role="group" aria-label="Category suggestions" hidden></div>
+                <label>Language<select name="language" data-hover-current-value><option value="">All languages</option><option value="en">English</option><option value="ja">Japanese</option><option value="ko">Korean</option><option value="zh">Chinese</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="pt">Portuguese</option><option value="ru">Russian</option><option value="other">Other</option></select></label>
+                <label>Event<select name="event" data-hover-current-value><option value="">All events</option><option value="drops_enabled">Drops Enabled</option></select></label>
+                <small>Following filters may require reconnecting Twitch.</small>
+                <div class="raid-browser-tag-input-row">
+                    <label>Tags<input type="search" data-raid-tag-search aria-label="Tags" title="Tags" maxlength="25" placeholder="Search tags..." autocomplete="off" aria-controls="raid-browser-tag-options" aria-expanded="false" aria-describedby="raid-browser-tag-limit"><small id="raid-browser-tag-limit" class="raid-browser-tag-limit" data-raid-tag-limit role="status" hidden>Maximum 25 characters</small></label>
+                    <div class="raid-browser-tag-match"><span>Match</span><button class="queue-state-toggle live" type="button" data-raid-tag-match aria-label="Match all tags" aria-pressed="true"><span class="queue-state-current">All</span><span class="queue-state-alternate" aria-hidden="true">Any</span></button></div>
+                </div>
+                <input type="hidden" name="tag_match" value="all">
+                <input type="hidden" name="tags" value="">
+                <div class="raid-browser-tag-options" data-raid-selected-tags role="group" aria-label="Selected tags"></div>
+                <div id="raid-browser-tag-options" class="raid-browser-tag-dropdown" popover="manual" role="group" aria-label="Available stream tags" hidden></div>
+                <div class="raid-browser-feedback">
+                    <p class="raid-browser-status" data-raid-browser-status role="status" aria-live="polite"></p>
+                </div>
+                </div>
+                <div class="raid-browser-filter-submit"><button class="button primary" type="submit">Submit</button><button class="button raid-browser-reset" type="reset">Reset</button></div>
+            </form>
+        </div>
+    </dialog>
+    <dialog id="dashboard-raid-preview" class="raid-preview-dialog" data-raid-preview data-details-url="/channel/api/raid-browser/preview" aria-labelledby="raid-preview-title">
+        <header class="raid-preview-header">
+            <button class="button secondary" type="button" data-raid-preview-back aria-label="Back to raid browser" title="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+            <h3 id="raid-preview-title">Stream preview</h3>
+            <div class="raid-preview-header-labels" tabindex="0" role="region" aria-label="Events and stream teams">
+                <div class="raid-preview-events" data-raid-preview-events></div>
+                <div class="raid-preview-teams" data-raid-preview-teams></div>
+            </div>
+            <div class="raid-preview-header-actions">
+                <button class="button secondary" type="button" data-raid-preview-favorite aria-pressed="false" aria-label="Favorite" title="Favorite"></button>
+                <details class="raid-preview-menu" data-raid-preview-menu>
+                    <summary aria-label="Options" title="Options">⋮</summary>
+                    <button type="button" data-raid-preview-block>Don’t recommend</button>
+                </details>
+            </div>
+            <button class="raid-browser-close" type="button" data-raid-preview-close aria-label="Close preview" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        </header>
+        <div class="raid-preview-body" data-raid-preview-body>
+            <section class="raid-preview-main" data-raid-preview-main aria-label="Stream and channel details">
+                <div class="raid-preview-video-row"><div class="raid-preview-video" data-raid-preview-video></div></div>
+                <div class="raid-preview-details" data-raid-preview-details>
+                    <div class="raid-preview-details-upper">
+                    <div class="raid-preview-details-header">
+                        <div class="raid-preview-identity" data-raid-preview-identity></div>
+                        <div class="raid-preview-details-actions">
+                            <div class="raid-preview-badges" data-raid-preview-badges></div>
+                        </div>
+                    </div>
+                    <div class="raid-preview-details-copy">
+                    <h4 data-raid-preview-stream-title></h4>
+                    <p class="raid-preview-meta" data-raid-preview-meta></p>
+                    <div class="raid-preview-tags" data-raid-preview-tags></div>
+                    </div>
+                    </div>
+                <footer class="raid-preview-footer" data-raid-preview-footer>
+                    <div class="raid-preview-footer-copy">
+                        <p class="raid-preview-description" data-raid-preview-description></p>
+                        <p data-raid-preview-status role="status" aria-live="polite"></p>
+                    </div>
+                    <button class="button primary" type="button" data-raid-preview-raid>Raid</button>
+                </footer>
+                </div>
+            </section>
+            <section class="raid-preview-chat" data-raid-preview-chat aria-label="Channel chat"></section>
+        </div>
+    </dialog>
+    <dialog class="raid-lists-dialog" data-raid-lists aria-labelledby="raid-lists-title">
+        <div class="raid-browser-header"><h3 id="raid-lists-title">Favorites and blacklist</h3><button type="button" class="raid-browser-close" data-raid-lists-close aria-label="Close list manager"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+        <p data-raid-lists-status role="status"></p>
+        <div class="raid-browser-tabs" role="tablist" aria-label="Saved channel lists">
+            <button type="button" id="raid-favorites-tab" role="tab" data-raid-list-tab="favorites" aria-controls="raid-favorites-panel" aria-selected="true" tabindex="0">Favorites</button>
+            <button type="button" id="raid-blacklist-tab" role="tab" data-raid-list-tab="blacklist" aria-controls="raid-blacklist-panel" aria-selected="false" tabindex="-1">Blacklist</button>
+        </div>
+        <section id="raid-favorites-panel" role="tabpanel" aria-labelledby="raid-favorites-tab" data-raid-list-panel="favorites"><div data-raid-favorite-list></div></section>
+        <section id="raid-blacklist-panel" role="tabpanel" aria-labelledby="raid-blacklist-tab" data-raid-list-panel="blacklist" hidden><div data-raid-blocked-list></div></section>
+        <p class="raid-lists-note">Saved for this connected channel in this browser. The blacklist only affects this raid browser, not Twitch follows or chat bans.</p>
+    </dialog>
+    <script src="{{ url_for('static', path='/js/chat-name-colors.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-autocomplete.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-emote-input.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-composer.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-target-selector.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-emote-picker.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/raid-preview-chat.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/raid-preview-player.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/raid-browser-search-fields.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/raid-browser-selects.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-raid-browser.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-raid-status.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-carousel.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="https://player.twitch.tv/js/embed/v1.js" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-stream-player.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-channel-metadata.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-viewer-queue.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-chat-test-mode.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-message-merge.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-chat-filters.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-chat-send.js') }}?v={{ deployment_stamp() }}" defer></script>

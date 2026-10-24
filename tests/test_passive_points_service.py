@@ -6,8 +6,8 @@ import asqlite
 import pytest
 from twitchio.exceptions import HTTPException
 
-import bot.services.engagement.passive_points as passive_module
-from bot.services.engagement.passive_points import PassivePointsService
+import loyalty.passive as passive_module
+from loyalty.passive import PassivePointsService
 
 
 class FakeChatIdentity:

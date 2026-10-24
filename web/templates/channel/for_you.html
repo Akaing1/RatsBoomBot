@@ -1,0 +1,66 @@
+        <div class="for-you-flipper" data-fy-flipper>
+            <div class="for-you-face for-you-front" data-fy-front>
+                <div class="panel-header">
+                    <h3>Moderation</h3>
+                    <button type="button" class="for-you-flip" data-fy-flip aria-label="Flip card to For You">For You <span aria-hidden="true">↻</span></button>
+                </div>
+                <p class="for-you-summary" data-fy-summary hidden></p>
+                <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Moderation activity">
+                    <button class="dashboard-tab active" type="button" role="tab" aria-selected="true" data-activity-tab="mod-actions">Mod actions</button>
+                    <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-activity-tab="automod">AutoMod</button>
+                </div>
+                <div data-activity-panel="mod-actions">
+                    <div id="mod-action-activity-content" class="activity-scroll">
+                        <div class="compact-empty-state"><h4>No moderation actions yet</h4><p>Moderator actions will appear here.</p></div>
+                    </div>
+                </div>
+                <div data-activity-panel="automod" hidden>
+                    <div id="automod-activity-content" class="activity-scroll">
+                        <div class="compact-empty-state"><h4>AutoMod queue is clear</h4><p>Held messages will appear here for review.</p></div>
+                    </div>
+                </div>
+            </div>
+            <div class="for-you-face for-you-back" data-fy-back aria-hidden="true" inert>
+                <div class="panel-header">
+                    <h3>For You</h3><a href="/channel/for-you">Notes archive &amp; quotes</a>
+                    <button type="button" class="for-you-flip" data-fy-flip aria-label="Flip card to Moderation">Moderation <span aria-hidden="true">↻</span></button>
+                </div>
+                <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="For You">
+                    <button id="for-you-notes-tab" class="dashboard-tab active" type="button" role="tab" aria-selected="true" aria-controls="for-you-notes" data-fy-tab="notes">Notes</button>
+                    <button id="for-you-timer-tab" class="dashboard-tab" type="button" role="tab" aria-selected="false" aria-controls="for-you-timer" tabindex="-1" data-fy-tab="timer">Timer</button>
+                </div>
+                <div id="for-you-notes" class="for-you-content" role="tabpanel" aria-labelledby="for-you-notes-tab" data-fy-panel="notes">
+                    <textarea aria-label="Stream notes" id="streamer-notes" data-fy-notes maxlength="20000" rows="5" placeholder="Ideas, moments to clip, things to remember…" disabled></textarea>
+                    <div class="for-you-actions"><span data-fy-save-status role="status">Loading notes…</span><button type="button" data-fy-save disabled>Save notes</button></div>
+                </div>
+                <div id="for-you-timer" class="for-you-content" role="tabpanel" aria-labelledby="for-you-timer-tab" data-fy-panel="timer" hidden>
+                    <form data-fy-timer-form>
+                        <div class="for-you-duration">
+                            <div class="for-you-duration-field">
+                                <label for="streamer-minutes">Minutes</label>
+                                <div class="for-you-number">
+                                    <input id="streamer-minutes" name="minutes" type="number" min="0" max="10080" step="1" value="20" required disabled>
+                                    <div class="for-you-steppers">
+                                        <button type="button" data-fy-step="minutes:1" aria-label="Increase minutes" disabled>▴</button>
+                                        <button type="button" data-fy-step="minutes:-1" aria-label="Decrease minutes" disabled>▾</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="for-you-colon" aria-hidden="true">:</span>
+                            <div class="for-you-duration-field">
+                                <label for="streamer-seconds">Seconds</label>
+                                <div class="for-you-number">
+                                    <input id="streamer-seconds" name="seconds" type="number" min="0" max="59" step="1" value="0" required disabled>
+                                    <div class="for-you-steppers">
+                                        <button type="button" data-fy-step="seconds:1" aria-label="Increase seconds" disabled>▴</button>
+                                        <button type="button" data-fy-step="seconds:-1" aria-label="Decrease seconds" disabled>▾</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="for-you-timer-actions"><div class="for-you-running" data-fy-running hidden>Time Remaining : <strong data-fy-countdown></strong></div><button class="for-you-start" data-fy-timer-action type="submit" disabled>Start timer</button></div>
+                    </form>
+                </div>
+                <p class="for-you-error" data-fy-error role="status"></p>
+            </div>
+        </div>

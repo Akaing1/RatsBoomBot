@@ -5,7 +5,7 @@ import pytest
 from twitchio.assets import Asset
 
 from bot.services.channels.chatter_stats import ChatterStatsService
-from bot.services.engagement.points import PointsService
+from loyalty.service import PointsService
 from bot.shared.commands.stats import StatsCommands
 from storage.migrations import MIGRATIONS
 from storage.migration_runner import run_migrations

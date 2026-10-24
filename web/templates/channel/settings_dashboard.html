@@ -1,0 +1,14 @@
+<section class="panel profile-settings-panel" id="dashboard-settings">
+    <h3>Raid preferences</h3>
+    <form method="post" action="/channel/customization">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="setting_name" value="dashboard.follow_raid">
+        <label for="follow-raid-default">Follow raids by default</label>
+        <select class="profile-setting-input" id="follow-raid-default" name="value">
+            <option value="1"{% if channel_settings.follow_raid %} selected{% endif %}>On</option>
+            <option value="0"{% if not channel_settings.follow_raid %} selected{% endif %}>Off</option>
+        </select>
+        <button class="button primary" type="submit" name="action" value="save">Save Changes</button>
+    </form>
+</section>
+

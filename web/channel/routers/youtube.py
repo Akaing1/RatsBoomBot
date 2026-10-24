@@ -16,7 +16,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 
 def youtube_redirect(result: str, message: str) -> RedirectResponse:
-    url = f"/channel/customization?youtube_result={result}&youtube_message={quote_plus(message)}&social_tab=youtube#youtube-integration"
+    url = f"/channel/settings?section=general&youtube_result={result}&youtube_message={quote_plus(message)}&social_tab=youtube#youtube-integration"
     return RedirectResponse(url=url, status_code=303)
 
 

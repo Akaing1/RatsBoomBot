@@ -15,6 +15,7 @@
     host.setAttribute("aria-hidden", "true");
     document.body.appendChild(host);
     const entries = new Map();
+    const dialogHosts = new WeakMap();
     let frame = 0;
     let pointerTarget = null;
     let dragging = null;
@@ -23,18 +24,37 @@
     function schedule() {
         if (!frame) frame = requestAnimationFrame(render);
     }
+    function keepVisible(element) {
+        const entry = entries.get(element);
+        if (!entry) return;
+        entry.activeUntil = performance.now() + 300;
+        setTimeout(schedule, 350);
+        schedule();
+    }
     function register(element) {
         if (!(element instanceof Element) || element.closest(".overlay-scrollbars")) return;
         const style = getComputedStyle(element);
         if (element !== root && !/auto|scroll/.test(`${style.overflowX} ${style.overflowY}`)) return;
         if (entries.has(element)) return;
+        const dialog = element.closest("dialog");
+        let container = host;
+        if (dialog) {
+            container = dialogHosts.get(dialog);
+            if (!container) {
+                container = document.createElement("div");
+                container.className = "overlay-scrollbars";
+                container.setAttribute("aria-hidden", "true");
+                dialog.appendChild(container);
+                dialogHosts.set(dialog, container);
+            }
+        }
         const bars = ["y", "x"].map(axis => {
             const track = document.createElement("div");
             track.className = `overlay-scrollbar axis-${axis}`;
             const thumb = document.createElement("div");
             thumb.className = "overlay-scrollbar-thumb";
             track.appendChild(thumb);
-            host.appendChild(track);
+            container.appendChild(track);
             const bar = {axis, track, thumb, geometry: null};
             track.addEventListener("wheel", event => {
                 if (!bar.geometry?.range) return;
@@ -66,13 +86,19 @@
                 element[dragging.property] = dragging.position + (coordinate - dragging.coordinate)
                     * bar.geometry.range / (bar.geometry.travel || 1);
             });
-            const endDrag = () => { dragging = null; schedule(); };
+            const endDrag = () => {
+                if (dragging?.bar !== bar) return;
+                dragging = null;
+                keepVisible(element);
+            };
+            track.addEventListener("pointerleave", () => keepVisible(element));
             track.addEventListener("pointerup", endDrag);
             track.addEventListener("pointercancel", endDrag);
             track.addEventListener("lostpointercapture", endDrag);
             return bar;
         });
         entries.set(element, {bars, activeUntil: 0});
+        element.addEventListener("pointerleave", () => keepVisible(element));
         resizeObserver.observe(element);
     }
     function scan(node) {
@@ -112,6 +138,7 @@
             }
             const rect = visibleRect(element);
             const visible = element === root || element.contains(pointerTarget) || element.contains(document.activeElement)
+                || entry.bars.some(bar => bar.track.contains(pointerTarget))
                 || entry.activeUntil > now || dragging?.element === element;
             entry.bars.forEach(bar => {
                 const vertical = bar.axis === "y";
@@ -122,8 +149,9 @@
                 bar.track.hidden = !rect || !overflow || content <= viewport + 1 || length <= 0;
                 if (bar.track.hidden) return;
                 bar.geometry = thumbGeometry(viewport, content, length, element[vertical ? "scrollTop" : "scrollLeft"]);
+                const outset = parseFloat(getComputedStyle(element).getPropertyValue("--overlay-scrollbar-outset")) || 0;
                 Object.assign(bar.track.style, vertical
-                    ? {top: `${rect.top + 2}px`, left: `${rect.right - 9}px`, height: `${length}px`}
+                    ? {top: `${rect.top + 2}px`, left: `${Math.max(0, Math.min(window.innerWidth - 9, rect.right - 9 + outset))}px`, height: `${length}px`}
                     : {top: `${rect.bottom - 9}px`, left: `${rect.left + 2}px`, width: `${length}px`});
                 bar.track.classList.toggle("is-visible", visible);
                 Object.assign(bar.thumb.style, vertical
@@ -145,11 +173,11 @@
     }).observe(document.body, {subtree: true, childList: true, attributes: true,
         attributeFilter: ["class", "style", "hidden", "open"]});
     document.addEventListener("pointerover", event => {
-        if (!host.contains(event.target)) pointerTarget = event.target;
+        pointerTarget = event.target;
         schedule();
     });
     document.addEventListener("pointerout", event => {
-        if (!host.contains(event.relatedTarget)) pointerTarget = event.relatedTarget;
+        pointerTarget = event.relatedTarget;
         schedule();
     });
     document.addEventListener("focusin", schedule);

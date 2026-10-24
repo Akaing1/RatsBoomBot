@@ -1,7 +1,7 @@
 import asqlite
 import pytest
 
-from bot.services.engagement.viewer_queue import ViewerQueueService
+from viewer_queue.service import ViewerQueueService
 from bot.shared.commands.viewer_queue import ViewerQueueCommands
 from storage.migration_runner import run_migrations
 

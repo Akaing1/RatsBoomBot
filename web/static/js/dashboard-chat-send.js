@@ -2,20 +2,17 @@
     const form = document.querySelector("[data-chat-composer]");
     if (!form) return;
 
-    const messageInput = form.querySelector('[name="message"]');
+    let messageInput = form.querySelector('[name="message"]');
     const defaultMessagePlaceholder = messageInput.placeholder;
     const sendButton = form.querySelector(".chat-send-button");
     const status = form.querySelector("[data-chat-send-status]");
-    const targets = Array.from(form.querySelectorAll("[data-chat-target]"));
+    const targetButton = form.querySelector("[data-chat-target-cycle]");
     const emoteToggle = form.querySelector("[data-emote-toggle]");
     const emotePicker = form.querySelector("[data-emote-picker]");
-    const emoteSearch = form.querySelector("[data-emote-search]");
-    const emoteGroup = form.querySelector("[data-emote-group]");
-    const emoteChannels = form.querySelector("[data-emote-channels]");
-    const seventvButton = form.querySelector("[data-emote-seventv]");
-    const emoteGrid = form.querySelector("[data-emote-grid]");
-    const emoteCount = form.querySelector("[data-emote-count]");
-    const emoteNote = form.querySelector("[data-emote-note]");
+    const pickerView = window.createChatEmotePicker({picker: emotePicker, getEmotes: () => emotes,
+        getPersonalGroup: () => personalGroup, insert: name => insertValue(name)});
+    const emoteSearch = pickerView.search;
+    const emoteNote = pickerView.note;
     const suggestionBox = form.querySelector("[data-emote-suggestions]");
     const replyContext = form.querySelector("[data-reply-context]");
     const replyMessageId = form.querySelector("[data-reply-message-id]");
@@ -23,19 +20,18 @@
     const replyPreview = form.querySelector("[data-reply-preview]");
     const replyCancel = form.querySelector("[data-reply-cancel]");
     let selectedTarget = "twitch";
-    let sending = false;
     let emotes = [];
     let users = [];
     let catalogLoadedAt = 0;
     let catalogPromise = null;
     let usersLoadedAt = 0;
     let usersPromise = null;
-    let suggestions = [];
-    let selectedSuggestion = 0;
-    let completionRange = null;
-    let selectedGroup = null;
+    let autocomplete = null;
     let personalGroup = "";
-    let statusFadeTimer = null;
+    let composer = null;
+    messageInput = window.createChatEmoteInput?.({input: messageInput, getEmotes: () => emotes,
+        enabled: () => selectedTarget !== "youtube",
+        onLimit: () => composer?.showStatus("Messages can contain up to 500 characters.", "warning", true)}) || messageInput;
     const messageHistoryKey = `ratsboombot:chat-message-history:${form.dataset.channelId || "channel"}`;
     let messageHistory = [];
     let historyIndex = 0;
@@ -91,20 +87,11 @@
     })).sort((left, right) => left.name.localeCompare(right.name));
 
     function showStatus(message, tone = "", fadeAfterDelay = false) {
-        window.clearTimeout(statusFadeTimer);
-        window.clearTimeout(status._connectionFadeTimer);
-        status.className = `chat-send-status${tone ? ` ${tone}` : ""}`;
-        status.textContent = message;
-        if (fadeAfterDelay) {
-            statusFadeTimer = window.setTimeout(() => {
-                if (status.dataset.connectionState === "disconnected") {
-                    status.className = "chat-send-status error";
-                    status.textContent = "Not connected";
-                } else {
-                    status.classList.add("is-fading");
-                }
-            }, 3000);
-        }
+        composer.showStatus(message, tone, fadeAfterDelay);
+    }
+
+    function reportSendFailure(platform, message) {
+        document.dispatchEvent(new CustomEvent("dashboard-chat-send-error", {detail: {platform, message}}));
     }
 
     function saveMessageHistory() {
@@ -153,49 +140,10 @@
         return true;
     }
 
-    function groupKey(emote) {
-        return emote.group_key || `${emote.provider}:other`;
-    }
-
-    function orderedGroups() {
-        const groups = new Map();
-        emotes.forEach(emote => groups.set(groupKey(emote), {
-            key: groupKey(emote), label: emote.group || emote.provider.toUpperCase(), image: emote.group_image || ""
-        }));
-        const rank = key => key === personalGroup ? 0 : key === "7tv" ? 3 : key === "twitch:global" ? 2 : 1;
-        return Array.from(groups.values()).sort((a, b) => rank(a.key) - rank(b.key)
-            || a.label.localeCompare(b.label, undefined, {sensitivity: "base"}));
-    }
-
-    function setGroupIcon(button, group) {
-        button.replaceChildren();
-        button.title = group.key === personalGroup ? `Your channel · ${group.label}` : group.label;
-        button.setAttribute("aria-label", button.title);
-        const fallback = document.createElement("span");
-        fallback.textContent = group.key === "7tv" ? "7TV" : group.label.slice(0, 2);
-        const image = document.createElement("img");
-        image.alt = "";
-        image.src = group.key === "7tv" ? "/static/img/7tv.svg"
-            : /^https:\/\/[^/]*jtvnw\.net\//.test(group.image) ? group.image
-            : "/static/img/twitch.svg";
-        image.addEventListener("error", () => image.replaceWith(fallback), {once: true});
-        button.appendChild(image);
-    }
-
     const trustedEmoteUrl = /^https:\/\/(?:static-cdn\.jtvnw\.net|cdn\.7tv\.app)\//;
 
-    function emoteSrcset(url) {
-        const larger = url.includes("static-cdn.jtvnw.net/")
-            ? url.replace(/\/2\.0$/, "/3.0")
-            : url.replace(/\/2x\.webp$/, "/3x.webp");
-        return larger === url ? "" : `${url} 2x, ${larger} 3x`;
-    }
-
     function hideSuggestions() {
-        suggestionBox.hidden = true;
-        suggestionBox.replaceChildren();
-        suggestions = [];
-        completionRange = null;
+        autocomplete?.hide();
     }
 
     function insertValue(value, range = null) {
@@ -218,91 +166,12 @@
         messageInput.focus();
     }
 
-    function insertEmote(name, range = null) {
-        insertValue(name, range);
-    }
+    function renderPicker() { pickerView.render(); }
 
-    function insertSuggestion(suggestion) {
-        insertValue(suggestion.value, completionRange);
-    }
-
-    function renderPicker() {
-        const query = emoteSearch.value.trim().toLocaleLowerCase();
-        const matches = emotes.filter(emote =>
-            (selectedGroup === null || groupKey(emote) === selectedGroup)
-            && (!query || emote.name.toLocaleLowerCase().includes(query))
-        ).sort((left, right) => left.name.localeCompare(right.name, undefined, {sensitivity: "variant"}));
-        emoteGrid.replaceChildren();
-        emoteGrid.scrollTop = 0;
-        emoteCount.textContent = String(matches.length);
-
-        orderedGroups().forEach(group => {
-            const items = matches.filter(emote => groupKey(emote) === group.key);
-            if (!items.length) return;
-            const section = document.createElement("section");
-            section.className = "chat-emote-section";
-            const heading = document.createElement("h4");
-            heading.textContent = group.key === personalGroup ? `Your channel · ${group.label}` : group.label;
-            const grid = document.createElement("div");
-            grid.className = "chat-emote-section-grid";
-            items.forEach(emote => {
-            const button = document.createElement("button");
-            button.type = "button";
-            button.className = "chat-emote-option";
-            button.title = `${emote.name} · ${emote.group || emote.provider.toUpperCase()}`;
-            button.setAttribute("aria-label", button.title);
-
-            const image = document.createElement("img");
-            image.src = emote.url;
-            image.srcset = emoteSrcset(emote.url);
-            image.alt = "";
-            image.loading = "lazy";
-            image.decoding = "async";
-
-            const label = document.createElement("span");
-            label.textContent = emote.name;
-            button.append(image, label);
-            button.addEventListener("click", () => insertEmote(emote.name));
-            grid.appendChild(button);
-            });
-            section.append(heading, grid);
-            emoteGrid.appendChild(section);
-        });
-    }
-
-    function renderGroupOptions() {
-        const groups = orderedGroups();
-        if (!groups.some(group => group.key === selectedGroup)) selectedGroup = null;
-        emoteChannels.replaceChildren();
-        groups.filter(group => group.key !== "7tv").forEach(group => {
-                const key = group.key;
-                const button = document.createElement("button");
-                button.type = "button";
-                button.className = "chat-emote-section-button";
-                button.dataset.emoteSection = key;
-                setGroupIcon(button, group);
-                button.addEventListener("click", () => selectEmoteGroup(key));
-                emoteChannels.appendChild(button);
-            });
-        seventvButton.dataset.emoteSection = "7tv";
-        setGroupIcon(seventvButton, {key: "7tv", label: "7TV", image: ""});
-        updateGroupButtons();
-    }
-
-    function updateGroupButtons() {
-        emoteGroup.querySelectorAll("[data-emote-section]").forEach(button => {
-            button.setAttribute("aria-pressed", String(button.dataset.emoteSection === selectedGroup));
-        });
-    }
-
-    function selectEmoteGroup(key) {
-        selectedGroup = selectedGroup === key ? null : key;
-        updateGroupButtons();
-        renderPicker();
-    }
+    function renderGroupOptions() { pickerView.renderGroups(); }
 
     async function loadEmotes(force = false) {
-        if (!force && emotes.length && Date.now() - catalogLoadedAt < 30000) return;
+        if (!force && catalogLoadedAt && Date.now() - catalogLoadedAt < 30000) return;
         if (catalogPromise) return catalogPromise;
 
         catalogPromise = (async () => {
@@ -315,6 +184,7 @@
                 typeof emote?.name === "string" && typeof emote?.url === "string" && trustedEmoteUrl.test(emote.url)
             );
             catalogLoadedAt = Date.now();
+            messageInput.refreshEmotes?.();
             personalGroup = payload.personal_group_key || "";
             renderGroupOptions();
             emoteNote.replaceChildren();
@@ -365,121 +235,23 @@
         return usersPromise;
     }
 
-    function renderSuggestions() {
-        suggestionBox.replaceChildren();
-
-        suggestions.forEach((suggestion, index) => {
-            const option = document.createElement("button");
-            option.type = "button";
-            option.className = "chat-emote-suggestion";
-            option.classList.toggle("active", index === selectedSuggestion);
-            option.setAttribute("role", "option");
-            option.setAttribute("aria-selected", String(index === selectedSuggestion));
-            option.title = suggestion.description || suggestion.label;
-
-            let visual;
-            if (suggestion.kind === "emote") {
-                visual = document.createElement("img");
-                visual.src = suggestion.url;
-                visual.srcset = emoteSrcset(suggestion.url);
-                visual.alt = "";
-            } else {
-                visual = document.createElement("span");
-                visual.className = "chat-completion-icon";
-                visual.textContent = suggestion.kind === "command" ? "/" : "@";
-            }
-            const label = document.createElement("span");
-            label.textContent = suggestion.label;
-            const detail = document.createElement("small");
-            detail.textContent = suggestion.detail;
-            option.append(visual, label, detail);
-            option.addEventListener("mousedown", event => event.preventDefault());
-            option.addEventListener("click", () => insertSuggestion(suggestion));
-            suggestionBox.appendChild(option);
-        });
-
-        suggestionBox.hidden = !suggestions.length;
-        suggestionBox.querySelector(".chat-emote-suggestion.active")?.scrollIntoView({block: "nearest"});
-    }
-
-    function updateSuggestions() {
-        if (selectedTarget === "youtube") {
-            hideSuggestions();
-            return;
-        }
-
-        const cursor = messageInput.selectionStart;
-        if (cursor !== messageInput.selectionEnd) {
-            hideSuggestions();
-            return;
-        }
-
-        const inputBeforeCursor = messageInput.value.slice(0, cursor);
-        const commandMatch = inputBeforeCursor.match(/^\/([A-Za-z]*)$/);
-        const userMatch = inputBeforeCursor.match(/(?:^|\s)@([A-Za-z0-9_]*)$/);
-        const emoteMatch = inputBeforeCursor.match(/(?:^|\s):([A-Za-z0-9_+-]+)$/);
-        const match = commandMatch || userMatch || emoteMatch;
-        if (!match) {
-            hideSuggestions();
-            return;
-        }
-
-        const query = match[1].toLocaleLowerCase();
-        if (commandMatch) {
-            suggestions = twitchCommands.filter(command => command.name.includes(query));
-        } else if (userMatch) {
-            if (!usersLoadedAt && !usersPromise) loadUsers();
-            suggestions = users.filter(user =>
-                user.username.toLocaleLowerCase().includes(query)
-                || user.display_name.toLocaleLowerCase().includes(query)
-            ).map(user => ({
-                kind: "user",
-                value: `@${user.username}`,
-                label: user.username,
-                detail: user.display_name !== user.username ? user.display_name : "USER",
-                description: `Mention @${user.username}`
-            }));
-        } else {
-            const seen = new Set();
-            suggestions = emotes.filter(emote => {
-                const key = emote.name.toLocaleLowerCase();
-                if (seen.has(emote.name) || !key.includes(query)) return false;
-                seen.add(emote.name);
-                return true;
-            }).sort((left, right) => left.name.localeCompare(right.name, undefined, {sensitivity: "variant"}))
-                .map(emote => ({
-                    kind: "emote",
-                    value: emote.name,
-                    label: emote.name,
-                    detail: emote.provider.toUpperCase(),
-                    description: `${emote.name} · ${emote.group || emote.provider.toUpperCase()}`,
-                    url: emote.url
-                }));
-        }
-        completionRange = {start: cursor - match[1].length - 1, end: cursor};
-        selectedSuggestion = Math.min(selectedSuggestion, Math.max(0, suggestions.length - 1));
-        renderSuggestions();
-    }
+    function updateSuggestions() { autocomplete.update(); }
 
     function selectTarget(target) {
-        const selected = targets.find(button => button.dataset.chatTarget === target && !button.disabled);
-        if (!selected) return;
-        selectedTarget = target;
-        if (target === "youtube") clearReply();
-        targets.forEach(button => {
-            const active = button === selected;
-            button.classList.toggle("active", active);
-            button.setAttribute("aria-pressed", String(active));
-        });
-        emoteToggle.disabled = target === "youtube";
-        if (target === "youtube") {
-            emotePicker.hidden = true;
-            emoteToggle.setAttribute("aria-expanded", "false");
-            hideSuggestions();
-        }
+        targetSelector.select(target);
     }
-
-    targets.forEach(button => button.addEventListener("click", () => selectTarget(button.dataset.chatTarget)));
+    const targetSelector = window.createChatTargetSelector({form, button: targetButton, input: messageInput,
+        onLayout: () => composer?.resize(),
+        youtubeAvailable: form.dataset.youtubeConnected === "true",
+        onChange(target) {
+            selectedTarget = target;
+            messageInput.refreshEmotes?.();
+            emoteToggle.disabled = target === "youtube";
+            if (target === "youtube") {
+                clearReply(); emotePicker.hidden = true;
+                emoteToggle.setAttribute("aria-expanded", "false"); hideSuggestions();
+            }
+        }});
 
     function clearReply() {
         replyMessageId.value = "";
@@ -517,160 +289,103 @@
         messageInput.focus();
     });
 
-    emoteToggle.addEventListener("click", async () => {
+    async function toggleEmotes() {
         const opening = emotePicker.hidden;
         emotePicker.hidden = !opening;
         emoteToggle.setAttribute("aria-expanded", String(opening));
         if (opening) {
             await loadEmotes();
-            emoteSearch.focus();
+            if (!emotePicker.hidden) emoteSearch.focus();
         }
-    });
+    }
+    emoteToggle.addEventListener("click", toggleEmotes);
 
-    emoteSearch.addEventListener("input", renderPicker);
-    seventvButton.addEventListener("click", () => selectEmoteGroup("7tv"));
     messageInput.addEventListener("focus", () => {
         loadEmotes();
         loadUsers();
     });
     function resizeMessageInput() {
-        const styles = getComputedStyle(messageInput);
-        const borders = parseFloat(styles.borderTopWidth) + parseFloat(styles.borderBottomWidth);
-        const singleRowHeight = parseFloat(styles.lineHeight) + parseFloat(styles.paddingTop)
-            + parseFloat(styles.paddingBottom) + borders;
-        messageInput.style.height = `${singleRowHeight}px`;
-        // A wrapped placeholder must not grow an otherwise empty input.
-        if (messageInput.value) {
-            messageInput.style.height = `${Math.max(singleRowHeight, messageInput.scrollHeight + borders)}px`;
-        }
+        composer.resize();
     }
 
-    messageInput.addEventListener("input", () => {
-        resizeMessageInput();
-        browsingHistory = false;
-        historyIndex = messageHistory.length;
-        updateSuggestions();
-    });
-    messageInput.addEventListener("click", updateSuggestions);
-    let composerWidth = 0;
-    if ("ResizeObserver" in window) {
-        new ResizeObserver(entries => {
-            const width = entries[0].contentRect.width;
-            if (width === composerWidth) return;
-            composerWidth = width;
-            resizeMessageInput();
-        }).observe(messageInput);
-    }
-    resizeMessageInput();
-
-    messageInput.addEventListener("keydown", event => {
+    function handleComposerKey(event) {
+        if (targetSelector.handleKey(event, () => !suggestionBox.hidden && autocomplete.handleKey(event))) return true;
         if (event.key === "Escape" && replyMessageId.value) {
             event.preventDefault();
             hideSuggestions();
             clearReply();
-            return;
+            return true;
         }
         if (suggestionBox.hidden && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
             const direction = event.key === "ArrowUp" ? -1 : 1;
             if (navigateMessageHistory(direction)) {
                 event.preventDefault();
-                return;
+                return true;
             }
         }
-        const inputBeforeCursor = messageInput.value.slice(0, messageInput.selectionStart);
-        const needsEmotes = !emotes.length && /(?:^|\s):[A-Za-z0-9_+-]+$/.test(inputBeforeCursor);
-        const needsUsers = !usersLoadedAt && /(?:^|\s)@[A-Za-z0-9_]*$/.test(inputBeforeCursor);
-        if (event.key === "Tab" && (needsEmotes || needsUsers)) {
-            event.preventDefault();
-            const loader = needsEmotes ? loadEmotes() : loadUsers();
-            loader.then(() => {
-                updateSuggestions();
-                if (suggestions.length) insertSuggestion(suggestions[0]);
-            });
-            return;
-        }
+        return false;
+    }
 
-        if (!suggestionBox.hidden && suggestions.length) {
-            if (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey)) {
-                event.preventDefault();
-                insertSuggestion(suggestions[selectedSuggestion]);
-                return;
+    composer = window.createChatComposer({form, input: messageInput, sendButton, status,
+        autocomplete: {box: suggestionBox,
+            getEmotes: () => emotes, getUsers: () => users, getCommands: () => twitchCommands,
+            loadEmotes, loadUsers, enabled: () => selectedTarget !== "youtube",
+            insert: (suggestion, range) => insertValue(suggestion.value, range)},
+        onInput() { browsingHistory = false; historyIndex = messageHistory.length; },
+        onKey: handleComposerKey,
+        focusAfterSend: true,
+        async send(outgoingMessage, signal) {
+          const target = selectedTarget;
+          let failureReported = false;
+          try {
+            const simulated = window.dashboardChatDebug?.send(outgoingMessage, selectedTarget);
+            let result = simulated, ok = true;
+            if (simulated) {
+                ok = Boolean(simulated.sent.length);
+            } else {
+                const data = new FormData(form);
+                data.set("message", outgoingMessage);
+                data.set("target", target);
+                const response = await fetch("/channel/api/chat/send", {method: "POST", body: data, signal});
+                result = await response.json();
+                ok = response.ok;
             }
-            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                event.preventDefault();
-                const direction = event.key === "ArrowDown" ? 1 : -1;
-                selectedSuggestion = (selectedSuggestion + direction + suggestions.length) % suggestions.length;
-                renderSuggestions();
-                return;
+
+            for (const platform of ["twitch", "youtube"]) {
+                if (!result.errors?.[platform]) continue;
+                reportSendFailure(platform, result.errors[platform]);
+                failureReported = true;
             }
-            if (event.key === "Escape") {
-                event.preventDefault();
-                hideSuggestions();
-                return;
-            }
-        }
 
-        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-            event.preventDefault();
-            form.requestSubmit();
-        }
-    });
-
-    form.addEventListener("submit", async event => {
-        event.preventDefault();
-        if (sending || !messageInput.value.trim()) return;
-        if (messageInput.value.length > messageInput.maxLength) {
-            showStatus("Messages can contain up to 500 characters.", "warning", true);
-            return;
-        }
-
-        sending = true;
-        sendButton.disabled = true;
-        showStatus("Sending…");
-
-        const outgoingMessage = messageInput.value.trim();
-        let messageSent = false;
-        const data = new FormData(form);
-        data.set("message", outgoingMessage);
-        data.set("target", selectedTarget);
-
-        try {
-            const response = await fetch("/channel/api/chat/send", {method: "POST", body: data});
-            const result = await response.json();
-
-            if (!response.ok) throw new Error(result.detail || "The message could not be sent.");
-            messageSent = true;
+            if (!ok) throw new Error(result.detail || Object.values(result.errors || {}).join(" ") || "The message could not be sent.");
+            window.confirmDashboardChatSend?.(result);
 
             const sent = (result.sent || []).map(platform => platform === "youtube" ? "YouTube" : "Twitch");
             const failures = Object.values(result.errors || {});
-            rememberMessage(outgoingMessage);
-            messageInput.value = "";
-            resizeMessageInput();
-            historyDraft = "";
-            clearReply();
-            hideSuggestions();
-            showStatus(
-                result.message || (failures.length ? `Sent to ${sent.join(" and ")}. ${failures.join(" ")}` : `Sent to ${sent.join(" and ")}.`),
-                failures.length ? "warning" : "success",
-                true
-            );
-        } catch (error) {
-            showStatus(error.message || "The message could not be sent.", "error", true);
-        } finally {
-            sending = false;
-            sendButton.disabled = false;
-            messageInput.focus();
-            if (messageSent) document.dispatchEvent(new CustomEvent("dashboard-chat-sent"));
+            return {message: result.message || (failures.length
+                ? `Sent to ${sent.join(" and ")}. ${failures.join(" ")}` : `Sent to ${sent.join(" and ")}.`),
+                tone: result.tone || (failures.length ? "warning" : "success")};
+          } catch (error) {
+            if (!signal?.aborted && !failureReported) {
+                for (const platform of target === "both" ? ["twitch", "youtube"] : [target]) {
+                    reportSendFailure(platform, `Delivery could not be confirmed. ${error.message || "Check the connection before retrying."}`);
+                }
+            }
+            throw error;
+          }
+        },
+        onSent(message) {
+            rememberMessage(message); historyDraft = ""; clearReply();
+            document.dispatchEvent(new CustomEvent("dashboard-chat-sent"));
         }
     });
+    autocomplete = composer.autocomplete;
+    window.addEventListener("beforeunload", () => { composer.destroy(); pickerView.destroy(); targetSelector.destroy(); }, {once: true});
 
     document.addEventListener("click", event => {
         if (!emotePicker.hidden && !emotePicker.contains(event.target) && !emoteToggle.contains(event.target)) {
             emotePicker.hidden = true;
             emoteToggle.setAttribute("aria-expanded", "false");
-        }
-        if (!suggestionBox.hidden && !suggestionBox.contains(event.target) && event.target !== messageInput) {
-            hideSuggestions();
         }
     });
 

@@ -2,43 +2,44 @@
 
 Pets belong to a chatter globally. One pet can be equipped at a time, and its passive applies in every channel. The Silly Bat has Gamble Luck (+5 percentage points to gamble win chance). The Little Rat is a Common pet with a four-frame sprite.
 
-Pet rarity and passive rarity are separate. Both use Common, Rare, and Ultra Rare tiers. A pet has one passive, chosen when it is first granted. The same pet can be equipped again without resetting its level or passive. Each chatter can own one of each pet type for now.
+Pet rarity and passive rarity are separate. Both use Common, Rare, and Ultra Rare tiers. Each summonable pet has a fixed passive from the catalog below. Administrator grants can override that passive for testing. The same pet can be equipped again without resetting its level or passive. Each chatter can own one of each pet type for now.
 
 | Passive | Tier | Level 1 → level 50 | Effect |
 | --- | --- | --- | --- |
+| Loyalty Gain | Common | 10% fixed | Extra earned loyalty points; excludes transfers, purchases, refunds, and gambling payouts |
 | Boss Hunt Damage | Common | 10% → 20% | Extra damage on each Boss Hunt attack |
 | Gamble Luck | Common | 5 → 10 percentage points | Added to the channel's gamble win chance, capped at 100% |
 | Boss Hunt Profit | Common | 10% → 20% | Extra contribution and final hit point rewards |
 | Rare Drop Luck | Rare | 1 → 5 percentage points | Added to the top contributor's mythical weapon roll |
 | Kamikaze Luck | Rare | 5 → 10 percentage points | Added to the targeted `!kamikaze` hit chance |
-| Second Chance | Ultra Rare | 10% fixed | Returns 10% of a lost `!gamble` bet; the result still counts as a loss |
+| Second Chance | Ultra Rare | 10% fixed | Returns 10% of a lost currency-command `gamble` bet; the result still counts as a loss |
 
-The level increases linearly from the listed starting value to its maximum at level 50, in whole basis points. Level progression remains future work. Self-service acquisition is described below. The current grant tool can issue and equip a rat for a known Twitch identity:
+Passive strength scales linearly from the listed starting value to its maximum at level 50, in whole basis points; fixed-value passives stay constant. Level progression remains future work. Self-service acquisition is described below. The administrator grant tool can issue and equip a pet for a known Twitch identity. For example, grant Little Rat with its normal Loyalty Gain passive:
 
 ```bash
-python -m scripts.grant_poc_pet chatter_name --pet rat --passive raid_damage
+python -m scripts.grant_pet chatter_name --pet rat
 ```
 
-Available `--passive` values are `loyalty_gain`, `raid_damage`, `gamble_odds`, `raid_profit`, `rare_drop_chance`, `kamikaze_odds`, and `gamble_loss_refund`. Regranting an owned rat equips the existing one; it does not replace its passive.
+For testing, add `--passive` to override the default. Available values are `loyalty_gain`, `raid_damage`, `gamble_odds`, `raid_profit`, `rare_drop_chance`, `kamikaze_odds`, and `gamble_loss_refund`. Regranting an owned rat equips the existing one; it does not replace its passive.
 
 ## Adding a pet
 
-1. Put a transparent PNG sprite sheet in `assets/`, named after the pet (for example `Sleepy Fox.png`). Current pets use four equal 112 × 149 frames in a 448 × 149 strip. Align the feet/contact baseline and leave room for the whole sprite. Review an animated preview before publishing.
+1. Put a transparent PNG sprite sheet in `assets/`, named after the pet (for example `Sleepy Fox.png`). New pet sheets use four equal 112 × 149 frames in a 448 × 149 strip; older assets may have different dimensions. Align the feet/contact baseline and leave room for the whole sprite. Review an animated preview before publishing.
 2. Add a **new** numbered migration in `storage/migrations/` inserting its stable ID, display name, rarity (`common`, `rare`, or `ultra_rare`), URL-encoded asset path, frame count, and maximum level into `pet_definitions`. Register it in `storage/migrations/__init__.py`. Never edit an already applied migration to rename or update a pet; add a new migration.
 3. Add its ID and fixed passive to `SUMMON_PASSIVES` in `pets/service.py`, add its ID to the allowed grant catalog, and optionally add a convenience grant method. The summon pool and Rates popup then use its seeded rarity automatically. Existing passives can be selected without adding new gameplay code.
-4. Add a short selector to `scripts/grant_poc_pet.py` (Sleepy Fox uses `--pet fox`). The script runs migrations, grants ownership, and equips the pet without resetting an existing copy.
+4. Add a short selector to `scripts/grant_pet.py` (Sleepy Fox uses `--pet fox`). The script runs migrations, grants ownership, and equips the pet without resetting an existing copy.
 5. The global profile renders the sprite from the database. For custom timing, add a pet-specific class in `web/templates/public/chatter_profile.html` and its animation in `web/static/css/style.css`. Sleepy Fox uses a 2.4-second breathing cycle. Respect the existing reduced-motion rule.
 6. Check fresh-database seeding, repeat grants, the profile render, and the animation. Run the tests and open a PR against the current release.
 
 After deployment, grant Sleepy Fox with:
 
 ```bash
-sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet fox
+sudo -u rats-bot .venv/bin/python -m scripts.grant_pet Ninjakaing --pet fox
 ```
 
 Sleepy Fox is Common. Administrator grants use the fixed mappings below by default; `--passive` can override them for testing. Self-service summons use the fixed passives below.
 
-## Summoning (release 13)
+## Summoning
 
 - `!pets`: equipped pet, active passive, ticket count, and full collection link on the global profile / me page.
 - `!pets buy ticket`, `!pets buy summon`, or `!pets buy summon ticket`: buy one global ticket for **50,000 loyalty points from the current channel**. Points must be enabled in that channel.
@@ -73,20 +74,20 @@ Duplicates return points to the ticket's original purchase channel, without loya
 
 Migration 59 adds Horned Wolf with the approved four-frame artwork in `assets/Horned Wolf.png`. The pixel-art strip synchronizes subtle breathing with the tail rising on inhale and lowering on exhale. The profile plays the four frames using its existing CSS sprite animation at a 1.2-second cycle; no generated GIF or procedural breathing warp is used. Frames are packed into equal cells with a shared ground baseline.
 
-Grant and equip it for UAT preview: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet <tester_login> --pet wolf`. An owned wolf can also be equipped with `!pets equip Horned Wolf`.
+Grant and equip it for UAT preview: `sudo -u rats-bot .venv/bin/python -m scripts.grant_pet <tester_login> --pet wolf`. An owned wolf can also be equipped with `!pets equip Horned Wolf`.
 
 
 ### Royal Raven
 
 Migration 60 adds Common Royal Raven with the fixed Boss Hunt Profit passive: +10% contribution and final-hit point rewards at level 1, scaling to +20% at level 50. The approved crownless gold-highlight artwork uses four equal 112 × 149 frames in `assets/Royal Raven.png`. Its 1.29-second idle keeps the feet planted and includes a short blink, using the same frame timing as the approved preview. Reduced-motion preferences disable the animation.
 
-Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet <tester_login> --pet raven`. Owners can use `!pets equip Royal Raven`.
+Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_pet <tester_login> --pet raven`. Owners can use `!pets equip Royal Raven`.
 
 ### Witch's Cat
 
 Migration 62 adds Common Witch's Cat with Gamble Luck: +5 percentage points to gamble win chance at level 1, scaling to +10 at level 50. The approved upright black cat and wide-brimmed white witch hat use four equal 112 × 149 frames in `assets/Witch's Cat.png`. The 1.2-second breathing, blink, and tail-wave loop is anchored to the front paws to avoid horizontal drift. Reduced-motion preferences disable animation.
 
-Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet cat`. Owners can use `!pets equip Witch's Cat`.
+Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_pet Ninjakaing --pet cat`. Owners can use `!pets equip Witch's Cat`.
 
 ### Dog of the Sun
 
@@ -94,10 +95,10 @@ A regal companion of the solar court, sharing the spoils of victory with its kee
 
 Migration 63 adds Common Dog of the Sun with fixed Boss Hunt Profit (Raid Profit): +10% raid point rewards at level 1, scaling to +20% at level 50. Its golden and ivory fur, amber eyes, tennis ball held in its jaws, and rotating solar halo use the approved four-frame sheet in `assets/Dog of the Sun.png`. Vertical breathing, tail wagging, and the halo play at 250 ms per frame (one-second loop) in both the equipped profile and collection. Reduced-motion preferences disable animation.
 
-Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet dog`. Owners can use `!pets equip Dog of the Sun`.
+Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_pet Ninjakaing --pet dog`. Owners can use `!pets equip Dog of the Sun`.
 
 ### Honey Hen
 
 Migration 64 adds Common Honey Hen with fixed Loyalty Gain: +10% earned loyalty points. This completes two Common pets for each of the four Common passives. The approved honey-and-cream chicken, heart-shaped comb, cheek freckles, and open honey jar with an amber spill use `assets/Honey Hen.png`, a 448 × 149 strip of four 112 × 149 frames. Both profile and collection play at 300 ms per frame (1.2-second loop), with reduced-motion support.
 
-Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_poc_pet Ninjakaing --pet hen`. Owners can use `!pets equip Honey Hen`.
+Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_pet Ninjakaing --pet hen`. Owners can use `!pets equip Honey Hen`.

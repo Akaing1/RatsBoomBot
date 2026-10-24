@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 
 from bot.profiles import ChannelAchievementNames
 from bot.services.channels.achievements import AchievementService
-from bot.services.engagement.points import PointsService
+from loyalty.service import PointsService
 from bot.shared.commands.utility import UtilityCommands
 from bot.shared.commands.points import PointsCommandHandler
 from bot.profiles import PointsConfig
