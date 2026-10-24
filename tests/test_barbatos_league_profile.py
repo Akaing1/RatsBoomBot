@@ -6,7 +6,7 @@ def test_barbatos_profile_configures_league_account() -> None:
 
     assert league.enabled is True
     assert league.provider == "opgg"
-    assert league.game_name == "Barbatos2upusRex"
-    assert league.tag_line == "1314"
+    assert league.game_name == ""
+    assert league.tag_line == ""
     assert league.region == "NA"
     assert league.display_name == "Barbatos"

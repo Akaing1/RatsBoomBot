@@ -27,14 +27,16 @@ async def test_provider_only_classifies_explicit_missing_summoner():
 
 @pytest.mark.asyncio
 async def test_missing_summoner_preserves_data_and_skips_duplicate_lookup(caplog):
-    service = LeagueService(SimpleNamespace(), None)
+    settings = SimpleNamespace(invalidate_league_identity=AsyncMock(return_value=True))
+    service = LeagueService(SimpleNamespace(services=SimpleNamespace(profile_settings=settings)), None)
     client = SimpleNamespace(fetch_season_summary=AsyncMock(side_effect=SummonerNotFoundError()),
                              fetch_recent_matches=AsyncMock())
     service.save_season_summary = AsyncMock()
     await service.refresh_profile(client, "1", LeagueConfig(game_name="Name", tag_line="TAG"), force_season=True)
     client.fetch_recent_matches.assert_not_awaited()
     service.save_season_summary.assert_not_awaited()
-    assert "Check the configured Riot ID" in caplog.text
+    settings.invalidate_league_identity.assert_awaited_once()
+    assert "Re-enter and verify" in caplog.text
 
 
 @pytest.mark.asyncio

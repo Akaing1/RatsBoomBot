@@ -40,6 +40,25 @@ sudo journalctl -u ratsboombot.service --since "1 hour ago" --no-pager -o cat | 
 (10 seconds up to five minutes) without repeated tracebacks. Unexpected failures
 retain tracebacks. An announcement HTTP 403 uses normal chat for one hour, then
 rechecks permission. Fix the sending account's moderator role/authorization to
-restore announcements. Missing League summoners retain an actionable warning
-with Riot ID/region, preserve stored data, and skip the redundant second lookup
-in that refresh cycle. Correct the configured account rather than suppressing it.
+restore announcements.
+
+## Database-backed League accounts
+
+Broadcaster Riot names and tags now come only from dashboard profile settings,
+stored in channel_profile_overrides. No channel account is hardcoded.
+Before deploying, save the current valid Riot name and tag using each channel's
+dashboard League settings if they have only existed as code defaults. Existing
+database overrides survive the upgrade. Accounts not saved there remain
+unconfigured until entered; there is no automatic import of obsolete defaults.
+
+For Steohanyy's channel, enter Riot game name `stowh bean`, tag `ant`, and
+confirm the region in dashboard settings. Save both fields. These instructions
+do not change the production database.
+
+A confirmed provider "Summoner not found" clears the broadcaster's saved name
+and tag atomically and stops subsequent account refreshes until replacement.
+The log and !champs prompt request re-evaluation in dashboard settings. A response
+for an older identity cannot clear a newer dashboard edit. Network errors do not
+clear identities. Historical match/champion data is retained. A changed identity
+gets a new seasonal refresh key, so its first refresh is not delayed by the old
+account's refresh timestamp. Community !register accounts are unchanged.
