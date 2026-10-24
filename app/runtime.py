@@ -14,6 +14,7 @@ from rich.logging import RichHandler
 from twitchio.exceptions import InvalidTokenException
 
 from bot.bot import TwitchBot
+from app.connection_watchdog import watch_connection
 from app.runtime_logs import runtime_log_buffer
 from app.performance_log import record_performance
 from config.settings import settings
@@ -29,11 +30,17 @@ SEPARATOR = "=" * 60
 async def run_services(bot: TwitchBot, admin_server: uvicorn.Server) -> None:
     bot_task = asyncio.create_task(bot.start(load_tokens=False), name="twitch-bot")
     admin_task = asyncio.create_task(admin_server.serve(), name="admin-dashboard")
-    tasks = {bot_task, admin_task}
+    watchdog_task = asyncio.create_task(watch_connection(bot), name="connection-watchdog")
+    tasks = {bot_task, admin_task, watchdog_task}
     performance_task = asyncio.create_task(record_performance(bot), name="performance-log")
 
     try:
         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+        if watchdog_task not in done:
+            watchdog_task.cancel()
+            await asyncio.gather(watchdog_task, return_exceptions=True)
+            pending.discard(watchdog_task)
 
         for task in done:
             exception = task.exception()
@@ -52,6 +59,7 @@ async def run_services(bot: TwitchBot, admin_server: uvicorn.Server) -> None:
         if pending:
             await asyncio.gather(*pending)
     finally:
+        watchdog_task.cancel()
         performance_task.cancel()
         await asyncio.gather(performance_task, return_exceptions=True)
         admin_server.should_exit = True
@@ -131,6 +139,7 @@ async def run_runtime() -> None:
                         host=settings.ADMIN_HOST,
                         port=settings.ADMIN_PORT,
                         log_level="info",
+                        timeout_graceful_shutdown=10,
                         proxy_headers=settings.TRUST_PROXY_HEADERS,
                         forwarded_allow_ips="127.0.0.1" if settings.TRUST_PROXY_HEADERS else None
                     )

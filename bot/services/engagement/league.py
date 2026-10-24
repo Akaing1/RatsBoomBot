@@ -45,6 +45,10 @@ class LeagueProviderError(RuntimeError):
     pass
 
 
+class SummonerNotFoundError(LeagueProviderError):
+    pass
+
+
 @dataclass(frozen=True)
 class TypedValue:
     name: str
@@ -259,6 +263,9 @@ class OpggMcpClient:
         payload = response.json()
 
         if payload.get("error"):
+            error = payload["error"]
+            if isinstance(error, dict) and str(error.get("message", "")).strip().casefold() == "summoner not found":
+                raise SummonerNotFoundError("Summoner not found")
             raise LeagueProviderError(str(payload["error"]))
 
         result = payload.get("result") or {}
@@ -674,6 +681,10 @@ class LeagueService:
                 summary = await client.fetch_season_summary(config)
                 await self.save_season_summary(broadcaster_id, config.provider, summary)
                 await self.mark_refreshed(season_key)
+            except SummonerNotFoundError:
+                LOGGER.warning("[League] Summoner not found for %s (%s#%s, %s). Check the configured Riot ID and region; skipping this profile for this refresh cycle.",
+                               config.display_name, config.game_name, config.tag_line, config.region)
+                return
             except Exception:
                 LOGGER.exception("[League] Failed to refresh seasonal champions for %s.", config.display_name)
 
@@ -683,6 +694,9 @@ class LeagueService:
             await self.cleanup_matches(broadcaster_id)
             await self.mark_refreshed(f"matches:{broadcaster_id}")
             LOGGER.info("[League] Saved %d new matches for %s.", inserted, config.display_name)
+        except SummonerNotFoundError:
+            LOGGER.warning("[League] Summoner not found for %s (%s#%s, %s). Check the configured Riot ID and region.",
+                           config.display_name, config.game_name, config.tag_line, config.region)
         except Exception:
             LOGGER.exception("[League] Failed to refresh recent matches for %s.", config.display_name)
 

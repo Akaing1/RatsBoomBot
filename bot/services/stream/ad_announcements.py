@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 
 from bot.profiles import DEFAULT_AD_ANNOUNCEMENT_MESSAGE, FeatureName, get_active_profile
@@ -16,6 +17,7 @@ class AdAnnouncementService:
         self.broadcasters = broadcasters
         self._task: asyncio.Task | None = None
         self.warned_ads: set[str] = set()
+        self._announcement_retry_at: dict[str, float] = {}
 
     async def start(self) -> None:
         if self._task is not None:
@@ -49,6 +51,7 @@ class AdAnnouncementService:
             )
 
         self.warned_ads.clear()
+        self._announcement_retry_at.clear()
 
         LOGGER.info("[Ads] Ad announcement service stopped.")
 
@@ -155,16 +158,25 @@ class AdAnnouncementService:
                 LOGGER.warning("[Ads] Invalid ad announcement template for %s (%s). Using the default message.", broadcaster_name, broadcaster_id)
                 message = DEFAULT_AD_ANNOUNCEMENT_MESSAGE.format(time=f"{minutes}:{seconds:02d}")
 
-            try:
-                await self.bot.services.chat_identity.send_announcement(broadcaster, message, "purple")
-            except Exception:
-                LOGGER.warning(
-                    "[Ads] Could not send an announcement to %s (%s). Falling back to a chat message.",
-                    broadcaster_name,
-                    broadcaster_id,
-                    exc_info=True
-                )
-
+            fallback = time.monotonic() < self._announcement_retry_at.get(broadcaster_id, 0)
+            if not fallback:
+                try:
+                    await self.bot.services.chat_identity.send_announcement(broadcaster, message, "purple")
+                    self._announcement_retry_at.pop(broadcaster_id, None)
+                except Exception as error:
+                    fallback = True
+                    if getattr(error, "status", None) == 403:
+                        self._announcement_retry_at[broadcaster_id] = time.monotonic() + 3600
+                        LOGGER.warning(
+                            "[Ads] Announcement permission denied in %s (%s). Using normal chat for one hour; check the sending bot's moderator role and announcement authorization.",
+                            broadcaster_name, broadcaster_id
+                        )
+                    else:
+                        LOGGER.warning(
+                            "[Ads] Could not send an announcement to %s (%s). Falling back to a chat message.",
+                            broadcaster_name, broadcaster_id, exc_info=True
+                        )
+            if fallback:
                 try:
                     await self.bot.services.chat_identity.send_message(broadcaster, message)
                 except Exception:
@@ -178,7 +190,8 @@ class AdAnnouncementService:
             self.warned_ads.add(ad_key)
 
             LOGGER.info(
-                "[Ads] Sent ad announcement to %s (%s) for an ad starting in %d seconds.",
+                "[Ads] Sent ad warning via %s to %s (%s) for an ad starting in %d seconds.",
+                "chat fallback" if fallback else "announcement",
                 broadcaster_name,
                 broadcaster_id,
                 seconds_until_ad

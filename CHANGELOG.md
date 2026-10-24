@@ -6,7 +6,9 @@ Only published releases receive dated version headings. Intermediate development
 
 ## Unreleased — release/15.0.0
 
-The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot/releases/tag/v14.2.2). The current working application version is 15.3.1; it is not yet a published release.
+The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot/releases/tag/v14.2.2). The current working application version is 15.3.3; it is not yet a published release.
+
+- Add sustained Twitch-disconnection recovery and diagnostic logging, bound web shutdown, back off 7TV transport failures, and handle announcement permissions/missing League summoners without repetitive tracebacks. Application version 15.3.3.
 
 - Raid browser with discovery filters, compatibility ranking, favorites and team views, stream/video previews, and shared preview chat ([PR #387](https://github.com/Akaing1/RatsBoomBot/pull/387), merged into the release branch).
 - Reusable chat composer, autocomplete, emote picker/input, cross-platform message merging, platform-specific delivery errors, and dashboard controls ([PR #387](https://github.com/Akaing1/RatsBoomBot/pull/387)).
