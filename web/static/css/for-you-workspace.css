@@ -66,3 +66,17 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
+
+.fy-clips-count { color: var(--muted); font-size: .85em; font-weight: 400; }
+.fy-clip-card { position: relative; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+@media (hover: hover) and (pointer: fine) {
+    .fy-workspace .fy-clip-card:hover {
+        transform: scale(1.025);
+        z-index: 1;
+        box-shadow: 0 8px 22px #0005;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .fy-clip-card { transition: none; }
+    .fy-workspace .fy-clip-card:hover { transform: none; }
+}
