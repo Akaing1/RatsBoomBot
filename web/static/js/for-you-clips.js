@@ -33,11 +33,13 @@
                 find('[data-clip-message]').textContent = ''; dialog.showModal();
             }); grid.append(card);
         }
-        status.textContent = rows.length + ' shown · ' + clips.length + ' loaded' + (clips.length ? '' : '. No clips found in this date range.');
+        find('[data-clips-count]').textContent = '– ' + clips.length + ' loaded';
+        status.textContent = !clips.length ? 'No clips found in this date range.'
+            : query ? rows.length + ' matching clips' : '';
     }
     async function load(reset) {
         controller?.abort(); controller = new AbortController(); const current = ++generation;
-        if (reset) { loaded = false; clips = []; cursor = ''; grid.replaceChildren(); more.hidden = true; }
+        if (reset) { loaded = false; clips = []; cursor = ''; grid.replaceChildren(); find('[data-clips-count]').textContent = '– 0 loaded'; more.hidden = true; }
         status.textContent = 'Loading clips…'; find('[data-clips-signin]').hidden = true; more.disabled = true;
         try {
             const params = new URLSearchParams({days:find('#clip-days').value,after:cursor});

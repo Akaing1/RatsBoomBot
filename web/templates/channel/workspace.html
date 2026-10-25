@@ -25,12 +25,12 @@
 <div class="fy-clips-layout">
 <form class="panel fy-clips-filters" data-clips-filters>
 <h3>Search clips</h3>
-<label for="clip-days">Date range</label><select id="clip-days" name="days"><option value="1">Last 24 hours</option><option value="7" selected>Last 7 days</option><option value="30">Last month</option><option value="0">All time</option></select>
+<label for="clip-days">Date range</label><select id="clip-days" name="days"><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last month</option><option value="0" selected>All time</option></select>
 <label for="clip-search">Title or creator</label><input id="clip-search" type="search" maxlength="200" placeholder="Search loaded clips">
 <label for="clip-sort">Sort loaded clips</label><select id="clip-sort"><option value="views">Most viewed</option><option value="newest">Newest</option></select>
 
 </form>
-<div class="panel fy-clips-results"><h3>Your clips</h3><p>Clips from your channel. Search and sorting apply to loaded clips; load more to expand results.</p>
+<div class="panel fy-clips-results"><h3>Your clips <span class="fy-clips-count" data-clips-count>– 0 loaded</span></h3>
 <p data-clips-status role="status" aria-live="polite"></p><a class="button secondary" data-clips-signin hidden href="/connect">Sign in to channel</a><div data-clips-grid class="fy-clips-grid"></div><button class="button secondary" data-clips-more hidden>Load more</button>
 </div></div>
 <dialog data-clip-player class="fy-clip-player"><button class="button secondary" data-clip-close>Close player</button><div data-clip-frame></div><a class="button secondary" data-clip-link target="_blank" rel="noopener noreferrer">Open on Twitch</a><button class="button secondary" data-clip-copy>Copy link</button><button class="button secondary" data-clip-download>Download</button><a class="button secondary" data-clip-save hidden target="_blank" rel="noopener noreferrer" download>Save video</a><p data-clip-message role="status"></p></dialog>
