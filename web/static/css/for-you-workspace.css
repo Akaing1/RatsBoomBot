@@ -29,3 +29,15 @@
 
 .channel-page-for-you .page-header { margin-bottom: 14px; }
 .channel-page-for-you .page-header h2 { margin: 0; font-size: 22px; }
+
+.fy-clips-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px}
+.fy-clips-filters{display:flex;flex-direction:column;gap:12px;align-self:start}
+.fy-clips-filters input,.fy-clips-filters select{width:100%;padding:10px;background:var(--bg-input,#171a21);color:inherit;border:1px solid #414655;border-radius:8px}
+.fy-clips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.fy-clip-card{border:1px solid #343946;border-radius:12px;overflow:hidden;background:#171b23;color:inherit;text-align:left;cursor:pointer;padding:0}
+.fy-clip-card img{width:100%;aspect-ratio:16/9;object-fit:cover}
+.fy-clip-card strong,.fy-clip-card small{display:block;padding:8px 12px;overflow-wrap:anywhere}
+.fy-clip-player{width:min(900px,95vw);background:#171b23;color:#eee;border:1px solid #414655;border-radius:12px}
+.fy-clip-player::backdrop{background:#000b}
+.fy-clip-player iframe{width:100%;aspect-ratio:16/9;border:0;margin:12px 0}
+@media(max-width:700px){.fy-clips-layout{grid-template-columns:1fr}.fy-clips-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}}
