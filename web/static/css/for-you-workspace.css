@@ -46,3 +46,23 @@
 @media(max-width:700px){.fy-clips-results,.fy-clips-filters{grid-column:auto;grid-row:auto}}
 
 @media(min-width:769px){.fy-clips-filters{position:sticky;top:16px;max-height:calc(100dvh - 180px);overflow-y:auto;box-sizing:border-box}}
+
+/* Match Overview's dark canvas and distinct card surfaces within Clips only. */
+.fy-workspace .settings-pages:has([data-workspace-panel="clips"]:not([hidden])) {
+    background: var(--background);
+}
+.fy-workspace .panel.fy-clips-results {
+    background: var(--surface);
+}
+.fy-workspace .panel.fy-clips-filters,
+.fy-workspace .fy-clip-card {
+    background: var(--surface-raised);
+}
+.fy-workspace .fy-clip-card:hover,
+.fy-workspace .fy-clip-card:focus-visible {
+    border-color: var(--accent);
+}
+.fy-workspace .fy-clip-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
