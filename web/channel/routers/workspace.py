@@ -150,14 +150,16 @@ async def channel_clips(request: Request, days: int = 7, after: str = ""):
     from web.channel.routers.dashboard import raid_browser_cached_request
 
     _, channel = workspace_context(request)
-    if days not in {1, 7, 30, 90} or len(after) > 2048:
+    if days not in {0, 1, 7, 30} or len(after) > 2048:
         raise HTTPException(400, "Invalid clip filters.")
     bot = get_bot()
     if bot is None:
         raise HTTPException(503, "Bot unavailable. Try again shortly.")
     # Round to the hour so identical requests can share the bounded existing cache.
     start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) - timedelta(days=days)
-    params = {"broadcaster_id": channel, "first": 50, "started_at": start.strftime("%Y-%m-%dT%H:%M:%SZ")}
+    params = {"broadcaster_id": channel, "first": 50}
+    if days:
+        params["started_at"] = start.strftime("%Y-%m-%dT%H:%M:%SZ")
     if after:
         params["after"] = after
     try:

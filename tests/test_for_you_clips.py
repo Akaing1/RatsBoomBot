@@ -67,3 +67,13 @@ async def test_clip_upstream_error_logs_reason_without_route(monkeypatch, caplog
     assert "upstream_status=400" in caplog.text
     assert "Invalid started_at" in caplog.text
     assert "do not log request credentials" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_all_time_clips_omit_date_restrictions(monkeypatch):
+    monkeypatch.setattr(workspace, "get_db", lambda: object())
+    monkeypatch.setattr(workspace, "get_bot", lambda: object())
+    fetch = AsyncMock(return_value={"data": [], "pagination": {"cursor": "next"}})
+    monkeypatch.setattr(dashboard, "raid_browser_cached_request", fetch)
+    await workspace.channel_clips(SimpleNamespace(session={workspace.CHANNEL_USER_ID_KEY: "123"}), days=0, after="page2")
+    assert fetch.call_args.args[3] == {"broadcaster_id": "123", "first": 50, "after": "page2"}
