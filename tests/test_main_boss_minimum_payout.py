@@ -21,7 +21,7 @@ async def test_main_boss_low_damage_minimum_pool(tmp_path, tier, damage, expecte
         await points.setup()
         await run_migrations(database)
         await service.setup()
-        config = build_config(max_hp=10000, base_damage_min=damage, base_damage_max=damage)
+        config = build_config(critical_chance=0, max_hp=10000, base_damage_min=damage, base_damage_max=damage)
         event = await service.spawn("channel-1", "melee", config, tier)
         if damage:
             await service.attack("channel-1", "stream-1", "user-1", "alice", config)
