@@ -30,7 +30,7 @@
 .channel-page-for-you .page-header { margin-bottom: 14px; }
 .channel-page-for-you .page-header h2 { margin: 0; font-size: 22px; }
 
-.fy-clips-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px}
+.fy-clips-layout{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:20px}
 .fy-clips-filters{display:flex;flex-direction:column;gap:12px;align-self:start}
 .fy-clips-filters input,.fy-clips-filters select{width:100%;padding:10px;background:var(--bg-input,#171a21);color:inherit;border:1px solid #414655;border-radius:8px}
 .fy-clips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
@@ -41,3 +41,6 @@
 .fy-clip-player::backdrop{background:#000b}
 .fy-clip-player iframe{width:100%;aspect-ratio:16/9;border:0;margin:12px 0}
 @media(max-width:700px){.fy-clips-layout{grid-template-columns:1fr}.fy-clips-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}}
+
+.fy-clips-results{grid-column:1;grid-row:1}.fy-clips-filters{grid-column:2;grid-row:1}
+@media(max-width:700px){.fy-clips-results,.fy-clips-filters{grid-column:auto;grid-row:auto}}

@@ -32,16 +32,23 @@
     }
     async function load(reset) {
         controller?.abort(); controller = new AbortController(); const current = ++generation;
-        if (reset) { clips = []; cursor = ''; grid.replaceChildren(); }
-        status.textContent = 'Loading clips…'; more.disabled = true;
+        if (reset) { loaded = false; clips = []; cursor = ''; grid.replaceChildren(); more.hidden = true; }
+        status.textContent = 'Loading clips…'; find('[data-clips-signin]').hidden = true; more.disabled = true;
         try {
             const params = new URLSearchParams({days:find('#clip-days').value,after:cursor});
-            const response = await fetch('/channel/api/for-you/clips?' + params, {signal:controller.signal,cache:'no-store'});
+            const response = await fetch('/channel/api/for-you/clips?' + params, {signal:controller.signal,cache:'no-store',credentials:'same-origin'});
+            if (response.redirected || response.status === 401 || response.status === 403) {
+                throw new Error('Your channel session needs attention. Sign in again, then retry.');
+            }
+            if (!(response.headers.get('content-type') || '').includes('application/json')) {
+                throw new Error('The server returned a page instead of clips. Sign in again or reload after deployment, then retry.');
+            }
             const result = await response.json(); if (!response.ok) throw new Error(result.detail || 'Unable to load clips.');
+            if (!Array.isArray(result.clips)) throw new Error('Unexpected clip response. Please reload this page.');
             if (current !== generation) return;
             clips = [...new Map([...clips,...result.clips].map(c => [c.id,c])).values()].slice(0,1000);
             cursor = result.cursor; loaded = true; more.hidden = !cursor || clips.length >= 1000; render();
-        } catch (error) { if (error.name !== 'AbortError' && current === generation) status.textContent = error.message; }
+        } catch (error) { if (error.name !== 'AbortError' && current === generation) { status.textContent = error.message; find('[data-clips-signin]').hidden = !error.message.includes('Sign in again'); } }
         finally { if (current === generation) more.disabled = false; }
     }
     form.addEventListener('submit', e => {e.preventDefault(); load(true);});
