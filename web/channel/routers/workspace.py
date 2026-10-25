@@ -140,3 +140,33 @@ async def get_note(request: Request, identity: str):
     if row is None:
         raise HTTPException(status_code=404, detail='This note was deleted. Refresh the note list.')
     return JSONResponse(dict(row), headers={'Cache-Control': 'no-store'})
+
+
+@router.get("/channel/api/for-you/clips")
+async def channel_clips(request: Request, days: int = 7, after: str = ""):
+    from datetime import datetime, timedelta, timezone
+    import asyncio
+    import logging
+    from web.channel.routers.dashboard import raid_browser_cached_request
+
+    _, channel = workspace_context(request)
+    if days not in {1, 7, 30, 90} or len(after) > 2048:
+        raise HTTPException(400, "Invalid clip filters.")
+    bot = get_bot()
+    if bot is None:
+        raise HTTPException(503, "Bot unavailable. Try again shortly.")
+    # Round to the hour so identical requests can share the bounded existing cache.
+    start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) - timedelta(days=days)
+    params = {"broadcaster_id": channel, "first": 50, "started_at": start.isoformat()}
+    if after:
+        params["after"] = after
+    try:
+        payload = await asyncio.wait_for(raid_browser_cached_request(bot, channel, "clips", params), timeout=15)
+    except Exception as error:
+        logging.getLogger("RatBoomBot").warning("[Clips] Clip request failed (%s).", type(error).__name__)
+        raise HTTPException(502, "Could not load Twitch clips. Please try again.") from error
+    fields = ("id", "title", "creator_name", "view_count", "created_at", "duration", "thumbnail_url")
+    return JSONResponse({
+        "clips": [{key: row.get(key) for key in fields} for row in payload.get("data", [])],
+        "cursor": payload.get("pagination", {}).get("cursor", ""),
+    }, headers={"Cache-Control": "no-store"})
