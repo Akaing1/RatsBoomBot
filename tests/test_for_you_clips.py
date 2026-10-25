@@ -49,7 +49,7 @@ async def test_clip_date_survives_twitchio_url_encoding(monkeypatch):
         assert datetime.fromisoformat(value).utcoffset().total_seconds() == 0
         return {"data": []}
     monkeypatch.setattr(dashboard, "raid_browser_cached_request", fetch)
-    response = await workspace.channel_clips(SimpleNamespace(session={workspace.CHANNEL_USER_ID_KEY: "123"}))
+    response = await workspace.channel_clips(SimpleNamespace(session={workspace.CHANNEL_USER_ID_KEY: "123"}), days=7)
     assert json.loads(response.body)["clips"] == []
 
 
@@ -75,5 +75,5 @@ async def test_all_time_clips_omit_date_restrictions(monkeypatch):
     monkeypatch.setattr(workspace, "get_bot", lambda: object())
     fetch = AsyncMock(return_value={"data": [], "pagination": {"cursor": "next"}})
     monkeypatch.setattr(dashboard, "raid_browser_cached_request", fetch)
-    await workspace.channel_clips(SimpleNamespace(session={workspace.CHANNEL_USER_ID_KEY: "123"}), days=0, after="page2")
+    await workspace.channel_clips(SimpleNamespace(session={workspace.CHANNEL_USER_ID_KEY: "123"}), after="page2")
     assert fetch.call_args.args[3] == {"broadcaster_id": "123", "first": 50, "after": "page2"}

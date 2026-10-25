@@ -143,7 +143,7 @@ async def get_note(request: Request, identity: str):
 
 
 @router.get("/channel/api/for-you/clips")
-async def channel_clips(request: Request, days: int = 7, after: str = ""):
+async def channel_clips(request: Request, days: int = 0, after: str = ""):
     from datetime import datetime, timedelta, timezone
     import asyncio
     import logging
