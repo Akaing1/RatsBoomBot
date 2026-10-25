@@ -51,8 +51,8 @@
         } catch (error) { if (error.name !== 'AbortError' && current === generation) { status.textContent = error.message; find('[data-clips-signin]').hidden = !error.message.includes('Sign in again'); } }
         finally { if (current === generation) more.disabled = false; }
     }
-    form.addEventListener('submit', e => {e.preventDefault(); load(true);});
-    form.addEventListener('reset', () => setTimeout(() => load(true),0));
+    form.addEventListener('submit', e => e.preventDefault());
+    find('#clip-days').addEventListener('change', () => load(true));
     find('#clip-search').addEventListener('input', render); find('#clip-sort').addEventListener('change',render);
     more.addEventListener('click', () => load(false));
     find('[data-clip-close]').addEventListener('click', () => dialog.close());
