@@ -177,3 +177,51 @@ async def channel_clips(request: Request, days: int = 0, after: str = ""):
         "clips": [{key: row.get(key) for key in fields} for row in payload.get("data", [])],
         "cursor": payload.get("pagination", {}).get("cursor", ""),
     }, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/channel/api/for-you/clips/download")
+async def clip_download(request: Request, clip_id: str = Form(..., min_length=1, max_length=200),
+                        csrf_token: str = Form(...)):
+    import asyncio
+    import logging
+    import re
+    from urllib.parse import urlsplit
+    from twitchio.http import Route
+    from twitchio.exceptions import HTTPException as TwitchHTTPException
+    from web.channel.routers.dashboard import raid_browser_cached_request
+
+    _, channel = workspace_context(request)
+    validate_csrf_token(request, csrf_token)
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", clip_id):
+        raise HTTPException(400, "Invalid clip ID.")
+    bot = get_bot()
+    if bot is None:
+        raise HTTPException(503, "Bot unavailable. Please try again.")
+    try:
+        # Never trust a supplied clip ID to belong to the signed-in broadcaster.
+        metadata = await asyncio.wait_for(
+            raid_browser_cached_request(bot, channel, "clips", {"id": clip_id}), timeout=15)
+        if not any(str(row.get("broadcaster_id")) == channel and row.get("id") == clip_id
+                   for row in metadata.get("data", [])):
+            raise HTTPException(404, "This clip is unavailable or does not belong to your channel.")
+        payload = await asyncio.wait_for(bot._http.request_json(Route(
+            "GET", "clips/downloads", token_for=channel,
+            params={"broadcaster_id": channel, "editor_id": channel, "clip_id": clip_id}
+        )), timeout=15)
+    except TwitchHTTPException as error:
+        logging.getLogger("RatBoomBot").warning("[Clips] Download link request failed, upstream_status=%s.", error.status)
+        if error.status in {401, 403}:
+            raise HTTPException(403, "Reconnect your channel in Settings to grant clip download permission.") from error
+        if error.status == 429:
+            raise HTTPException(429, "Twitch download limit reached. Please wait a minute and retry.") from error
+        raise HTTPException(502, "Twitch could not prepare this download. Please try again.") from error
+    except (asyncio.TimeoutError, OSError) as error:
+        raise HTTPException(504, "Preparing the download timed out. Please try again.") from error
+    rows = payload.get("data", [])
+    row = next((item for item in rows if item.get("clip_id") == clip_id), {})
+    url = row.get("landscape_download_url") or row.get("portrait_download_url")
+    parsed = urlsplit(url or "")
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise HTTPException(404, "Twitch has no download available for this clip.")
+    # Signed URLs are temporary: return only on demand and never persist/cache them.
+    return JSONResponse({"url": url}, headers={"Cache-Control": "no-store"})
