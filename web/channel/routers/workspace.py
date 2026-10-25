@@ -157,13 +157,18 @@ async def channel_clips(request: Request, days: int = 7, after: str = ""):
         raise HTTPException(503, "Bot unavailable. Try again shortly.")
     # Round to the hour so identical requests can share the bounded existing cache.
     start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) - timedelta(days=days)
-    params = {"broadcaster_id": channel, "first": 50, "started_at": start.isoformat()}
+    params = {"broadcaster_id": channel, "first": 50, "started_at": start.strftime("%Y-%m-%dT%H:%M:%SZ")}
     if after:
         params["after"] = after
     try:
         payload = await asyncio.wait_for(raid_browser_cached_request(bot, channel, "clips", params), timeout=15)
     except Exception as error:
-        logging.getLogger("RatBoomBot").warning("[Clips] Clip request failed (%s).", type(error).__name__)
+        extra = getattr(error, "extra", {})
+        message = str(extra.get("message", ""))[:300] if isinstance(extra, dict) else ""
+        logging.getLogger("RatBoomBot").warning(
+            "[Clips] Clip request failed (%s), upstream_status=%s, message=%s.",
+            type(error).__name__, getattr(error, "status", None), message.replace("\n", " ").replace("\r", " ")
+        )
         raise HTTPException(502, "Could not load Twitch clips. Please try again.") from error
     fields = ("id", "title", "creator_name", "view_count", "created_at", "duration", "thumbnail_url")
     return JSONResponse({

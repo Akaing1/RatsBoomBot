@@ -37,11 +37,11 @@
         try {
             const params = new URLSearchParams({days:find('#clip-days').value,after:cursor});
             const response = await fetch('/channel/api/for-you/clips?' + params, {signal:controller.signal,cache:'no-store',credentials:'same-origin'});
-            if (response.redirected || response.status === 401 || response.status === 403) {
+            if (response.status === 401) {
                 throw new Error('Your channel session needs attention. Sign in again, then retry.');
             }
             if (!(response.headers.get('content-type') || '').includes('application/json')) {
-                throw new Error('The server returned a page instead of clips. Sign in again or reload after deployment, then retry.');
+                throw new Error('Clips could not load (HTTP ' + response.status + '). Please retry shortly. If this continues, check the bot logs.');
             }
             const result = await response.json(); if (!response.ok) throw new Error(result.detail || 'Unable to load clips.');
             if (!Array.isArray(result.clips)) throw new Error('Unexpected clip response. Please reload this page.');
