@@ -1,6 +1,33 @@
 (() => {
     const panel = document.querySelector("[data-viewer-queue-panel]");
     if (!panel) return;
+    if (panel.dataset.readOnly === 'true') {
+        let refreshing = false;
+        async function refreshReadOnly() {
+            if (refreshing || document.hidden) return;
+            refreshing = true;
+            try {
+                const response = await fetch(panel.dataset.stateUrl, {cache: 'no-store'});
+                if (!response.ok) return;
+                const data = await response.json();
+                panel.querySelector('[data-queue-count]').textContent = `${data.users.length} queued`;
+                panel.querySelector('.queue-state-current').textContent = data.open ? 'Open' : 'Closed';
+                const list = document.createElement('ol'); list.className = 'queue-list';
+                data.users.forEach((user, i) => {
+                    const row = document.createElement('li'); row.className = 'queue-list-item';
+                    const position = document.createElement('span'); position.className = 'queue-position'; position.textContent = i + 1;
+                    const label = document.createElement('strong'); label.textContent = user.label || user.username;
+                    row.append(position, label); list.append(row);
+                });
+                if (!data.users.length) { const empty = document.createElement('p'); empty.textContent = 'The queue is empty'; list.append(empty); }
+                document.getElementById('viewer-queue-content').replaceChildren(list);
+            } catch { /* Keep the last confirmed queue during a network interruption. */ }
+            finally { refreshing = false; }
+        }
+        refreshReadOnly();
+        window.setInterval(refreshReadOnly, 2000);
+        return;
+    }
     const stateUrl = panel.dataset.stateUrl;
     const actionUrl = panel.dataset.actionUrl;
     const csrfToken = panel.dataset.csrfToken;
@@ -324,7 +351,7 @@
         requestInProgress = true;
         try {
             const response = await fetch(stateUrl, {headers: {Accept: "application/json"}, cache: "no-store"});
-            if (response.status === 401) return window.location.assign("/connect");
+            if (response.status === 401) return window.location.assign(globalThis.document?.body?.dataset?.channelRoot?.startsWith("/me/mod/") ? "/me" : "/connect");
             if (response.ok) {
                 actualState = await response.json();
                 if (!simulationActive) renderQueue(actualState);

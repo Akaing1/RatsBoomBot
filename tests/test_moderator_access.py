@@ -19,6 +19,7 @@ async def setup(tmp_path, monkeypatch):
     async with asqlite.create_pool(str(tmp_path / 'access.db')) as db:
         await run_migrations(db)
         monkeypatch.setattr(moderation, 'get_db', lambda: db)
+        monkeypatch.setattr('web.viewer.dashboard.get_db', lambda: db)
         bot = SimpleNamespace(fetch_users=AsyncMock(return_value=[SimpleNamespace(id='2', display_name='Moderator')]))
         monkeypatch.setattr(moderation, 'get_bot', lambda: bot)
         token = await create_viewer_session(db, '2')
@@ -43,14 +44,14 @@ def payload(note, **changes):
 @pytest.mark.asyncio
 async def test_grant_required_and_other_channel_denied(setup):
     client, session, db, note, _ = setup
-    assert (await client.get('/me/mod/1')).status_code == 403
+    assert (await client.get('/me/mod/1/notes')).status_code == 403
     await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'view')
-    page = await client.get('/me/mod/1')
+    page = await client.get('/me/mod/1/notes')
     assert page.status_code == 200
     assert page.headers['cache-control'] == 'no-store'
     assert '&lt;script&gt;secret&lt;/script&gt;' in page.text
     assert 'Save note' not in page.text
-    assert (await client.get('/me/mod/3')).status_code == 403
+    assert (await client.get('/me/mod/3/notes')).status_code == 403
     assert 'channel_user_id' not in session
 
 
@@ -77,10 +78,10 @@ async def test_view_cannot_edit_and_edit_is_audited(setup):
 async def test_revocation_blocks_open_page_save_and_removes_channel(setup):
     client, session, db, note, _ = setup
     await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'edit')
-    assert (await client.get('/me/mod/1')).status_code == 200
+    assert (await client.get('/me/mod/1/notes')).status_code == 200
     await set_grant(db, '1', '2', '', '', 'revoke')
     assert await channels_for_user(db, '2') == []
-    assert (await client.get('/me/mod/1')).status_code == 403
+    assert (await client.get('/me/mod/1/notes')).status_code == 403
     assert (await client.post('/me/mod/1/notes/' + note['note_id'], data=payload(note))).status_code == 403
 
 
@@ -99,7 +100,7 @@ async def test_revoked_signin_cannot_read_or_write(setup):
     client, session, db, note, _ = setup
     await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'edit')
     await revoke_viewer_session(db, session['viewer_server_token'])
-    assert (await client.get('/me/mod/1')).status_code == 401
+    assert (await client.get('/me/mod/1/notes')).status_code == 401
     assert (await client.post('/me/mod/1/notes/' + note['note_id'], data=payload(note))).status_code == 401
 
 
@@ -135,9 +136,9 @@ async def test_mod_bar_requires_valid_session(setup):
 async def test_no_grant_from_twitch_role_or_admin_session(setup):
     client, session, db, note, _ = setup
     session.update(administrator_id=1, channel_user_id='3')
-    assert (await client.get('/me/mod/1')).status_code == 403
+    assert (await client.get('/me/mod/1/notes')).status_code == 403
     session.clear()
-    response = await client.get('/me/mod/1')
+    response = await client.get('/me/mod/1/notes')
     assert response.status_code == 303
     assert response.headers['location'] == '/me/connect'
 
@@ -148,11 +149,11 @@ async def test_pagination_and_escaped_channel_names(setup):
     await set_grant(db, '1', '2', '<script>channel</script>', 'Moderator', 'view')
     for i in range(20):
         await manage_note(db, '1', 'create', title=str(i), notes='Note')
-    page = await client.get('/me/mod/1')
+    page = await client.get('/me/mod/1/notes')
     assert '?offset=20' in page.text
     assert '&lt;script&gt;channel&lt;/script&gt;' in page.text
-    assert (await client.get('/me/mod/1?offset=-1')).status_code == 422
-    assert 'Next</a>' not in (await client.get('/me/mod/1?offset=20')).text
+    assert (await client.get('/me/mod/1/notes?offset=-1')).status_code == 422
+    assert 'Next</a>' not in (await client.get('/me/mod/1/notes?offset=20')).text
 
 
 @pytest.mark.asyncio

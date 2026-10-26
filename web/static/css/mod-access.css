@@ -30,3 +30,32 @@
 .access-badge { display: inline-block; border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; font-size: 12px; color: var(--muted); background: var(--surface-raised); }
 @media (max-width: 1100px) { .access-layout { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 480px) { .access-row { align-items: stretch; flex-direction: column; } .access-row .button { width: 100%; } }
+
+.mod-overview-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 8px 0; flex-shrink: 0; font-size: 13px; }
+.mod-overview-banner .button { padding: 7px 12px; }
+.moderator-dashboard .dashboard-actions-panel { display: none; }
+.moderator-dashboard .dashboard-activity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mod-predictions { min-width: 0; }
+.mod-predictions h4 { overflow-wrap: anywhere; }
+.mod-prediction-form { display: grid; gap: 12px; margin-top: 12px; }
+.mod-prediction-form .profile-setting-input { margin-top: 6px; }
+.mod-prediction-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+@media (max-width: 768px) { .moderator-dashboard .dashboard-activity-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.moderator-dashboard .dashboard-lower-panels { grid-template-columns: minmax(0, 1fr); grid-template-areas: "activities"; }
+
+.moderator-dashboard .twitch-channel-field > h3 { font-size: 14px; }
+.moderator-dashboard [contenteditable="false"]::after { display: none; }
+.moderator-dashboard .queue-panel-header { flex-wrap: wrap; }
+.moderator-dashboard .queue-panel-header h3 { flex-basis: 100%; }
+.moderator-dashboard .queue-panel-header [data-queue-count] { margin-left: 0; }
+.mod-predictions .panel-header { flex-wrap: wrap; }
+.mod-predictions .panel-header h3 { font-size: 18px; }
+.mod-predictions .panel-header .button { padding: 6px 10px; font-size: 12px; }
+.mod-predictions p { font-size: 14px; line-height: 1.5; }
+@media (max-width: 768px) { .mod-overview-banner { display: none; } }
+@media (max-width: 768px) {
+    .moderator-dashboard .dashboard-carousel-slide[data-dashboard-carousel-slide="1"] { overflow-y: auto; }
+    .moderator-dashboard .dashboard-carousel-slide > .mod-predictions { flex: 0 0 auto; }
+    .moderator-dashboard .dashboard-carousel-slide[data-dashboard-carousel-slide="1"] > [data-viewer-queue-panel] { min-height: 300px; flex: 0 0 auto; }
+}

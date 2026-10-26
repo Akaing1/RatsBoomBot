@@ -93,8 +93,8 @@ async def change_access(request: Request, csrf_token: str = Form(...), login: st
     owner = owner_id(request)
     validate_csrf_token(request, csrf_token)
     db = database()
-    if permission not in ('view', 'edit', 'revoke'):
-        raise HTTPException(400, 'Choose View or Edit.')
+    if permission not in ('view', 'edit', 'super', 'revoke'):
+        raise HTTPException(400, 'Choose View, Moderator, or Super moderator.')
     name = ''
     if permission == 'revoke':
         if not user_id.isdecimal():
@@ -108,7 +108,7 @@ async def change_access(request: Request, csrf_token: str = Form(...), login: st
     return RedirectResponse('/channel/access', status_code=303, headers=PRIVATE)
 
 
-@router.get('/me/mod/{channel}')
+@router.get('/me/mod/{channel}/notes')
 async def mod_page(request: Request, channel: str, offset: int = Query(0, ge=0, le=1000000)):
     db = database()
     if not viewer_user_id(request):
@@ -118,7 +118,10 @@ async def mod_page(request: Request, channel: str, offset: int = Query(0, ge=0, 
         grant, notes, more = await delegated_notes(db, channel, actor, offset)
     except PermissionError as error:
         raise HTTPException(403, str(error)) from error
+    from web.viewer.dashboard import authorize
+    await authorize(request, channel)
     return templates.TemplateResponse(request=request, name='viewer/mod_dashboard.html', context={
+        'active_page': 'notes',
         'grant': grant, 'notes': notes, 'more': more, 'offset': offset,
         'mod_channels': await channels_for_user(db, actor), 'csrf_token': get_csrf_token(request),
     }, headers=PRIVATE)
@@ -139,4 +142,4 @@ async def save_note(request: Request, channel: str, identity: str, csrf_token: s
         return templates.TemplateResponse(request=request, name='viewer/mod_conflict.html', context={
             'channel': channel, 'title': title, 'notes': notes, 'message': str(error),
         }, status_code=409, headers=PRIVATE)
-    return RedirectResponse(f'/me/mod/{channel}', status_code=303, headers=PRIVATE)
+    return RedirectResponse(f'/me/mod/{channel}/notes', status_code=303, headers=PRIVATE)

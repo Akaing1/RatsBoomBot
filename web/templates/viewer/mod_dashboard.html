@@ -1,14 +1,13 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ grant.channel_name }} | Mod dashboard</title>
-<link rel="stylesheet" href="/static/css/style.css?v={{ deployment_stamp() }}"><link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}"></head>
-<body class="chatter-profile-page"><header class="public-command-navigation"><a class="landing-brand" href="/me">← My account</a><strong>{{ grant.channel_name }} · Mod dashboard</strong></header>
-<div class="mod-account-layout"><main class="chatter-profile-content"><section class="panel"><h1>Notes</h1><p>{{ grant.channel_name }} · {{ grant.permission | title }} access</p><p>Refresh this page to see the latest notes.</p></section>
+{% extends "channel/layout.html" %}
+{% block title %}{{ grant.channel_name }} | Notes{% endblock %}
+{% block content %}<header class="page-header"><h2>{{ grant.channel_name }} · Notes</h2></header>
 {% for note in notes %}<article class="panel mod-note">
-{% if grant.permission == 'edit' %}<form class="mod-note" method="post" action="/me/mod/{{ grant.broadcaster_id }}/notes/{{ note.note_id }}">
+{% if grant.permission in ('edit', 'super') %}<form class="mod-note" method="post" action="/me/mod/{{ grant.broadcaster_id }}/notes/{{ note.note_id }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="revision" value="{{ note.revision }}">
 <label for="title-{{ note.note_id }}">Title</label><input id="title-{{ note.note_id }}" name="title" value="{{ note.title }}" maxlength="120" placeholder="{{ note.display_name }}">
 <label for="body-{{ note.note_id }}">Note</label><textarea id="body-{{ note.note_id }}" name="notes" maxlength="20000" rows="7">{{ note.notes }}</textarea><button class="button primary" type="submit">Save note</button></form>
 {% else %}<h2>{{ note.display_name }}</h2><div class="mod-note-text">{{ note.notes }}</div>{% endif %}</article>
 {% else %}<section class="panel"><p>No notes available. The channel owner can create them in For You.</p></section>{% endfor %}
 <nav aria-label="Notes pages">{% if offset > 0 %}<a class="button secondary" href="?offset={{ [0, offset - 20] | max }}">Previous</a>{% endif %}{% if more %}<a class="button secondary" href="?offset={{ offset + 20 }}">Next</a>{% endif %}</nav>
-</main>{% include "viewer/mod_bar.html" %}</div></body></html>
+
+{% endblock %}

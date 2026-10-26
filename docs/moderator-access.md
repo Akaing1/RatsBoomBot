@@ -1,19 +1,46 @@
-# Moderator access (16.0.0)
+# Moderator dashboard (16.1.0)
 
-This first increment delegates **Notes** only. Owners open **Moderator access** in the channel dashboard, enter a Twitch username and choose View or Edit. Saving resolves the username to a Twitch user ID; grants are stored by ID. View reads existing notes. Edit also updates existing notes. Creating/deleting notes, other dashboard features, bot authorization and access management remain owner-only.
+Channel owners grant access from **Moderator access**, using the existing Twitch-user search and confirmation. Grants use stable Twitch user IDs. Twitch moderator status alone does not grant dashboard access, and granting bot access does not add a Twitch moderator badge.
 
-Moderators sign in through `/me` (the `!me` entry point). The right-hand Mod Bar lists explicitly granted channels. It also appears for accounts with no chatter activity. On narrow screens it becomes a collapsible panel above the content. Public chatter pages never receive the channel list. Moderators do not connect their own channel or acquire the owner's session.
+| Level | Access |
+| --- | --- |
+| View | Overview video embed, combined chat, redeems, commands, moderation activity, AutoMod queue, ads and viewer queue status; Notes; sending Twitch chat as their own authorized account |
+| Moderator | View plus prediction creation/locking/canceling/resolving, supported Twitch moderation actions, viewer queue/ad controls, and existing Notes edits |
+| Super moderator | Moderator plus bot settings/customization, feature switches, protected users, queue blacklist and stream metadata |
 
-Migration 71 adds `channel_access` and `channel_access_audit`. Every moderator page/save validates the server-backed viewer session and reads the current grant. A save checks Edit permission and updates the note within one write transaction, so grant revocation and updates cannot race through a cached permission. Existing revision checks protect against concurrent owner/moderator edits; a conflict page preserves the submitted draft. Reads paginate 20 notes at a time. There are no polling loops or background tasks.
+Existing View/Edit grants migrate to View/Moderator. Nobody automatically gains Super moderator access. Revoking a grant blocks future pages/actions and removes the channel from the signed-in personal profile's right-side Mod Bar. Public chatter profiles never receive grants.
 
-Grant/revoke actions and successful edits are audited with channel, actor, action, subject and timestamp. Note contents and auth tokens are not copied into the audit log. There is no audit viewer yet.
+## Entry and navigation
 
-To try it in UAT after merging/deploying:
+Sign in through `/me` (the `!me` entry point) and choose a channel in the Mod Bar. `/me/mod/{channel}` now opens the shared channel Overview; Notes moved to `/me/mod/{channel}/notes`. Overview hides the circular broadcaster shortcuts, raid browser, personal workspace flip, bot identity, account connections, widget secrets and access management. Super moderators receive a Settings navigation item. Owner-only pages are not registered under moderator URLs.
 
-1. Sign in as a channel owner, open Moderator access, and grant a different Twitch account Notes/View.
-2. Sign in as that account through `/me`, select the channel in the right-hand Mod Bar, and verify Notes are read-only.
-3. Change the grant to Edit; refresh the moderator page and save an existing note. Verify it in the owner's For You page.
-4. Revoke access while the moderator page is open. Saving/refreshing must fail, and refreshing `/me` must remove that channel.
-5. Check a second channel and a public chatter URL: neither should expose the first channel's private notes or grants.
+The dashboard uses the existing Overview template and feed services. Only an explicit allowlist of routes is exposed under the moderator prefix. Every request validates the viewer's server-backed session, channel grant and capability before resolving the target channel on request state. It never replaces `channel_user_id` in the session. JSON/form inputs cannot choose the actor or target broadcaster. Redirects remain under the same moderator prefix.
 
-Further features should receive explicit capabilities and server-side checks before becoming available here. Do not implement switching by replacing `channel_user_id` with a granted channel ID: that would grant the owner's unrelated privileges.
+## Twitch authorization and actions
+
+The **Authorize [account] for chat** button requests authorization from the signed-in moderator's own Twitch account using the existing viewer OAuth callback URI. The callback checks CSRF state, the existing session, the current channel grant and the returned Twitch user ID. Using another Twitch account is rejected. Cancellation returns to the moderator Overview, not administrator sign-in.
+
+Ordinary `/me` sign-in remains identity-only. Moderator action access/refresh tokens are kept in the separate `moderator_twitch_tokens` database table, not the session cookie or broadcaster/bot token registry. They do not onboard a channel. User-authenticated chat always uses that actor as `sender_id`; moderator API calls use that actor as `moderator_id`. There is no fallback to broadcaster credentials. YouTube chat remains visible, but moderator messages are Twitch-only because this flow does not authorize the moderator's YouTube identity.
+
+View grants request `user:write:chat` and `user:read:emotes`. Moderator/Super moderator authorization additionally requests the scopes for message deletion/pins, bans, announcements, chat settings, AutoMod, warnings and shoutouts. A bot grant cannot bypass Twitch's own moderator and scope checks. After upgrading a role, authorize again if Twitch denies an action for missing scopes.
+
+Supported slash commands: `/ban`, `/timeout`, `/unban`, `/clear`, `/warn`, announcement colors, slow/follower/subscriber/emote/unique-chat modes, and `/shoutout`. Owner-only commands such as `/mod`, `/raid` and `/commercial` are not forwarded through the moderator chat endpoint. There are separate permission-checked ad controls.
+
+Twitch prediction APIs require the broadcaster's user token. Authorized Moderator/Super moderator requests use that channel's existing server-side authorization and are attributed to the actor in the audit log. Broadcasters must reconnect once to grant the newly requested `channel:manage:predictions` scope, and the channel must be eligible for Channel Points predictions. Prediction data loads on demand with Refresh; no new polling worker is introduced. Resolution verifies the prediction and selected outcome belong to this channel.
+
+Token transport refreshes once on HTTP 401; other rejected/uncertain writes are not retried automatically. Signed tokens, upstream response bodies and message contents are not returned in error messages or copied into the audit log.
+
+## Revocation and auditing
+
+Normal requests check the database grant every time. Live-chat streams check session/grant validity during the connection and before delivering subsequent messages, with checks throttled to five seconds and idle checks at the existing 15-second heartbeat. On revocation they close and unsubscribe; the browser stops reconnecting after the access-revoked event. Already completed external actions are not undone.
+
+Migration 72 expands the grant constraint for the three roles and creates the dedicated moderator token table. Settings overrides identify the actor as `moderator:{id}`. Completed moderator POST requests and native slash commands are recorded in `channel_access_audit`; failed form submissions that return a redirect can also appear as submitted attempts. There is no audit viewer yet.
+
+## UAT walkthrough
+
+1. Grant a second Twitch account View; open its `/me`, select the channel, and verify the stream embed, chat, activity, moderation and queue status. Confirm there are no raid shortcuts or Settings link.
+2. Authorize that same account for chat and send/reply to a message. Confirm Twitch displays the moderator account, never the broadcaster or bot. Try a different account during OAuth; it must be rejected.
+3. Change to Moderator. Refresh, authorize the expanded Twitch scopes, and test moderation with a Twitch account that has a real moderator badge. Test create/lock/resolve or cancel on a prediction-enabled channel after the broadcaster reconnects.
+4. Grant Super moderator, change a feature switch and a command setting, and verify the intended channel updates. Connections, bot identity, widget URLs and access management must remain inaccessible.
+5. Downgrade or revoke access while the page is open. Future privileged actions must fail; an open chat connection must stop within the heartbeat window. Another channel must remain inaccessible.
+6. Review live Twitch behavior in UAT. Local Chromium checks covered desktop/mobile View, Moderator and Super moderator pages, the mobile carousel, the chat composer and scrolling to queue actions beneath an expanded prediction form. Those previews used mocked feed data and a placeholder video embed; real Twitch OAuth, playback and actions still need UAT validation.

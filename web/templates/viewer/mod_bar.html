@@ -4,7 +4,7 @@
 <p>Channels you can help manage</p>
 <nav aria-label="Moderator channels">{% for entry in mod_channels %}
 <a class="mod-channel" href="/me/mod/{{ entry.broadcaster_id }}"{% if grant is defined and grant.broadcaster_id == entry.broadcaster_id %} aria-current="page"{% endif %}>
-<strong>{{ entry.channel_name }}</strong><small>Notes · {{ entry.permission | title }}</small></a>
+<strong>{{ entry.channel_name }}</strong><small>{{ {'view': 'View', 'edit': 'Moderator', 'super': 'Super moderator'}[entry.permission] }}</small></a>
 {% endfor %}</nav>
 </details></aside>
 {% endif %}

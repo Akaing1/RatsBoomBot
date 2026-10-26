@@ -18,6 +18,7 @@
         {name: "Ads, Viewer Queue and Actions", selectors: [".dashboard-ads-panel", "[data-viewer-queue-panel]", ".dashboard-actions-panel"]},
         {name: "Moderation and Activity", selectors: [".dashboard-moderation-panel", ".dashboard-community-panel"]}
     ];
+    if (layout.querySelector(".mod-predictions")) groups[1].selectors.unshift(".mod-predictions");
     const cards = groups.map(group => ({
         name: group.name,
         elements: group.selectors.map(selector => layout.querySelector(selector))
