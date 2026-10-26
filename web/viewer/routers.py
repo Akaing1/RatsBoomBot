@@ -11,6 +11,7 @@ from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.shared.common import templates
 from web.shared.oauth import build_viewer_oauth_url, exchange_code_for_token, fetch_twitch_user
 from web.state import get_bot, get_db
+from web.viewer.moderation import mod_bar_channels
 from web.viewer.auth import (
     VIEWER_USER_DISPLAY_NAME_KEY,
     VIEWER_OAUTH_NEXT_KEY,
@@ -89,6 +90,7 @@ async def my_account(request: Request):
     if runtime_bot is None or runtime_bot.services is None:
         return HTMLResponse("Chatter profiles are temporarily unavailable.", status_code=503, headers=PRIVATE_HEADERS)
 
+    mod_channels = await mod_bar_channels(request)
     profile = await runtime_bot.services.chatter_stats.get_global_profile(user_id)
     if profile is not None and str(profile["identity"]["user_id"]) == user_id:
         pets = getattr(runtime_bot.services, "pets", None)
@@ -104,6 +106,7 @@ async def my_account(request: Request):
                 "profile": profile,
                 "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
                 "account_mode": True,
+                "mod_channels": mod_channels,
                 "viewer_user_id": user_id,
                 "csrf_token": get_csrf_token(request),
             },
@@ -115,6 +118,7 @@ async def my_account(request: Request):
         name="viewer/empty.html",
         context={
             "display_name": request.session.get(VIEWER_USER_DISPLAY_NAME_KEY, "Chatter"),
+            "mod_channels": mod_channels,
             "csrf_token": get_csrf_token(request),
         },
         headers=PRIVATE_HEADERS,

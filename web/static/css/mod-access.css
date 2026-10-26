@@ -1,0 +1,15 @@
+.mod-account-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 24px; width: min(100% - 40px, 1400px); margin: auto; align-items: start; }
+.mod-account-layout > .chatter-profile-content { width: 100%; min-width: 0; }
+.mod-bar.panel { position: sticky; top: 24px; margin-top: 34px; background: var(--surface-raised); max-height: calc(100dvh - 48px); overflow: auto; }
+.mod-bar summary { font-size: 1.15rem; font-weight: 700; cursor: pointer; }
+.mod-bar p, .mod-channel small { color: var(--muted); }
+.mod-channel { display: flex; flex-direction: column; gap: 5px; padding: 12px; margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.mod-channel:hover, .mod-channel:focus-visible, .mod-channel[aria-current] { border-color: var(--accent); }
+.access-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+.access-form { display: grid; gap: 12px; }
+.access-form input, .access-form select, .mod-note input, .mod-note textarea { width: 100%; box-sizing: border-box; }
+.mod-note { display: grid; gap: 12px; margin-bottom: 20px; }
+.mod-note textarea { resize: vertical; min-height: 160px; }
+.mod-note-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.access-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
+@media (max-width: 900px) { .mod-account-layout, .access-layout { grid-template-columns: minmax(0, 1fr); } .mod-account-layout > .mod-bar { grid-row: 1; position: static; margin: 18px 0 0; max-height: none; } .mod-account-layout > .chatter-profile-content { padding-top: 0; } }

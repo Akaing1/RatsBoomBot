@@ -8,6 +8,7 @@
     <link rel="canonical" href="{{ public_base_url }}/chatters/{{ profile.identity.login }}">
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
+    <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
 </head>
 <body class="chatter-profile-page">
     <header class="public-command-navigation">
@@ -27,6 +28,7 @@
         {% endif %}
     </header>
 
+{% if account_mode and mod_channels %}<div class="mod-account-layout">{% endif %}
     <main class="chatter-profile-content">
         {% if account_mode %}<section class="panel chatter-account-intro"><p class="eyebrow">My account</p><h2>Your activity</h2><p>Your public profile is below. Channel balances and raid items are in each community card.</p></section>{% endif %}
         <header class="chatter-profile-hero">
@@ -161,6 +163,7 @@
 
         {% if profile.achievements %}{% include 'public/achievements.html' %}{% endif %}
     </main>
+{% if account_mode and mod_channels %}{% include "viewer/mod_bar.html" %}</div>{% endif %}
     <script src="{{ url_for('static', path='/js/chatter-tabs.js') }}?v={{ deployment_stamp() }}" defer></script>
 </body>
 </html>
