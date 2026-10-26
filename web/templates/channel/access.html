@@ -2,16 +2,26 @@
 {% block title %}Moderator access | RatsBoomBot{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
-<header class="page-header"><h2>Moderator access</h2><p>Choose who can help with your channel's Notes.</p></header>
+<header class="page-header access-header"><div><h2>Moderator access</h2><p>Choose who can help with your channel's Notes.</p></div></header>
 <div class="access-layout"><section class="panel"><h3>People with access</h3>
-{% for entry in grants %}<div class="access-row"><div><strong>{{ entry.user_name }}</strong><p>Notes · {{ entry.permission | title }}</p></div>
+{% for entry in grants %}<div class="access-row"><div><strong>{{ entry.user_name }}</strong><p><span class="access-badge">Notes · {{ entry.permission | title }}</span></p></div>
 <form method="post" action="/channel/access"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" value="{{ entry.user_id }}"><input type="hidden" name="permission" value="revoke"><button class="button danger" type="submit">Revoke</button></form></div>
 {% else %}<p>No one has access yet.</p>{% endfor %}
 <p>They sign in through <a href="/me">My account</a> (or the link from <code>!me</code>) and choose your channel in the Mod Bar.</p>
-</section><aside class="panel"><h3>Grant or update access</h3><form class="access-form" method="post" action="/channel/access">
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<label for="access-login">Twitch username</label><input id="access-login" name="login" maxlength="25" required placeholder="username">
-<label for="access-level">Notes permission</label><select id="access-level" name="permission"><option value="view">View</option><option value="edit">Edit</option></select>
-<p>View can read Notes. Edit can also update existing Notes. Other features and account settings remain private.</p>
-<button class="button primary" type="submit">Save access</button></form></aside></div>
+</section><aside class="panel access-settings"><h3>Grant or update access</h3>
+<form class="protected-user-search" data-access-search>
+<label for="access-query">Twitch username</label>
+<div class="protected-user-search-controls"><input id="access-query" class="profile-setting-input" name="query" maxlength="25" autocomplete="off" required placeholder="Enter username"><button class="button secondary" type="submit">Search</button></div>
+<p class="protected-user-search-message" data-access-message role="status" aria-live="polite"></p>
+</form>
+<form class="protected-user-result access-result" method="post" action="/channel/access" data-access-result hidden>
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" data-access-id>
+<div><span>Verified Twitch user</span><strong data-access-label></strong></div>
+<label for="access-level">Notes permission</label><select class="profile-setting-input" id="access-level" name="permission"><option value="view">View</option><option value="edit">Edit</option></select>
+<p class="access-help">View can read Notes. Edit can also update existing Notes.</p>
+<button class="button primary" type="submit">Save access</button></form>
+<p class="access-help">Search for a Twitch user, confirm the account, then choose their access.</p>
+<noscript><p>Enable JavaScript to search and confirm a Twitch user.</p></noscript>
+</aside></div>
 {% endblock %}
+{% block page_scripts %}{{ super() }}<script src="/static/js/mod-access.js?v={{ deployment_stamp() }}" defer></script>{% endblock %}

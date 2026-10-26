@@ -169,3 +169,43 @@ async def test_new_chatter_can_use_mod_bar_without_channel_activity(setup, monke
     assert 'Mod Bar' in page.text and 'href="/me/mod/1"' in page.text
     await revoke_viewer_session(db, session['viewer_server_token'])
     assert 'Mod Bar' not in (await client.get('/me')).text
+
+
+@pytest.mark.asyncio
+async def test_access_search_is_owner_only_and_reports_existing_grant(setup):
+    client, session, db, note, bot = setup
+    assert (await client.get('/channel/access/search?query=moderator')).status_code == 401
+    bot.fetch_users.assert_not_awaited()
+    session.update(channel_user_id='1')
+    await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'edit')
+    response = await client.get('/channel/access/search?query=%40Moderator')
+    assert response.status_code == 200
+    assert response.headers['cache-control'] == 'no-store'
+    assert response.json()['user'] == {'id': '2', 'display_name': 'Moderator', 'permission': 'edit', 'is_owner': False}
+    bot.fetch_users.assert_awaited_once_with(logins=['moderator'])
+    assert (await client.get('/channel/access/search?query=invalid!')).status_code == 400
+    bot.fetch_users.return_value = []
+    assert (await client.get('/channel/access/search?query=missing')).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_selected_account_is_reverified_by_stable_id(setup):
+    client, session, db, note, bot = setup
+    session.update(channel_user_id='1')
+    response = await client.post('/channel/access', data={'csrf_token': 'secret', 'user_id': '2', 'permission': 'view'})
+    assert response.status_code == 303
+    bot.fetch_users.assert_awaited_once_with(ids=['2'])
+    assert (await channels_for_user(db, '2'))[0]['permission'] == 'view'
+    bot.fetch_users.return_value = []
+    assert (await client.post('/channel/access', data={'csrf_token': 'secret', 'user_id': '3', 'permission': 'edit'})).status_code == 404
+    assert await channels_for_user(db, '3') == []
+
+
+@pytest.mark.asyncio
+async def test_owner_search_and_runtime_failure(setup):
+    client, session, db, note, bot = setup
+    session.update(channel_user_id='2')
+    assert (await client.get('/channel/access/search?query=moderator')).json()['user']['is_owner'] is True
+    assert (await client.post('/channel/access', data={'csrf_token': 'secret', 'user_id': '2', 'permission': 'edit'})).status_code == 400
+    bot.fetch_users.side_effect = TimeoutError()
+    assert (await client.get('/channel/access/search?query=moderator')).status_code == 503
