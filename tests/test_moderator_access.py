@@ -45,20 +45,19 @@ def payload(note, **changes):
 async def test_grant_required_and_other_channel_denied(setup):
     client, session, db, note, _ = setup
     assert (await client.get('/me/mod/1/notes')).status_code == 403
-    await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'view')
+    await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'edit')
     page = await client.get('/me/mod/1/notes')
     assert page.status_code == 200
     assert page.headers['cache-control'] == 'no-store'
     assert '&lt;script&gt;secret&lt;/script&gt;' in page.text
-    assert 'Save note' not in page.text
+    assert 'Save note' in page.text
     assert (await client.get('/me/mod/3/notes')).status_code == 403
     assert 'channel_user_id' not in session
 
 
 @pytest.mark.asyncio
-async def test_view_cannot_edit_and_edit_is_audited(setup):
+async def test_missing_grant_cannot_edit_and_moderator_is_audited(setup):
     client, session, db, note, _ = setup
-    await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'view')
     path = '/me/mod/1/notes/' + note['note_id']
     assert (await client.post(path, data=payload(note))).status_code == 403
     await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'edit')
@@ -125,7 +124,7 @@ async def test_only_owner_can_manage_grants_and_user_id_is_resolved(setup):
 @pytest.mark.asyncio
 async def test_mod_bar_requires_valid_session(setup):
     client, session, db, note, _ = setup
-    await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'view')
+    await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'edit')
     request = SimpleNamespace(session=session)
     assert len(await moderation.mod_bar_channels(request)) == 1
     session['viewer_server_token'] = 'invalid'
@@ -146,7 +145,7 @@ async def test_no_grant_from_twitch_role_or_admin_session(setup):
 @pytest.mark.asyncio
 async def test_pagination_and_escaped_channel_names(setup):
     client, session, db, note, _ = setup
-    await set_grant(db, '1', '2', '<script>channel</script>', 'Moderator', 'view')
+    await set_grant(db, '1', '2', '<script>channel</script>', 'Moderator', 'edit')
     for i in range(20):
         await manage_note(db, '1', 'create', title=str(i), notes='Note')
     page = await client.get('/me/mod/1/notes')
@@ -164,7 +163,7 @@ async def test_new_chatter_can_use_mod_bar_without_channel_activity(setup, monke
     monkeypatch.setattr(routers, 'get_bot', lambda: SimpleNamespace(services=SimpleNamespace(
         chatter_stats=SimpleNamespace(get_global_profile=AsyncMock(return_value=None)))))
     assert 'Mod Bar' not in (await client.get('/me')).text
-    await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'view')
+    await set_grant(db, '1', '2', 'Streamer', 'Moderator', 'edit')
     page = await client.get('/me')
     assert page.status_code == 200
     assert 'Mod Bar' in page.text and 'href="/me/mod/1"' in page.text
@@ -193,10 +192,10 @@ async def test_access_search_is_owner_only_and_reports_existing_grant(setup):
 async def test_selected_account_is_reverified_by_stable_id(setup):
     client, session, db, note, bot = setup
     session.update(channel_user_id='1')
-    response = await client.post('/channel/access', data={'csrf_token': 'secret', 'user_id': '2', 'permission': 'view'})
+    response = await client.post('/channel/access', data={'csrf_token': 'secret', 'user_id': '2', 'permission': 'edit'})
     assert response.status_code == 303
     bot.fetch_users.assert_awaited_once_with(ids=['2'])
-    assert (await channels_for_user(db, '2'))[0]['permission'] == 'view'
+    assert (await channels_for_user(db, '2'))[0]['permission'] == 'edit'
     bot.fetch_users.return_value = []
     assert (await client.post('/channel/access', data={'csrf_token': 'secret', 'user_id': '3', 'permission': 'edit'})).status_code == 404
     assert await channels_for_user(db, '3') == []
@@ -210,3 +209,40 @@ async def test_owner_search_and_runtime_failure(setup):
     assert (await client.post('/channel/access', data={'csrf_token': 'secret', 'user_id': '2', 'permission': 'edit'})).status_code == 400
     bot.fetch_users.side_effect = TimeoutError()
     assert (await client.get('/channel/access/search?query=moderator')).status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_owner_changes_existing_role_and_view_is_rejected(setup):
+    client, session, db, note, bot = setup
+    session.update(channel_user_id='1')
+    await set_grant(db,'1','2','Streamer','Moderator','edit')
+    page = await client.get('/channel/access')
+    assert 'data-role-select' in page.text and 'role-edit' in page.text
+    assert '<option value="view">' not in page.text
+    for role in ('super','edit'):
+        response = await client.post('/channel/access', data={'csrf_token':'secret','user_id':'2','permission':role}, headers={'Accept':'application/json'})
+        assert response.status_code == 200
+        assert response.json() == {'permission':role, 'user_id':'2'}
+        assert (await channels_for_user(db,'2'))[0]['permission'] == role
+    assert (await client.post('/channel/access',data={'csrf_token':'secret','user_id':'2','permission':'view'})).status_code == 400
+    with pytest.raises(ValueError):
+        await set_grant(db,'1','2','Streamer','Moderator','view')
+
+
+@pytest.mark.asyncio
+async def test_retired_view_grants_are_removed_without_escalating_roles(tmp_path):
+    from storage.migrations.core.v071_channel_access import migrate as m71
+    from storage.migrations.core.v072_moderator_dashboard import migrate as m72
+    from storage.migrations.core.v074_retire_view_role import migrate as m74
+    async with asqlite.create_pool(str(tmp_path/'legacy.db')) as db:
+        async with db.acquire() as conn:
+            await m71(conn)
+            await m72(conn)
+            for actor, role in [('2','view'),('3','edit'),('4','super')]:
+                await conn.execute("INSERT INTO channel_access VALUES ('1', ?, 'Streamer', 'Person', 'dashboard', ?)", (actor,role))
+            await m74(conn)
+            rows=await conn.fetchall('SELECT user_id, permission FROM channel_access ORDER BY user_id')
+            assert [tuple(r) for r in rows]==[('3','edit'),('4','super')]
+            import sqlite3
+            with pytest.raises(sqlite3.IntegrityError):
+                await conn.execute("INSERT INTO channel_access VALUES ('1','2','Streamer','Person','dashboard','view')")

@@ -3,8 +3,11 @@
 {% block content %}
 <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
 <header class="page-header access-header"><div><h2>Moderator access</h2></div></header>
-<div class="access-layout"><section class="panel"><h3>People with access</h3>
-{% for entry in grants %}<div class="access-row"><div><strong>{{ entry.user_name }}</strong><p><span class="access-badge">{{ {'view': 'View', 'edit': 'Moderator', 'super': 'Super moderator'}[entry.permission] }}</span></p></div>
+<div class="access-layout"><section class="panel"><h3 class="access-list-heading">People with access</h3>
+{% for entry in grants %}<div class="access-row"><div><strong>{{ entry.user_name }}</strong><form method="post" action="/channel/access" data-role-form>
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" value="{{ entry.user_id }}">
+<select class="access-badge role-{{ entry.permission }}" name="permission" aria-label="Role for {{ entry.user_name }}" data-role-select data-original="{{ entry.permission }}"><option value="edit"{% if entry.permission == 'edit' %} selected{% endif %}>Moderator</option><option value="super"{% if entry.permission == 'super' %} selected{% endif %}>Super moderator</option></select>
+<noscript><button class="button secondary" type="submit">Save role</button></noscript><p data-role-status role="status" aria-live="polite"></p></form></div>
 <form method="post" action="/channel/access"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" value="{{ entry.user_id }}"><input type="hidden" name="permission" value="revoke"><button class="button danger" type="submit">Revoke</button></form></div>
 {% else %}<p>No one has access yet.</p>{% endfor %}
 
@@ -17,8 +20,8 @@
 <form class="protected-user-result access-result" method="post" action="/channel/access" data-access-result hidden>
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" data-access-id>
 <div><span>Verified Twitch user</span><strong data-access-label></strong></div>
-<label for="access-level">Access level</label><select class="profile-setting-input" id="access-level" name="permission"><option value="view">View</option><option value="edit">Moderator</option><option value="super">Super moderator</option></select>
-<p class="access-help">View can see Overview and send chat as their own account. Moderators can manage predictions and moderation. Super moderators can also customize bot settings.</p>
+<label for="access-level">Access level</label><select class="profile-setting-input" id="access-level" name="permission"><option value="edit">Moderator</option><option value="super">Super moderator</option></select>
+<p class="access-help">Moderators can manage chat, the viewer queue and notes. Super moderators can also manage ads and customize bot settings.</p>
 <button class="button primary" type="submit">Save access</button></form>
 <p class="access-help">Search for a Twitch user, confirm the account, then choose their access.</p>
 <noscript><p>Enable JavaScript to search and confirm a Twitch user.</p></noscript>

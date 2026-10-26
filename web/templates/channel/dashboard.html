@@ -109,7 +109,7 @@
             data-refresh-url="{{ channel_root }}/api/dashboard-stats"
             aria-label="Channel statistics; activate a statistic to show or hide its number"
         >
-            <button
+            {% if not moderator_mode %}<button
                 class="dashboard-header-stat dashboard-stream-stat {% if broadcaster.is_live %}state-live{% else %}state-offline{% endif %}"
                 type="button"
                 data-stream-status
@@ -120,6 +120,7 @@
                 <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
                 <strong data-stream-status-text>{% if broadcaster.is_live %}Online{% else %}Offline{% endif %}</strong>
             </button>
+            {% endif %}
             {% for stat in dashboard_header_stats | default([]) %}
                 {% if stat.key != "points_lost" %}
                 <button
