@@ -61,3 +61,19 @@ async def save_delegated_note(db, channel, actor, identity, revision, title, not
             await connection.execute("UPDATE streamer_notes SET title = ?, notes = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE broadcaster_id = ? AND note_id = ?", (title.strip(), notes, channel, identity))
             await connection.execute("UPDATE streamer_workspace SET notes = ?, notes_revision = notes_revision + 1 WHERE broadcaster_id = ? AND note_key = ?", (notes, channel, row['note_key']))
             await audit(connection, channel, actor, 'notes:save', identity)
+
+
+async def create_delegated_note(db, channel, actor, submission_id, title, notes):
+    """Recheck access and create an idempotent For You note in one transaction."""
+    key = f'moderator:{actor}:{submission_id}'
+    async with db.acquire() as connection:
+        async with immediate_transaction(connection):
+            await require_grant(connection, channel, actor, edit=True)
+            existing = await connection.fetchone(NOTE_SELECT + " WHERE n.broadcaster_id = ? AND n.note_key = ?", (channel, key))
+            if existing:
+                return dict(existing)
+            await connection.execute("INSERT INTO streamer_notes (broadcaster_id, note_key, title, notes) VALUES (?, ?, ?, ?)",
+                                     (channel, key, title.strip(), notes))
+            note = await connection.fetchone(NOTE_SELECT + " WHERE n.broadcaster_id = ? AND n.note_key = ?", (channel, key))
+            await audit(connection, channel, actor, 'notes:create', note['note_id'])
+            return dict(note)

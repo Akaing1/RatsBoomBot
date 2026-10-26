@@ -143,3 +143,20 @@ async def save_note(request: Request, channel: str, identity: str, csrf_token: s
             'channel': channel, 'title': title, 'notes': notes, 'message': str(error),
         }, status_code=409, headers=PRIVATE)
     return RedirectResponse(f'/me/mod/{channel}/notes', status_code=303, headers=PRIVATE)
+
+
+@router.post('/me/mod/{channel}/api/notes')
+async def create_note(request: Request, channel: str, csrf_token: str = Form(...),
+                      submission_id: str = Form(..., pattern=r'^[0-9a-f]{32}$'),
+                      title: str = Form('', max_length=120), notes: str = Form(..., max_length=20000)):
+    from web.viewer.dashboard import authorize
+    from storage.channel_access import create_delegated_note
+    await authorize(request, channel, 'moderate')
+    validate_csrf_token(request, csrf_token)
+    if not notes.strip():
+        raise HTTPException(400, 'Write a note before saving.', headers=PRIVATE)
+    try:
+        note = await create_delegated_note(database(), channel, viewer_user_id(request), submission_id, title, notes)
+    except PermissionError as error:
+        raise HTTPException(403, str(error), headers=PRIVATE) from error
+    return JSONResponse({'note': note}, headers=PRIVATE)

@@ -1,0 +1,12 @@
+<dialog id="mod-note-dialog" class="mod-note-dialog" aria-labelledby="mod-note-title" data-mod-note-dialog>
+    <div class="mod-note-dialog-heading"><h2 id="mod-note-title">Note for {{ broadcaster.name }}</h2><button type="button" class="button secondary" data-mod-note-close aria-label="Close note">×</button></div>
+    {% if can_moderate %}
+    <form class="mod-note" data-mod-note-form action="{{ channel_root }}/api/notes" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="mod-note-heading">Title</label><input id="mod-note-heading" name="title" maxlength="120" placeholder="Optional title">
+        <label for="mod-note-body">Note</label><textarea id="mod-note-body" name="notes" maxlength="20000" rows="8" required></textarea>
+        <p data-mod-note-status role="status" aria-live="polite"></p>
+        <button class="button primary" type="submit">Save note</button>
+    </form>
+    {% else %}<p>Moderator or Super moderator access is required to write notes.</p>{% endif %}
+</dialog>

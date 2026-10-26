@@ -1,4 +1,4 @@
-# Moderator dashboard (16.1.1)
+# Moderator dashboard (16.1.2)
 
 Channel owners grant access from **Moderator access**, using the existing Twitch-user search and confirmation. Grants use stable Twitch user IDs. Twitch moderator status alone does not grant dashboard access, and granting bot access does not add a Twitch moderator badge.
 
@@ -12,7 +12,7 @@ Existing View/Edit grants migrate to View/Moderator. Nobody automatically gains 
 
 ## Entry and navigation
 
-Sign in through `/me` (the `!me` entry point) and choose a channel in the Mod Bar. `/me/mod/{channel}` now opens the shared channel Overview; Notes moved to `/me/mod/{channel}/notes`. The left navigation contains My account, Overview, Settings for Super moderators, and a separated list of granted channels, with SVG icons when collapsed. Notes is an Overview circle shortcut. Overview hides the Predictions panel, audience statistics (also filtered from its API), raid browser, personal workspace flip, bot identity, account connections, widget secrets and access management. Super moderators receive a Settings navigation item. Owner-only pages are not registered under moderator URLs.
+Sign in through `/me` (the `!me` entry point) and choose a channel in the Mod Bar. `/me/mod/{channel}` now opens the shared channel Overview; Notes moved to `/me/mod/{channel}/notes`. The left navigation contains My account, Overview, Settings for Super moderators, and a separated list of granted channels, with SVG icons when collapsed. Notes is an Overview circle shortcut opening a note composer dialog. Moderator and Super moderator users can save a new titled note directly to the channel’s For You notes collection. View access remains read-only. Creation rechecks the grant transactionally, audits the actor, and deduplicates retries by submission ID. Polls, Predictions and Shouts are disabled coming-soon circles. Overview hides the Predictions panel, audience statistics (also filtered from its API), raid browser, personal workspace flip, bot identity, account connections, widget secrets and access management. Super moderators receive a Settings navigation item. Owner-only pages are not registered under moderator URLs.
 
 The dashboard uses the existing Overview template and feed services. Only an explicit allowlist of routes is exposed under the moderator prefix. Every request validates the viewer's server-backed session, channel grant and capability before resolving the target channel on request state. It never replaces `channel_user_id` in the session. JSON/form inputs cannot choose the actor or target broadcaster. Redirects remain under the same moderator prefix.
 
