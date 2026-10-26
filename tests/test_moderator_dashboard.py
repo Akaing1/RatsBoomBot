@@ -68,10 +68,10 @@ async def env(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_overview_view_role_shows_feeds_and_hides_owner_controls(env):
+async def test_overview_moderator_role_shows_feeds_and_hides_owner_controls(env):
     client, session, db, bot = env
     assert (await client.get('/me/mod/1')).status_code == 403
-    await set_grant(db,'1','2','Streamer','Alice','view')
+    await set_grant(db,'1','2','Streamer','Alice','edit')
     page = await client.get('/me/mod/1')
     assert page.status_code == 200
     assert page.headers['cache-control'] == 'no-store'
@@ -81,9 +81,9 @@ async def test_overview_view_role_shows_feeds_and_hides_owner_controls(env):
     assert 'data-raid-browser data-' not in page.text
     assert 'data-mod-note-open' in page.text
     assert 'data-predictions' not in page.text
-    assert 'data-queue-action="clear"' not in page.text
+    assert 'data-queue-action="clear"' in page.text
     assert 'data-ad-action="run-90"' not in page.text
-    assert 'data-moderation-url=' not in page.text
+    assert 'data-moderation-url=' in page.text
     assert 'data-youtube-connected="false"' in page.text
     assert 'contenteditable="false"' in page.text
     assert 'href="/me/mod/1/settings"' not in page.text
@@ -95,10 +95,10 @@ async def test_overview_view_role_shows_feeds_and_hides_owner_controls(env):
 @pytest.mark.asyncio
 async def test_role_boundaries_are_enforced_on_every_endpoint(env):
     client, session, db, bot = env
-    await set_grant(db,'1','2','Streamer','Alice','view')
+    await set_grant(db,'1','2','Streamer','Alice','edit')
     for path in ['/settings','/protected-users/search?query=alice','/viewer-queue/blacklist']:
         assert (await client.get('/me/mod/1'+path)).status_code == 403
-    for path in ['/customization','/features/toggles','/api/viewer-queue/action','/api/ads/action','/api/channel-metadata']:
+    for path in ['/customization','/features/toggles','/api/ads/action','/api/channel-metadata']:
         response = await client.post('/me/mod/1'+path,data={'csrf_token':'secret','setting_name':'x','action':'enable', 'toggle_type':'feature','toggle_name':'points'})
         assert response.status_code == 403, (path,response.text)
     for path in ['/api/raid-browser','/access','/youtube/connect','/custom-bot/connect','/api/for-you/clips']:
@@ -132,7 +132,7 @@ async def test_super_settings_hide_connections_and_use_actor_audit(env):
 @pytest.mark.asyncio
 async def test_chat_uses_actor_never_owner_or_supplied_sender(env, monkeypatch):
     client,session,db,bot=env
-    await set_grant(db,'1','2','Streamer','Alice','view')
+    await set_grant(db,'1','2','Streamer','Alice','edit')
     send=AsyncMock(return_value={'data':[{'is_sent':True,'message_id':'abc'}]})
     monkeypatch.setattr(dashboard,'user_request',send)
     response=await client.post('/me/mod/1/api/chat/send',data={'csrf_token':'secret','message':'hello','target':'twitch','sender_id':'99','broadcaster_id':'99','reply_parent_message_id':'twitch:parent'})
@@ -141,6 +141,7 @@ async def test_chat_uses_actor_never_owner_or_supplied_sender(env, monkeypatch):
     assert send.call_args.kwargs['body']=={'broadcaster_id':'1','sender_id':'2','message':'hello','reply_parent_message_id':'parent'}
     assert (await client.post('/me/mod/1/api/chat/send',data={'csrf_token':'secret','message':'hello','target':'both'})).status_code==400
     assert (await client.post('/me/mod/1/api/chat/send',data={'csrf_token':'bad','message':'hello'})).status_code==403
+    await set_grant(db,'1','2','','','revoke')
     assert (await client.post('/me/mod/1/api/chat/send',data={'csrf_token':'secret','message':'/clear'})).status_code==403
     bot.create_partialuser.assert_not_called()
 
@@ -148,7 +149,6 @@ async def test_chat_uses_actor_never_owner_or_supplied_sender(env, monkeypatch):
 @pytest.mark.asyncio
 async def test_predictions_are_role_checked_channel_scoped_and_audited(env, monkeypatch):
     client,session,db,bot=env
-    await set_grant(db,'1','2','Streamer','Alice','view')
     action={'csrf_token':'secret','action':'create','title':'Win?','outcomes':'Yes\nNo','window':'60','broadcaster_id':'99'}
     assert (await client.post('/me/mod/1/api/predictions',data=action)).status_code==403
     await set_grant(db,'1','2','Streamer','Alice','edit')
@@ -186,7 +186,7 @@ async def test_native_moderation_never_falls_back_to_broadcaster(env,monkeypatch
     assert (await client.post('/me/mod/1/api/chat/send',data={'csrf_token':'secret','message':'/mod target'})).status_code==400
     assert (await client.post('/me/mod/1/api/automod/action',data={'csrf_token':'secret','action':'approve','message_id':'a'})).status_code==200
     assert calls.call_args.kwargs['body']['user_id']=='2'
-    await set_grant(db,'1','2','Streamer','Alice','view')
+    await set_grant(db,'1','2','','','revoke')
     assert (await client.post('/me/mod/1/api/chat/moderate',data=form)).status_code==403
 
 
@@ -233,7 +233,7 @@ async def test_open_stream_rechecks_access_and_unsubscribes_on_revocation(env):
     import asyncio
     from web.shared.live_chat import stream_chat_events
     client,session,db,bot=env
-    await set_grant(db,'1','2','Streamer','Alice','view')
+    await set_grant(db,'1','2','Streamer','Alice','edit')
     queue=asyncio.Queue()
     live=SimpleNamespace(subscribe=Mock(return_value=queue),unsubscribe=Mock(),history=Mock(return_value=[]))
     scope={'type':'http','path':'/me/mod/1/api/chat/stream','method':'GET','headers':[], 'session':session}
@@ -317,7 +317,7 @@ async def test_owner_overview_keeps_owner_urls_and_shortcuts(env):
 @pytest.mark.asyncio
 async def test_navigation_authorization_and_reauthorization_requirements(env, monkeypatch):
     client, session, db, bot = env
-    await set_grant(db, '1', '2', 'Streamer', 'Alice', 'view')
+    await set_grant(db, '1', '2', 'Streamer', 'Alice', 'edit')
     await set_grant(db, '3', '2', 'Other channel', 'Alice', 'edit')
     page = (await client.get('/me/mod/1')).text
     nav = page.split('<nav class="navigation moderator-navigation">')[1].split('</nav>')[0]
@@ -329,9 +329,9 @@ async def test_navigation_authorization_and_reauthorization_requirements(env, mo
     assert 'data-mod-auth-banner>' in page
     token = TwitchTokenResponse('access', 'refresh', 3600, list(twitch_actions.CHAT_SCOPES), 'bearer')
     await twitch_actions.save_credentials(db, '2', token)
-    assert (await client.get('/me/mod/1/api/authorization')).json() == {'required': False}
+    assert (await client.get('/me/mod/1/api/authorization')).json() == {'required': True}
     page = (await client.get('/me/mod/1')).text
-    assert 'data-mod-auth-banner hidden>' in page
+    assert 'data-mod-auth-banner>' in page
     await set_grant(db, '1', '2', 'Streamer', 'Alice', 'edit')
     assert (await client.get('/me/mod/1/api/authorization')).json()['required']
     token = TwitchTokenResponse('access', 'refresh', 3600, list(twitch_actions.MOD_SCOPES), 'bearer')
@@ -353,7 +353,7 @@ async def test_ads_are_super_only_and_audience_metrics_stay_private(env, monkeyp
     client, session, db, bot = env
     stats = [{'key': key, 'label': key, 'display_value': '42'} for key in ('viewers','followers','subscribers','points_lost')]
     monkeypatch.setattr(owner, 'get_dashboard_header_stats', AsyncMock(return_value=stats))
-    for role in ('view', 'edit', 'super'):
+    for role in ('edit', 'super'):
         await set_grant(db, '1', '2', 'Streamer', 'Alice', role)
         page = (await client.get('/me/mod/1')).text
         assert 'data-dashboard-stat=' not in page
@@ -381,7 +381,6 @@ async def test_note_popup_creates_channel_note_once_and_enforces_permissions(env
     from storage.for_you import notes_page
     client, session, db, bot = env
     data = {'csrf_token':'secret', 'submission_id':'a'*32, 'title':'Next stream', 'notes':'Remember the community game.', 'broadcaster_id':'99', 'actor':'99'}
-    await set_grant(db,'1','2','Streamer','Alice','view')
     assert (await client.post('/me/mod/1/api/notes',data=data)).status_code == 403
     for role in ('edit','super'):
         await set_grant(db,'1','2','Streamer','Alice',role)
@@ -405,3 +404,23 @@ async def test_note_popup_creates_channel_note_once_and_enforces_permissions(env
         assert len(logs)==1 and logs[0]['actor_id']=='2' and logs[0]['broadcaster_id']=='1'
     await set_grant(db,'1','2','','','revoke')
     assert (await client.post('/me/mod/1/api/notes',data=data)).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_revoked_pages_are_clean_html_and_api_errors_stay_json(env):
+    client, session, db, bot = env
+    await set_grant(db,'1','2','Streamer','Alice','edit')
+    page=await client.get('/me/mod/1')
+    assert 'data-stream-status\n' not in page.text
+    assert 'dashboard-stream-stat ' not in page.text
+    await set_grant(db,'1','2','','','revoke')
+    for path in ('','/settings','/notes'):
+        response=await client.get('/me/mod/1'+path)
+        assert response.status_code==403
+        assert 'text/html' in response.headers['content-type']
+        assert '<h1>Unauthorized</h1>' in response.text
+        assert 'href="/me"' in response.text
+        assert '/admin/login' not in response.text
+        assert response.headers['cache-control']=='no-store'
+    response=await client.get('/me/mod/1/api/dashboard-stats')
+    assert response.status_code==403 and 'detail' in response.json()

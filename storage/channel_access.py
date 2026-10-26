@@ -6,13 +6,13 @@ from storage.for_you import NOTE_SELECT
 async def channels_for_user(db, user_id):
     async with db.acquire() as connection:
         return [dict(row) for row in await connection.fetchall(
-            "SELECT * FROM channel_access WHERE user_id = ? ORDER BY channel_name", (user_id,))]
+            "SELECT * FROM channel_access WHERE user_id = ? AND permission IN ('edit', 'super') ORDER BY channel_name", (user_id,))]
 
 
 async def grants_for_owner(db, owner):
     async with db.acquire() as connection:
         return [dict(row) for row in await connection.fetchall(
-            "SELECT * FROM channel_access WHERE broadcaster_id = ? ORDER BY user_name", (owner,))]
+            "SELECT * FROM channel_access WHERE broadcaster_id = ? AND permission IN ('edit', 'super') ORDER BY user_name", (owner,))]
 
 
 async def audit(connection, channel, actor, action, subject):
@@ -21,7 +21,7 @@ async def audit(connection, channel, actor, action, subject):
 
 
 async def set_grant(db, owner, user, channel_name, user_name, permission):
-    if permission not in ('view', 'edit', 'super', 'revoke') or owner == user:
+    if permission not in ('edit', 'super', 'revoke') or owner == user:
         raise ValueError('Invalid access grant.')
     async with db.acquire() as connection:
         async with immediate_transaction(connection):
@@ -37,7 +37,7 @@ async def set_grant(db, owner, user, channel_name, user_name, permission):
 
 async def require_grant(connection, channel, actor, edit=False):
     row = await connection.fetchone("SELECT * FROM channel_access WHERE broadcaster_id = ? AND user_id = ? AND feature = 'dashboard'", (channel, actor))
-    if row is None or (edit and row['permission'] not in ('edit', 'super')):
+    if row is None or row['permission'] not in ('edit', 'super'):
         raise PermissionError('You no longer have access to this channel.')
     return dict(row)
 

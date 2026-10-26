@@ -34,7 +34,7 @@ def token_lock(actor):
 
 
 def required_scopes(permission):
-    return CHAT_SCOPES if permission == 'view' else MOD_SCOPES
+    return MOD_SCOPES
 
 
 async def authorization_required(db, actor, permission):

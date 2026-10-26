@@ -54,3 +54,30 @@
 .mod-note-dialog-heading h2 { margin: 0; font-size: 20px; overflow-wrap: anywhere; }
 .mod-note-dialog input, .mod-note-dialog textarea { padding: 10px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 .mod-note-dialog [role="status"]:empty { display: none; }
+
+.access-layout .access-list-heading { padding-bottom: 16px; margin-bottom: 0; border-bottom: 1px solid var(--border); }
+.role-edit { color: #6ee7a0; }
+.role-super { color: #ffb36b; }
+.access-badge.role-edit { color: #6ee7a0; border-color: #32734b; background: #173425; }
+.access-badge.role-super { color: #ffb36b; border-color: #925a2d; background: #39281c; }
+select.access-badge { cursor: pointer; font: inherit; font-size: 12px; padding: 6px 10px; margin-top: 10px; }
+[data-role-status] { font-size: 12px; color: var(--muted); max-width: 280px; }
+[data-role-status]:empty { display: none; }
+.mod-bar.panel { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+.mod-bar-heading { display: flex; align-items: center; gap: 9px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.mod-bar-heading h2 { margin: 0; font-size: 16px; }
+.mod-bar-heading svg, .mod-channel-arrow { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.mod-bar-heading svg { color: var(--accent); }
+.mod-bar-count { margin-left: auto; padding: 2px 7px; border-radius: 20px; color: var(--muted); background: var(--surface-raised); font-size: 12px; }
+.mod-channel { flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 8px; margin: 6px 0 0; border-color: transparent; background: transparent; }
+.mod-channel:hover, .mod-channel:focus-visible { background: var(--surface-raised); }
+.mod-channel-copy { display: grid; gap: 5px; min-width: 0; }
+.mod-channel-copy strong { font-size: 14px; }
+.mod-channel-copy .role-edit { color: #6ee7a0; }
+.mod-channel-copy .role-super { color: #ffb36b; }
+.mod-channel-arrow { width: 16px; color: var(--muted); }
+.mod-unauthorized { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+.mod-unauthorized .panel { width: min(100%, 460px); text-align: center; padding: 36px; }
+.mod-unauthorized svg { width: 44px; fill: none; stroke: var(--accent); stroke-width: 1.6; }
+.mod-unauthorized p { color: var(--muted); line-height: 1.6; }
+.moderator-dashboard .dashboard-header-side:not(:has([data-ad-status-mirror])) { display: none; }

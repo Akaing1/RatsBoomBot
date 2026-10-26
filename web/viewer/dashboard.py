@@ -1,6 +1,6 @@
 """Explicit, fail-closed route delegation for the shared channel Overview."""
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.routing import APIRoute
+from web.viewer.access_errors import AccessPageRoute
 from fastapi.responses import JSONResponse, RedirectResponse
 from twitchio.http import Route
 from storage.channel_access import require_grant, audit, channels_for_user
@@ -14,7 +14,7 @@ from web.state import get_db, get_bot
 PRIVATE = {'Cache-Control': 'no-store'}
 
 
-async def authorize(request: Request, channel: str, capability='view'):
+async def authorize(request: Request, channel: str, capability='overview'):
     db = get_db()
     actor = viewer_user_id(request)
     if db is None:
@@ -47,7 +47,7 @@ async def still_authorized(request):
     await authorize(request, access['broadcaster_id'])
 
 
-class DelegatedRoute(APIRoute):
+class DelegatedRoute(AccessPageRoute):
     def get_route_handler(self):
         original = super().get_route_handler()
         async def handle(request):
@@ -88,7 +88,7 @@ SETTINGS = {'/channel/api/ad-status', '/channel/api/ads/action', '/channel/setti
 for route in owner.router.routes:
     if route.path not in READS | MODERATE | SETTINGS:
         continue
-    capability = 'view' if route.path in READS else 'moderate' if route.path in MODERATE else 'settings'
+    capability = 'overview' if route.path in READS else 'moderate' if route.path in MODERATE else 'settings'
     router.add_api_route(route.path.replace('/channel', '/me/mod/{channel}', 1), route.endpoint,
         methods=list(route.methods), dependencies=[Depends(permission_dependency(capability))], name='mod_' + route.name,
         response_class=route.response_class)
@@ -114,7 +114,7 @@ async def authorization_status(request: Request, channel: str):
 @router.post('/me/mod/{channel}/api/chat/send')
 async def send_chat(request: Request, channel: str, message: str = Form(..., max_length=500), target: str = Form('twitch'),
                     csrf_token: str = Form(...), reply_parent_message_id: str = Form('')):
-    access, db = await action_context(request, channel, csrf_token, 'view')
+    access, db = await action_context(request, channel, csrf_token, 'overview')
     message = message.strip()
     if not message or target != 'twitch':
         raise HTTPException(400, 'Enter a Twitch message. Moderator messages are sent only as your Twitch account.')

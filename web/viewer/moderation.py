@@ -12,7 +12,9 @@ from web.shared.common import templates
 from web.state import get_db, get_bot
 from web.viewer.auth import viewer_user_id, VIEWER_SERVER_TOKEN_KEY
 
-router = APIRouter()
+from web.viewer.access_errors import AccessPageRoute
+
+router = APIRouter(route_class=AccessPageRoute)
 PRIVATE = {"Cache-Control": "no-store"}
 
 
@@ -93,8 +95,8 @@ async def change_access(request: Request, csrf_token: str = Form(...), login: st
     owner = owner_id(request)
     validate_csrf_token(request, csrf_token)
     db = database()
-    if permission not in ('view', 'edit', 'super', 'revoke'):
-        raise HTTPException(400, 'Choose View, Moderator, or Super moderator.')
+    if permission not in ('edit', 'super', 'revoke'):
+        raise HTTPException(400, 'Choose Moderator or Super moderator.')
     name = ''
     if permission == 'revoke':
         if not user_id.isdecimal():
@@ -105,6 +107,8 @@ async def change_access(request: Request, csrf_token: str = Form(...), login: st
     if owner == user_id:
         raise HTTPException(400, 'You already own this channel.')
     await set_grant(db, owner, user_id, request.session.get(CHANNEL_USER_DISPLAY_NAME_KEY, owner), name, permission)
+    if 'application/json' in request.headers.get('accept', ''):
+        return JSONResponse({'permission': permission, 'user_id': user_id}, headers=PRIVATE)
     return RedirectResponse('/channel/access', status_code=303, headers=PRIVATE)
 
 
