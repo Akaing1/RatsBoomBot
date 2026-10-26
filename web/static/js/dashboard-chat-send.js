@@ -357,6 +357,7 @@
                 failureReported = true;
             }
 
+            if (!ok && globalThis.document?.body?.dataset?.channelRoot?.startsWith("/me/mod/")) document.dispatchEvent(new Event("moderator-authorization-check"));
             if (!ok) throw new Error(result.detail || Object.values(result.errors || {}).join(" ") || "The message could not be sent.");
             window.confirmDashboardChatSend?.(result);
 

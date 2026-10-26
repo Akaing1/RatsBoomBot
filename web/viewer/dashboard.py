@@ -3,12 +3,12 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.routing import APIRoute
 from fastapi.responses import JSONResponse, RedirectResponse
 from twitchio.http import Route
-from storage.channel_access import require_grant, audit
+from storage.channel_access import require_grant, audit, channels_for_user
 from storage.viewer_sessions import valid_viewer_session
 from web.admin.auth import validate_csrf_token
 from web.channel.routers import dashboard as owner
 from web.viewer.auth import viewer_user_id, VIEWER_SERVER_TOKEN_KEY
-from web.viewer.twitch_actions import user_request, start_authorization
+from web.viewer.twitch_actions import user_request, start_authorization, authorization_required
 from web.state import get_db, get_bot
 
 PRIVATE = {'Cache-Control': 'no-store'}
@@ -31,6 +31,9 @@ async def authorize(request: Request, channel: str, capability='view'):
     if capability == 'moderate' and access['permission'] not in ('edit', 'super'):
         raise HTTPException(403, 'Moderator access is required.', headers=PRIVATE)
     request.state.channel_access = access
+    if request.method == 'GET' and '/api/' not in request.url.path:
+        request.state.moderator_channels = await channels_for_user(db, actor)
+        request.state.moderator_auth_required = await authorization_required(db, actor, access['permission'])
     return access
 
 
@@ -77,9 +80,9 @@ def permission_dependency(capability):
 # Nothing outside this allowlist can be reached under a moderator URL.
 READS = {'/channel', '/channel/api/dashboard-stats', '/channel/api/redemptions',
     '/channel/api/viewer-queue', '/channel/api/chat/stream',
-    '/channel/api/chat/users', '/channel/api/chat/pinned', '/channel/api/ad-status', '/channel/api/raid-contributors'}
-MODERATE = {'/channel/api/viewer-queue/action', '/channel/viewer-queue/remove', '/channel/api/ads/action'}
-SETTINGS = {'/channel/settings', '/channel/customization', '/channel/features/toggles',
+    '/channel/api/chat/users', '/channel/api/chat/pinned', '/channel/api/raid-contributors'}
+MODERATE = {'/channel/api/viewer-queue/action', '/channel/viewer-queue/remove'}
+SETTINGS = {'/channel/api/ad-status', '/channel/api/ads/action', '/channel/settings', '/channel/customization', '/channel/features/toggles',
     '/channel/protected-users/search', '/channel/protected-users/add', '/channel/protected-users/remove',
     '/channel/viewer-queue/blacklist', '/channel/api/channel-metadata', '/channel/api/games'}
 for route in owner.router.routes:
@@ -100,6 +103,12 @@ async def action_context(request, channel, csrf_token, capability='moderate'):
 @router.get('/me/mod/{channel}/connect')
 async def connect_actions(request: Request, channel: str):
     return start_authorization(request, await authorize(request, channel))
+
+
+@router.get('/me/mod/{channel}/api/authorization')
+async def authorization_status(request: Request, channel: str):
+    access = await authorize(request, channel)
+    return JSONResponse({'required': await authorization_required(get_db(), access['user_id'], access['permission'])}, headers=PRIVATE)
 
 
 @router.post('/me/mod/{channel}/api/chat/send')

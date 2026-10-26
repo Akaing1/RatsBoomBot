@@ -75,11 +75,12 @@ async def test_overview_view_role_shows_feeds_and_hides_owner_controls(env):
     page = await client.get('/me/mod/1')
     assert page.status_code == 200
     assert page.headers['cache-control'] == 'no-store'
-    for text in ['Combined Chat','Mod actions','Redeems','AutoMod','data-stream-player','data-stream-url="/me/mod/1/api/chat/stream', 'Predictions']:
+    for text in ['Combined Chat','Mod actions','Redeems','AutoMod','data-stream-player','data-stream-url="/me/mod/1/api/chat/stream']:
         assert text in page.text
     assert 'data-raid-browser-open' not in page.text
     assert 'data-raid-browser data-' not in page.text
-    assert 'class="dashboard-action-placeholder"' not in page.text
+    assert 'href="/me/mod/1/notes"' in page.text
+    assert 'data-predictions' not in page.text
     assert 'data-queue-action="clear"' not in page.text
     assert 'data-ad-action="run-90"' not in page.text
     assert 'data-moderation-url=' not in page.text
@@ -311,3 +312,65 @@ async def test_owner_overview_keeps_owner_urls_and_shortcuts(env):
     assert 'data-for-you data-csrf-token' in page.text
     assert 'Moderator dashboard' not in page.text
     assert 'data-youtube-connected="true"' in page.text
+
+
+@pytest.mark.asyncio
+async def test_navigation_authorization_and_reauthorization_requirements(env, monkeypatch):
+    client, session, db, bot = env
+    await set_grant(db, '1', '2', 'Streamer', 'Alice', 'view')
+    await set_grant(db, '3', '2', 'Other channel', 'Alice', 'edit')
+    page = (await client.get('/me/mod/1')).text
+    nav = page.split('<nav class="navigation moderator-navigation">')[1].split('</nav>')[0]
+    import re
+    assert re.findall(r'<span class="nav-link-label">(.*?)</span>', nav) == ['My account', 'Overview', 'Other channel', 'Streamer']
+    assert nav.count('<svg') == 4
+    assert '<hr ' in nav
+    assert '/connect' not in nav and '/notes' not in nav
+    assert 'data-mod-auth-banner>' in page
+    token = TwitchTokenResponse('access', 'refresh', 3600, list(twitch_actions.CHAT_SCOPES), 'bearer')
+    await twitch_actions.save_credentials(db, '2', token)
+    assert (await client.get('/me/mod/1/api/authorization')).json() == {'required': False}
+    page = (await client.get('/me/mod/1')).text
+    assert 'data-mod-auth-banner hidden>' in page
+    await set_grant(db, '1', '2', 'Streamer', 'Alice', 'edit')
+    assert (await client.get('/me/mod/1/api/authorization')).json()['required']
+    token = TwitchTokenResponse('access', 'refresh', 3600, list(twitch_actions.MOD_SCOPES), 'bearer')
+    await twitch_actions.save_credentials(db, '2', token)
+    assert not (await client.get('/me/mod/1/api/authorization')).json()['required']
+    monkeypatch.setattr(twitch_actions, 'AUTHORIZATION_REVISION', 2)
+    assert (await client.get('/me/mod/1/api/authorization')).json()['required']
+    await twitch_actions.save_credentials(db, '2', token)
+    assert not (await client.get('/me/mod/1/api/authorization')).json()['required']
+    await twitch_actions.invalidate_credentials(db, '2')
+    assert (await client.get('/me/mod/1/api/authorization')).json()['required']
+    await set_grant(db, '3', '2', '', '', 'revoke')
+    page = (await client.get('/me/mod/1')).text
+    assert 'href="/me/mod/3"' not in page
+
+
+@pytest.mark.asyncio
+async def test_ads_are_super_only_and_audience_metrics_stay_private(env, monkeypatch):
+    client, session, db, bot = env
+    stats = [{'key': key, 'label': key, 'display_value': '42'} for key in ('viewers','followers','subscribers','points_lost')]
+    monkeypatch.setattr(owner, 'get_dashboard_header_stats', AsyncMock(return_value=stats))
+    for role in ('view', 'edit', 'super'):
+        await set_grant(db, '1', '2', 'Streamer', 'Alice', role)
+        page = (await client.get('/me/mod/1')).text
+        assert 'data-dashboard-stat=' not in page
+        assert 'data-dashboard-points-lost>' in page
+        assert 'class="mod-predictions' not in page
+        assert ('data-ad-panel ' in page) == (role == 'super')
+        response = await client.get('/me/mod/1/api/dashboard-stats')
+        assert [s['key'] for s in response.json()['stats']] == ['points_lost']
+        if role != 'super':
+            assert (await client.get('/me/mod/1/api/ad-status')).status_code == 403
+            assert (await client.post('/me/mod/1/api/ads/action', data={'csrf_token':'secret', 'action':'run-90'})).status_code == 403
+        else:
+            assert (await client.get('/me/mod/1/api/ad-status')).status_code == 200
+            assert 'data-ad-action="run-90"' in page
+            user = SimpleNamespace(start_commercial=AsyncMock(return_value=SimpleNamespace(message='', length=90)))
+            bot.create_partialuser.return_value = user
+            assert (await client.post('/me/mod/1/api/ads/action', data={'csrf_token':'secret', 'action':'run-90'})).status_code == 200
+            user.start_commercial.assert_awaited_once_with(length=90)
+    session['channel_user_id'] = '1'
+    assert len((await client.get('/channel/api/dashboard-stats')).json()['stats']) == 4
