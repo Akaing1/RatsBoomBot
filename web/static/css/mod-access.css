@@ -13,3 +13,20 @@
 .mod-note-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .access-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
 @media (max-width: 900px) { .mod-account-layout, .access-layout { grid-template-columns: minmax(0, 1fr); } .mod-account-layout > .mod-bar { grid-row: 1; position: static; margin: 18px 0 0; max-height: none; } .mod-account-layout > .chatter-profile-content { padding-top: 0; } }
+
+.access-header h2 { margin-bottom: 10px; }
+.access-header p, .access-help { color: var(--muted); font-size: 14px; line-height: 1.6; }
+.access-layout { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); }
+.access-layout > .panel { min-width: 0; }
+.access-layout h3 { margin: 0 0 20px; }
+.access-settings.panel { background: var(--surface-raised); }
+.access-settings .protected-user-search { margin-top: 0; }
+.access-settings .access-result { display: grid; gap: 12px; }
+.access-settings .access-result[hidden] { display: none; }
+.access-result .profile-setting-input { margin: 0; }
+.access-result strong, .access-row strong { overflow-wrap: anywhere; }
+.access-result label { font-size: 13px; font-weight: 700; }
+.access-result .access-help { margin: 0; }
+.access-badge { display: inline-block; border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; font-size: 12px; color: var(--muted); background: var(--surface-raised); }
+@media (max-width: 1100px) { .access-layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .access-row { align-items: stretch; flex-direction: column; } .access-row .button { width: 100%; } }
