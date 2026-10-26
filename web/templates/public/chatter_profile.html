@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
     <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
 </head>
-<body class="chatter-profile-page">
+<body class="chatter-profile-page{% if account_mode %} account-page{% endif %}">
     <header class="public-command-navigation">
         <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
             <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
@@ -28,9 +28,8 @@
         {% endif %}
     </header>
 
-{% if account_mode and mod_channels %}<div class="mod-account-layout">{% endif %}
+{% if account_mode %}<div class="mod-account-layout account-layout">{% endif %}
     <main class="chatter-profile-content">
-        {% if account_mode %}<section class="panel chatter-account-intro"><p class="eyebrow">My account</p><h2>Your activity</h2><p>Your public profile is below. Channel balances and raid items are in each community card.</p></section>{% endif %}
         <header class="chatter-profile-hero">
             {% if profile.identity.profile_image_url %}<img class="chatter-profile-avatar" src="{{ profile.identity.profile_image_url }}" alt="{{ profile.identity.display_name }} Twitch profile picture">{% else %}<div class="chatter-profile-avatar">{{ profile.identity.display_name[0] | upper }}</div>{% endif %}
             <div>
@@ -99,16 +98,17 @@
 
         <section data-chatter-panel="overview">
             <p><strong>{{ profile.achievements.unlocked if profile.achievements else 0 }} achievement tiers unlocked</strong> · Explore the Achievements tab for badges and progress.</p>
-            <div class="chatter-stat-grid" aria-label="Global chatter statistics">
+            <div class="chatter-stat-grid{% if account_mode %} account-stat-grid{% endif %}" aria-label="Global chatter statistics">
                 <article><span>Messages sent</span><strong>{{ "{:,}".format(profile.messages_sent) }}</strong></article>
                 <article><span>Channels visited</span><strong>{{ profile.channels_interacted }}</strong></article>
                 <article><span>Points earned</span><strong>{{ "{:,}".format(profile.lifetime_points_earned) }}</strong></article>
                 <article><span>Total daily check-ins</span><strong>{{ "{:,}".format(profile.daily_check_ins) }}</strong></article>
-                <article><span>Favorite channel</span><strong>{{ profile.favorite_channel.display_name if profile.favorite_channel else "Not enough activity" }}</strong></article>
+                <article><span>Most Visited</span><strong>{{ profile.favorite_channel.display_name if profile.favorite_channel else "Not enough activity" }}</strong></article>
                 {% set gamble_losses = profile.gamble_total - profile.gamble_wins %}
                 <article><span>Gamble win rate</span><strong>{{ "%.1f%%" | format(profile.gamble_win_rate) if profile.gamble_win_rate is not none else "—" }}</strong><small>{{ profile.gamble_wins }} {{ "win" if profile.gamble_wins == 1 else "wins" }} / {{ gamble_losses }} {{ "loss" if gamble_losses == 1 else "losses" }}</small></article>
             </div>
 
+{% if not account_mode %}
             <section class="chatter-section">
             <div class="chatter-section-heading">
                 <div><p class="eyebrow">Channel activity</p><h2>Communities</h2></div>
@@ -129,6 +129,7 @@
                 <div class="panel compact-empty-state"><h2>No channel activity yet</h2><p>Activity will appear after this chatter participates in a connected channel.</p></div>
             {% endif %}
             </section>
+{% endif %}
         </section>
 
         <section data-chatter-panel="raids" hidden>
@@ -163,7 +164,7 @@
 
         {% if profile.achievements %}{% include 'public/achievements.html' %}{% endif %}
     </main>
-{% if account_mode and mod_channels %}{% include "viewer/mod_bar.html" %}</div>{% endif %}
+{% if account_mode %}<aside class="account-sidebar" aria-label="Your channels">{% include "viewer/mod_bar.html" %}{% include "viewer/communities.html" %}</aside></div>{% endif %}
     <script src="{{ url_for('static', path='/js/chatter-tabs.js') }}?v={{ deployment_stamp() }}" defer></script>
 </body>
 </html>

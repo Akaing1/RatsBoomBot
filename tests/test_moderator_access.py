@@ -246,3 +246,15 @@ async def test_retired_view_grants_are_removed_without_escalating_roles(tmp_path
             import sqlite3
             with pytest.raises(sqlite3.IntegrityError):
                 await conn.execute("INSERT INTO channel_access VALUES ('1','2','Streamer','Person','dashboard','view')")
+
+
+@pytest.mark.asyncio
+async def test_mod_bar_uses_cached_streamer_avatars(setup):
+    client, session, db, note, bot = setup
+    await set_grant(db,'1','2','Streamer','Moderator','edit')
+    await set_grant(db,'3','2','Missing image','Moderator','edit')
+    bot.services=SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda:{'1':SimpleNamespace(profile_image_url='https://example.com/streamer.png')}))
+    channels=await moderation.mod_bar_channels(SimpleNamespace(session=session))
+    assert next(c for c in channels if c['broadcaster_id']=='1')['profile_image_url']=='https://example.com/streamer.png'
+    assert next(c for c in channels if c['broadcaster_id']=='3')['profile_image_url'] is None
+    bot.fetch_users.assert_not_awaited()

@@ -232,7 +232,12 @@ def test_sign_in_from_public_profile_keeps_account_available(monkeypatch) -> Non
                 assert "My account" not in signed_in.text
                 assert "Back to global profile" in signed_in.text
             else:
-                assert "My account" in signed_in.text
+                assert "Sign out" in signed_in.text
+                assert "chatter-account-intro" not in signed_in.text
+                assert 'class="account-sidebar"' in signed_in.text
+                assert signed_in.text.count('<h2>Communities</h2>') == 1
+                assert "Most Visited" in signed_in.text
+                assert "Favorite channel" not in signed_in.text
             assert "Sign in with Twitch" not in signed_in.text
             assert "Sign out" in signed_in.text
             assert signed_in.headers["cache-control"] == "no-store"

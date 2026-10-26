@@ -44,7 +44,14 @@ async def mod_bar_channels(request):
     actor = viewer_user_id(request)
     if db is None or not actor or not await valid_viewer_session(db, actor, request.session.get(VIEWER_SERVER_TOKEN_KEY)):
         return []
-    return await channels_for_user(db, actor)
+    channels = await channels_for_user(db, actor)
+    runtime = get_bot()
+    service = getattr(getattr(runtime, 'services', None), 'broadcasters', None)
+    broadcasters = service.get_broadcasters() if service is not None else {}
+    for channel in channels:
+        broadcaster = broadcasters.get(channel['broadcaster_id'])
+        channel['profile_image_url'] = getattr(broadcaster, 'profile_image_url', None)
+    return channels
 
 
 @router.get('/channel/access')

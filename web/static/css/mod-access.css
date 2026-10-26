@@ -81,3 +81,33 @@ select.access-badge { cursor: pointer; font: inherit; font-size: 12px; padding: 
 .mod-unauthorized svg { width: 44px; fill: none; stroke: var(--accent); stroke-width: 1.6; }
 .mod-unauthorized p { color: var(--muted); line-height: 1.6; }
 .moderator-dashboard .dashboard-header-side:not(:has([data-ad-status-mirror])) { display: none; }
+
+/* Personal account layout: profile first, shared channel lists on the right. */
+.account-page .public-command-navigation { width: calc(100% - 64px); max-width: none; margin-inline: auto; }
+.account-layout { width: min(100% - 64px, 1600px); grid-template-columns: minmax(0, 1fr) 290px; }
+.account-sidebar { display: grid; gap: 18px; position: sticky; top: 24px; margin-top: 34px; min-width: 0; }
+.account-sidebar .mod-bar.panel { position: static; margin: 0; max-height: none; }
+.account-channel-avatar { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 50%; object-fit: cover; background: var(--surface-raised); color: var(--muted); font-size: 14px; }
+.mod-channel-copy { flex: 1; }
+.mod-channel { gap: 10px; }
+.account-empty-channels { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.account-empty-profile { padding: 24px 0; }
+.account-empty-profile p { color: var(--muted); line-height: 1.6; }
+.account-page .chatter-profile-hero h1 { font-size: clamp(24px, 2.3vw, 38px); overflow-wrap: anywhere; }
+.account-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.account-stat-grid article { --stat-accent: #ac8aff; position: relative; min-height: 140px; padding: 22px; border-top: 3px solid var(--stat-accent); background: linear-gradient(135deg, color-mix(in srgb, var(--stat-accent) 10%, var(--surface)), var(--surface) 80%); }
+.account-stat-grid article:nth-child(2), .account-stat-grid article:nth-child(5) { --stat-accent: #5ed4c8; }
+.account-stat-grid article:nth-child(3), .account-stat-grid article:nth-child(6) { --stat-accent: #ffb36b; }
+.account-stat-grid article:nth-child(4) { --stat-accent: #7acb87; }
+.account-stat-grid span { font-size: 13px; margin-bottom: 18px; }
+.account-stat-grid strong { display: block; color: var(--stat-accent); font-size: clamp(25px, 2.4vw, 36px); line-height: 1.2; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.account-stat-grid article:nth-child(5) strong { font-size: 23px; }
+@media (max-width: 1200px) { .account-page .chatter-profile-hero { grid-template-columns: auto minmax(0,1fr); } .account-page .chatter-level-summary { grid-column: 2; } }
+@media (max-width: 900px) { .account-layout { grid-template-columns: minmax(0,1fr); width: calc(100% - 32px); } .account-sidebar { position: static; margin-top: 0; margin-bottom: 24px; grid-template-columns: repeat(2,minmax(0,1fr)); } .account-page .public-command-navigation { width: calc(100% - 32px); } .account-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 540px) { .account-sidebar { grid-template-columns: minmax(0,1fr); } .account-stat-grid article { padding: 16px; min-height: 120px; } .account-stat-grid article:nth-child(5) { grid-column: 1 / -1; } .account-page .public-command-navigation { flex-wrap: wrap; gap: 14px; } .account-page .chatter-search { order: 3; width: 100%; } .account-page .chatter-search input { flex: 1; width: 0; } .account-page .chatter-profile-hero { padding: 18px; gap: 14px; } .account-page .chatter-level-summary { grid-column: 1 / -1; width: 100%; } }
+@media (max-width: 540px) {
+    .account-page .chatter-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); width: 100%; }
+    .account-page .chatter-tabs button { white-space: nowrap; }
+    .account-stat-grid article:nth-child(6) { grid-column: 1 / -1; }
+    .account-layout > .chatter-profile-content { padding-bottom: 24px; }
+}
