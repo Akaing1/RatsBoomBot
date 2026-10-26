@@ -79,7 +79,7 @@ async def test_overview_view_role_shows_feeds_and_hides_owner_controls(env):
         assert text in page.text
     assert 'data-raid-browser-open' not in page.text
     assert 'data-raid-browser data-' not in page.text
-    assert 'href="/me/mod/1/notes"' in page.text
+    assert 'data-mod-note-open' in page.text
     assert 'data-predictions' not in page.text
     assert 'data-queue-action="clear"' not in page.text
     assert 'data-ad-action="run-90"' not in page.text
@@ -374,3 +374,34 @@ async def test_ads_are_super_only_and_audience_metrics_stay_private(env, monkeyp
             user.start_commercial.assert_awaited_once_with(length=90)
     session['channel_user_id'] = '1'
     assert len((await client.get('/channel/api/dashboard-stats')).json()['stats']) == 4
+
+
+@pytest.mark.asyncio
+async def test_note_popup_creates_channel_note_once_and_enforces_permissions(env):
+    from storage.for_you import notes_page
+    client, session, db, bot = env
+    data = {'csrf_token':'secret', 'submission_id':'a'*32, 'title':'Next stream', 'notes':'Remember the community game.', 'broadcaster_id':'99', 'actor':'99'}
+    await set_grant(db,'1','2','Streamer','Alice','view')
+    assert (await client.post('/me/mod/1/api/notes',data=data)).status_code == 403
+    for role in ('edit','super'):
+        await set_grant(db,'1','2','Streamer','Alice',role)
+        page=(await client.get('/me/mod/1')).text
+        for label in ('Polls','Predictions','Shouts'):
+            assert f'disabled title="{label} — coming soon"' in page
+        assert 'data-mod-note-dialog' in page and 'data-mod-note-form' in page
+        assert 'href="/me/mod/1/notes"' not in page
+        assert (await client.post('/me/mod/1/api/notes',data={**data,'csrf_token':'bad'})).status_code == 403
+        assert (await client.post('/me/mod/1/api/notes',data={**data,'notes':'   '})).status_code == 400
+        assert (await client.post('/me/mod/1/api/notes',data={**data,'submission_id':'bad'})).status_code == 422
+        saved=await client.post('/me/mod/1/api/notes',data=data)
+        assert saved.status_code == 200
+        assert saved.json()['note']['notes'] == data['notes']
+    owner_notes=await notes_page(db,'1')
+    assert len(owner_notes['items']) == 1
+    assert owner_notes['items'][0]['title'] == 'Next stream'
+    assert not (await notes_page(db,'99'))['items']
+    async with db.acquire() as connection:
+        logs=await connection.fetchall("SELECT * FROM channel_access_audit WHERE action='notes:create'")
+        assert len(logs)==1 and logs[0]['actor_id']=='2' and logs[0]['broadcaster_id']=='1'
+    await set_grant(db,'1','2','','','revoke')
+    assert (await client.post('/me/mod/1/api/notes',data=data)).status_code == 403
