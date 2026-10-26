@@ -2308,9 +2308,9 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.twitch-game-field:focus-within .channel-metadata-status { opacity: 0; }' in dashboard_styles
     assert 'setStatusSpace(Math.ceil(status.getBoundingClientRect().width))' in metadata_script
     assert 'statusSpaceTimer = window.setTimeout(() => setStatusSpace(0), 450)' in metadata_script
-    assert '.dashboard-video-header { --metadata-label-width: 88px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header { --metadata-label-width: 64px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr);' in dashboard_styles
     assert '.dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: var(--metadata-label-width) minmax(0,1fr);' in dashboard_styles
-    assert '.dashboard-video-header .twitch-channel-field > h3 { margin: 0; line-height: 1.2; text-align: right;' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field > h3 { margin: 0; font-size: 14px; line-height: 1.2; text-align: left;' in dashboard_styles
     assert '.dashboard-video-header .twitch-channel-field strong { box-sizing: border-box; width: 100%;' in dashboard_styles
     assert 'updateTitleEditingWidth' not in metadata_script
     assert 'range.selectNodeContents(field)' in metadata_script
