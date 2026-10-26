@@ -5,7 +5,6 @@
 {% endblock %}
 
 {% block content %}
-{% if moderator_mode %}<div class="mod-overview-banner"><strong>{{ broadcaster.name }} · Moderator dashboard</strong><a class="button secondary" href="{{ channel_root }}/connect">Authorize {{ moderator_name }} for chat</a><span role="status">{{ request.query_params.get('auth_message', '') }}</span></div>{% endif %}
 
 <link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard-for-you.css') }}?v={{ deployment_stamp() }}">
 <dialog class="for-you-dialog" data-fy-dialog aria-labelledby="for-you-alert-title">
@@ -135,14 +134,14 @@
                 </button>
                 {% endif %}
             {% endfor %}
-            <div class="dashboard-ad-stat dashboard-ad-sticky" data-ad-status-mirror aria-hidden="true">
+            {% if can_customize %}<div class="dashboard-ad-stat dashboard-ad-sticky" data-ad-status-mirror aria-hidden="true">
                 <svg class="dashboard-ad-progress" viewBox="0 0 24 24" aria-hidden="true">
                     <circle class="dashboard-ad-progress-track" cx="12" cy="12" r="9"></circle>
                     <circle class="dashboard-ad-progress-ring" cx="12" cy="12" r="9" data-ad-progress-mirror-ring></circle>
                     <path class="dashboard-ad-progress-check" d="M6.5 12.5 10.5 16.5 18 8.5"></path>
                 </svg>
                 <strong data-ad-status-mirror-text>{{ ad_status.label }}</strong>
-            </div>
+            </div>{% endif %}
         </div>
     </div>
     <section class="panel live-chat-panel">
@@ -357,11 +356,14 @@
             <button class="dashboard-action-placeholder" type="button" disabled title="Shouts — coming soon" aria-label="Shouts — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 6-3v18l-6-3H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h9V5Zm-7 12 2 5h4l-2-5M14 7v10"/></svg><span class="sr-only">Shouts</span></button>
             <button class="dashboard-action-placeholder" type="button" disabled title="Whispers — coming soon" aria-label="Whispers — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v9ZM7 8h10M7 12h7"/></svg><span class="sr-only">Whispers</span></button>
             <button class="dashboard-action-placeholder" type="button" disabled title="Points redeems — coming soon" aria-label="Points redeems — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z"/></svg><span class="sr-only">Points redeems</span></button>
+{% else %}
+            <a class="dashboard-action-placeholder" href="{{ channel_root }}/notes" title="Notes" aria-label="Notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5ZM8 7h8M8 11h8M8 15h5"/></svg><span class="sr-only">Notes</span></a>
+            {% if can_customize %}<a class="dashboard-action-placeholder" href="{{ channel_root }}/settings" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg><span class="sr-only">Settings</span></a>{% endif %}
 {% endif %}</section>
     </div>
 
     <div class="channel-dashboard-side viewer-queue-column">
-        {% if moderator_mode %}{% include 'viewer/predictions.html' %}{% endif %}
+        {% if can_customize %}
         <section class="panel dashboard-ads-panel" data-ad-panel data-action-url="{{ channel_root }}/api/ads/action" data-csrf-token="{{ csrf_token }}">
             <div class="panel-header">
                 <h3>Ads</h3>
@@ -374,13 +376,14 @@
                     <strong data-ad-status-text>{{ ad_status.label }}</strong>
                 </div>
             </div>
-            {% if can_moderate %}<div class="dashboard-ad-actions" aria-label="Ad controls">
+            {% if can_customize %}<div class="dashboard-ad-actions" aria-label="Ad controls">
                 <button type="button" data-ad-action="run-90" title="Start a 90-second ad now">+1.5 min</button>
                 <button type="button" data-ad-action="run-180" title="Start a 3-minute ad now">+3 min</button>
                 <button type="button" data-ad-action="snooze" title="Delay the next scheduled ad by 5 minutes">Snooze ads</button>
             </div>{% endif %}
             <p class="dashboard-ad-action-status" data-ad-action-status role="status" aria-live="polite"></p>
         </section>
+        {% endif %}
         <section
             class="panel"
             data-viewer-queue-panel data-read-only="{{ 'false' if can_moderate else 'true' }}"

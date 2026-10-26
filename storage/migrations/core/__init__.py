@@ -41,6 +41,7 @@ from .v070_note_management import migrate as migrate_070
 
 from .v071_channel_access import migrate as migrate_071
 
+from .v073_moderator_authorization import migrate as migrate_073
 from .v072_moderator_dashboard import migrate as migrate_072
 
 MIGRATIONS = (
@@ -78,4 +79,5 @@ MIGRATIONS = (
     Migration(70, "note_management", migrate_070),
     Migration(71, "channel_access", migrate_071),
     Migration(72, "moderator_dashboard", migrate_072),
+    Migration(73, "moderator_authorization", migrate_073),
 )

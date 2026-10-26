@@ -481,6 +481,8 @@ async def channel_dashboard_stats(request: Request):
 
     points_lost = await runtime_bot.services.points.get_gambling_loss_total(broadcaster_id)
     stats = await get_dashboard_header_stats(runtime_bot, broadcaster, refresh_viewers=True, points_lost=points_lost)
+    if getattr(request.state, "channel_access", None):
+        stats = [stat for stat in stats if stat["key"] == "points_lost"]
     started_at = getattr(broadcaster, "stream_started_at", None)
     return JSONResponse({
         "stats": stats,
@@ -2093,6 +2095,8 @@ async def channel_dashboard(request: Request):
     raid_metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_enabled else None
     ad_status = await get_ad_status(broadcaster, runtime_bot.create_partialuser(str(broadcaster_id)))
     dashboard_header_stats = await get_dashboard_header_stats(runtime_bot, broadcaster, points_lost=gambling_loss_total)
+    if getattr(request.state, "channel_access", None):
+        dashboard_header_stats = [stat for stat in dashboard_header_stats if stat["key"] == "points_lost"]
     twitch_channel_metadata = await get_twitch_channel_metadata(runtime_bot, broadcaster_id)
 
     return templates.TemplateResponse(
