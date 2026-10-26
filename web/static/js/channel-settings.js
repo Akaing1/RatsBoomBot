@@ -24,7 +24,7 @@
         try { sessionStorage.setItem(storageKey, key); } catch { /* Storage may be disabled. */ }
         if (updateURL) {
             const url = new URL(window.location.href);
-            url.pathname = '/channel/settings'; url.searchParams.set('section', key);
+            url.pathname = (globalThis.document?.body?.dataset?.channelRoot || "/channel") + '/settings'; url.searchParams.set('section', key);
             history.replaceState(null, '', url);
         }
     }

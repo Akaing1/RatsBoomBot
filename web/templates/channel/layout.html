@@ -11,6 +11,7 @@
     <title>
         {% block title %}RatsBoomBot Channel{% endblock %}
     </title>
+    <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
 
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
 
@@ -20,7 +21,7 @@
     >
 </head>
 
-<body class="dashboard-page channel-page channel-page-{{ active_page }}">
+<body data-channel-root="{{ channel_root }}" class="dashboard-page channel-page channel-page-{{ active_page }}{% if moderator_mode %} moderator-dashboard{% endif %}">
     <div class="app-shell" data-dashboard-shell data-sidebar-storage-key="ratsboombot-channel-sidebar-collapsed">
         <script>
             // Set the mobile state before the sidebar can paint as expanded.
@@ -53,13 +54,16 @@
 
                 <div class="brand-copy">
                     <h1>RatsBoomBot</h1>
-                    <p class="sidebar-brand-subtitle">Streamer Control</p>
+                    <p class="sidebar-brand-subtitle">{{ 'Moderator Control' if moderator_mode else 'Streamer Control' }}</p>
                 </div>
             </div>
             {% if active_page == 'overview' %}
             <span class="dashboard-carousel-navbar-label" data-dashboard-carousel-position role="status" aria-live="polite"><span class="dashboard-carousel-navbar-count" data-dashboard-carousel-count>1 / 3</span><span class="dashboard-carousel-navbar-name" data-dashboard-carousel-name>Stream and Chat</span></span>
             {% endif %}
 
+{% if moderator_mode %}
+<nav class="navigation"><a class="nav-link" href="/me">← My account</a><a class="nav-link {{ 'active' if active_page == 'overview' else '' }}" href="{{ channel_root }}">Overview</a><a class="nav-link" href="{{ channel_root }}/connect">Authorize my Twitch account</a><a class="nav-link {{ 'active' if active_page == 'notes' else '' }}" href="{{ channel_root }}/notes">Notes</a>{% if can_customize %}<a class="nav-link {{ 'active' if active_page == 'settings' else '' }}" href="{{ channel_root }}/settings">Settings</a>{% endif %}</nav>
+{% else %}
             <nav class="navigation">
                 <a
                     class="nav-link {% if active_page == 'overview' %}active{% endif %}"
@@ -92,9 +96,9 @@
                     <span class="nav-link-label">Help</span>
                 </a>
                 <a class="nav-link {% if active_page == 'access' %}active{% endif %}" href="/channel/access"><span class="nav-link-icon" aria-hidden="true">♧</span><span class="nav-link-label">Moderator access</span></a>
-            </nav>
+            </nav>{% endif %}
 
-            <form class="sidebar-logout" method="post" action="/channel/logout">
+            <form class="sidebar-logout" method="post" action="{{ '/me/logout' if moderator_mode else '/channel/logout' }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
                 <button class="button secondary" type="submit">
@@ -112,6 +116,7 @@
     <script src="{{ url_for('static', path='/js/channel-sidebar.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/hover-labels.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/overlay-scrollbars.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="/static/js/mod-predictions.js?v={{ deployment_stamp() }}" defer></script>
     {% block page_scripts %}{% endblock %}
 </body>
 </html>

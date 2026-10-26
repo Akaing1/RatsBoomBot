@@ -21,24 +21,24 @@ async def audit(connection, channel, actor, action, subject):
 
 
 async def set_grant(db, owner, user, channel_name, user_name, permission):
-    if permission not in ('view', 'edit', 'revoke') or owner == user:
+    if permission not in ('view', 'edit', 'super', 'revoke') or owner == user:
         raise ValueError('Invalid access grant.')
     async with db.acquire() as connection:
         async with immediate_transaction(connection):
             if permission == 'revoke':
                 await connection.execute("DELETE FROM channel_access WHERE broadcaster_id = ? AND user_id = ?", (owner, user))
             else:
-                await connection.execute("""INSERT INTO channel_access VALUES (?, ?, ?, ?, 'notes', ?)
+                await connection.execute("""INSERT INTO channel_access VALUES (?, ?, ?, ?, 'dashboard', ?)
                     ON CONFLICT(broadcaster_id, user_id, feature) DO UPDATE SET
                     channel_name = excluded.channel_name, user_name = excluded.user_name, permission = excluded.permission""",
                     (owner, user, channel_name, user_name, permission))
-            await audit(connection, owner, owner, 'notes:' + permission, user)
+            await audit(connection, owner, owner, 'access:' + permission, user)
 
 
 async def require_grant(connection, channel, actor, edit=False):
-    row = await connection.fetchone("SELECT * FROM channel_access WHERE broadcaster_id = ? AND user_id = ? AND feature = 'notes'", (channel, actor))
-    if row is None or (edit and row['permission'] != 'edit'):
-        raise PermissionError('You no longer have access to these notes.')
+    row = await connection.fetchone("SELECT * FROM channel_access WHERE broadcaster_id = ? AND user_id = ? AND feature = 'dashboard'", (channel, actor))
+    if row is None or (edit and row['permission'] not in ('edit', 'super')):
+        raise PermissionError('You no longer have access to this channel.')
     return dict(row)
 
 

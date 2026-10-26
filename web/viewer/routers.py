@@ -49,6 +49,9 @@ async def connect_viewer(request: Request, next: str = ""):
 
 @router.get("/oauth/viewer/connect")
 async def viewer_oauth_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+    from web.viewer.twitch_actions import MOD_STATE, finish_authorization
+    if MOD_STATE in request.session and state == request.session[MOD_STATE].get("state"):
+        return await finish_authorization(request, state=state, code=code, error=error)
     if not consume_viewer_oauth_state(request, state):
         return HTMLResponse("Viewer sign-in could not be verified. Please try again.", status_code=400, headers=PRIVATE_HEADERS)
 

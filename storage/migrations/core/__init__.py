@@ -41,6 +41,8 @@ from .v070_note_management import migrate as migrate_070
 
 from .v071_channel_access import migrate as migrate_071
 
+from .v072_moderator_dashboard import migrate as migrate_072
+
 MIGRATIONS = (
     Migration(1, "initial_schema", migrate_001),
     Migration(2, "redeem_stats", migrate_002),
@@ -75,4 +77,5 @@ MIGRATIONS = (
     Migration(69, "for_you_archive", migrate_069),
     Migration(70, "note_management", migrate_070),
     Migration(71, "channel_access", migrate_071),
+    Migration(72, "moderator_dashboard", migrate_072),
 )

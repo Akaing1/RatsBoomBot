@@ -24,7 +24,7 @@ from bot.services.channels.stream_metadata import (
 from config.settings import settings
 from web.channel.settings_book import build_settings_sections
 from web.admin.auth import get_csrf_token, validate_csrf_token
-from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
+from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user, current_channel_id, settings_actor
 from web.channel.api_context import resolve_channel_api_context
 from web.shared.common import templates
 from web.shared.category_relevance import low_relevance_category_ids
@@ -528,7 +528,7 @@ async def channel_viewer_queue_action(
     count: int = Form(4),
     expected_users: str = Form("")
 ):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     validate_csrf_token(request, csrf_token)
@@ -588,7 +588,7 @@ async def channel_viewer_queue_action(
 
 @router.get("/channel/api/raid-browser/pending", response_class=JSONResponse)
 async def channel_pending_raid(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     runtime_bot = get_bot()
@@ -605,7 +605,7 @@ async def channel_pending_raid(request: Request):
 @router.post("/channel/api/raid-browser/action", response_class=JSONResponse)
 async def channel_raid_action(request: Request, action: str = Form(...),
                               target_id: str = Form(""), csrf_token: str = Form(...)):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     validate_csrf_token(request, csrf_token)
@@ -659,7 +659,7 @@ async def channel_raid_action(request: Request, action: str = Form(...),
 
 @router.get("/channel/api/raid-browser/preview", response_class=JSONResponse)
 async def channel_raid_preview(request: Request, target_id: str = ""):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     runtime_bot = get_bot()
@@ -688,7 +688,7 @@ async def channel_raid_browser(
     mutual: bool = False, recommended: bool = False, same_team: bool = False, team: str = "", favorites: str = "",
     favorites_only: bool = False, blocked: str = "", category_id: str = "", suggested: bool = False, sort: str = "", event: str = "", developer_only: bool = False, defer_profiles: bool = False,
 ):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     runtime_bot = get_bot()
@@ -1201,7 +1201,7 @@ async def raid_browser_relationships(runtime_bot, broadcaster_id, channels, foll
 
 @router.get("/channel/api/raid-browser/profiles", response_class=JSONResponse)
 async def channel_raid_browser_profiles(request: Request, ids: str = ""):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     runtime_bot = get_bot()
@@ -1394,7 +1394,7 @@ async def raid_browser_team_streams(runtime_bot, broadcaster_id: str):
 
 @router.get("/channel/api/raid-browser/lists", response_class=JSONResponse)
 async def channel_raid_browser_lists(request: Request, ids: str = ""):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     runtime_bot = get_bot()
@@ -1425,7 +1425,7 @@ async def update_twitch_channel_metadata(
     value: str = Form(...),
     csrf_token: str = Form(...)
 ):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     validate_csrf_token(request, csrf_token)
@@ -1476,7 +1476,7 @@ async def update_twitch_channel_metadata(
 
 @router.get("/channel/api/chat/pinned", response_class=JSONResponse)
 async def channel_pinned_chat_message(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     runtime_bot = get_bot()
@@ -1543,7 +1543,7 @@ async def moderate_channel_chat_message(
     csrf_token: str = Form(...),
     duration_minutes: str = Form("")
 ):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     validate_csrf_token(request, csrf_token)
@@ -1645,7 +1645,7 @@ async def moderate_automod_message(
     message_id: str = Form(...),
     csrf_token: str = Form(...)
 ):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     validate_csrf_token(request, csrf_token)
@@ -1671,7 +1671,7 @@ async def moderate_automod_message(
 
 @router.get("/channel/api/games", response_class=JSONResponse)
 async def search_twitch_games(request: Request, query: str = "", current_first: bool = False):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     runtime_bot = get_bot()
@@ -1736,7 +1736,7 @@ async def prioritize_raid_current_category(runtime_bot, broadcaster_id, payload)
 
 @router.get("/channel/api/chat/stream")
 async def channel_chat_stream(request: Request, view: str = "both"):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
@@ -1758,7 +1758,7 @@ async def channel_chat_stream(request: Request, view: str = "both"):
 
 
 def preview_chat_runtime(request, target_id):
-    reader = request.session.get(CHANNEL_USER_ID_KEY)
+    reader = current_channel_id(request)
     if not reader:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     if not re.fullmatch(r"\d{1,25}", target_id):
@@ -1857,7 +1857,7 @@ async def channel_ad_status(request: Request):
 
 @router.post("/channel/api/ads/action", response_class=JSONResponse)
 async def channel_ad_action(request: Request, action: str = Form(...), csrf_token: str = Form(...)):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     validate_csrf_token(request, csrf_token)
@@ -1927,7 +1927,7 @@ async def channel_send_chat_message(
     csrf_token: str = Form(...),
     reply_parent_message_id: str = Form("")
 ):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
@@ -2054,7 +2054,7 @@ async def channel_send_chat_message(
 
 @router.get("/channel", response_class=HTMLResponse)
 async def channel_dashboard(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
@@ -2125,7 +2125,7 @@ async def channel_dashboard(request: Request):
 
 @router.get("/channel/boss-hunt", response_class=HTMLResponse)
 async def channel_boss_hunt(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
 
@@ -2166,7 +2166,7 @@ async def channel_boss_hunt_action(
     boss_type: str = Form(""),
 ):
     validate_csrf_token(request, csrf_token)
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
 
@@ -2213,7 +2213,7 @@ async def channel_boss_hunt_action(
 
 @router.get("/channel/viewer-queue/blacklist", response_class=HTMLResponse)
 async def channel_viewer_queue_blacklist(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
     runtime_bot = get_bot()
@@ -2247,7 +2247,7 @@ async def update_channel_viewer_queue_blacklist(
     username: str = Form(...),
     csrf_token: str = Form(...)
 ):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
     validate_csrf_token(request, csrf_token)
@@ -2270,7 +2270,7 @@ async def update_channel_viewer_queue_blacklist(
 
 @router.get("/channel/help", response_class=HTMLResponse)
 async def channel_help_page(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
@@ -2313,7 +2313,7 @@ async def channel_help_page(request: Request):
 @router.get("/channel/loyalty", response_class=RedirectResponse)
 async def legacy_channel_settings_page(request: Request):
     """Keep bookmarked settings URLs working without duplicate page renderers."""
-    if not request.session.get(CHANNEL_USER_ID_KEY):
+    if not current_channel_id(request):
         return RedirectResponse(url="/connect", status_code=303)
     target = request.url.replace(path="/channel/settings")
     if request.url.path == "/channel/loyalty":
@@ -2323,7 +2323,7 @@ async def legacy_channel_settings_page(request: Request):
 
 @router.get("/channel/settings", response_class=HTMLResponse)
 async def channel_customization_page(request: Request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
@@ -2341,7 +2341,7 @@ async def channel_customization_page(request: Request):
         return RedirectResponse(url="/connect", status_code=303)
 
     groups = services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)})
-    widget_token = await services.live_chat.get_or_create_widget_token(broadcaster_id)
+    widget_token = "" if getattr(getattr(request, "state", None), "channel_access", None) else await services.live_chat.get_or_create_widget_token(broadcaster_id)
     widget_base_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/widgets/chat/{widget_token}"
     widget_urls = {view: f"{widget_base_url}?view={view}" for view in ("chat", "commands", "both")}
 
@@ -2350,19 +2350,19 @@ async def channel_customization_page(request: Request):
         name="channel/settings.html",
         context={
             "active_page": "settings",
-            "customization_action": "/channel/customization",
-            "settings_sections": build_settings_sections(
+            "customization_action": f"/me/mod/{broadcaster_id}/customization" if getattr(getattr(request, "state", None), "channel_access", None) else "/channel/customization",
+            "settings_sections": visible_settings_sections(request, build_settings_sections(
                 groups, services.features.get_channel_features(broadcaster_id),
                 services.features.get_profile_features(broadcaster_id),
                 services.features.get_global_groups(broadcaster_id),
                 services.features.get_global_commands(broadcaster_id),
-            ),
+            )),
             "toggle_result": request.query_params.get("toggle_result"),
             "toggle_message": request.query_params.get("toggle_message"),
             "loyalty_alias": get_active_profile(broadcaster_id).points.command_alias,
             "broadcaster": broadcaster,
             "channel_settings": await services.broadcaster_settings.get_settings(broadcaster_id),
-            "chat_identity": services.chat_identity.get_state(broadcaster_id),
+            "chat_identity": None if getattr(getattr(request, "state", None), "channel_access", None) else services.chat_identity.get_state(broadcaster_id),
             "youtube_chat": services.live_chat.get_youtube_state(broadcaster_id),
             "widget_urls": widget_urls,
             "setting_result": request.query_params.get("setting_result"),
@@ -2386,7 +2386,7 @@ async def channel_customization_page(request: Request):
 async def update_channel_customization(request: Request, setting_name: str = Form(...), value: str = Form(""), action: str = Form(...), csrf_token: str = Form(...)):
     legacy_loyalty = request.url.path == "/channel/loyalty"
     destination = "/channel/settings?section=loyalty&" if legacy_loyalty else "/channel/settings?"
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
@@ -2417,10 +2417,10 @@ async def update_channel_customization(request: Request, setting_name: str = For
             definition = services.profile_settings.get_definition(setting_name)
 
             if action == "save":
-                await services.profile_settings.set_override(broadcaster_id, setting_name, value, f"streamer:{broadcaster_id}")
+                await services.profile_settings.set_override(broadcaster_id, setting_name, value, settings_actor(request))
                 message = f"{definition.label} was updated."
             elif action == "reset":
-                await services.profile_settings.clear_override(broadcaster_id, setting_name, f"streamer:{broadcaster_id}")
+                await services.profile_settings.clear_override(broadcaster_id, setting_name, settings_actor(request))
                 message = f"{definition.label} was reset to its channel default."
             else:
                 raise ValueError("Unknown customization action.")
@@ -2432,7 +2432,7 @@ async def update_channel_customization(request: Request, setting_name: str = For
 
 @router.get("/channel/protected-users/search")
 async def search_channel_protected_user(request: Request, query: str = ""):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return JSONResponse({"detail": "Connect your Twitch channel first."}, status_code=401)
@@ -2452,7 +2452,7 @@ async def search_channel_protected_user(request: Request, query: str = ""):
 
 @router.post("/channel/protected-users/add")
 async def add_channel_protected_user(request: Request, user_id: str = Form(...), csrf_token: str = Form(...)):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
@@ -2473,7 +2473,7 @@ async def add_channel_protected_user(request: Request, user_id: str = Form(...),
 
 @router.post("/channel/protected-users/remove")
 async def remove_channel_protected_user(request: Request, user_id: str = Form(...), csrf_token: str = Form(...)):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
@@ -2494,7 +2494,7 @@ async def remove_channel_protected_user(request: Request, user_id: str = Form(..
 
 @router.post("/channel/features/toggles")
 async def update_channel_feature(request: Request, toggle_type: str = Form(...), toggle_name: str = Form(...), action: str = Form(...), csrf_token: str = Form(...)):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
@@ -2517,7 +2517,7 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
         return RedirectResponse(url="/channel/settings?toggle_result=error&toggle_message=Unknown+toggle+action.", status_code=303)
 
     enabled = action == "enable"
-    updated_by = f"streamer:{broadcaster_id}"
+    updated_by = settings_actor(request)
 
     try:
         if toggle_type == "feature":
@@ -2579,7 +2579,7 @@ async def update_channel_feature(request: Request, toggle_type: str = Form(...),
 
 @router.post("/channel/viewer-queue/remove")
 async def remove_viewer_from_channel_queue(request: Request, position: int = Form(...), csrf_token: str = Form(...)):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
         return RedirectResponse(url="/connect", status_code=303)
@@ -2614,3 +2614,7 @@ async def channel_logout(request: Request, csrf_token: str = Form(...)):
 
     return RedirectResponse(url="/connect", status_code=303)
 
+
+
+def visible_settings_sections(request, sections):
+    return [section for section in sections if section['key'] != 'connections'] if getattr(getattr(request, 'state', None), 'channel_access', None) else sections

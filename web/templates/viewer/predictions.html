@@ -1,0 +1,10 @@
+<section class="panel mod-predictions" data-predictions data-api="{{ channel_root }}/api/predictions" data-csrf="{{ csrf_token }}" data-can-edit="{{ 'true' if can_moderate else 'false' }}">
+<div class="panel-header"><h3>Predictions</h3><button class="button secondary" type="button" data-prediction-refresh>Refresh</button></div>
+<p data-prediction-status role="status" aria-live="polite">Load predictions to view the current status.</p>
+<div data-prediction-current></div>
+{% if can_moderate %}<details><summary>Start a prediction</summary><form data-prediction-create class="mod-prediction-form">
+<label>Question<input class="profile-setting-input" name="title" maxlength="45" required></label>
+<label>Outcomes<textarea class="profile-setting-input" name="outcomes" maxlength="300" rows="3" placeholder="One outcome per line" required></textarea></label>
+<label>Prediction window (seconds)<input class="profile-setting-input" type="number" name="window" min="30" max="1800" value="300" required></label>
+<button class="button primary" type="submit">Start prediction</button></form></details>{% endif %}
+</section>
