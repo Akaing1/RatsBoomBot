@@ -2,12 +2,12 @@
 {% block title %}Moderator access | RatsBoomBot{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
-<header class="page-header access-header"><div><h2>Moderator access</h2><p>Choose who can help with your channel's Notes.</p></div></header>
+<header class="page-header access-header"><div><h2>Moderator access</h2></div></header>
 <div class="access-layout"><section class="panel"><h3>People with access</h3>
 {% for entry in grants %}<div class="access-row"><div><strong>{{ entry.user_name }}</strong><p><span class="access-badge">Notes · {{ entry.permission | title }}</span></p></div>
 <form method="post" action="/channel/access"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" value="{{ entry.user_id }}"><input type="hidden" name="permission" value="revoke"><button class="button danger" type="submit">Revoke</button></form></div>
 {% else %}<p>No one has access yet.</p>{% endfor %}
-<p>They sign in through <a href="/me">My account</a> (or the link from <code>!me</code>) and choose your channel in the Mod Bar.</p>
+
 </section><aside class="panel access-settings"><h3>Grant or update access</h3>
 <form class="protected-user-search" data-access-search>
 <label for="access-query">Twitch username</label>
