@@ -1,0 +1,10 @@
+{% if mod_channels %}
+<aside class="mod-bar panel" aria-label="Mod Bar">
+<details open><summary>Mod Bar</summary>
+<p>Channels you can help manage</p>
+<nav aria-label="Moderator channels">{% for entry in mod_channels %}
+<a class="mod-channel" href="/me/mod/{{ entry.broadcaster_id }}"{% if grant is defined and grant.broadcaster_id == entry.broadcaster_id %} aria-current="page"{% endif %}>
+<strong>{{ entry.channel_name }}</strong><small>Notes · {{ entry.permission | title }}</small></a>
+{% endfor %}</nav>
+</details></aside>
+{% endif %}

@@ -14,6 +14,7 @@ from web.channel.routers.workspace import router as workspace_router
 from web.public.routers import router as public_router
 from web.shared.routers import health_router
 from web.viewer.routers import router as viewer_router
+from web.viewer.moderation import router as moderation_router
 WEB_DIRECTORY = Path(__file__).resolve().parent
 STATIC_DIRECTORY = WEB_DIRECTORY / "static"
 ASSETS_DIRECTORY = WEB_DIRECTORY.parent / "assets"
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     application.include_router(channel_youtube_router)
     application.include_router(workspace_router)
     application.include_router(viewer_router)
+    application.include_router(moderation_router)
     application.include_router(public_router)
     application.include_router(health_router)
 
