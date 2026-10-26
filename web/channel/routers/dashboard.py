@@ -26,6 +26,7 @@ from web.channel.settings_book import build_settings_sections
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
 from web.channel.api_context import resolve_channel_api_context
+from web.channel.routers.engagement import router as engagement_router
 from web.shared.common import templates
 from web.shared.category_relevance import low_relevance_category_ids
 from web.shared.raid_suggestions import get_suggested_streamers
@@ -43,6 +44,7 @@ from web.state import get_bot
 from storage.incoming_raids import recent_incoming_raids
 
 router = APIRouter()
+router.include_router(engagement_router)
 LOGGER = logging.getLogger("RatBoomBot")
 CHAT_SEND_TARGETS = {"twitch", "youtube", "both"}
 CHAT_MESSAGE_MAX_LENGTH = 500

@@ -23,17 +23,23 @@ class PlaceholderParser(HTMLParser):
             self.current = None
 
 
-def test_seven_dashboard_actions_are_ordered_and_only_browser_is_enabled():
+def test_seven_dashboard_actions_are_ordered_and_available_overlays_are_enabled():
     parser = PlaceholderParser()
     parser.feed(Path("web/templates/channel/dashboard.html").read_text(encoding="utf-8"))
     assert [button["text"] for button in parser.buttons] == [
-        "Raid browser", "Polls", "Predictions", "Stream Together", "Shouts", "Whispers", "Points redeems"]
+        "Polls", "Predictions", "Raid browser", "Stream Together", "Shouts", "Whispers", "Points redeems"]
     for button in parser.buttons:
         assert button["attrs"]["type"] == "button"
         if button["text"] == "Raid browser":
             assert "disabled" not in button["attrs"]
             assert "data-raid-browser-open" in button["attrs"]
             assert button["attrs"]["aria-haspopup"] == "dialog"
+            continue
+        if button["text"] in {"Polls", "Predictions"}:
+            assert "disabled" not in button["attrs"]
+            assert button["attrs"]["data-engagement-open"] == button["text"].lower()
+            assert button["attrs"]["aria-haspopup"] == "dialog"
+            assert button["attrs"]["aria-controls"] == "dashboard-engagement"
             continue
         assert "disabled" in button["attrs"]
         assert "coming soon" in button["attrs"]["title"]
@@ -51,7 +57,7 @@ def test_unavailable_actions_are_visually_disabled():
 
 def test_predictions_uses_crystal_ball_with_a_legible_question_dot():
     template = Path("web/templates/channel/dashboard.html").read_text(encoding="utf-8")
-    button = template.split('title="Predictions — coming soon"', 1)[1].split('</button>', 1)[0]
+    button = template.split('title="Predictions"', 1)[1].split('</button>', 1)[0]
     assert '<circle cx="12" cy="10" r="8"/>' in button
     assert 'M9.5 8a2.5 2.5' in button
     assert '<circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/>' in button

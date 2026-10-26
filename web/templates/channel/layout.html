@@ -18,6 +18,7 @@
         rel="stylesheet"
         href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}"
     >
+    {% block page_styles %}{% endblock %}
 </head>
 
 <body class="dashboard-page channel-page channel-page-{{ active_page }}">
