@@ -103,3 +103,66 @@ async def test_deadline_retries_back_off_preserve_cursor_and_allow_cancellation(
         assert [call.args[0] for call in sleep.await_args_list] == [1, 2, 4, 8, 16, 30, 30, 1]
         assert requests[-1].page_token == "saved"
     service._poll_live_chat.assert_not_awaited()
+
+
+def test_youtube_replay_survives_busy_twitch_and_cursor_reset(caplog):
+    from bot.services.channels.live_chat import UnifiedChatMessage
+    service = LiveChatService(None)
+    queue = asyncio.Queue(maxsize=20)
+    service.subscribers["channel"].add(queue)
+    old = {"id": "old", "snippet": {"displayMessage": "hello", "publishedAt": "2026-10-27T12:00:00Z"}}
+    service._publish_youtube_items("channel", [old])
+    for index in range(1100):
+        service.publish("channel", UnifiedChatMessage(str(index), "twitch", "chat", "u", "U", "hi", "now"))
+    assert "youtube:old" not in service.message_ids["channel"]
+    while not queue.empty():
+        queue.get_nowait()
+    service.youtube_page_tokens.clear()
+    # Same text from a new message is legitimate; only the old ID is a replay.
+    new = {**old, "id": "new"}
+    with caplog.at_level("INFO"):
+        service._publish_youtube_items("channel", [old, new, old])
+    assert queue.qsize() == 1
+    assert queue.get_nowait().id == "youtube:new"
+    assert "Suppressed 2 replayed YouTube messages" in caplog.text
+    assert service.history("channel")[-1]["id"] == "youtube:new"
+    service._publish_youtube_items("other", [old])
+    assert service.history("other")[-1]["id"] == "youtube:old"
+
+
+def test_youtube_replay_memory_is_bounded():
+    service = LiveChatService(None)
+    service._publish_youtube_items("channel", [
+        {"id": str(index), "snippet": {"displayMessage": "hi"}} for index in range(5100)
+    ])
+    assert len(service.youtube_message_ids["channel"]) == 5000
+    assert len(service.youtube_message_id_order["channel"]) == 5000
+    assert "youtube:0" not in service.youtube_message_ids["channel"]
+
+
+@pytest.mark.asyncio
+async def test_replay_ids_survive_same_chat_rediscovery_but_reset_for_new_stream(monkeypatch):
+    service = LiveChatService(None)
+    service.started = True
+    service.connections['channel'] = SimpleNamespace()
+    service._find_active_live_chat = AsyncMock(side_effect=['chat-a', 'chat-a', 'chat-b'])
+    monkeypatch.setattr('bot.services.channels.live_chat.asyncio.sleep', AsyncMock())
+    attempts = 0
+
+    async def stream(channel, chat):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            service._publish_youtube_items(channel, [{'id': 'old', 'snippet': {'displayMessage': 'hello'}}])
+        elif attempts == 2:
+            assert 'youtube:old' in service.youtube_message_ids[channel]
+        else:
+            assert chat == 'chat-b'
+            assert not service.youtube_message_ids[channel]
+            raise asyncio.CancelledError()
+        return True  # Stream ends; rediscovery can still return the same live chat.
+
+    service._stream_live_chat = stream
+    with pytest.raises(asyncio.CancelledError):
+        await service._watch_youtube('channel')
+    assert attempts == 3

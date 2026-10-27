@@ -132,6 +132,11 @@ class LiveChatService:
         self.command_response_id_order: dict[str, deque[str]] = defaultdict(deque)
         self.subscribers: dict[str, set[asyncio.Queue]] = defaultdict(set)
         self.youtube_page_tokens: dict[str, tuple[str, str]] = {}
+        # Keep replay protection independent of busy Twitch traffic and display history.
+        # Bounded per broadcaster; retained across transport/cursor/auth renewals.
+        self.youtube_message_ids: dict[str, set[str]] = defaultdict(set)
+        self.youtube_message_id_order: dict[str, deque[str]] = defaultdict(deque)
+        self.youtube_replay_chat_ids: dict[str, str] = {}
         self.youtube_refresh_locks: dict[str, asyncio.Lock] = {}
         self.tasks: dict[str, asyncio.Task] = {}
         self.seventv_tasks: dict[str, asyncio.Task] = {}
@@ -912,8 +917,17 @@ class LiveChatService:
     def publish(self, broadcaster_id: str, message: UnifiedChatMessage) -> bool:
         broadcaster_id = str(broadcaster_id)
 
+        if message.platform == "youtube" and message.id in self.youtube_message_ids[broadcaster_id]:
+            return False
         if message.id in self.message_ids[broadcaster_id]:
             return False
+
+        if message.platform == "youtube":
+            self.youtube_message_ids[broadcaster_id].add(message.id)
+            self.youtube_message_id_order[broadcaster_id].append(message.id)
+            while len(self.youtube_message_id_order[broadcaster_id]) > 5000:
+                expired_id = self.youtube_message_id_order[broadcaster_id].popleft()
+                self.youtube_message_ids[broadcaster_id].discard(expired_id)
 
         self.message_ids[broadcaster_id].add(message.id)
         self.message_id_order[broadcaster_id].append(message.id)
@@ -1253,6 +1267,9 @@ class LiveChatService:
         self.youtube_page_tokens.pop(broadcaster_id, None)
         self.youtube_statuses.pop(broadcaster_id, None)
         self.active_youtube_chat_ids.pop(broadcaster_id, None)
+        self.youtube_message_ids.pop(broadcaster_id, None)
+        self.youtube_message_id_order.pop(broadcaster_id, None)
+        self.youtube_replay_chat_ids.pop(broadcaster_id, None)
         LOGGER.info("[Live Chat] Disconnected YouTube from broadcaster %s.", broadcaster_id)
 
     def _start_watcher(self, broadcaster_id: str) -> None:
@@ -1300,6 +1317,10 @@ class LiveChatService:
                     if live_chat_id is None:
                         self.youtube_statuses[broadcaster_id] = ("waiting", "Waiting for an active YouTube livestream.")
                     else:
+                        if self.youtube_replay_chat_ids.get(broadcaster_id) != live_chat_id:
+                            self.youtube_message_ids.pop(broadcaster_id, None)
+                            self.youtube_message_id_order.pop(broadcaster_id, None)
+                            self.youtube_replay_chat_ids[broadcaster_id] = live_chat_id
                         known_chat_id = live_chat_id
                         self.active_youtube_chat_ids[broadcaster_id] = live_chat_id
                         self.youtube_statuses[broadcaster_id] = ("live", "Receiving YouTube live-chat messages.")
@@ -1500,6 +1521,7 @@ class LiveChatService:
         return True
 
     def _publish_youtube_items(self, broadcaster_id: str, items: list[dict]) -> None:
+        duplicates = 0
         for item in items:
             snippet = item.get("snippet", {})
             message_text = str(snippet.get("displayMessage") or "").strip()
@@ -1531,7 +1553,11 @@ class LiveChatService:
                 timestamp=str(snippet.get("publishedAt") or datetime.now(UTC).isoformat()),
                 badges=tuple(badges)
             )
-            self.publish(broadcaster_id, message)
+            if not self.publish(broadcaster_id, message):
+                duplicates += 1
+        if duplicates:
+            LOGGER.info("[Live Chat] Suppressed %s replayed YouTube messages for broadcaster %s.",
+                        duplicates, broadcaster_id)
 
     async def _youtube_get(self, broadcaster_id: str, path: str, params: dict[str, object]) -> dict:
         if self.client is None:
