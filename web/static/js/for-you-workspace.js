@@ -10,7 +10,7 @@
     let selected = null, currentMode = true, noteBusy = false;
     const canLeave = () => !dirty || confirm('Discard your unsaved note changes?');
     async function request(path = '', data) {
-        const response = await fetch('/channel/api/for-you' + path, {credentials: 'same-origin', cache: 'no-store', method: data ? 'POST' : 'GET', ...(data ? {body: new URLSearchParams({csrf_token: root.dataset.csrf, ...data})} : {})});
+        const response = await fetch((document.body.dataset.channelRoot || '/channel') + '/api/for-you' + path, {credentials: 'same-origin', cache: 'no-store', method: data ? 'POST' : 'GET', ...(data ? {body: new URLSearchParams({csrf_token: root.dataset.csrf, ...data})} : {})});
         let result;
         try { result = await response.json(); } catch { throw new Error('Could not reach For You. Please try again.'); }
         if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Please check your input and try again.');

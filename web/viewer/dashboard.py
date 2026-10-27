@@ -6,7 +6,7 @@ from twitchio.http import Route
 from storage.channel_access import require_grant, audit, channels_for_user
 from storage.viewer_sessions import valid_viewer_session
 from web.admin.auth import validate_csrf_token
-from web.channel.routers import dashboard as owner
+from web.channel.routers import dashboard as owner, workspace as owner_workspace
 from web.viewer.auth import viewer_user_id, VIEWER_SERVER_TOKEN_KEY
 from web.viewer.twitch_actions import user_request, start_authorization, authorization_required
 from web.state import get_db, get_bot
@@ -92,6 +92,16 @@ for route in owner.router.routes:
     router.add_api_route(route.path.replace('/channel', '/me/mod/{channel}', 1), route.endpoint,
         methods=list(route.methods), dependencies=[Depends(permission_dependency(capability))], name='mod_' + route.name,
         response_class=route.response_class)
+
+
+WORKSPACE = {'/channel/for-you', '/channel/api/for-you', '/channel/api/for-you/notes',
+    '/channel/api/for-you/notes/{identity}', '/channel/api/for-you/quotes',
+    '/channel/api/for-you/clips', '/channel/api/for-you/clips/download'}
+for route in owner_workspace.router.routes:
+    if route.path in WORKSPACE:
+        router.add_api_route(route.path.replace('/channel', '/me/mod/{channel}', 1), route.endpoint,
+            methods=list(route.methods), dependencies=[Depends(permission_dependency('settings'))],
+            name='mod_' + route.name, response_class=route.response_class)
 
 
 async def action_context(request, channel, csrf_token, capability='moderate'):

@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from storage.streamer_workspace import get_workspace, update_workspace
 from web.admin.auth import validate_csrf_token, get_csrf_token
-from web.channel.auth import CHANNEL_USER_ID_KEY
+from web.channel.auth import CHANNEL_USER_ID_KEY, current_channel_id, settings_actor
 from web.state import get_db, get_bot
 from web.shared.common import templates
 from storage.for_you import notes_page, quotes_page, change_quote, manage_note
@@ -14,7 +14,7 @@ router = APIRouter()
 
 
 def workspace_context(request):
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         raise HTTPException(status_code=401, detail="Channel authentication required.")
     db = get_db()
@@ -44,6 +44,8 @@ async def save_workspace(
 ):
     db, broadcaster_id = workspace_context(request)
     validate_csrf_token(request, csrf_token)
+    if getattr(getattr(request, "state", None), "channel_access", None) and action != "notes":
+        raise HTTPException(status_code=403, detail="Only notes can be updated from this page.")
     if action not in {"notes", "start", "clear"}:
         raise HTTPException(status_code=400, detail="Unknown workspace action.")
     if action == "start" and not 1 <= minutes * 60 + seconds <= 604800:
@@ -76,7 +78,7 @@ def current_note_key(channel):
 
 @router.get('/channel/for-you')
 async def for_you_page(request: Request):
-    if not request.session.get(CHANNEL_USER_ID_KEY):
+    if not current_channel_id(request):
         return RedirectResponse('/connect', status_code=303)
     return templates.TemplateResponse(request=request, name='channel/workspace.html', context={
         'active_page': 'for-you', 'csrf_token': get_csrf_token(request),
@@ -108,7 +110,7 @@ async def save_quote(request: Request, csrf_token: str = Form(...), action: str 
         raise HTTPException(status_code=400, detail='Enter a quote first.')
     try:
         if action == 'add':
-            await QuoteService(db).add(channel, message, 'streamer:' + channel)
+            await QuoteService(db).add(channel, message, settings_actor(request))
         else:
             await change_quote(db, channel, identity, original, message if action == 'edit' else None)
     except ValueError as error:
@@ -211,7 +213,7 @@ async def clip_download(request: Request, clip_id: str = Form(..., min_length=1,
     except TwitchHTTPException as error:
         logging.getLogger("RatBoomBot").warning("[Clips] Download link request failed, upstream_status=%s.", error.status)
         if error.status in {401, 403}:
-            raise HTTPException(403, "Reconnect your channel in Settings to grant clip download permission.") from error
+            raise HTTPException(403, "Ask the streamer to reconnect Twitch in Settings to grant clip download permission." if getattr(getattr(request, "state", None), "channel_access", None) else "Reconnect your channel in Settings to grant clip download permission.") from error
         if error.status == 429:
             raise HTTPException(429, "Twitch download limit reached. Please wait a minute and retry.") from error
         raise HTTPException(502, "Twitch could not prepare this download. Please try again.") from error
