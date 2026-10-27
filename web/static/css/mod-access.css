@@ -192,3 +192,38 @@ select.access-badge { cursor: pointer; font: inherit; font-size: 12px; padding: 
     .channel-profile-hero > .button { grid-column: 1 / -1; }
     .channel-chatter-page .chatter-inventory-list > div { align-items: flex-start; flex-direction: column; gap: 8px; }
 }
+
+.activity-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 24px; margin-bottom: 24px; border: 1px solid var(--border); border-radius: 18px; background: linear-gradient(120deg,#8b5cf620,var(--surface)); }
+.activity-header h2, .activity-section-title h2 { margin: 0; }
+.activity-header p { margin: 8px 0 0; color: var(--muted); }
+.activity-balance { display: grid; gap: 4px; text-align: right; }
+.activity-balance span, .activity-balance small { color: var(--muted); font-size: 13px; }
+.activity-balance strong { color: #ac86ff; font-size: clamp(28px,4vw,42px); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.activity-gamble.panel { border-top: 3px solid #ffb36b; background: linear-gradient(120deg,#ffb36b0c,var(--surface)); padding: 24px; }
+.activity-section-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.activity-odds { color: #ffb36b; background: #ffb36b12; padding: 8px 12px; border-radius: 999px; font-size: 13px; }
+.activity-panel .chatter-gamble-form { padding: 0; }
+.activity-panel .chatter-shop-grid { grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 16px; }
+.activity-panel .chatter-shop-card { border-top: 3px solid #5ed4c8; padding: 22px; display: flex; flex-direction: column; min-width: 0; background: linear-gradient(135deg,#5ed4c80a,var(--surface)); }
+.activity-panel .chatter-shop-card h3 { margin: 0 0 12px; overflow-wrap: anywhere; }
+.activity-panel .chatter-shop-card p { color: var(--muted); margin: 0 0 20px; }
+.activity-panel .chatter-shop-card form { margin-top: auto; }
+.activity-panel .chatter-shop-card button { width: 100%; }
+.activity-shop > section:nth-of-type(2) .chatter-shop-card { border-top-color: #ac86ff; }
+.activity-shop > section:nth-of-type(3) .chatter-shop-card { border-top-color: #ffb36b; }
+.activity-panel .chatter-shop-result { border-left: 3px solid var(--accent); }
+@media (max-width: 600px) {
+    .activity-header { align-items: flex-start; padding: 18px; }
+    .activity-balance { min-width: 0; }
+    .activity-section-title { align-items: flex-start; flex-direction: column; }
+    .activity-gamble.panel { padding: 18px; }
+    .activity-panel .chatter-gamble-form form { display: flex; flex-direction: column; align-items: stretch; }
+    .activity-panel .chatter-gamble-form input { width: 100%; min-width: 0; }
+}
+.activity-panel { padding: 0; }
+.activity-panel .chatter-shop-card { margin-bottom: 0; }
+.activity-panel .chatter-shop-card form { width: 100%; }
+@media (max-width: 600px) {
+    .activity-panel .chatter-gamble-form form { width: 100%; }
+    .activity-panel .chatter-gamble-form input[name="amount"] { max-width: none; }
+}
