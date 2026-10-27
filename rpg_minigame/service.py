@@ -1,3 +1,4 @@
+from rpg_minigame.rewards import minimum_main_boss_pool
 import asyncio
 import logging
 import math
@@ -1545,6 +1546,7 @@ class RaidBossService:
 
         damage_dealt = event.max_hp - event.current_hp
         payout_pool = round(event.reward_pool * damage_dealt / event.max_hp)
+        payout_pool = minimum_main_boss_pool(event.boss_tier, defeated, damage_dealt, event.max_hp, payout_pool)
         status = "defeated" if defeated else "failed"
 
         async with self.db.acquire() as connection:

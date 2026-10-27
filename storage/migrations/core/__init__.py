@@ -39,6 +39,12 @@ from .v069_for_you_archive import migrate as migrate_069
 
 from .v070_note_management import migrate as migrate_070
 
+from .v071_channel_access import migrate as migrate_071
+
+from .v074_retire_view_role import migrate as migrate_074
+from .v073_moderator_authorization import migrate as migrate_073
+from .v072_moderator_dashboard import migrate as migrate_072
+
 MIGRATIONS = (
     Migration(1, "initial_schema", migrate_001),
     Migration(2, "redeem_stats", migrate_002),
@@ -72,4 +78,8 @@ MIGRATIONS = (
     Migration(68, "streamer_workspace", migrate_068),
     Migration(69, "for_you_archive", migrate_069),
     Migration(70, "note_management", migrate_070),
+    Migration(71, "channel_access", migrate_071),
+    Migration(72, "moderator_dashboard", migrate_072),
+    Migration(73, "moderator_authorization", migrate_073),
+    Migration(74, "retire_view_role", migrate_074),
 )

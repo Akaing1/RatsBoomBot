@@ -5,6 +5,7 @@
 {% endblock %}
 
 {% block content %}
+
 <link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard-for-you.css') }}?v={{ deployment_stamp() }}">
 <dialog class="for-you-dialog" data-fy-dialog aria-labelledby="for-you-alert-title">
     <h3 id="for-you-alert-title">Dink Donk - Pizza's Ready!</h3>
@@ -57,21 +58,21 @@
 
 <section
     class="panel dashboard-video-card"
-    data-channel-metadata
-    data-update-url="/channel/api/channel-metadata"
-    data-games-url="/channel/api/games"
+    {% if can_customize %}data-channel-metadata{% endif %}
+    data-update-url="{{ channel_root }}/api/channel-metadata"
+    data-games-url="{{ channel_root }}/api/games"
     data-csrf-token="{{ csrf_token }}"
     aria-label="Twitch stream preview and metadata"
 >
     <div class="panel-header dashboard-video-header">
         <div class="twitch-channel-field">
             <h3>Title</h3>
-            <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" aria-label="Stream title (140 characters maximum)" data-channel-field="title">{{ twitch_channel_metadata.title }}</strong>
+            <strong contenteditable="{{ 'plaintext-only' if not moderator_mode or can_customize else 'false' }}" role="textbox" tabindex="0" spellcheck="false" aria-label="Stream title (140 characters maximum)" data-channel-field="title">{{ twitch_channel_metadata.title }}</strong>
         </div>
         <div class="twitch-channel-field twitch-game-field">
             <h3>Category</h3>
-            <strong contenteditable="plaintext-only" role="textbox" tabindex="0" spellcheck="false" data-channel-field="game">{{ twitch_channel_metadata.game }}</strong>
-            <p class="channel-metadata-status" data-channel-metadata-status aria-live="polite">Click the title or game to edit.</p>
+            <strong contenteditable="{{ 'plaintext-only' if not moderator_mode or can_customize else 'false' }}" role="textbox" tabindex="0" spellcheck="false" data-channel-field="game">{{ twitch_channel_metadata.game }}</strong>
+            <p class="channel-metadata-status" data-channel-metadata-status aria-live="polite">{{ 'Click the title or game to edit.' if not moderator_mode or can_customize else 'Stream details' }}</p>
             <div id="dashboard-category-picker" class="twitch-game-suggestions" data-game-suggestions hidden>
                 <div class="twitch-game-options" data-game-options role="listbox"></div>
                 <div class="twitch-game-selection-preview" data-game-selection-preview></div>
@@ -105,10 +106,10 @@
             class="dashboard-header-stats"
             data-dashboard-header-stats
             data-channel-id="{{ broadcaster.id }}"
-            data-refresh-url="/channel/api/dashboard-stats"
+            data-refresh-url="{{ channel_root }}/api/dashboard-stats"
             aria-label="Channel statistics; activate a statistic to show or hide its number"
         >
-            <button
+            {% if not moderator_mode %}<button
                 class="dashboard-header-stat dashboard-stream-stat {% if broadcaster.is_live %}state-live{% else %}state-offline{% endif %}"
                 type="button"
                 data-stream-status
@@ -119,6 +120,7 @@
                 <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
                 <strong data-stream-status-text>{% if broadcaster.is_live %}Online{% else %}Offline{% endif %}</strong>
             </button>
+            {% endif %}
             {% for stat in dashboard_header_stats | default([]) %}
                 {% if stat.key != "points_lost" %}
                 <button
@@ -133,14 +135,14 @@
                 </button>
                 {% endif %}
             {% endfor %}
-            <div class="dashboard-ad-stat dashboard-ad-sticky" data-ad-status-mirror aria-hidden="true">
+            {% if can_customize %}<div class="dashboard-ad-stat dashboard-ad-sticky" data-ad-status-mirror aria-hidden="true">
                 <svg class="dashboard-ad-progress" viewBox="0 0 24 24" aria-hidden="true">
                     <circle class="dashboard-ad-progress-track" cx="12" cy="12" r="9"></circle>
                     <circle class="dashboard-ad-progress-ring" cx="12" cy="12" r="9" data-ad-progress-mirror-ring></circle>
                     <path class="dashboard-ad-progress-check" d="M6.5 12.5 10.5 16.5 18 8.5"></path>
                 </svg>
                 <strong data-ad-status-mirror-text>{{ ad_status.label }}</strong>
-            </div>
+            </div>{% endif %}
         </div>
     </div>
     <section class="panel live-chat-panel">
@@ -169,7 +171,7 @@
                             <div class="chat-filter-platform-section" role="group" aria-label="{{ platform_label }} users">
                                 <div class="chat-filter-platform-heading">
                                     <label class="chat-filter-row chat-filter-platform-title" title="{{ platform_label }}"><input type="checkbox" data-chat-filter-platform="{{ platform_key }}" {% if not connected %}disabled{% endif %} {% if not (twitch_connected and youtube_chat.connected) %}hidden{% endif %}> <span>{{ platform_label }}</span></label>
-                                    <a class="chat-filter-connection{% if connected %} is-connected{% endif %}" data-chat-filter-connection data-connected="{{ 'true' if connected else 'false' }}" href="{{ '/connect' if platform_key == 'twitch' else '/channel/settings?section=general&social_tab=youtube#youtube-integration' }}" title="{{ 'Edit' if connected else 'Connect' }} {{ platform_label }} connection" aria-label="{{ platform_label }} {{ 'connected' if connected else 'not connected' }}. Open channel connection settings.">{{ 'Connected' if connected else 'Not connected' }}</a>
+                                    {% if moderator_mode %}<span class="chat-filter-connection" data-chat-filter-connection data-connected="{{ 'true' if connected else 'false' }}">{{ 'Connected' if connected else 'Not connected' }}</span>{% else %}<a class="chat-filter-connection{% if connected %} is-connected{% endif %}" data-chat-filter-connection data-connected="{{ 'true' if connected else 'false' }}" href="{{ '/connect' if platform_key == 'twitch' else '/channel/settings?section=general&social_tab=youtube#youtube-integration' }}" title="{{ 'Edit' if connected else 'Connect' }} {{ platform_label }} connection" aria-label="{{ platform_label }} {{ 'connected' if connected else 'not connected' }}. Open channel connection settings.">{{ 'Connected' if connected else 'Not connected' }}</a>{% endif %}
                                 </div>
                                 <div {% if not connected %}hidden{% endif %}>
                                 {% for key, label in platform_entries %}
@@ -199,7 +201,7 @@
             </div>
         </div>
 
-        <div class="dashboard-pending-raid" data-pending-raid data-pending-url="/channel/api/raid-browser/pending" data-action-url="/channel/api/raid-browser/action" data-csrf-token="{{ csrf_token }}" hidden role="status" aria-live="polite" tabindex="-1">
+        <div class="dashboard-pending-raid" data-pending-raid data-pending-url="{{ channel_root }}/api/raid-browser/pending" data-action-url="{{ channel_root }}/api/raid-browser/action" data-csrf-token="{{ csrf_token }}" hidden role="status" aria-live="polite" tabindex="-1">
             <img class="dashboard-pending-raid-avatar" data-pending-raid-avatar alt="" width="32" height="32" hidden>
             <div class="dashboard-pending-raid-info"><a data-pending-raid-channel target="_blank" rel="noopener noreferrer"></a><span data-pending-raid-description></span><span data-pending-raid-text></span></div>
             <label class="dashboard-follow-raid"><input type="checkbox" data-pending-raid-follow {% if channel_settings.follow_raid | default(true) %}checked{% endif %}> Follow raid</label>
@@ -213,15 +215,15 @@
         <div
                 class="live-chat-feed dashboard-chat-feed"
                 data-live-chat-feed
-                data-stream-url="/channel/api/chat/stream?view=both"
-                data-moderation-url="/channel/api/chat/moderate"
-            data-pinned-url="/channel/api/chat/pinned"
+                data-stream-url="{{ channel_root }}/api/chat/stream?view=both"
+                {% if can_moderate %}data-moderation-url="{{ channel_root }}/api/chat/moderate"{% endif %}
+            data-pinned-url="{{ channel_root }}/api/chat/pinned"
             data-csrf-token="{{ csrf_token }}"
             data-connection-status-target="#chat-send-status"
             data-max-messages="150"
         ></div>
 
-        <form class="dashboard-chat-composer" data-chat-composer data-channel-id="{{ broadcaster.id }}" data-youtube-connected="{{ 'true' if youtube_chat.connected else 'false' }}">
+        <form class="dashboard-chat-composer" data-chat-composer data-channel-id="{{ broadcaster.id }}" data-youtube-connected="{{ 'true' if youtube_chat.connected and not moderator_mode else 'false' }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="reply_parent_message_id" value="" data-reply-message-id>
             <div class="chat-reply-context" data-reply-context hidden>
@@ -244,7 +246,7 @@
             </div>
             <button class="button primary chat-send-button" type="submit" aria-label="Send message" title="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3 21 12 4 21 8 12Z"/></svg></button>
             </div>
-            <p id="dashboard-chat-send-hint" class="chat-send-hint"><kbd>Shift</kbd> + <kbd>Enter</kbd> sends to all connected platforms</p>
+            <p id="dashboard-chat-send-hint" class="chat-send-hint">{% if moderator_mode %}Messages are sent as {{ moderator_name }} on Twitch.{% else %}<kbd>Shift</kbd> + <kbd>Enter</kbd> sends to all connected platforms{% endif %}</p>
                 <div class="chat-emote-picker" data-emote-picker hidden>
                     <div class="chat-emote-picker-header">
                         <label class="sr-only" for="dashboard-emote-search">Search emotes</label>
@@ -266,7 +268,7 @@
 
     <div class="dashboard-lower-panels">
     <div class="dashboard-activity-grid">
-    <section class="panel activity-panel dashboard-activity-panel dashboard-moderation-panel for-you-card" data-activity-group data-for-you data-csrf-token="{{ csrf_token }}">
+    <section class="panel activity-panel dashboard-activity-panel dashboard-moderation-panel for-you-card" data-activity-group {% if not moderator_mode %}data-for-you{% endif %} data-csrf-token="{{ csrf_token }}">
         {% include "channel/for_you.html" %}
     </section>
 
@@ -332,7 +334,7 @@
             <div
                 class="live-chat-feed dashboard-command-feed"
                 data-live-chat-feed
-                data-stream-url="/channel/api/chat/stream?view=commands"
+                data-stream-url="{{ channel_root }}/api/chat/stream?view=commands"
                 data-activity-notify="commands"
                 data-newest-first="true"
                 data-max-messages="100"
@@ -347,7 +349,7 @@
     </section>
     </div>
 
-        <section class="dashboard-actions-panel" role="group" aria-label="Dashboard actions">
+<section class="dashboard-actions-panel" role="group" aria-label="Dashboard actions">{% if not moderator_mode %}
             <button class="dashboard-action-placeholder" type="button" data-raid-browser-open aria-haspopup="dialog" aria-controls="dashboard-raid-browser" title="Raid browser" aria-label="Raid browser"><svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(40 12 12)"><path d="M12 1c.5 2.5 3.5 3 4 5.5.3 1.5-.5 3-2 3.5.5-1.5-.5-2.5-1.5-3.5 0 1.5-.5 2.5-2 3.5C8 9 7.5 7 8.5 5.5c.5 1 1 1.5 1.5 1.5-1-2 0-4.5 2-6ZM8 11h8l-2.5 2h-3L8 11Zm2.5 2h3L13 23h-2l-.5-10Z"/></g></svg><span class="sr-only">Raid browser</span></button>
             <button class="dashboard-action-placeholder" type="button" disabled title="Polls — coming soon" aria-label="Polls — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10h3v10m3 0V4h3v16m3 0v-7h3v7M3 20h19"/></svg><span class="sr-only">Polls</span></button>
             <button class="dashboard-action-placeholder" type="button" disabled title="Predictions — coming soon" aria-label="Predictions — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="8"/><path d="m7 17-2 5h14l-2-5M9.5 8a2.5 2.5 0 0 1 5 0c0 1.5-2.5 1.5-2.5 3"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg><span class="sr-only">Predictions</span></button>
@@ -355,11 +357,18 @@
             <button class="dashboard-action-placeholder" type="button" disabled title="Shouts — coming soon" aria-label="Shouts — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 6-3v18l-6-3H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h9V5Zm-7 12 2 5h4l-2-5M14 7v10"/></svg><span class="sr-only">Shouts</span></button>
             <button class="dashboard-action-placeholder" type="button" disabled title="Whispers — coming soon" aria-label="Whispers — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v9ZM7 8h10M7 12h7"/></svg><span class="sr-only">Whispers</span></button>
             <button class="dashboard-action-placeholder" type="button" disabled title="Points redeems — coming soon" aria-label="Points redeems — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z"/></svg><span class="sr-only">Points redeems</span></button>
-        </section>
+{% else %}
+            <button class="dashboard-action-placeholder" type="button" disabled title="Polls — coming soon" aria-label="Polls — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10h3v10m3 0V4h3v16m3 0v-7h3v7M3 20h19"/></svg><span class="sr-only">Polls</span></button>
+            <button class="dashboard-action-placeholder" type="button" disabled title="Predictions — coming soon" aria-label="Predictions — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="8"/><path d="m7 17-2 5h14l-2-5M9.5 8a2.5 2.5 0 0 1 5 0c0 1.5-2.5 1.5-2.5 3"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg><span class="sr-only">Predictions</span></button>
+            <button class="dashboard-action-placeholder" type="button" disabled title="Shouts — coming soon" aria-label="Shouts — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 6-3v18l-6-3H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h9V5Zm-7 12 2 5h4l-2-5M14 7v10"/></svg><span class="sr-only">Shouts</span></button>
+            <button class="dashboard-action-placeholder" type="button" data-mod-note-open aria-haspopup="dialog" aria-controls="mod-note-dialog" title="Notes" aria-label="Notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5ZM8 7h8M8 11h8M8 15h5"/></svg><span class="sr-only">Notes</span></button>
+            {% if can_customize %}<a class="dashboard-action-placeholder" href="{{ channel_root }}/settings" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg><span class="sr-only">Settings</span></a>{% endif %}
+{% endif %}</section>
     </div>
 
     <div class="channel-dashboard-side viewer-queue-column">
-        <section class="panel dashboard-ads-panel" data-ad-panel data-action-url="/channel/api/ads/action" data-csrf-token="{{ csrf_token }}">
+        {% if can_customize %}
+        <section class="panel dashboard-ads-panel" data-ad-panel data-action-url="{{ channel_root }}/api/ads/action" data-csrf-token="{{ csrf_token }}">
             <div class="panel-header">
                 <h3>Ads</h3>
                 <div class="dashboard-ad-stat state-{{ ad_status.state }}" data-ad-status data-state="{{ ad_status.state }}" data-next-ad-at="{{ ad_status.next_ad_at or '' }}" data-started-at="{{ ad_status.started_at or '' }}" data-ends-at="{{ ad_status.ends_at or '' }}" data-snoozes-available="{{ ad_status.snoozes_available if ad_status.snoozes_available is not none else '' }}">
@@ -371,18 +380,19 @@
                     <strong data-ad-status-text>{{ ad_status.label }}</strong>
                 </div>
             </div>
-            <div class="dashboard-ad-actions" aria-label="Ad controls">
+            {% if can_customize %}<div class="dashboard-ad-actions" aria-label="Ad controls">
                 <button type="button" data-ad-action="run-90" title="Start a 90-second ad now">+1.5 min</button>
                 <button type="button" data-ad-action="run-180" title="Start a 3-minute ad now">+3 min</button>
                 <button type="button" data-ad-action="snooze" title="Delay the next scheduled ad by 5 minutes">Snooze ads</button>
-            </div>
+            </div>{% endif %}
             <p class="dashboard-ad-action-status" data-ad-action-status role="status" aria-live="polite"></p>
         </section>
+        {% endif %}
         <section
             class="panel"
-            data-viewer-queue-panel
-            data-state-url="/channel/api/viewer-queue"
-            data-action-url="/channel/api/viewer-queue/action"
+            data-viewer-queue-panel data-read-only="{{ 'false' if can_moderate else 'true' }}"
+            data-state-url="{{ channel_root }}/api/viewer-queue"
+            data-action-url="{{ channel_root }}/api/viewer-queue/action"
             data-csrf-token="{{ csrf_token }}"
             data-channel-id="{{ broadcaster.id }}"
         >
@@ -390,13 +400,13 @@
                 <h3>Viewer queue</h3>
                 <small data-queue-count>{{ queue_size }} queued</small>
 
-                <button id="queue-panel-state" class="queue-state-toggle {% if queue_open %}live{% endif %}" type="button" data-queue-toggle data-open="{{ 'true' if queue_open else 'false' }}">
+                <button {% if not can_moderate %}disabled{% endif %} id="queue-panel-state" class="queue-state-toggle {% if queue_open %}live{% endif %}" type="button" data-queue-toggle data-open="{{ 'true' if queue_open else 'false' }}">
                     <span class="queue-state-current">{% if queue_open %}Open{% else %}Closed{% endif %}</span>
                     <span class="queue-state-alternate">{% if queue_open %}Close{% else %}Open{% endif %}</span>
                 </button>
             </div>
 
-            <div class="queue-toolbar" aria-label="Viewer queue actions">
+            {% if can_moderate %}<div class="queue-toolbar" aria-label="Viewer queue actions">
                 <div class="queue-next-control">
                     <button type="button" data-queue-action="next">Next <span data-queue-next-count>4</span></button>
                     <label class="queue-next-picker" title="Choose how many viewers to take next">
@@ -409,9 +419,9 @@
                     </label>
                 </div>
                 <button type="button" data-queue-action="clear" class="danger">Clear queue</button>
-                <a href="/channel/viewer-queue/blacklist">Blacklist</a>
+                {% if can_customize %}<a href="{{ channel_root }}/viewer-queue/blacklist">Blacklist</a>{% endif %}
             </div>
-            <p class="queue-action-status" data-queue-action-status role="status" aria-live="polite"></p>
+            {% endif %}<p class="queue-action-status" data-queue-action-status role="status" aria-live="polite"></p>
 
             {% if queue_message %}
                 <div
@@ -434,10 +444,10 @@
                             <strong class="queue-username" title="{{ member.label }}">{{ member.label }}</strong>
                             <span class="queue-grab-indicator" aria-hidden="true"></span>
 
-                            <div class="queue-item-actions">
+                            {% if can_moderate %}<div class="queue-item-actions">
                                 <form
                                     method="post"
-                                    action="/channel/viewer-queue/remove"
+                                    action="{{ channel_root }}/viewer-queue/remove"
                                     onsubmit="return confirm('Remove {{ member.username }} from the viewer queue?');"
                                 >
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -452,7 +462,7 @@
                                         &times;
                                     </button>
                                 </form>
-                            </div>
+                            </div>{% endif %}
                         </li>
                     {% endfor %}
                     </ul>
@@ -514,7 +524,7 @@
 
     (() => {
         if (document.querySelector("[data-viewer-queue-panel]")) return;
-        const endpoint = "/channel/api/viewer-queue";
+        const endpoint = "{{ channel_root }}/api/viewer-queue";
         const csrfToken = {{ csrf_token | tojson }};
         const panelState = document.getElementById("queue-panel-state");
         const queueContent = document.getElementById("viewer-queue-content");
@@ -524,7 +534,7 @@
         function buildRemoveForm(username, position) {
             const form = document.createElement("form");
             form.method = "post";
-            form.action = "/channel/viewer-queue/remove";
+            form.action = "{{ channel_root }}/viewer-queue/remove";
             form.addEventListener("submit", event => {
                 if (!window.confirm(`Remove ${username} from the viewer queue?`)) {
                     event.preventDefault();
@@ -629,7 +639,7 @@
                 });
 
                 if (response.status === 401) {
-                    window.location.assign("/connect");
+                    window.location.assign({{ ('/me' if moderator_mode else '/connect') | tojson }});
                     return;
                 }
 
@@ -655,11 +665,12 @@
     })();
 
     (() => {
-        const activityEndpoint = "/channel/api/redemptions";
+        const activityEndpoint = "{{ channel_root }}/api/redemptions";
         const feedContent = document.getElementById("community-activity-content");
         const modActionContent = document.getElementById("mod-action-activity-content");
         const automodContent = document.getElementById("automod-activity-content");
-        const automodActionUrl = "/channel/api/automod/action";
+        const canModerate = {{ 'true' if can_moderate else 'false' }};
+        const automodActionUrl = "{{ channel_root }}/api/automod/action";
         const csrfToken = {{ csrf_token | tojson }};
         let activityRequestInProgress = false;
         let lastFeedSignature = null;
@@ -890,7 +901,7 @@
                 main.append(user, text, reason);
                 const actions = document.createElement("div");
                 actions.className = "automod-actions";
-                [["approve", "Allow"], ["deny", "Deny"]].forEach(([action, label]) => {
+                (canModerate ? [["approve", "Allow"], ["deny", "Deny"]] : []).forEach(([action, label]) => {
                     const button = document.createElement("button");
                     button.type = "button";
                     button.className = `button ${action === "deny" ? "danger" : "secondary"}`;
@@ -946,7 +957,7 @@
                 cache: "no-store"
             });
             if (response.status === 401) {
-                window.location.assign("/connect");
+                window.location.assign({{ ('/me' if moderator_mode else '/connect') | tojson }});
             } else if (response.ok) {
                 const data = await response.json();
                 renderRedemptions(data);
@@ -978,8 +989,13 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="{{ url_for('static', path='/js/dashboard-for-you.js') }}?v={{ deployment_stamp() }}" defer></script>
-    <dialog id="dashboard-raid-browser" class="raid-browser-dialog" aria-labelledby="raid-browser-title" data-raid-browser data-browser-url="/channel/api/raid-browser" data-raid-action-url="/channel/api/raid-browser/action" data-csrf-token="{{ csrf_token }}" data-channel-id="{{ broadcaster.id }}">
+    {% if moderator_mode %}
+    {% include 'viewer/note_dialog.html' %}
+    <script src="/static/js/mod-note-dialog.js?v={{ deployment_stamp() }}" defer></script>
+    {% endif %}
+{% if not moderator_mode %}<script src="{{ url_for('static', path='/js/dashboard-for-you.js') }}?v={{ deployment_stamp() }}" defer></script>{% endif %}
+{% if not moderator_mode %}
+    <dialog id="dashboard-raid-browser" class="raid-browser-dialog" aria-labelledby="raid-browser-title" data-raid-browser data-browser-url="{{ channel_root }}/api/raid-browser" data-raid-action-url="{{ channel_root }}/api/raid-browser/action" data-csrf-token="{{ csrf_token }}" data-channel-id="{{ broadcaster.id }}">
         <div class="raid-browser-header">
             <label class="raid-browser-search-heading" for="raid-browser-channel-search">Search</label>
             <button class="button raid-browser-reset" type="reset" form="raid-browser-filters">Reset</button>
@@ -1053,7 +1069,7 @@
             </form>
         </div>
     </dialog>
-    <dialog id="dashboard-raid-preview" class="raid-preview-dialog" data-raid-preview data-details-url="/channel/api/raid-browser/preview" aria-labelledby="raid-preview-title">
+    <dialog id="dashboard-raid-preview" class="raid-preview-dialog" data-raid-preview data-details-url="{{ channel_root }}/api/raid-browser/preview" aria-labelledby="raid-preview-title">
         <header class="raid-preview-header">
             <button class="button secondary" type="button" data-raid-preview-back aria-label="Back to raid browser" title="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
             <h3 id="raid-preview-title">Stream preview</h3>
@@ -1110,6 +1126,8 @@
         <section id="raid-blacklist-panel" role="tabpanel" aria-labelledby="raid-blacklist-tab" data-raid-list-panel="blacklist" hidden><div data-raid-blocked-list></div></section>
         <p class="raid-lists-note">Saved for this connected channel in this browser. The blacklist only affects this raid browser, not Twitch follows or chat bans.</p>
     </dialog>
+
+{% endif %}
     <script src="{{ url_for('static', path='/js/chat-name-colors.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/chat-autocomplete.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/chat-emote-input.js') }}?v={{ deployment_stamp() }}" defer></script>

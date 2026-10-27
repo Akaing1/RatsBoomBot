@@ -18,6 +18,10 @@
         {name: "Ads, Viewer Queue and Actions", selectors: [".dashboard-ads-panel", "[data-viewer-queue-panel]", ".dashboard-actions-panel"]},
         {name: "Moderation and Activity", selectors: [".dashboard-moderation-panel", ".dashboard-community-panel"]}
     ];
+    if (!layout.querySelector(".dashboard-ads-panel")) {
+        groups[1].selectors = groups[1].selectors.filter(selector => selector !== ".dashboard-ads-panel");
+        groups[1].name = "Viewer Queue and Actions";
+    }
     const cards = groups.map(group => ({
         name: group.name,
         elements: group.selectors.map(selector => layout.querySelector(selector))

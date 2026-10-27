@@ -11,6 +11,7 @@ from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.shared.common import templates
 from web.shared.oauth import build_viewer_oauth_url, exchange_code_for_token, fetch_twitch_user
 from web.state import get_bot, get_db
+from web.viewer.moderation import mod_bar_channels
 from web.viewer.auth import (
     VIEWER_USER_DISPLAY_NAME_KEY,
     VIEWER_OAUTH_NEXT_KEY,
@@ -48,6 +49,9 @@ async def connect_viewer(request: Request, next: str = ""):
 
 @router.get("/oauth/viewer/connect")
 async def viewer_oauth_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+    from web.viewer.twitch_actions import MOD_STATE, finish_authorization
+    if MOD_STATE in request.session and state == request.session[MOD_STATE].get("state"):
+        return await finish_authorization(request, state=state, code=code, error=error)
     if not consume_viewer_oauth_state(request, state):
         return HTMLResponse("Viewer sign-in could not be verified. Please try again.", status_code=400, headers=PRIVATE_HEADERS)
 
@@ -89,6 +93,7 @@ async def my_account(request: Request):
     if runtime_bot is None or runtime_bot.services is None:
         return HTMLResponse("Chatter profiles are temporarily unavailable.", status_code=503, headers=PRIVATE_HEADERS)
 
+    mod_channels = await mod_bar_channels(request)
     profile = await runtime_bot.services.chatter_stats.get_global_profile(user_id)
     if profile is not None and str(profile["identity"]["user_id"]) == user_id:
         pets = getattr(runtime_bot.services, "pets", None)
@@ -104,6 +109,7 @@ async def my_account(request: Request):
                 "profile": profile,
                 "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
                 "account_mode": True,
+                "mod_channels": mod_channels,
                 "viewer_user_id": user_id,
                 "csrf_token": get_csrf_token(request),
             },
@@ -115,6 +121,7 @@ async def my_account(request: Request):
         name="viewer/empty.html",
         context={
             "display_name": request.session.get(VIEWER_USER_DISPLAY_NAME_KEY, "Chatter"),
+            "mod_channels": mod_channels,
             "csrf_token": get_csrf_token(request),
         },
         headers=PRIVATE_HEADERS,
@@ -180,7 +187,7 @@ async def viewer_raid_shop(request: Request, channel_name: str):
         return context
 
     _, _, profile, _, _ = context
-    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=shop", status_code=303, headers=PRIVATE_HEADERS)
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=activity", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.post("/me/channels/{channel_name}/shop/{action}")
@@ -213,7 +220,7 @@ async def viewer_raid_action(request: Request, channel_name: str, action: str, i
 
     if result not in SHOP_RESULTS:
         result = "invalid"
-    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=shop&result={result}", status_code=303, headers=PRIVATE_HEADERS)
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=activity&result={result}", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.get("/me/channels/{channel_name}/gamble")
@@ -222,7 +229,7 @@ async def viewer_gamble_page(request: Request, channel_name: str):
     if isinstance(context, RedirectResponse):
         return context
     _, _, profile, _, _ = context
-    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=gamble", status_code=303, headers=PRIVATE_HEADERS)
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=activity", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.post("/me/channels/{channel_name}/gamble")
@@ -263,7 +270,7 @@ async def viewer_gamble(request: Request, channel_name: str, amount: str = Form(
             }
         )
 
-    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=gamble", status_code=303, headers=PRIVATE_HEADERS)
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=activity", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.post("/me/logout")

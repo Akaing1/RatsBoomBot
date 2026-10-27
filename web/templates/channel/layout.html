@@ -11,6 +11,7 @@
     <title>
         {% block title %}RatsBoomBot Channel{% endblock %}
     </title>
+    <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
 
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
 
@@ -18,9 +19,10 @@
         rel="stylesheet"
         href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}"
     >
+    {% block page_styles %}{% endblock %}
 </head>
 
-<body class="dashboard-page channel-page channel-page-{{ active_page }}">
+<body data-channel-root="{{ channel_root }}" class="dashboard-page channel-page channel-page-{{ active_page }}{% if moderator_mode %} moderator-dashboard{% endif %}">
     <div class="app-shell" data-dashboard-shell data-sidebar-storage-key="ratsboombot-channel-sidebar-collapsed">
         <script>
             // Set the mobile state before the sidebar can paint as expanded.
@@ -53,13 +55,24 @@
 
                 <div class="brand-copy">
                     <h1>RatsBoomBot</h1>
-                    <p class="sidebar-brand-subtitle">Streamer Control</p>
+                    <p class="sidebar-brand-subtitle">{{ 'Moderator Control' if moderator_mode else 'Streamer Control' }}</p>
                 </div>
             </div>
             {% if active_page == 'overview' %}
             <span class="dashboard-carousel-navbar-label" data-dashboard-carousel-position role="status" aria-live="polite"><span class="dashboard-carousel-navbar-count" data-dashboard-carousel-count>1 / 3</span><span class="dashboard-carousel-navbar-name" data-dashboard-carousel-name>Stream and Chat</span></span>
             {% endif %}
 
+{% if moderator_mode %}
+<nav class="navigation moderator-navigation">
+<a class="nav-link " href="/me" aria-label="My account" title="My account"><span class="nav-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></svg></span><span class="nav-link-label">My account</span></a>
+<a class="nav-link {{ 'active' if active_page == 'overview' else '' }}" href="{{ channel_root }}" aria-label="Overview" title="Overview"><span class="nav-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v11h-6v-7H9v7H3Z"/></svg></span><span class="nav-link-label">Overview</span></a>
+{% if can_customize %}<a class="nav-link {{ 'active' if active_page == 'settings' else '' }}" href="{{ channel_root }}/settings" aria-label="Settings" title="Settings"><span class="nav-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg></span><span class="nav-link-label">Settings</span></a>{% endif %}
+<hr class="mod-nav-divider">
+{% for mod_channel in moderator_channels %}
+<a class="nav-link {{ 'active' if channel_root == '/me/mod/' ~ mod_channel.broadcaster_id else '' }}" href="/me/mod/{{ mod_channel.broadcaster_id }}" aria-label="{{ mod_channel.channel_name }}" title="{{ mod_channel.channel_name }}"><span class="nav-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/></svg></span><span class="nav-link-label">{{ mod_channel.channel_name }}</span></a>
+{% endfor %}
+</nav>
+{% else %}
             <nav class="navigation">
                 <a
                     class="nav-link {% if active_page == 'overview' %}active{% endif %}"
@@ -72,6 +85,11 @@
                 <a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="/channel/settings">
                     <span class="nav-link-icon" aria-hidden="true">⚙</span>
                     <span class="nav-link-label">Settings</span>
+                </a>
+
+                <a class="nav-link {% if active_page == 'followers' %}active{% endif %}" href="/channel/followers">
+                    <span class="nav-link-icon" aria-hidden="true">♟</span>
+                    <span class="nav-link-label">Followers</span>
                 </a>
 
                 <a class="nav-link {% if active_page == 'for-you' %}active{% endif %}" href="/channel/for-you">
@@ -91,9 +109,10 @@
                     <span class="nav-link-icon" aria-hidden="true">?</span>
                     <span class="nav-link-label">Help</span>
                 </a>
-            </nav>
+                <a class="nav-link {% if active_page == 'access' %}active{% endif %}" href="/channel/access"><span class="nav-link-icon" aria-hidden="true">♧</span><span class="nav-link-label">Moderator access</span></a>
+            </nav>{% endif %}
 
-            <form class="sidebar-logout" method="post" action="/channel/logout">
+            <form class="sidebar-logout" method="post" action="{{ '/me/logout' if moderator_mode else '/channel/logout' }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
                 <button class="button secondary" type="submit">
@@ -105,12 +124,19 @@
         </aside>
 
         <main class="main-content streamer-main-content">
+            {% if moderator_mode %}
+            <div class="mod-auth-banner" data-mod-auth-banner{% if not moderator_auth_required %} hidden{% endif %}>
+                <a class="button mod-authorize-button" href="{{ channel_root }}/connect">Authorize Twitch</a>
+            </div>
+            {% endif %}
             {% block content %}{% endblock %}
         </main>
     </div>
     <script src="{{ url_for('static', path='/js/channel-sidebar.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/hover-labels.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/overlay-scrollbars.js') }}?v={{ deployment_stamp() }}" defer></script>
+
+    {% if moderator_mode %}<script src="/static/js/mod-authorization.js?v={{ deployment_stamp() }}" defer></script>{% endif %}
     {% block page_scripts %}{% endblock %}
 </body>
 </html>

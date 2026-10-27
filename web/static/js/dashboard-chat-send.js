@@ -176,7 +176,7 @@
 
         catalogPromise = (async () => {
           try {
-            const response = await fetch("/channel/api/chat/emotes");
+            const response = await fetch((globalThis.document?.body?.dataset?.channelRoot || "/channel") + '/api/chat/emotes');
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.detail || "Emotes are unavailable.");
 
@@ -192,7 +192,7 @@
             if (payload.twitch_reconnect_required) {
                 emoteNote.append("Other channel emotes need additional Twitch permission. ");
                 const reconnect = document.createElement("a");
-                reconnect.href = "/connect/twitch";
+                reconnect.href = globalThis.document?.body?.dataset?.channelRoot?.startsWith("/me/mod/") ? `${globalThis.document?.body?.dataset?.channelRoot}/connect` : "/connect/twitch";
                 reconnect.textContent = "Reconnect Twitch to load them";
                 reconnect.title = "Authorize access to every emote this Twitch account can use";
                 emoteNote.append(reconnect, ".");
@@ -217,7 +217,7 @@
 
         usersPromise = (async () => {
             try {
-                const response = await fetch("/channel/api/chat/users", {cache: "no-store"});
+                const response = await fetch((globalThis.document?.body?.dataset?.channelRoot || "/channel") + '/api/chat/users', {cache: "no-store"});
                 const payload = await response.json();
                 if (!response.ok) throw new Error(payload.detail || "Users are unavailable.");
                 users = (Array.isArray(payload.users) ? payload.users : []).filter(user =>
@@ -346,7 +346,7 @@
                 const data = new FormData(form);
                 data.set("message", outgoingMessage);
                 data.set("target", target);
-                const response = await fetch("/channel/api/chat/send", {method: "POST", body: data, signal});
+                const response = await fetch((globalThis.document?.body?.dataset?.channelRoot || "/channel") + '/api/chat/send', {method: "POST", body: data, signal});
                 result = await response.json();
                 ok = response.ok;
             }
@@ -357,6 +357,7 @@
                 failureReported = true;
             }
 
+            if (!ok && globalThis.document?.body?.dataset?.channelRoot?.startsWith("/me/mod/")) document.dispatchEvent(new Event("moderator-authorization-check"));
             if (!ok) throw new Error(result.detail || Object.values(result.errors || {}).join(" ") || "The message could not be sent.");
             window.confirmDashboardChatSend?.(result);
 
