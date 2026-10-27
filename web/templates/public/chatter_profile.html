@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
     <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
 </head>
-<body class="chatter-profile-page{% if account_mode %} account-page{% endif %}">
+<body class="chatter-profile-page profile-page{% if account_mode %} account-page{% endif %}">
     <header class="public-command-navigation">
         <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
             <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
@@ -28,7 +28,7 @@
         {% endif %}
     </header>
 
-{% if account_mode %}<div class="mod-account-layout account-layout">{% endif %}
+<div class="mod-account-layout account-layout">
     <main class="chatter-profile-content">
         <header class="chatter-profile-hero">
             {% if profile.identity.profile_image_url %}<img class="chatter-profile-avatar" src="{{ profile.identity.profile_image_url }}" alt="{{ profile.identity.display_name }} Twitch profile picture">{% else %}<div class="chatter-profile-avatar">{{ profile.identity.display_name[0] | upper }}</div>{% endif %}
@@ -93,12 +93,12 @@
                     <p class="pet-passive"><strong>{{ pet.passive_percent_label }}%</strong> {{ pet.passive_description }}</p>
                     {% if not equipped %}<details class="pet-equip-help"><summary>Equip in chat</summary><code>!pets equip {{ pet.display_name }}</code></details>{% endif %}
                 </article>
-                {% else %}<div class="panel collection-empty"><h3>Your collection starts here</h3><p>Summon your first pet using the commands above.</p></div>{% endfor %}
+                {% else %}<div class="panel collection-empty"><h3>{{ 'Your collection starts here' if account_mode else 'No pets collected yet' }}</h3>{% if account_mode %}<p>Summon your first pet using the commands above.</p>{% endif %}</div>{% endfor %}
             </div>
         </section>
 
         <section data-chatter-panel="overview">
-            <div class="chatter-stat-grid{% if account_mode %} account-stat-grid{% endif %}" aria-label="Global chatter statistics">
+            <div class="chatter-stat-grid account-stat-grid" aria-label="Global chatter statistics">
                 <article><span>Messages sent</span><strong>{{ "{:,}".format(profile.messages_sent) }}</strong></article>
                 <article><span>Channels visited</span><strong>{{ profile.channels_interacted }}</strong></article>
                 <article><span>Points earned</span><strong>{{ "{:,}".format(profile.lifetime_points_earned) }}</strong></article>
@@ -107,29 +107,6 @@
                 {% set gamble_losses = profile.gamble_total - profile.gamble_wins %}
                 <article><span>Gamble win rate</span><strong>{{ "%.1f%%" | format(profile.gamble_win_rate) if profile.gamble_win_rate is not none else "—" }}</strong><small>{{ profile.gamble_wins }} {{ "win" if profile.gamble_wins == 1 else "wins" }} / {{ gamble_losses }} {{ "loss" if gamble_losses == 1 else "losses" }}</small></article>
             </div>
-
-{% if not account_mode %}
-            <section class="chatter-section">
-            <div class="chatter-section-heading">
-                <div><p class="eyebrow">Channel activity</p><h2>Communities</h2></div>
-                <p>Select a channel for balances, Boss Hunt inventory, redeems, and detailed activity.</p>
-            </div>
-
-            {% if profile.channels %}
-                <div class="chatter-channel-grid">
-                    {% for channel in profile.channels %}
-                        <a class="chatter-channel-card" href="/chatters/{{ profile.identity.login }}/channels/{{ channel.login }}">
-                            {% if channel.profile_image_url %}<img src="{{ channel.profile_image_url }}" alt="">{% else %}<div class="chatter-channel-avatar">{{ channel.display_name[0] | upper }}</div>{% endif %}
-                            <div><h3>{{ channel.display_name }}</h3><p>{{ "{:,}".format(channel.messages_sent) }} messages &middot; {{ "{:,}".format(channel.raid_damage) }} Boss Hunt damage</p></div>
-                            <span>&rsaquo;</span>
-                        </a>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="panel compact-empty-state"><h2>No channel activity yet</h2><p>Activity will appear after this chatter participates in a connected channel.</p></div>
-            {% endif %}
-            </section>
-{% endif %}
         </section>
 
         <section data-chatter-panel="raids" hidden>
@@ -166,7 +143,7 @@
 
         {% if profile.achievements %}{% include 'public/achievements.html' %}{% endif %}
     </main>
-{% if account_mode %}<aside class="account-sidebar" aria-label="Your channels">{% include "viewer/mod_bar.html" %}{% include "viewer/communities.html" %}</aside></div>{% endif %}
+<aside class="account-sidebar" aria-label="Profile channels">{% if account_mode %}{% include "viewer/mod_bar.html" %}{% endif %}{% include "viewer/communities.html" %}</aside></div>
     <script src="{{ url_for('static', path='/js/chatter-tabs.js') }}?v={{ deployment_stamp() }}" defer></script>
 </body>
 </html>
