@@ -190,7 +190,7 @@ async def followers_api(request: Request, page: int = Query(1, ge=1), page_size:
         if mutual and following_warning:
             return JSONResponse({'detail': following_warning}, status_code=503)
     async with snapshot['metrics_lock']:
-        if followers and time.monotonic() - snapshot['metrics_at'] >= 15:
+        if followers and (not snapshot['metrics_at'] or time.monotonic() - snapshot['metrics_at'] >= 15):
             snapshot['metrics'] = await follower_metrics(db, channel_id, [str(item['user_id']) for item in followers])
             snapshot['metrics_generation'] += 1
             snapshot['metrics_at'] = time.monotonic() if followers is snapshot['followers'] else 0

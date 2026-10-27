@@ -177,13 +177,16 @@ async def test_followers_publish_before_remaining_pages_and_slow_roles(directory
 
 
 @pytest.mark.asyncio
-async def test_pages_reuse_sorted_rows_until_statistics_change(directory, monkeypatch):
+@pytest.mark.parametrize('uptime', [10.0, 1234.0, 1_000_000.0])
+async def test_pages_reuse_sorted_rows_until_statistics_change(directory, monkeypatch, uptime):
     client, _, db, bot, _ = directory
+    # Freeze the clock before creating cache timestamps, regardless of host uptime.
+    monkeypatch.setattr(followers, 'time', SimpleNamespace(monotonic=lambda: uptime))
     await ready(client, bot)
-    monkeypatch.setattr(followers, 'time', SimpleNamespace(monotonic=lambda: 1234.0))
     builder = Mock(wraps=followers.build_table_rows)
     monkeypatch.setattr(followers, 'build_table_rows', builder)
-    await client.get('/channel/api/followers?sort=points')
+    initial = await client.get('/channel/api/followers?sort=points')
+    assert initial.json()['rows'][0]['points'] == 500
     await client.get('/channel/api/followers?sort=points&page=2')
     await client.get('/channel/api/followers?sort=points&page_size=10')
     assert builder.call_count == 1
