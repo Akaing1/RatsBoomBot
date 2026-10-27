@@ -1,0 +1,39 @@
+{% extends 'channel/layout.html' %}
+{% block title %}Followers | RatsBoomBot{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/channel-followers.css') }}?v={{ deployment_stamp() }}">{% endblock %}
+{% block content %}
+<section class="followers-page" data-followers data-channel-id="{{ channel_id }}">
+    <header class="page-header"><h2>Followers</h2>
+    <form id="followers-controls" class="followers-controls" data-followers-controls>
+        <label class="followers-search"><span class="sr-only">Search followers</span><input type="search" name="search" placeholder="Search followers…" maxlength="100"></label>
+        <details class="followers-roles-menu">
+        <summary>Roles<span data-followers-role-count></span></summary>
+        <fieldset class="followers-role-filter"><legend class="sr-only">Roles</legend>
+            <label><input type="checkbox" name="rank" value="mod">Moderator</label>
+            <label><input type="checkbox" name="rank" value="vip">VIP</label>
+            <label><input type="checkbox" name="rank" value="subscriber">Subscriber</label>
+            <label><input type="checkbox" name="mutual" value="true">Mutual followers</label>
+            <label><input type="checkbox" name="rank" value="tier1">Tier 1</label>
+            <label><input type="checkbox" name="rank" value="tier2">Tier 2</label>
+            <label><input type="checkbox" name="rank" value="tier3">Tier 3</label>
+            <label><input type="checkbox" name="raid_favorites" value="true">Raid favorites</label>
+        </fieldset>
+        </details>
+        <input type="hidden" name="sort" value="followed_at">
+        <input type="hidden" name="direction" value="desc">
+    </form>
+    <button class="button secondary" type="button" data-followers-refresh>Refresh</button></header>
+    <p class="followers-status" data-followers-status role="status" aria-live="polite">Loading followers…</p>
+    <p class="followers-warning" data-followers-warning role="alert" hidden></p>
+    <div class="followers-table-wrap" tabindex="0" role="region" aria-label="Followers table">
+        <table class="followers-table"><caption class="sr-only">Followers and channel statistics. Expand a follower for more details.</caption>
+            <colgroup></colgroup>
+            <thead><tr></tr></thead>
+            <tbody data-followers-rows></tbody>
+        </table>
+    </div>
+    <footer class="followers-pagination"><label class="followers-row-count"># Rows<select name="page_size" form="followers-controls"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label><button type="button" class="button secondary" data-followers-prev disabled>Previous</button><span data-followers-page>Page 1</span><button type="button" class="button secondary" data-followers-next disabled>Next</button></footer>
+    <p class="page-description followers-notes">Points are this channel’s RatsBoomBot currency, not Twitch Channel Points. Labels show Twitch roles. Watch time uses live-presence samples, not exact video viewing. Missing dates mean no corresponding observation has been recorded in this channel.</p>
+</section>
+{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', path='/js/channel-followers.js') }}?v={{ deployment_stamp() }}" defer></script>{% endblock %}

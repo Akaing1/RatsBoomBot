@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current application version: **15.3.2** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
+Current application version: **15.3.3** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
 
 ## Highlights
 
@@ -373,3 +373,5 @@ Each bot process records one JSON sample every 60 seconds in `performance.jsonl`
 Samples contain a Unix timestamp, PID, application version, process resident memory, host memory, swap usage, CPU usage/temperature, load, active stream-log session count, async task count, and Raspberry Pi throttling flags. Unsupported measurements are `null`; the initial CPU sample is also `null`. Stream-session count reflects the bot's tracked sessions, not an independent Twitch poll. Throttling flags include historical flags since boot. No chat content or tokens are recorded.
 
 To inspect history, run `tail -n 10 /path/to/database-directory/performance.jsonl`. Copy the current file and rotated backups when investigating an incident. Samples flush after each write; a stalled process may leave a gap, and this logger cannot diagnose an outage before it was deployed. File/firmware reads run off the chat event loop, with a two-second firmware command timeout.
+
+Connection recovery and monitoring: [operations guide](docs/connection-recovery.md).

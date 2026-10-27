@@ -43,7 +43,7 @@ async def record_migration(connection: Any, migration: Migration) -> None:
     )
 
 
-async def run_migration(connection: Any, migration: Migration) -> None:
+async def run_migration(connection: Any, migration: Migration, *, superseded_name: str | None = None) -> None:
     started_at = perf_counter()
 
     LOGGER.info(
@@ -55,6 +55,9 @@ async def run_migration(connection: Any, migration: Migration) -> None:
     await connection.execute("BEGIN")
 
     try:
+        if superseded_name is not None:
+            await connection.execute('DELETE FROM schema_migrations WHERE version = ? AND name = ?',
+                (migration.version, superseded_name))
         await migration.run(connection)
         await record_migration(connection, migration)
         await connection.commit()
@@ -90,6 +93,7 @@ async def run_migrations(db: asqlite.Pool) -> None:
             "SELECT version, name FROM schema_migrations ORDER BY version"
         )
         registered = {migration.version: migration for migration in MIGRATIONS}
+        superseded = {}
         for expected_version, row in enumerate(history, start=1):
             version, name = int(row["version"]), row["name"]
             migration = registered.get(version)
@@ -104,10 +108,19 @@ async def run_migrations(db: asqlite.Pool) -> None:
                 and migration.name == "honey_hen"
                 and name == "incoming_raid_recency"
             )
-            if name != migration.name and not known_collision:
+            # The Followers branch used 71 before merging the channel-access release.
+            # Reapply the real 71 transactionally; the existing index is retained by 75.
+            follower_collision = (
+                version == 71 and version == len(history)
+                and name == 'follower_last_watched_index' and migration.name == 'channel_access'
+                and registered.get(75) is not None and registered[75].name == 'follower_last_watched_index'
+            )
+            if follower_collision:
+                superseded[version] = name
+            if name != migration.name and not known_collision and not follower_collision:
                 raise ValueError(f"Database migration {version} is named {name!r}, expected {migration.name!r}.")
         applied_versions = {int(row["version"]) for row in history}
-        pending_migrations = [migration for migration in MIGRATIONS if migration.version not in applied_versions]
+        pending_migrations = [migration for migration in MIGRATIONS if migration.version not in applied_versions or migration.version in superseded]
 
         LOGGER.info(
             "[Database] Found %d registered migrations: %d applied, %d pending.",
@@ -117,7 +130,7 @@ async def run_migrations(db: asqlite.Pool) -> None:
         )
 
         for migration in pending_migrations:
-            await run_migration(connection, migration)
+            await run_migration(connection, migration, superseded_name=superseded.get(migration.version))
 
     if not pending_migrations:
         LOGGER.info("[Database] Database migrations are up to date.")

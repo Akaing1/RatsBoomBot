@@ -349,7 +349,7 @@ async def test_dashboard_override_enables_default_disabled_league(monkeypatch) -
         assert component.get_context(context) == ("channel-1", profile.league)
         assert service.configured_profiles() == (("channel-1", profile.league),)
         await component.champions.callback(component, context, champion=None)
-        assert "not configured yet" in context.messages[0]
+        assert "dashboard settings" in context.messages[0]
         monkeypatch.setattr(features, "is_profile_feature_enabled", lambda *args: False)
         assert component.get_context(context) is None
         assert service.configured_profiles() == ()

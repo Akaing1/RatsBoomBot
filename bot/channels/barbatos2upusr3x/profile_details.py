@@ -17,8 +17,6 @@ from bot.profiles import (
 BARBATOS2UPUSR3X_LEAGUE = LeagueConfig(
     enabled=True,
     provider="opgg",
-    game_name="Barbatos2upusRex",
-    tag_line="1314",
     region="NA",
     display_name="Barbatos"
 )
