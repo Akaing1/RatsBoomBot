@@ -187,7 +187,7 @@ async def viewer_raid_shop(request: Request, channel_name: str):
         return context
 
     _, _, profile, _, _ = context
-    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=shop", status_code=303, headers=PRIVATE_HEADERS)
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=activity", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.post("/me/channels/{channel_name}/shop/{action}")
@@ -220,7 +220,7 @@ async def viewer_raid_action(request: Request, channel_name: str, action: str, i
 
     if result not in SHOP_RESULTS:
         result = "invalid"
-    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=shop&result={result}", status_code=303, headers=PRIVATE_HEADERS)
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=activity&result={result}", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.get("/me/channels/{channel_name}/gamble")
@@ -229,7 +229,7 @@ async def viewer_gamble_page(request: Request, channel_name: str):
     if isinstance(context, RedirectResponse):
         return context
     _, _, profile, _, _ = context
-    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=gamble", status_code=303, headers=PRIVATE_HEADERS)
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=activity", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.post("/me/channels/{channel_name}/gamble")
@@ -270,7 +270,7 @@ async def viewer_gamble(request: Request, channel_name: str, amount: str = Form(
             }
         )
 
-    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=gamble", status_code=303, headers=PRIVATE_HEADERS)
+    return RedirectResponse(f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}?tab=activity", status_code=303, headers=PRIVATE_HEADERS)
 
 
 @router.post("/me/logout")

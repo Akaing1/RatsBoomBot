@@ -77,16 +77,19 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
                 page = await client.get(shop_url, follow_redirects=True)
                 assert page.status_code == 200
                 assert page.url.path == "/chatters/alice/channels/testchannel"
-                assert 'data-chatter-panel="shop"' in page.text
-                assert 'data-chatter-tab="shop"' in page.text
-                assert "1,000 Points" in page.text
+                assert 'data-chatter-panel="activity"' in page.text
+                assert 'data-chatter-tab="activity"' in page.text
+                assert "<strong>1,000</strong><small>Points</small>" in page.text
+                assert page.text.count('data-chatter-tab="activity"') == 1
+                assert 'data-chatter-tab="shop"' not in page.text
+                assert 'data-chatter-tab="gamble"' not in page.text
                 csrf = re.search(r'name="csrf_token" value="([^"]+)"', page.text).group(1)
                 action = f"{shop_url}/buy"
                 assert (await client.post(action, data={"csrf_token": "invalid", "item_id": "basic_sword"})).status_code == 403
                 assert (await client.post(action, data={"csrf_token": csrf, "item_id": "blessing"})).status_code == 400
 
                 first = await client.post(action, data={"csrf_token": csrf, "item_id": "basic_sword"}, follow_redirects=False)
-                assert first.headers["location"].startswith("/chatters/alice/channels/testchannel?tab=shop")
+                assert first.headers["location"].startswith("/chatters/alice/channels/testchannel?tab=activity")
                 assert first.headers["location"].endswith("result=bought")
                 assert (await client.post(action, data={"csrf_token": csrf, "item_id": "basic_sword"})).status_code == 429
                 now[0] += 3
@@ -106,10 +109,10 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
                 assert rewards["points"] > 0  # Buying and crafting can unlock channel achievements.
                 assert inventory["quantity"] == 0
 
-                other_shop = "/chatters/alice/channels/otherchannel?tab=shop"
+                other_shop = "/chatters/alice/channels/otherchannel?tab=activity"
                 other_page = await client.get(other_shop)
-                assert "500 Crumbs" in other_page.text
-                assert 'data-chatter-tab="shop"' in other_page.text
+                assert "<strong>500</strong><small>Crumbs</small>" in other_page.text
+                assert 'data-chatter-tab="activity"' in other_page.text
                 now[0] += 3
                 other_purchase = await client.post("/me/channels/otherchannel/shop/buy", data={"csrf_token": csrf, "item_id": "basic_bow"}, follow_redirects=False)
                 assert other_purchase.headers["location"].startswith(other_shop)
@@ -123,14 +126,14 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
                 gamble_url = "/me/channels/otherchannel/gamble"
                 gamble_page = await client.get(gamble_url, follow_redirects=True)
                 assert gamble_page.url.path == "/chatters/alice/channels/otherchannel"
-                assert 'data-chatter-tab="gamble"' in gamble_page.text
+                assert 'data-chatter-tab="activity"' in gamble_page.text
                 assert "Crumbs" in gamble_page.text
                 assert (await client.post(gamble_url, data={"csrf_token": "invalid", "amount": "50"})).status_code == 403
                 assert (await client.post(gamble_url, data={"csrf_token": csrf, "amount": "5oops"})).status_code == 400
                 now[0] += 6
                 monkeypatch.setattr("web.viewer.routers.random.random", lambda: 0.0)
                 win = await client.post(gamble_url, data={"csrf_token": csrf, "amount": "50"}, follow_redirects=False)
-                assert win.headers["location"] == "/chatters/alice/channels/otherchannel?tab=gamble"
+                assert win.headers["location"] == "/chatters/alice/channels/otherchannel?tab=activity"
                 assert (await client.post(gamble_url, data={"csrf_token": csrf, "amount": "50"})).status_code == 429
                 result = await client.get(win.headers["location"])
                 assert "You won 50 Crumbs" in result.text
@@ -156,8 +159,8 @@ async def test_shop_reuses_raid_transactions_and_revokes_on_signout(tmp_path, mo
 
                 monkeypatch.setattr(services.features, "is_enabled", lambda broadcaster, feature: feature == FeatureName.POINTS if broadcaster == "channel-2" else True)
                 points_only = await client.get("/chatters/alice/channels/otherchannel")
-                assert 'data-chatter-tab="gamble"' in points_only.text
-                assert 'data-chatter-tab="shop"' not in points_only.text
+                assert 'data-chatter-tab="activity"' in points_only.text
+                assert '/shop/buy' not in points_only.text
 
                 assert (await client.post("/me/logout", data={"csrf_token": csrf}, follow_redirects=False)).status_code == 303
                 assert (await client.get(shop_url, follow_redirects=False)).headers["location"].startswith("/me/connect")

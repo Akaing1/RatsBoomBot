@@ -292,6 +292,7 @@ def test_another_chatter_profile_stays_public_after_sign_in(monkeypatch) -> None
     assert '<h2>Mod Bar</h2>' not in global_profile.text
     assert '<h2>Mod Bar</h2>' not in channel_profile.text
     assert 'chatter-channel-back" href="/chatters/alice"' in channel_profile.text
+    assert 'data-chatter-tab="activity"' not in channel_profile.text
     assert 'data-chatter-tab="shop"' not in channel_profile.text
     assert 'data-chatter-tab="gamble"' not in channel_profile.text
     assert "My chatter profile" not in global_profile.text
