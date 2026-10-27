@@ -96,12 +96,12 @@ async def test_overview_moderator_role_shows_feeds_and_hides_owner_controls(env)
 async def test_role_boundaries_are_enforced_on_every_endpoint(env):
     client, session, db, bot = env
     await set_grant(db,'1','2','Streamer','Alice','edit')
-    for path in ['/settings','/protected-users/search?query=alice','/viewer-queue/blacklist']:
+    for path in ['/for-you','/api/for-you/notes','/api/for-you/quotes','/api/for-you/clips','/settings','/protected-users/search?query=alice','/viewer-queue/blacklist']:
         assert (await client.get('/me/mod/1'+path)).status_code == 403
-    for path in ['/customization','/features/toggles','/api/ads/action','/api/channel-metadata']:
+    for path in ['/api/for-you/notes','/api/for-you/quotes','/api/for-you/clips/download','/customization','/features/toggles','/api/ads/action','/api/channel-metadata']:
         response = await client.post('/me/mod/1'+path,data={'csrf_token':'secret','setting_name':'x','action':'enable', 'toggle_type':'feature','toggle_name':'points'})
         assert response.status_code == 403, (path,response.text)
-    for path in ['/api/raid-browser','/access','/youtube/connect','/custom-bot/connect','/api/for-you/clips']:
+    for path in ['/api/raid-browser','/access','/youtube/connect','/custom-bot/connect']:
         assert (await client.get('/me/mod/1'+path)).status_code == 404
     assert (await client.get('/me/mod/3')).status_code == 403
 
@@ -424,3 +424,62 @@ async def test_revoked_pages_are_clean_html_and_api_errors_stay_json(env):
         assert response.headers['cache-control']=='no-store'
     response=await client.get('/me/mod/1/api/dashboard-stats')
     assert response.status_code==403 and 'detail' in response.json()
+
+
+@pytest.mark.asyncio
+async def test_super_workspace_is_scoped_and_revocable(env, monkeypatch):
+    from web.channel.routers import workspace
+    client, session, db, bot = env
+    monkeypatch.setattr(workspace, 'get_db', lambda: db)
+    await set_grant(db, '1', '2', 'Streamer', 'Alice', 'super')
+    page = await client.get('/me/mod/1/for-you')
+    assert page.status_code == 200
+    assert 'data-channel-root="/me/mod/1"' in page.text
+    assert 'href="/me/mod/1/for-you"' in page.text
+    for label in ('Notes', 'Quotes', 'Clips'):
+        assert label in page.text
+    listing = AsyncMock(return_value={'items': []})
+    monkeypatch.setattr(workspace, 'notes_page', listing)
+    assert (await client.get('/me/mod/1/api/for-you/notes')).status_code == 200
+    assert listing.call_args.args[1] == '1'
+    assert session['channel_user_id'] == '99'
+    assert (await client.post('/me/mod/1/api/for-you/notes', data={'action': 'create', 'csrf_token': 'bad'})).status_code == 403
+    await set_grant(db, '1', '2', 'Streamer', 'Alice', 'edit')
+    assert (await client.get('/me/mod/1/for-you')).status_code == 403
+    assert (await client.get('/me/mod/1/api/for-you/notes')).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_super_workspace_writes_and_clips_use_selected_channel(env, monkeypatch):
+    from web.channel.routers import workspace
+    client, session, db, bot = env
+    monkeypatch.setattr(workspace, 'get_db', lambda: db)
+    monkeypatch.setattr(workspace, 'get_bot', lambda: bot)
+    await set_grant(db, '1', '2', 'Streamer', 'Alice', 'super')
+    note = AsyncMock(return_value={'note_id': 'note'})
+    monkeypatch.setattr(workspace, 'manage_note', note)
+    response = await client.post('/me/mod/1/api/for-you/notes', data={
+        'csrf_token': 'secret', 'action': 'create', 'title': 'Hello', 'broadcaster_id': '99'})
+    assert response.status_code == 200
+    assert note.call_args.args[1] == '1'
+    quote = AsyncMock()
+    monkeypatch.setattr(workspace.QuoteService, 'add', quote)
+    response = await client.post('/me/mod/1/api/for-you/quotes', data={
+        'csrf_token': 'secret', 'action': 'add', 'message': 'Hello'})
+    assert response.status_code == 200
+    assert quote.call_args.args == ('1', 'Hello', 'moderator:2')
+    clips = AsyncMock(return_value={'data': [{'id': 'clip', 'broadcaster_id': '99'}]})
+    monkeypatch.setattr(owner, 'raid_browser_cached_request', clips)
+    assert (await client.get('/me/mod/1/api/for-you/clips')).status_code == 200
+    assert clips.call_args.args[1] == '1'
+    assert clips.call_args.args[3]['broadcaster_id'] == '1'
+    assert (await client.post('/me/mod/1/api/for-you/clips/download', data={
+        'csrf_token': 'secret', 'clip_id': 'clip'})).status_code == 404
+    bot._http.request_json.assert_not_awaited()
+    current = AsyncMock(return_value={})
+    monkeypatch.setattr(workspace, 'get_workspace', current)
+    monkeypatch.setattr(workspace, 'current_note_key', lambda channel: None)
+    assert (await client.get('/me/mod/1/api/for-you')).status_code == 200
+    assert current.call_args.args[1] == '1'
+    assert (await client.post('/me/mod/1/api/for-you', data={
+        'csrf_token': 'secret', 'action': 'start', 'minutes': '1'})).status_code == 403
