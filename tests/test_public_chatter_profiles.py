@@ -119,7 +119,7 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert "Gamble win rate" in response.text
     assert "62.5%" in response.text
     assert "5 wins / 3 losses" in response.text
-    assert "Recent Boss Hunt history" in response.text
+    assert "Recent battles" in response.text
     assert "#2 of 12" in response.text
     assert 'data-chatter-tab="overview"' in response.text
     assert 'data-chatter-tab="raids"' in response.text
@@ -232,7 +232,12 @@ def test_sign_in_from_public_profile_keeps_account_available(monkeypatch) -> Non
                 assert "My account" not in signed_in.text
                 assert "Back to global profile" in signed_in.text
             else:
-                assert "My account" in signed_in.text
+                assert "Sign out" in signed_in.text
+                assert "chatter-account-intro" not in signed_in.text
+                assert 'class="account-sidebar"' in signed_in.text
+                assert signed_in.text.count('<h2>Communities</h2>') == 1
+                assert "Most Visited" in signed_in.text
+                assert "Favorite channel" not in signed_in.text
             assert "Sign in with Twitch" not in signed_in.text
             assert "Sign out" in signed_in.text
             assert signed_in.headers["cache-control"] == "no-store"

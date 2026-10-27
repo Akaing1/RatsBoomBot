@@ -319,7 +319,7 @@
         if (refreshInProgress) return;
         refreshInProgress = true;
         try {
-            const response = await fetch("/channel/api/ad-status", {headers: {Accept: "application/json"}});
+            const response = await fetch((globalThis.document?.body?.dataset?.channelRoot || "/channel") + '/api/ad-status', {headers: {Accept: "application/json"}});
             if (response.ok) applyStatus(await response.json());
         } catch (error) {
             // Keep the last known schedule during transient network failures.

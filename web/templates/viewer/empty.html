@@ -6,18 +6,20 @@
     <title>My account | RatsBoomBot</title>
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
+    <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
 </head>
-<body class="chatter-profile-page">
+<body class="chatter-profile-page account-page">
     <header class="public-command-navigation">
-        <a class="landing-brand" href="/">RatsBoomBot</a>
+        <a class="landing-brand" href="/"><img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon"><span><strong>RatsBoomBot</strong><small>Chatter profiles</small></span></a>
         <form action="/me/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>
     </header>
+<div class="mod-account-layout account-layout">
     <main class="chatter-profile-content">
-        <section class="panel chatter-account-intro">
-            <p class="eyebrow">My account</p>
+        <section class="account-empty-profile">
             <h1>Welcome, {{ display_name }}</h1>
             <p>Your Twitch account is connected. Your stats and channel activity will appear after you participate in a connected stream.</p>
         </section>
     </main>
+<aside class="account-sidebar" aria-label="Your channels">{% include "viewer/mod_bar.html" %}{% include "viewer/communities.html" %}</aside></div>
 </body>
 </html>

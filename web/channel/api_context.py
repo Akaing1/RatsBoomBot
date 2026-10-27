@@ -5,7 +5,7 @@ from typing import Any, Callable
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user
+from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user, current_channel_id, settings_actor
 
 
 @dataclass(frozen=True)
@@ -20,7 +20,7 @@ class ChannelAPIContext:
 
 
 def resolve_channel_api_context(request: Request, runtime_provider: Callable[[], Any]) -> ChannelAPIContext | JSONResponse:
-    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    broadcaster_id = current_channel_id(request)
     if not broadcaster_id:
         return JSONResponse({"detail": "Channel authentication required."}, status_code=401)
     runtime_bot = runtime_provider()

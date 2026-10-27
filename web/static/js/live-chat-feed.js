@@ -139,7 +139,8 @@
         unpin.setAttribute("aria-label", "Unpin message");
         unpin.addEventListener("click", () => moderateMessage(feed, "pin", message.id, unpin));
         actions.append(duration, unpin);
-        feed.pinnedContainer.append(copy, actions);
+        feed.pinnedContainer.append(copy);
+        if (feed.moderationUrl) feed.pinnedContainer.append(actions);
 
         const expiry = Date.parse(feed.pinEndsAt || "");
         const durationMs = Number(feed.pinDurationMinutes) * 60_000;
@@ -540,6 +541,10 @@
         }
 
         const source = new EventSource(element.dataset.streamUrl);
+        source.addEventListener('access-revoked', () => {
+            source.close();
+            element.replaceChildren(makeElement('p', 'live-chat-status', 'Channel access ended. Return to My account.'));
+        });
         if (element.classList.contains("dashboard-chat-feed")) {
             const removeTestNotices = attachTestNotices(feed);
             window.addEventListener("beforeunload", removeTestNotices, {once: true});

@@ -19,6 +19,9 @@ def clear_stale_chat_on_refresh(service, broadcaster, *, now=None):
 async def stream_chat_events(request, service, broadcaster_id: str, view: str):
     broadcaster_id = str(broadcaster_id)
     view = normalize_chat_view(view)
+    check_access = getattr(getattr(request, "state", None), "check_channel_access", None)
+    if check_access:
+        await check_access()
     queue = service.subscribe(broadcaster_id)
 
     try:
@@ -30,12 +33,24 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str):
         yield "event: history-complete\ndata: {}\n\n"
 
         while not await request.is_disconnected():
+            if check_access:
+                try:
+                    await check_access()
+                except Exception:
+                    yield "event: access-revoked\ndata: {}\n\n"
+                    return
             try:
                 message = await asyncio.wait_for(queue.get(), timeout=15)
             except TimeoutError:
                 yield ": keep-alive\n\n"
                 continue
 
+            if check_access:
+                try:
+                    await check_access()
+                except Exception:
+                    yield "event: access-revoked\ndata: {}\n\n"
+                    return
             if isinstance(message, dict) and message.get("event") == "chat-clear":
                 yield f"event: chat-clear\ndata: {json.dumps(message, separators=(',', ':'))}\n\n"
             elif message_matches_view(message, view):

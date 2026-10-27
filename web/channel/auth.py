@@ -36,8 +36,21 @@ def login_channel_user(request: Request, user_id: str, login: str, display_name:
 
 
 def logout_channel_user(request: Request) -> None:
+    if getattr(getattr(request, "state", None), "channel_access", None):
+        return
     request.session.pop(YOUTUBE_OAUTH_STATE_KEY, None)
     request.session.pop(YOUTUBE_OAUTH_OWNER_KEY, None)
     request.session.pop(CHANNEL_USER_ID_KEY, None)
     request.session.pop(CHANNEL_USER_LOGIN_KEY, None)
     request.session.pop(CHANNEL_USER_DISPLAY_NAME_KEY, None)
+
+
+def current_channel_id(request):
+    """Only an authorized moderator route may set a target; never change session identity."""
+    delegated = getattr(getattr(request, 'state', None), 'channel_access', None)
+    return delegated['broadcaster_id'] if delegated else request.session.get(CHANNEL_USER_ID_KEY)
+
+
+def settings_actor(request):
+    delegated = getattr(getattr(request, 'state', None), 'channel_access', None)
+    return f"moderator:{delegated['user_id']}" if delegated else f"streamer:{current_channel_id(request)}"
