@@ -111,3 +111,29 @@ select.access-badge { cursor: pointer; font: inherit; font-size: 12px; padding: 
     .account-stat-grid article:nth-child(6) { grid-column: 1 / -1; }
     .account-layout > .chatter-profile-content { padding-bottom: 24px; }
 }
+
+/* Profile tab panels share the Overview's accent palette. */
+.chatter-profile-page .boss-highlight-grid { grid-template-columns: repeat(3,minmax(0,1fr)); margin-bottom: 16px; }
+.boss-highlight-grid article { --stat-accent: #ac86ff; border-top: 3px solid var(--stat-accent); background: linear-gradient(135deg,#ac86ff12,transparent),var(--surface); }
+.boss-highlight-grid article:nth-child(2) { --stat-accent: #ffb064; background: linear-gradient(135deg,#ffb06412,transparent),var(--surface); }
+.boss-highlight-grid article:nth-child(3) { --stat-accent: #56d7d0; background: linear-gradient(135deg,#56d7d012,transparent),var(--surface); }
+.boss-highlight-grid strong { color: var(--stat-accent); font-size: clamp(28px,3vw,40px); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.boss-record-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); padding: 22px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.boss-record-grid article { display: flex; flex-direction: column; gap: 8px; padding: 0 16px; border-right: 1px solid var(--border); }
+.boss-record-grid article:last-child { border-right: 0; }
+.boss-record-grid strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+.boss-record-grid span { color: var(--muted); font-size: 13px; }
+.boss-battle-list article { border-left: 3px solid #ac86ff; padding: 22px; }
+.boss-battle-list strong { overflow-wrap: anywhere; }
+.boss-battle-list .boss-contributor { color: #ffb064; font-size: 11px; }
+.boss-battle-list .chatter-raid-result { gap: 7px; }
+.account-page [data-chatter-panel="achievements"] > .panel-header { margin-bottom: 20px; }
+.account-page .achievement-card { background: linear-gradient(135deg,color-mix(in srgb,var(--badge-color) 7%,transparent),transparent),var(--surface); }
+.account-page .achievement-card details { border-top: 1px solid var(--border); padding-top: 14px; }
+@media (max-width: 700px) {
+    .chatter-profile-page .boss-highlight-grid { grid-template-columns: 1fr; gap: 12px; }
+    .boss-record-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px 0; }
+    .boss-record-grid article:nth-child(2) { border-right: 0; }
+    .boss-battle-list article { padding: 18px; }
+}
+.boss-record-grid { margin-bottom: 30px; }
