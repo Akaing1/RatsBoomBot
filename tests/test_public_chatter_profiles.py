@@ -120,6 +120,10 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert "62.5%" in response.text
     assert "5 wins / 3 losses" in response.text
     assert "Recent battles" in response.text
+    assert 'chatter-stat-grid account-stat-grid' in response.text
+    assert '/css/mod-access.css' in response.text
+    assert '<h2>Mod Bar</h2>' not in response.text
+    assert '/me/logout' not in response.text
     assert "#2 of 12" in response.text
     assert 'data-chatter-tab="overview"' in response.text
     assert 'data-chatter-tab="raids"' in response.text
@@ -186,7 +190,11 @@ def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
     assert "Equipped" in response.text
     assert "#2 of 12" in response.text
     assert "Top Contributor finishes" in response.text
-    assert "Recent Boss Hunt history" in response.text
+    assert "Recent battles" in response.text
+    assert 'chatter-stat-grid account-stat-grid' in response.text
+    assert '/css/mod-access.css' in response.text
+    assert '<h2>Mod Bar</h2>' not in response.text
+    assert '/me/logout' not in response.text
     assert "/me/connect?next=/chatters/alice/channels/testchannel" in response.text
     assert 'class="public-command-navigation chatter-channel-navigation"' in response.text
     assert 'class="button secondary chatter-channel-back"' in response.text
@@ -279,6 +287,13 @@ def test_another_chatter_profile_stays_public_after_sign_in(monkeypatch) -> None
         channel_profile = client.get("/chatters/alice/channels/testchannel")
 
     assert "Public chatter profile" in global_profile.text
+    assert 'class="account-sidebar"' in global_profile.text
+    assert global_profile.text.count('<h2>Communities</h2>') == 1
+    assert '<h2>Mod Bar</h2>' not in global_profile.text
+    assert '<h2>Mod Bar</h2>' not in channel_profile.text
+    assert 'chatter-channel-back" href="/chatters/alice"' in channel_profile.text
+    assert 'data-chatter-tab="shop"' not in channel_profile.text
+    assert 'data-chatter-tab="gamble"' not in channel_profile.text
     assert "My chatter profile" not in global_profile.text
     assert "Sign out" not in global_profile.text
     assert "@alice in" in channel_profile.text
