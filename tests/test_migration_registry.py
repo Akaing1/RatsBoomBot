@@ -101,3 +101,42 @@ async def test_fresh_install_records_complete_history_and_repeat_is_noop(tmp_pat
             after = [tuple(row) for row in await connection.fetchall('SELECT * FROM schema_migrations ORDER BY version')]
     assert before == after
     assert [(row[0], row[1]) for row in after] == [(m.version, m.name) for m in MIGRATIONS]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('legacy_follower_index', [False, True])
+async def test_upgrade_from_release_or_earlier_followers_branch(tmp_path, monkeypatch, legacy_follower_index):
+    current = migration_runner.MIGRATIONS
+    initial = tuple(migration for migration in current if migration.version <= 70)
+    if legacy_follower_index:
+        index = next(migration for migration in current if migration.name == 'follower_last_watched_index')
+        initial += (Migration(71, index.name, index.run),)
+    async with asqlite.create_pool(str(tmp_path / 'followers-upgrade.db')) as db:
+        monkeypatch.setattr(migration_runner, 'MIGRATIONS', initial)
+        await migration_runner.run_migrations(db)
+        async with db.acquire() as connection:
+            await connection.execute("INSERT INTO viewers VALUES ('channel','viewer','viewer',123,0)")
+        monkeypatch.setattr(migration_runner, 'MIGRATIONS', current)
+        await migration_runner.run_migrations(db)
+        await migration_runner.run_migrations(db)
+        async with db.acquire() as connection:
+            history = await connection.fetchall('SELECT version,name FROM schema_migrations ORDER BY version')
+            assert [(row['version'], row['name']) for row in history] == [(migration.version, migration.name) for migration in current]
+            assert (await connection.fetchone("SELECT points FROM viewers WHERE broadcaster_id='channel' AND user_id='viewer'"))['points'] == 123
+            assert await connection.fetchone("SELECT name FROM sqlite_master WHERE type='table' AND name='channel_access'")
+            assert await connection.fetchone("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_passive_point_payouts_follower_presence'")
+
+
+@pytest.mark.asyncio
+async def test_replacing_development_migration_history_is_transactional(tmp_path):
+    async def broken(connection):
+        await connection.execute('CREATE TABLE partial_repair (value TEXT)')
+        raise RuntimeError('repair failed')
+    async with asqlite.create_pool(str(tmp_path / 'repair-rollback.db')) as db:
+        async with db.acquire() as connection:
+            await migration_runner.create_migration_table(connection)
+            await connection.execute("INSERT INTO schema_migrations (version,name) VALUES (71,'follower_last_watched_index')")
+            with pytest.raises(RuntimeError, match='repair failed'):
+                await migration_runner.run_migration(connection, Migration(71, 'channel_access', broken), superseded_name='follower_last_watched_index')
+            assert (await connection.fetchone('SELECT name FROM schema_migrations WHERE version=71'))['name'] == 'follower_last_watched_index'
+            assert await connection.fetchone("SELECT name FROM sqlite_master WHERE name='partial_repair'") is None
