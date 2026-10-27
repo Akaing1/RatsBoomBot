@@ -137,3 +137,41 @@ select.access-badge { cursor: pointer; font: inherit; font-size: 12px; padding: 
     .boss-battle-list article { padding: 18px; }
 }
 .boss-record-grid { margin-bottom: 30px; }
+
+.collection-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 22px; }
+.collection-heading h2 { margin: 0; }
+.collection-count { padding: 7px 12px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 13px; }
+.achievement-completion { display: grid; gap: 8px; min-width: 210px; color: var(--muted); font-size: 13px; }
+.achievement-completion strong { color: #ac86ff; font-size: 22px; }
+.achievement-completion progress { width: 100%; height: 7px; accent-color: #ac86ff; }
+.account-page .achievement-filters { display: flex; width: fit-content; padding: 5px; border-radius: 999px; }
+.account-page .achievement-filters button { border-radius: 999px; padding: 9px 16px; font-size: 13px; }
+.account-page .achievement-grid { grid-template-columns: repeat(auto-fit,minmax(min(100%,290px),1fr)); gap: 16px; }
+.account-page .achievement-heading { align-items: center; gap: 14px; }
+.account-page .achievement-badge { width: 62px; }
+.account-page .achievement-heading h3 { font-size: 19px; overflow-wrap: anywhere; }
+.achievement-tier-label { display: inline-block; color: var(--badge-color); font-size: 12px; padding: 4px 9px; border-radius: 999px; background: color-mix(in srgb,var(--badge-color) 12%,transparent); }
+.account-page .achievement-card summary { color: var(--muted); font-size: 13px; }
+.pet-collection-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 18px; }
+.pet-collection-card { --pet-color: #7acb91; min-width: 0; padding: 20px; border: 1px solid var(--border); border-top: 3px solid var(--pet-color); border-radius: 18px; background: var(--surface); }
+.pet-collection-card.rarity-rare { --pet-color: #64baff; }
+.pet-collection-card.rarity-ultra_rare { --pet-color: #d797ff; }
+.pet-collection-card.is-equipped { box-shadow: 0 0 0 1px var(--pet-color); }
+.pet-card-labels { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--pet-color); font-size: 12px; font-weight: 700; }
+.pet-equipped-label { padding: 4px 9px; border-radius: 999px; background: color-mix(in srgb,var(--pet-color) 15%,transparent); }
+.pet-collection-card .pet-collection-sprite-slot { display: flex; align-items: center; justify-content: center; min-height: 150px; margin: 16px 0; border-radius: 12px; background: radial-gradient(ellipse,color-mix(in srgb,var(--pet-color) 12%,transparent),transparent 75%); }
+.pet-collection-card h3 { margin: 0 0 12px; font-size: 21px; text-align: center; }
+.pet-passive { min-height: 44px; color: var(--muted); text-align: center; font-size: 14px; }
+.pet-passive strong { color: var(--pet-color); }
+.pet-equip-help { border-top: 1px solid var(--border); padding-top: 12px; font-size: 13px; }
+.pet-equip-help summary { cursor: pointer; color: var(--muted); }
+.pet-equip-help code { display: block; margin-top: 12px; overflow-wrap: anywhere; }
+.collection-empty { grid-column: 1 / -1; text-align: center; }
+.account-page .pet-summon-info { padding: 16px 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); font-size: 13px; }
+@media (max-width: 600px) {
+    .achievement-collection-heading { align-items: stretch; flex-direction: column; }
+    .account-page .achievement-filters { width: 100%; border-radius: 14px; }
+    .account-page .achievement-filters button { flex: 1 1 auto; padding: 9px 12px; }
+    .account-page .achievement-tiers li { grid-template-columns: 1fr 1fr; }
+    .account-page .achievement-tier-status { grid-column: 1 / -1; max-width: none; text-align: left; }
+}

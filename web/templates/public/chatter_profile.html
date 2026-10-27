@@ -60,11 +60,11 @@
         </nav>
 
         <section id="pets" class="chatter-section" data-chatter-panel="pets" aria-label="Pet collection" hidden>
-            <div class="chatter-section-heading"><div><p class="eyebrow">Global companions</p><h2>Pet collection</h2></div></div>
+            <div class="collection-heading"><h2>Pets</h2><span class="collection-count">{{ profile.pets | length }} collected</span></div>
             <div class="pet-summon-info">
                 <span>Buy a ticket with <code>!pets buy ticket</code> for 50,000 channel points, then use <code>!pets summon</code></span>
                 <details class="pet-rates">
-                    <summary aria-label="Show pet summon rates">* Rates</summary>
+                    <summary aria-label="Show pet summon rates">Summon rates</summary>
                     <div class="pet-rates-popup">
                         <strong>Summon rates</strong>
                         <table>
@@ -81,18 +81,19 @@
                     </div>
                 </details>
             </div>
-            <div class="chatter-stat-grid">
+            <div class="pet-collection-grid">
                 {% for pet in profile.pets %}
-                <article>
+                {% set equipped = profile.pet and profile.pet.user_pet_id == pet.user_pet_id %}
+                <article class="pet-collection-card rarity-{{ pet.rarity }}{% if equipped %} is-equipped{% endif %}">
+                    <div class="pet-card-labels"><span>{{ 'UR' if pet.rarity == 'ultra_rare' else pet.rarity | title }}</span>{% if equipped %}<span class="pet-equipped-label">Equipped</span>{% endif %}</div>
                     <div class="pet-collection-sprite-slot">
                     <div class="chatter-pet-sprite{% if pet.pet_id == 'honey_hen' %} chatter-pet-sprite--hen{% elif pet.pet_id == 'dog_of_the_sun' %} chatter-pet-sprite--sun-dog{% elif pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif pet.pet_id == 'witch_cat' %} chatter-pet-sprite--cat{% elif pet.pet_id == 'royal_raven' %} chatter-pet-sprite--raven{% elif pet.pet_id == 'horned_wolf' %} chatter-pet-sprite--wolf{% elif pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ pet.sprite_path | replace("'", '%27') }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ pet.frame_count }}" role="img" aria-label="{{ pet.display_name }}"></div>
                     </div>
-                    <strong>{{ pet.display_name }}</strong>
-                    <span>{{ 'UR' if pet.rarity == 'ultra_rare' else pet.rarity | title }}{% if profile.pet and profile.pet.user_pet_id == pet.user_pet_id %} · Equipped{% endif %}</span>
-                    <small>{{ pet.passive_percent_label }}% {{ pet.passive_description }}</small>
-                    <small>Equip: <code>!pets equip {{ pet.display_name }}</code></small>
+                    <h3>{{ pet.display_name }}</h3>
+                    <p class="pet-passive"><strong>{{ pet.passive_percent_label }}%</strong> {{ pet.passive_description }}</p>
+                    {% if not equipped %}<details class="pet-equip-help"><summary>Equip in chat</summary><code>!pets equip {{ pet.display_name }}</code></details>{% endif %}
                 </article>
-                {% else %}<p>No pets collected yet. Your first summon is equipped automatically.</p>{% endfor %}
+                {% else %}<div class="panel collection-empty"><h3>Your collection starts here</h3><p>Summon your first pet using the commands above.</p></div>{% endfor %}
             </div>
         </section>
 

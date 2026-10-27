@@ -15,6 +15,7 @@ from web.shared.live_chat import stream_chat_events
 from web.shared.markdown import render_markdown
 from web.state import get_bot, get_db
 from web.viewer.auth import VIEWER_SERVER_TOKEN_KEY, viewer_user_id
+from web.viewer.moderation import mod_bar_channels
 from web.viewer.routers import GAMBLE_RESULT_KEY, SHOP_RESULTS, SHOP_WEAPONS
 
 router = APIRouter()
@@ -144,6 +145,7 @@ async def public_chatter_profile(request: Request, chatter_name: str):
             "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/"),
             "viewer_user_id": signed_in_user_id,
             "account_mode": is_owner,
+            "mod_channels": await mod_bar_channels(request) if is_owner else [],
             "csrf_token": get_csrf_token(request) if is_owner else None,
         },
         headers={"Cache-Control": "no-store"} if is_owner else None,

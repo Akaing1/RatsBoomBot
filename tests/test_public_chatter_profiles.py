@@ -218,6 +218,13 @@ def test_sign_in_from_public_profile_keeps_account_available(monkeypatch) -> Non
     monkeypatch.setattr("web.viewer.routers.fetch_twitch_user", fetch)
     monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=SimpleNamespace(chatter_stats=FakeChatterStats())))
 
+    async def mod_channels(request):
+        return [{"broadcaster_id": "channel-1", "channel_name": "TestChannel",
+                 "permission": "edit", "profile_image_url": None}]
+    monkeypatch.setattr("web.public.routers.mod_bar_channels", mod_channels)
+    monkeypatch.setattr("web.viewer.routers.mod_bar_channels", mod_channels)
+    monkeypatch.setattr("web.viewer.routers.get_bot", lambda: SimpleNamespace(services=SimpleNamespace(chatter_stats=FakeChatterStats())))
+
     with TestClient(app) as client:
         profile = client.get("/chatters/alice")
         assert "/me/connect?next=/chatters/alice" in profile.text
@@ -231,7 +238,12 @@ def test_sign_in_from_public_profile_keeps_account_available(monkeypatch) -> Non
             if path.endswith("/testchannel"):
                 assert "My account" not in signed_in.text
                 assert "Back to global profile" in signed_in.text
+                assert 'chatter-channel-back" href="/me"' in signed_in.text
+                returned = client.get("/me")
+                assert returned.status_code == 200
+                assert "<h2>Mod Bar</h2>" in returned.text
             else:
+                assert "<h2>Mod Bar</h2>" in signed_in.text
                 assert "Sign out" in signed_in.text
                 assert "chatter-account-intro" not in signed_in.text
                 assert 'class="account-sidebar"' in signed_in.text
@@ -318,7 +330,8 @@ def test_public_profile_renders_full_pet_collection(monkeypatch):
     assert "No pets available" in response.text
     assert "70% Silly Bat" not in response.text
     assert 'id="pets"' in response.text
-    assert "Common · Equipped" in response.text
+    assert 'class="pet-equipped-label">Equipped' in response.text
+    assert "rarity-common is-equipped" in response.text
     assert "UR" in response.text
     assert "!pets equip Sleepy Fox" in response.text
     assert "/assets/Sleepy%20Fox.png" in response.text
