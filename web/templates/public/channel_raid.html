@@ -20,12 +20,11 @@
 <body class="public-command-page hunt-guide">
     {% from "shared/public_header.html" import public_header with context %}
     {% call public_header("Boss Hunt guide") %}
+        {% include "shared/community_nav.html" %}
 <nav class="public-raid-navigation" aria-label="Channel links">
-            <a href="/help/{{ broadcaster.login or broadcaster.id }}">Command Help</a>
             {% if broadcaster.login %}<a class="button primary" href="https://twitch.tv/{{ broadcaster.login }}">Watch on Twitch</a>{% endif %}
         </nav>
     {% endcall %}
-    {% include "shared/community_nav.html" %}
 
     <main class="public-command-content">
         <header class="public-command-hero">

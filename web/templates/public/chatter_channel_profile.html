@@ -15,6 +15,7 @@
 <body class="chatter-profile-page profile-page channel-chatter-page">
     {% from "shared/public_header.html" import public_header with context %}
     {% call public_header("Chatter profiles") %}
+        {% include "shared/community_nav.html" %}
 <a class="button secondary chatter-channel-back" href="{{ '/me' if owner_mode else '/chatters/' ~ profile.identity.login }}">Back to global profile</a>
         {% if owner_mode %}
             <form method="post" action="/me/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>
@@ -22,7 +23,6 @@
             <a class="button secondary chatter-channel-auth" href="/me/connect?next={{ ('/chatters/' ~ profile.identity.login ~ '/channels/' ~ profile.channel.login)|urlencode }}">Sign in with Twitch</a>
         {% endif %}
     {% endcall %}
-    {% include "shared/community_nav.html" %}
 
     <main class="chatter-profile-content">
         <header class="chatter-profile-hero channel-profile-hero">
