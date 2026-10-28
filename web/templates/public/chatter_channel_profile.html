@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
     <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
 <link rel="stylesheet" href="/static/css/public-header.css?v={{ deployment_stamp() }}">
+<link rel="stylesheet" href="/static/css/community-nav.css?v={{ deployment_stamp() }}">
 </head>
 <body class="chatter-profile-page profile-page channel-chatter-page">
     {% from "shared/public_header.html" import public_header with context %}
@@ -21,6 +22,7 @@
             <a class="button secondary chatter-channel-auth" href="/me/connect?next={{ ('/chatters/' ~ profile.identity.login ~ '/channels/' ~ profile.channel.login)|urlencode }}">Sign in with Twitch</a>
         {% endif %}
     {% endcall %}
+    {% include "shared/community_nav.html" %}
 
     <main class="chatter-profile-content">
         <header class="chatter-profile-hero channel-profile-hero">

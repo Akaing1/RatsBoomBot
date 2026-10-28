@@ -1,0 +1,11 @@
+<nav class="community-nav" aria-label="Community navigation">
+    <div class="community-nav-identity">
+        {% if community_image %}<img src="{{ community_image }}" alt="" width="32" height="32">{% else %}<span class="community-nav-avatar" aria-hidden="true">{{ community_name[0]|upper }}</span>{% endif %}
+        <span><small>Community</small><strong>{{ community_name }}</strong></span>
+    </div>
+    <div class="community-nav-links">
+        <a href="/me/channels/{{ community_login|urlencode }}/profile"{% if community_page == 'profile' and owner_mode %} aria-current="page"{% endif %}>My channel profile</a>
+        <a href="/help/{{ community_login|urlencode }}"{% if community_page == 'help' %} aria-current="page"{% endif %}>Command Help</a>
+        {% if community_boss_enabled %}<a href="/raid/{{ community_login|urlencode }}"{% if community_page == 'raid' %} aria-current="page"{% endif %}>Boss Hunt guide</a>{% endif %}
+    </div>
+</nav>
