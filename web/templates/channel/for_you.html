@@ -2,7 +2,7 @@
             <div class="for-you-face for-you-front" data-fy-front>
                 <div class="panel-header">
                     <h3>Moderation</h3>
-                    <button type="button" class="for-you-flip" data-fy-flip aria-label="Flip card to For You">For You <span aria-hidden="true">↻</span></button>
+                    {% if not moderator_mode %}<button type="button" class="for-you-flip" data-fy-flip aria-label="Flip card to For You">For You <span aria-hidden="true">↻</span></button>{% endif %}
                 </div>
                 <p class="for-you-summary" data-fy-summary hidden></p>
                 <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="Moderation activity">
@@ -20,9 +20,10 @@
                     </div>
                 </div>
             </div>
+{% if not moderator_mode %}
             <div class="for-you-face for-you-back" data-fy-back aria-hidden="true" inert>
                 <div class="panel-header">
-                    <h3>For You</h3>
+                    <h3>For You</h3><a href="{{ channel_root }}/for-you">Notes archive &amp; quotes</a>
                     <button type="button" class="for-you-flip" data-fy-flip aria-label="Flip card to Moderation">Moderation <span aria-hidden="true">↻</span></button>
                 </div>
                 <div class="dashboard-tabs activity-tabs" role="tablist" aria-label="For You">
@@ -63,4 +64,5 @@
                 </div>
                 <p class="for-you-error" data-fy-error role="status"></p>
             </div>
+{% endif %}
         </div>

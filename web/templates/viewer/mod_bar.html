@@ -1,0 +1,9 @@
+{% if mod_channels %}
+<aside class="mod-bar panel" aria-label="Mod Bar">
+<header class="mod-bar-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z"/><path d="m8 12 3 3 5-6"/></svg><h2>Mod Bar</h2><span class="mod-bar-count">{{ mod_channels|length }}</span></header>
+<nav aria-label="Moderator channels">{% for entry in mod_channels %}
+<a class="mod-channel" href="/me/mod/{{ entry.broadcaster_id }}"{% if grant is defined and grant.broadcaster_id == entry.broadcaster_id %} aria-current="page"{% endif %}>
+{% if entry.profile_image_url %}<img class="account-channel-avatar" src="{{ entry.profile_image_url }}" alt="" loading="lazy">{% else %}<span class="account-channel-avatar" aria-hidden="true">{{ entry.channel_name[:1]|upper }}</span>{% endif %}
+<span class="mod-channel-copy"><strong>{{ entry.channel_name }}</strong><small class="role-{{ entry.permission }}">{{ {'edit': 'Moderator', 'super': 'Super moderator'}[entry.permission] }}</small></span><svg class="mod-channel-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a>
+{% endfor %}</nav></aside>
+{% endif %}

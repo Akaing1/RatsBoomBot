@@ -119,7 +119,11 @@ def test_public_global_chatter_profile_renders(monkeypatch) -> None:
     assert "Gamble win rate" in response.text
     assert "62.5%" in response.text
     assert "5 wins / 3 losses" in response.text
-    assert "Recent Boss Hunt history" in response.text
+    assert "Recent battles" in response.text
+    assert 'chatter-stat-grid account-stat-grid' in response.text
+    assert '/css/mod-access.css' in response.text
+    assert '<h2>Mod Bar</h2>' not in response.text
+    assert '/me/logout' not in response.text
     assert "#2 of 12" in response.text
     assert 'data-chatter-tab="overview"' in response.text
     assert 'data-chatter-tab="raids"' in response.text
@@ -186,7 +190,11 @@ def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
     assert "Equipped" in response.text
     assert "#2 of 12" in response.text
     assert "Top Contributor finishes" in response.text
-    assert "Recent Boss Hunt history" in response.text
+    assert "Recent battles" in response.text
+    assert 'chatter-stat-grid account-stat-grid' in response.text
+    assert '/css/mod-access.css' in response.text
+    assert '<h2>Mod Bar</h2>' not in response.text
+    assert '/me/logout' not in response.text
     assert "/me/connect?next=/chatters/alice/channels/testchannel" in response.text
     assert 'class="public-command-navigation chatter-channel-navigation"' in response.text
     assert 'class="button secondary chatter-channel-back"' in response.text
@@ -218,6 +226,13 @@ def test_sign_in_from_public_profile_keeps_account_available(monkeypatch) -> Non
     monkeypatch.setattr("web.viewer.routers.fetch_twitch_user", fetch)
     monkeypatch.setattr("web.public.routers.get_bot", lambda: SimpleNamespace(services=SimpleNamespace(chatter_stats=FakeChatterStats())))
 
+    async def mod_channels(request):
+        return [{"broadcaster_id": "channel-1", "channel_name": "TestChannel",
+                 "permission": "edit", "profile_image_url": None}]
+    monkeypatch.setattr("web.public.routers.mod_bar_channels", mod_channels)
+    monkeypatch.setattr("web.viewer.routers.mod_bar_channels", mod_channels)
+    monkeypatch.setattr("web.viewer.routers.get_bot", lambda: SimpleNamespace(services=SimpleNamespace(chatter_stats=FakeChatterStats())))
+
     with TestClient(app) as client:
         profile = client.get("/chatters/alice")
         assert "/me/connect?next=/chatters/alice" in profile.text
@@ -231,8 +246,18 @@ def test_sign_in_from_public_profile_keeps_account_available(monkeypatch) -> Non
             if path.endswith("/testchannel"):
                 assert "My account" not in signed_in.text
                 assert "Back to global profile" in signed_in.text
+                assert 'chatter-channel-back" href="/me"' in signed_in.text
+                returned = client.get("/me")
+                assert returned.status_code == 200
+                assert "<h2>Mod Bar</h2>" in returned.text
             else:
-                assert "My account" in signed_in.text
+                assert "<h2>Mod Bar</h2>" in signed_in.text
+                assert "Sign out" in signed_in.text
+                assert "chatter-account-intro" not in signed_in.text
+                assert 'class="account-sidebar"' in signed_in.text
+                assert signed_in.text.count('<h2>Communities</h2>') == 1
+                assert "Most Visited" in signed_in.text
+                assert "Favorite channel" not in signed_in.text
             assert "Sign in with Twitch" not in signed_in.text
             assert "Sign out" in signed_in.text
             assert signed_in.headers["cache-control"] == "no-store"
@@ -262,6 +287,14 @@ def test_another_chatter_profile_stays_public_after_sign_in(monkeypatch) -> None
         channel_profile = client.get("/chatters/alice/channels/testchannel")
 
     assert "Public chatter profile" in global_profile.text
+    assert 'class="account-sidebar"' in global_profile.text
+    assert global_profile.text.count('<h2>Communities</h2>') == 1
+    assert '<h2>Mod Bar</h2>' not in global_profile.text
+    assert '<h2>Mod Bar</h2>' not in channel_profile.text
+    assert 'chatter-channel-back" href="/chatters/alice"' in channel_profile.text
+    assert 'data-chatter-tab="activity"' not in channel_profile.text
+    assert 'data-chatter-tab="shop"' not in channel_profile.text
+    assert 'data-chatter-tab="gamble"' not in channel_profile.text
     assert "My chatter profile" not in global_profile.text
     assert "Sign out" not in global_profile.text
     assert "@alice in" in channel_profile.text
@@ -313,7 +346,8 @@ def test_public_profile_renders_full_pet_collection(monkeypatch):
     assert "No pets available" in response.text
     assert "70% Silly Bat" not in response.text
     assert 'id="pets"' in response.text
-    assert "Common · Equipped" in response.text
+    assert 'class="pet-equipped-label">Equipped' in response.text
+    assert "rarity-common is-equipped" in response.text
     assert "UR" in response.text
     assert "!pets equip Sleepy Fox" in response.text
     assert "/assets/Sleepy%20Fox.png" in response.text

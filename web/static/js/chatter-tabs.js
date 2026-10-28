@@ -14,13 +14,16 @@ chatterTabs.forEach((tab) => {
         selectChatterTab(tab.dataset.chatterTab);
     });
 });
-const selectedTab = new URLSearchParams(window.location.search).get("tab") || window.location.hash.slice(1);
+function resolveChatterTab(value) {
+    return ["shop", "gamble"].includes(value) && Array.from(chatterTabs).some(tab => tab.dataset.chatterTab === "activity") ? "activity" : value;
+}
+const selectedTab = resolveChatterTab(new URLSearchParams(window.location.search).get("tab") || window.location.hash.slice(1));
 if (selectedTab && Array.from(chatterTabs).some((tab) => tab.dataset.chatterTab === selectedTab)) {
     selectChatterTab(selectedTab);
 }
 
 window.addEventListener("hashchange", () => {
-    const selected = window.location.hash.slice(1);
+    const selected = resolveChatterTab(window.location.hash.slice(1));
     if (Array.from(chatterTabs).some((tab) => tab.dataset.chatterTab === selected)) {
         selectChatterTab(selected);
     }

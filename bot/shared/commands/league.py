@@ -85,7 +85,7 @@ class LeagueCommands(commands.Component):
         broadcaster_id, config = context
 
         if not config.game_name or not config.tag_line:
-            await ctx.send("This channel's League account is not configured yet. Community commands !register, !rank, and !ladder are available.")
+            await ctx.send("This channel's League account needs configuration or re-evaluation. Update the Riot name, tag and region in dashboard settings. Community commands !register, !rank, and !ladder are available.")
             return
 
         if champion:

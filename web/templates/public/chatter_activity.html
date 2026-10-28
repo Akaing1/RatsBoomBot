@@ -1,0 +1,60 @@
+{% if shop_available or gamble_available %}
+<section class="chatter-shop activity-panel" data-chatter-panel="activity" hidden>
+    <header class="activity-header">
+        <div><h2>Activity</h2><p>{{ profile.channel.display_name }}</p></div>
+        <div class="activity-balance"><span>Available balance</span><strong>{{ '{:,}'.format(profile.current_points) }}</strong><small>{{ profile.currency_name }}</small></div>
+    </header>
+    {% if gamble_signed_in or shop_signed_in %}
+        {% if gamble_available %}
+        <section class="activity-gamble panel">
+            {% if gamble_signed_in %}
+                <div class="activity-section-title"><div><p class="eyebrow">Try your luck</p><h2>Gamble</h2></div><span class="activity-odds">{{ (gamble_chance * 100)|round(1) }}% chance to double</span></div>
+                {% if gamble_result %}<div class="panel chatter-shop-result" role="status">
+                    {% if gamble_result.message %}{{ gamble_result.message }}
+                    {% elif gamble_result.won %}You won {{ '{:,}'.format(gamble_result.bet) }} {{ profile.currency_name }}! New balance: {{ '{:,}'.format(gamble_result.balance) }}.
+                    {% else %}You lost {{ '{:,}'.format(gamble_result.bet) }} {{ profile.currency_name }}.{% if gamble_result.refund %} Your pet refunded {{ '{:,}'.format(gamble_result.refund) }}.{% endif %} New balance: {{ '{:,}'.format(gamble_result.balance) }}.{% endif %}
+                </div>{% endif %}
+                <div class="chatter-gamble-form">
+                    <form action="/me/channels/{{ profile.channel.login }}/gamble" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label for="gamble-amount">Bet amount</label>
+                        <input id="gamble-amount" name="amount" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="18" autocomplete="off" required placeholder="Enter {{ profile.currency_name }}">
+                        <button class="button primary" type="submit">Place bet</button>
+                    </form>
+                    <form action="/me/channels/{{ profile.channel.login }}/gamble" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="amount" value="all">
+                        <button class="button secondary" type="submit">Bet all</button>
+                    </form>
+                </div>
+            {% endif %}
+        </section>
+        {% endif %}
+        {% if shop_available %}
+        <div class="activity-shop">
+            {% if shop_signed_in %}
+                {% if shop_message %}<div class="panel chatter-shop-result" role="status">{{ shop_message }}</div>{% endif %}
+                <section class="chatter-section"><div class="chatter-section-heading"><h2>Buy weapons</h2></div>
+                    <div class="chatter-shop-grid">{% for item_id, name, price in shop_weapons %}
+                        <article class="panel chatter-shop-card"><h3>{{ name }}</h3><p>{{ '{:,}'.format(price) }} {{ profile.currency_name }}</p><form method="post" action="/me/channels/{{ profile.channel.login }}/shop/buy"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item_id }}"><button class="button primary" type="submit">Buy</button></form></article>
+                    {% endfor %}</div>
+                </section>
+                <section class="chatter-section"><div class="chatter-section-heading"><h2>Craft upgrades</h2></div>
+                    <div class="chatter-shop-grid">{% for item_id, name, ingredient, price in shop_recipes %}
+                        <article class="panel chatter-shop-card"><h3>{{ name }}</h3><p>2 &times; {{ ingredient }} + {{ '{:,}'.format(price) }} {{ profile.currency_name }}</p><form method="post" action="/me/channels/{{ profile.channel.login }}/shop/craft"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item_id }}"><button class="button secondary" type="submit">Craft</button></form></article>
+                    {% endfor %}</div>
+                </section>
+                <section class="chatter-section"><div class="chatter-section-heading"><h2>Sell weapons</h2><p>Sell one eligible copy at a time. Your final equipped copy cannot be sold.</p></div>
+                    {% if shop_sellable %}<div class="chatter-shop-grid">{% for item in shop_sellable %}
+                        <article class="panel chatter-shop-card"><h3>{{ item.display_name }}</h3><p>Owned: {{ item.quantity }}{% if item.equipped %} &middot; Equipped{% endif %}</p><form method="post" action="/me/channels/{{ profile.channel.login }}/shop/sell"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="item_id" value="{{ item.item_id }}"><button class="button secondary" type="submit">Sell one</button></form></article>
+                    {% endfor %}</div>{% else %}<div class="panel compact-empty-state"><p>No sellable weapons in this channel yet.</p></div>{% endif %}
+                </section>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    {% else %}
+        <div class="panel compact-empty-state"><h3>Sign in to use Activity</h3><a class="button primary" href="/me/connect?next={{ ('/chatters/' ~ profile.identity.login ~ '/channels/' ~ profile.channel.login ~ '?tab=activity')|urlencode }}">Sign in with Twitch</a></div>
+    {% endif %}
+</section>
+{% endif %}

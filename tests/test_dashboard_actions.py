@@ -25,7 +25,9 @@ class PlaceholderParser(HTMLParser):
 
 def test_seven_dashboard_actions_are_ordered_and_available_overlays_are_enabled():
     parser = PlaceholderParser()
-    parser.feed(Path("web/templates/channel/dashboard.html").read_text(encoding="utf-8"))
+    template = Path("web/templates/channel/dashboard.html").read_text(encoding="utf-8")
+    owner_actions = template.split('class="dashboard-actions-panel"', 1)[1].split("{% else %}", 1)[0]
+    parser.feed(owner_actions)
     assert [button["text"] for button in parser.buttons] == [
         "Polls", "Predictions", "Raid browser", "Stream Together", "Shouts", "Whispers", "Points redeems"]
     for button in parser.buttons:
@@ -101,8 +103,8 @@ def test_actions_are_compact_without_a_surrounding_panel():
     assert 'class="dashboard-lower-panels"' in template
     assert template.index('class="dashboard-activity-grid"') < template.index('class="dashboard-actions-panel"') < template.index('class="channel-dashboard-side viewer-queue-column"')
     actions = template.split('class="dashboard-actions-panel"', 1)[1].split('</section>', 1)[0]
-    assert actions.count('<svg viewBox="0 0 24 24" aria-hidden="true">') == 7
-    assert actions.count('<span class="sr-only">') == 7
+    assert actions.split('{% else %}', 1)[0].count('<svg viewBox="0 0 24 24" aria-hidden="true">') == 7
+    assert actions.split('{% else %}', 1)[0].count('<span class="sr-only">') == 7
     parser = PlaceholderParser()
     parser.feed(actions)
     # The section opening was removed, but every icon button retains its name.

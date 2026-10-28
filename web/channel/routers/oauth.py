@@ -14,7 +14,7 @@ from web.channel.auth import (
     login_channel_user,
     validate_channel_oauth_state
 )
-from web.shared.common import render_error, templates
+from web.shared.common import templates
 from web.shared.oauth import build_public_channel_oauth_url, build_public_custom_bot_oauth_url, exchange_code_for_token, fetch_twitch_user
 from web.state import get_bot, get_db
 
@@ -22,11 +22,19 @@ router = APIRouter()
 
 
 def customization_redirect(result: str, message: str) -> RedirectResponse:
-    return RedirectResponse(url=f"/channel/customization?identity_result={result}&identity_message={quote_plus(message)}", status_code=303)
+    return RedirectResponse(url=f"/channel/settings?section=connections&identity_result={result}&identity_message={quote_plus(message)}", status_code=303)
 
 
 def render_custom_bot_result(request: Request, title: str, message: str, *, success: bool = False, status_code: int = 200) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="channel/custom_bot_result.html", context={"title": title, "message": message, "success": success}, status_code=status_code)
+
+
+def render_channel_auth_error(request: Request, *, title: str, message: str, status_code: int) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request, name="channel/auth_error.html",
+        context={"title": title, "message": message}, status_code=status_code,
+        headers={"Cache-Control": "no-store"}
+    )
 
 
 @router.get("/connect", response_class=HTMLResponse)
@@ -42,7 +50,7 @@ async def public_connect_twitch(request: Request):
 
 @router.get("/channel/custom-bot/connect")
 async def connect_channel_custom_bot(request: Request):
-    return RedirectResponse(url="/channel/customization", status_code=303)
+    return RedirectResponse(url="/channel/settings?section=connections", status_code=303)
 
 
 @router.post("/channel/custom-bot/connect", response_class=HTMLResponse)
@@ -168,13 +176,13 @@ async def public_channel_callback(request: Request, code: str | None = None, sta
         return await custom_bot_callback(request, code, state, error)
 
     if not validate_channel_oauth_state(request, state):
-        return await render_error(request, title="Channel authorization failed", message="The Twitch authorization request could not be verified.", status_code=400)
+        return render_channel_auth_error(request, title="Channel authorization failed", message="This authorization attempt expired, was already used, or could not be verified. Start channel sign-in again from this page.", status_code=400)
 
     if error:
         return RedirectResponse(url="/", status_code=303)
 
     if not code:
-        return await render_error(request, title="Channel authorization failed", message="No authorization code was provided.", status_code=400)
+        return render_channel_auth_error(request, title="Channel authorization failed", message="No authorization code was provided.", status_code=400)
 
     try:
         token_response = await exchange_code_for_token(code=code, redirect_uri=settings.PUBLIC_CHANNEL_REDIRECT_URI)
@@ -187,11 +195,11 @@ async def public_channel_callback(request: Request, code: str | None = None, sta
         elif runtime_db is not None:
             await save_token(db=runtime_db, user_id=twitch_user.user_id, token=token_response.access_token, refresh=token_response.refresh_token)
         else:
-            return await render_error(request, title="Runtime unavailable", message="The RatsBoomBot runtime is not available.", status_code=503)
+            return render_channel_auth_error(request, title="Runtime unavailable", message="The RatsBoomBot runtime is not available.", status_code=503)
 
         login_channel_user(request, twitch_user.user_id, twitch_user.login, twitch_user.display_name)
-    except Exception as error:
-        return await render_error(request, title="Channel connection failed", message=repr(error), status_code=500)
+    except Exception:
+        return render_channel_auth_error(request, title="Channel connection failed", message="The channel could not be connected. Please try again shortly.", status_code=500)
 
     return RedirectResponse(url="/channel", status_code=303)
 

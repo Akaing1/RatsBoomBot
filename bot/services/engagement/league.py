@@ -45,6 +45,10 @@ class LeagueProviderError(RuntimeError):
     pass
 
 
+class SummonerNotFoundError(LeagueProviderError):
+    pass
+
+
 @dataclass(frozen=True)
 class TypedValue:
     name: str
@@ -259,6 +263,9 @@ class OpggMcpClient:
         payload = response.json()
 
         if payload.get("error"):
+            error = payload["error"]
+            if isinstance(error, dict) and str(error.get("message", "")).strip().casefold() == "summoner not found":
+                raise SummonerNotFoundError("Summoner not found")
             raise LeagueProviderError(str(payload["error"]))
 
         result = payload.get("result") or {}
@@ -667,13 +674,16 @@ class LeagueService:
             LOGGER.exception("[League] OP.GG refresh cycle failed.")
 
     async def refresh_profile(self, client: OpggMcpClient, broadcaster_id: str, config: LeagueConfig, *, force_season: bool) -> None:
-        season_key = f"season:{broadcaster_id}"
+        season_key = f"season:{broadcaster_id}:{config.region}:{config.game_name}#{config.tag_line}"
 
         if force_season or await self.refresh_due(season_key, SEASON_REFRESH_SECONDS):
             try:
                 summary = await client.fetch_season_summary(config)
                 await self.save_season_summary(broadcaster_id, config.provider, summary)
                 await self.mark_refreshed(season_key)
+            except SummonerNotFoundError:
+                await self.invalidate_profile_identity(broadcaster_id, config)
+                return
             except Exception:
                 LOGGER.exception("[League] Failed to refresh seasonal champions for %s.", config.display_name)
 
@@ -683,8 +693,18 @@ class LeagueService:
             await self.cleanup_matches(broadcaster_id)
             await self.mark_refreshed(f"matches:{broadcaster_id}")
             LOGGER.info("[League] Saved %d new matches for %s.", inserted, config.display_name)
+        except SummonerNotFoundError:
+            await self.invalidate_profile_identity(broadcaster_id, config)
         except Exception:
             LOGGER.exception("[League] Failed to refresh recent matches for %s.", config.display_name)
+
+    async def invalidate_profile_identity(self, broadcaster_id: str, config: LeagueConfig) -> None:
+        cleared = await self.bot.services.profile_settings.invalidate_league_identity(broadcaster_id, config)
+        if cleared:
+            LOGGER.warning(
+                "[League] Obsolete Riot ID cleared for %s. Re-enter and verify the Riot name, tag and region in dashboard settings.",
+                config.display_name
+            )
 
     async def refresh_registered_players(self, client: OpggMcpClient, active_broadcaster_ids: set[str]) -> None:
         if not active_broadcaster_ids:

@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
 
-Current application version: **15.2.3** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
+Current application version: **15.3.3** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
 
 ## Highlights
 
@@ -360,4 +360,18 @@ Flip the Moderation card to **For You** for private, account-saved stream notes 
 
 ### Channel settings notebook
 
-Settings combines feature switches and customization into General, Chat, Stream Events, Timers, Connections, Loyalty Points, Viewer Queue, and Pets and Boss Hunt. Games appears when a channel has an enabled game integration, and contains only enabled game data. General contains protected users, YouTube chat, and game enable switches. Raid preferences live under Stream Events. SVG tabs sit above the settings on desktop and mobile. Single feature status buttons live in expandable group headers; multi-feature controls use aligned rows inside the group. Timers and Loyalty Points show their forms directly, without extra accordions; standalone commands use compact rows. Switch tabs without losing form drafts; a dot marks sections with unsaved edits. Save controls apply to their individual forms. Saving one form warns before discarding drafts in other forms. Expand detailed groups as needed. Existing Features and Customization links remain supported, and `/channel/settings?section=loyalty` opens a category directly.
+Settings combines feature switches and customization into General, Chat, Stream Events, Timers, Connections, Loyalty Points, Viewer Queue, and Pets and Boss Hunt. Games appears when a channel has an enabled game integration, and contains only enabled game data. General contains protected users, YouTube chat, and game enable switches. Raid preferences live under Stream Events. SVG tabs sit above the settings on desktop and mobile. Single feature status buttons live in expandable group headers; multi-feature controls use aligned rows inside the group. Timers and Loyalty Points show their forms directly, without extra accordions; standalone commands use compact rows. Switch tabs without losing form drafts; a dot marks sections with unsaved edits. Save controls apply to their individual forms. Saving one form warns before discarding drafts in other forms. Expand detailed groups as needed. Loyalty Points is managed inside Settings rather than a separate sidebar page. Old Features, Customization, and Loyalty Points URLs redirect to Settings, and `/channel/settings?section=loyalty` opens a category directly.
+
+### For You
+
+The For You sidebar page contains Notes and Quotes. Notes share the Overview editor: saves update one entry per stream, including streams crossing midnight, or one entry per offline UTC day. Notes can be created, titled, edited, deleted, and reordered using the note list. Untitled entries are displayed as Unnamed note 1, Unnamed note 2, etc., in list order; deleting or titling one closes numbering gaps. Stream/day grouping stays internal. Existing note content is preserved on upgrade. Quote search, addition, editing, and deletion use the same channel quotes as chat commands. Lists paginate in groups of 20; deletion renumbers quotes as usual.
+
+## Unattended performance history
+
+Each bot process records one JSON sample every 60 seconds in `performance.jsonl` beside its configured database. The dashboard does not need to be open. The file and three rotated backups (`.1` through `.3`) use approximately 8 MiB maximum per deployment and survive restarts. Production and UAT databases should live in separate directories.
+
+Samples contain a Unix timestamp, PID, application version, process resident memory, host memory, swap usage, CPU usage/temperature, load, active stream-log session count, async task count, and Raspberry Pi throttling flags. Unsupported measurements are `null`; the initial CPU sample is also `null`. Stream-session count reflects the bot's tracked sessions, not an independent Twitch poll. Throttling flags include historical flags since boot. No chat content or tokens are recorded.
+
+To inspect history, run `tail -n 10 /path/to/database-directory/performance.jsonl`. Copy the current file and rotated backups when investigating an incident. Samples flush after each write; a stalled process may leave a gap, and this logger cannot diagnose an outage before it was deployed. File/firmware reads run off the chat event loop, with a two-second firmware command timeout.
+
+Connection recovery and monitoring: [operations guide](docs/connection-recovery.md).

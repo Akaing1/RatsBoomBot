@@ -6,7 +6,11 @@ Only published releases receive dated version headings. Intermediate development
 
 ## Unreleased — release/15.0.0
 
-The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot/releases/tag/v14.2.2). The current working application version is 15.2.3; it is not yet a published release.
+The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot/releases/tag/v14.2.2). The current working application version is 15.3.3; it is not yet a published release.
+
+- Store broadcaster Riot identities exclusively in dashboard database settings; clear confirmed obsolete IDs and request re-evaluation without overwriting newer edits.
+
+- Add sustained Twitch-disconnection recovery and diagnostic logging, bound web shutdown, back off 7TV transport failures, and handle announcement permissions/missing League summoners without repetitive tracebacks. Application version 15.3.3.
 
 - Raid browser with discovery filters, compatibility ranking, favorites and team views, stream/video previews, and shared preview chat ([PR #387](https://github.com/Akaing1/RatsBoomBot/pull/387), merged into the release branch).
 - Reusable chat composer, autocomplete, emote picker/input, cross-platform message merging, platform-specific delivery errors, and dashboard controls ([PR #387](https://github.com/Akaing1/RatsBoomBot/pull/387)).
@@ -33,6 +37,12 @@ The latest published release is [v14.2.2](https://github.com/Akaing1/RatsBoomBot
 - Combine Features and Customization into a settings notebook with eight categories, right-side SVG tabs, mobile navigation, expandable groups, and unsaved-change indicators. Existing save endpoints and legacy links remain supported; application version 15.2.0.
 
 - Expand Settings to the full dashboard workspace, align form and card styling with Overview, and arrange timer messages into responsive cards; application version 15.2.1.
+
+- Match For You to Settings styling, remove explanatory text and displayed timestamps, and add note titles, editing, deletion, and ordering with automatic untitled numbering; application version 15.3.1.
+
+- Add For You with shared current notes, per-stream/offline-day note archives, and searchable channel quote management; preserve existing notes and protect quote identities during renumbering. Application version 15.3.0.
+
+- Remove the duplicate Loyalty Points sidebar page, retire unused Features/Customization/Loyalty templates, and consolidate settings redirects while preserving old bookmarks and form submissions; application version 15.2.4.
 
 - Reorganize Settings categories, move protection and YouTube into General, keep raid preferences with Stream Events, conditionally show enabled game data, simplify Timers and Loyalty Points, and align message controls and input styling; application version 15.2.3.
 

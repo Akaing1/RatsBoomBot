@@ -1,0 +1,30 @@
+{% extends "channel/layout.html" %}
+{% block title %}Moderator access | RatsBoomBot{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
+<header class="page-header access-header"><div><h2>Moderator access</h2></div></header>
+<div class="access-layout"><section class="panel"><h3 class="access-list-heading">People with access</h3>
+{% for entry in grants %}<div class="access-row"><div><strong>{{ entry.user_name }}</strong><form method="post" action="/channel/access" data-role-form>
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" value="{{ entry.user_id }}">
+<select class="access-badge role-{{ entry.permission }}" name="permission" aria-label="Role for {{ entry.user_name }}" data-role-select data-original="{{ entry.permission }}"><option value="edit"{% if entry.permission == 'edit' %} selected{% endif %}>Moderator</option><option value="super"{% if entry.permission == 'super' %} selected{% endif %}>Super moderator</option></select>
+<noscript><button class="button secondary" type="submit">Save role</button></noscript><p data-role-status role="status" aria-live="polite"></p></form></div>
+<form method="post" action="/channel/access"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" value="{{ entry.user_id }}"><input type="hidden" name="permission" value="revoke"><button class="button danger" type="submit">Revoke</button></form></div>
+{% else %}<p>No one has access yet.</p>{% endfor %}
+
+</section><aside class="panel access-settings"><h3>Grant or update access</h3>
+<form class="protected-user-search" data-access-search>
+<label for="access-query">Twitch username</label>
+<div class="protected-user-search-controls"><input id="access-query" class="profile-setting-input" name="query" maxlength="25" autocomplete="off" required placeholder="Enter username"><button class="button secondary" type="submit">Search</button></div>
+<p class="protected-user-search-message" data-access-message role="status" aria-live="polite"></p>
+</form>
+<form class="protected-user-result access-result" method="post" action="/channel/access" data-access-result hidden>
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" data-access-id>
+<div><span>Verified Twitch user</span><strong data-access-label></strong></div>
+<label for="access-level">Access level</label><select class="profile-setting-input" id="access-level" name="permission"><option value="edit">Moderator</option><option value="super">Super moderator</option></select>
+<p class="access-help">Moderators can manage chat, the viewer queue and notes. Super moderators can also manage ads and customize bot settings.</p>
+<button class="button primary" type="submit">Save access</button></form>
+<p class="access-help">Search for a Twitch user, confirm the account, then choose their access.</p>
+<noscript><p>Enable JavaScript to search and confirm a Twitch user.</p></noscript>
+</aside></div>
+{% endblock %}
+{% block page_scripts %}{{ super() }}<script src="/static/js/mod-access.js?v={{ deployment_stamp() }}" defer></script>{% endblock %}

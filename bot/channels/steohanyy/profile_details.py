@@ -14,8 +14,6 @@ from bot.profiles import (
 STEOHANYY_LEAGUE = LeagueConfig(
     enabled=True,
     provider="opgg",
-    game_name="steohany",
-    tag_line="ant",
     region="NA",
     display_name="Steohany"
 )

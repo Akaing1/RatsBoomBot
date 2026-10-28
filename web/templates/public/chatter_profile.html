@@ -8,8 +8,9 @@
     <link rel="canonical" href="{{ public_base_url }}/chatters/{{ profile.identity.login }}">
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
+    <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
 </head>
-<body class="chatter-profile-page">
+<body class="chatter-profile-page profile-page{% if account_mode %} account-page{% endif %}">
     <header class="public-command-navigation">
         <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
             <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
@@ -27,8 +28,8 @@
         {% endif %}
     </header>
 
+<div class="mod-account-layout account-layout">
     <main class="chatter-profile-content">
-        {% if account_mode %}<section class="panel chatter-account-intro"><p class="eyebrow">My account</p><h2>Your activity</h2><p>Your public profile is below. Channel balances and raid items are in each community card.</p></section>{% endif %}
         <header class="chatter-profile-hero">
             {% if profile.identity.profile_image_url %}<img class="chatter-profile-avatar" src="{{ profile.identity.profile_image_url }}" alt="{{ profile.identity.display_name }} Twitch profile picture">{% else %}<div class="chatter-profile-avatar">{{ profile.identity.display_name[0] | upper }}</div>{% endif %}
             <div>
@@ -53,17 +54,17 @@
 
         <nav class="chatter-tabs" aria-label="Chatter profile sections">
             <button type="button" class="active" data-chatter-tab="overview" aria-selected="true">Overview</button>
-            <button type="button" data-chatter-tab="raids" aria-selected="false">Boss Hunt</button>
             <button type="button" data-chatter-tab="achievements" aria-selected="false">Achievements</button>
             <button type="button" data-chatter-tab="pets" aria-selected="false">Pets</button>
+            <button type="button" data-chatter-tab="raids" aria-selected="false">Boss Hunt</button>
         </nav>
 
         <section id="pets" class="chatter-section" data-chatter-panel="pets" aria-label="Pet collection" hidden>
-            <div class="chatter-section-heading"><div><p class="eyebrow">Global companions</p><h2>Pet collection</h2></div></div>
+            <div class="collection-heading"><h2>Pets</h2><span class="collection-count">{{ profile.pets | length }} collected</span></div>
             <div class="pet-summon-info">
                 <span>Buy a ticket with <code>!pets buy ticket</code> for 50,000 channel points, then use <code>!pets summon</code></span>
                 <details class="pet-rates">
-                    <summary aria-label="Show pet summon rates">* Rates</summary>
+                    <summary aria-label="Show pet summon rates">Summon rates</summary>
                     <div class="pet-rates-popup">
                         <strong>Summon rates</strong>
                         <table>
@@ -80,87 +81,69 @@
                     </div>
                 </details>
             </div>
-            <div class="chatter-stat-grid">
+            <div class="pet-collection-grid">
                 {% for pet in profile.pets %}
-                <article>
+                {% set equipped = profile.pet and profile.pet.user_pet_id == pet.user_pet_id %}
+                <article class="pet-collection-card rarity-{{ pet.rarity }}{% if equipped %} is-equipped{% endif %}">
+                    <div class="pet-card-labels"><span>{{ 'UR' if pet.rarity == 'ultra_rare' else pet.rarity | title }}</span>{% if equipped %}<span class="pet-equipped-label">Equipped</span>{% endif %}</div>
                     <div class="pet-collection-sprite-slot">
                     <div class="chatter-pet-sprite{% if pet.pet_id == 'honey_hen' %} chatter-pet-sprite--hen{% elif pet.pet_id == 'dog_of_the_sun' %} chatter-pet-sprite--sun-dog{% elif pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif pet.pet_id == 'witch_cat' %} chatter-pet-sprite--cat{% elif pet.pet_id == 'royal_raven' %} chatter-pet-sprite--raven{% elif pet.pet_id == 'horned_wolf' %} chatter-pet-sprite--wolf{% elif pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ pet.sprite_path | replace("'", '%27') }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ pet.frame_count }}" role="img" aria-label="{{ pet.display_name }}"></div>
                     </div>
-                    <strong>{{ pet.display_name }}</strong>
-                    <span>{{ 'UR' if pet.rarity == 'ultra_rare' else pet.rarity | title }}{% if profile.pet and profile.pet.user_pet_id == pet.user_pet_id %} · Equipped{% endif %}</span>
-                    <small>{{ pet.passive_percent_label }}% {{ pet.passive_description }}</small>
-                    <small>Equip: <code>!pets equip {{ pet.display_name }}</code></small>
+                    <h3>{{ pet.display_name }}</h3>
+                    <p class="pet-passive"><strong>{{ pet.passive_percent_label }}%</strong> {{ pet.passive_description }}</p>
+                    {% if not equipped %}<details class="pet-equip-help"><summary>Equip in chat</summary><code>!pets equip {{ pet.display_name }}</code></details>{% endif %}
                 </article>
-                {% else %}<p>No pets collected yet. Your first summon is equipped automatically.</p>{% endfor %}
+                {% else %}<div class="panel collection-empty"><h3>{{ 'Your collection starts here' if account_mode else 'No pets collected yet' }}</h3>{% if account_mode %}<p>Summon your first pet using the commands above.</p>{% endif %}</div>{% endfor %}
             </div>
         </section>
 
         <section data-chatter-panel="overview">
-            <p><strong>{{ profile.achievements.unlocked if profile.achievements else 0 }} achievement tiers unlocked</strong> · Explore the Achievements tab for badges and progress.</p>
-            <div class="chatter-stat-grid" aria-label="Global chatter statistics">
+            <div class="chatter-stat-grid account-stat-grid" aria-label="Global chatter statistics">
                 <article><span>Messages sent</span><strong>{{ "{:,}".format(profile.messages_sent) }}</strong></article>
                 <article><span>Channels visited</span><strong>{{ profile.channels_interacted }}</strong></article>
                 <article><span>Points earned</span><strong>{{ "{:,}".format(profile.lifetime_points_earned) }}</strong></article>
                 <article><span>Total daily check-ins</span><strong>{{ "{:,}".format(profile.daily_check_ins) }}</strong></article>
-                <article><span>Favorite channel</span><strong>{{ profile.favorite_channel.display_name if profile.favorite_channel else "Not enough activity" }}</strong></article>
+                <article><span>Most Visited</span><strong>{{ profile.favorite_channel.display_name if profile.favorite_channel else "Not enough activity" }}</strong></article>
                 {% set gamble_losses = profile.gamble_total - profile.gamble_wins %}
                 <article><span>Gamble win rate</span><strong>{{ "%.1f%%" | format(profile.gamble_win_rate) if profile.gamble_win_rate is not none else "—" }}</strong><small>{{ profile.gamble_wins }} {{ "win" if profile.gamble_wins == 1 else "wins" }} / {{ gamble_losses }} {{ "loss" if gamble_losses == 1 else "losses" }}</small></article>
             </div>
-
-            <section class="chatter-section">
-            <div class="chatter-section-heading">
-                <div><p class="eyebrow">Channel activity</p><h2>Communities</h2></div>
-                <p>Select a channel for balances, Boss Hunt inventory, redeems, and detailed activity.</p>
-            </div>
-
-            {% if profile.channels %}
-                <div class="chatter-channel-grid">
-                    {% for channel in profile.channels %}
-                        <a class="chatter-channel-card" href="/chatters/{{ profile.identity.login }}/channels/{{ channel.login }}">
-                            {% if channel.profile_image_url %}<img src="{{ channel.profile_image_url }}" alt="">{% else %}<div class="chatter-channel-avatar">{{ channel.display_name[0] | upper }}</div>{% endif %}
-                            <div><h3>{{ channel.display_name }}</h3><p>{{ "{:,}".format(channel.messages_sent) }} messages &middot; {{ "{:,}".format(channel.raid_damage) }} Boss Hunt damage</p></div>
-                            <span>&rsaquo;</span>
-                        </a>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="panel compact-empty-state"><h2>No channel activity yet</h2><p>Activity will appear after this chatter participates in a connected channel.</p></div>
-            {% endif %}
-            </section>
         </section>
 
         <section data-chatter-panel="raids" hidden>
-            <div class="chatter-section-heading"><div><p class="eyebrow">Boss Hunt history</p><h2>Boss record</h2></div><p>Combined performance across every connected RatsBoomBot channel.</p></div>
-            <div class="chatter-stat-grid" aria-label="Global Boss Hunt statistics">
+            <div class="chatter-section-heading"><h2>Boss Hunt</h2></div>
+            <div class="chatter-stat-grid boss-highlight-grid" aria-label="Boss Hunt highlights">
                 <article><span>Total damage</span><strong>{{ "{:,}".format(profile.damage_dealt) }}</strong></article>
+                <article><span>Points earned</span><strong>{{ "{:,}".format(profile.raid_reward_points) }}</strong></article>
                 <article><span>Best contribution</span><strong>{{ "{:,}".format(profile.highest_contribution) }}</strong></article>
-                <article><span>Bosses attacked</span><strong>{{ profile.bosses_attacked }}</strong></article>
-                <article><span>Bosses defeated</span><strong>{{ profile.bosses_defeated }}</strong></article>
-                <article><span>Final hits</span><strong>{{ profile.final_hits }}</strong></article>
-                <article><span>Total rewards earned</span><strong>{{ "{:,}".format(profile.raid_reward_points) }}</strong></article>
-                <article><span>Top Contributor finishes</span><strong>{{ profile.top_contributor_finishes }}</strong></article>
+            </div>
+            <div class="boss-record-grid" aria-label="Boss Hunt record">
+                <article><strong>{{ profile.bosses_attacked }}</strong><span>Bosses attacked</span></article>
+                <article><strong>{{ profile.bosses_defeated }}</strong><span>Bosses defeated</span></article>
+                <article><strong>{{ profile.final_hits }}</strong><span>Final hits</span></article>
+                <article><strong>{{ profile.top_contributor_finishes }}</strong><span>Top Contributor finishes</span></article>
             </div>
 
             <section class="chatter-section">
-                <div class="chatter-section-heading"><div><p class="eyebrow">Latest battles</p><h2>Recent Boss Hunt history</h2></div><p>The five most recent completed encounters this chatter participated in.</p></div>
+                <div class="chatter-section-heading"><h2>Recent battles</h2></div>
                 {% if profile.recent_raids %}
-                    <div class="chatter-raid-history">
+                    <div class="chatter-raid-history boss-battle-list">
                         {% for raid in profile.recent_raids %}
                             <article>
                                 <div><strong>{{ raid.boss_name }}</strong><span>{{ raid.channel.display_name }} &middot; {{ raid.date }}</span></div>
                                 <div><strong>{{ "{:,}".format(raid.damage) }} damage</strong><span>{{ "{:,}".format(raid.reward_points) }} points earned</span></div>
-                                <div class="chatter-raid-result"><span class="{{ raid.status }}">{{ raid.status | title }}</span><em>#{{ raid.placement }} of {{ raid.participant_count }}{% if raid.top_contributor %} &middot; Top Contributor{% endif %}</em></div>
+                                <div class="chatter-raid-result"><span class="{{ raid.status }}">{{ raid.status | title }}</span><em>#{{ raid.placement }} of {{ raid.participant_count }}</em>{% if raid.top_contributor %}<strong class="boss-contributor">Top Contributor</strong>{% endif %}</div>
                             </article>
                         {% endfor %}
                     </div>
                 {% else %}
-                    <div class="panel compact-empty-state"><h3>No completed encounters yet</h3><p>Boss Hunt results will appear here after this chatter completes a boss encounter.</p></div>
+                    <div class="panel compact-empty-state"><h3>No completed battles yet</h3></div>
                 {% endif %}
             </section>
         </section>
 
         {% if profile.achievements %}{% include 'public/achievements.html' %}{% endif %}
     </main>
+<aside class="account-sidebar" aria-label="Profile channels">{% if account_mode %}{% include "viewer/mod_bar.html" %}{% endif %}{% include "viewer/communities.html" %}</aside></div>
     <script src="{{ url_for('static', path='/js/chatter-tabs.js') }}?v={{ deployment_stamp() }}" defer></script>
 </body>
 </html>

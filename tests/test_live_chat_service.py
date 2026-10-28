@@ -540,7 +540,7 @@ def test_clear_chat_removes_twitch_history_and_notifies_subscribers():
 
 
 @pytest.mark.parametrize("platform,connected,url", [
-    ("twitch", False, "/connect"), ("youtube", False, "/channel/customization?social_tab=youtube#youtube-integration"),
+    ("twitch", False, "/connect"), ("youtube", False, "/channel/settings?section=general&social_tab=youtube#youtube-integration"),
     ("twitch", True, None), ("youtube", True, None)])
 def test_platform_filter_connection_links(platform, connected, url):
     from pathlib import Path
@@ -1914,7 +1914,7 @@ def test_dashboard_mobile_activity_panels_keep_tabs_above_scrollable_events():
 
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
-    features = open("web/templates/channel/features.html", encoding="utf-8").read()
+    features = open("web/templates/channel/settings.html", encoding="utf-8").read()
     channel_layout = open("web/templates/channel/layout.html", encoding="utf-8").read()
     customization = open("web/templates/shared/profile_inputs.html", encoding="utf-8").read()
     youtube_settings = open("web/templates/shared/youtube_settings.html", encoding="utf-8").read()
@@ -1930,8 +1930,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     metadata_script = open("web/static/js/dashboard-channel-metadata.js", encoding="utf-8").read()
     queue_script = open("web/static/js/dashboard-viewer-queue.js", encoding="utf-8").read()
 
-    assert 'data-stream-url="/channel/api/chat/stream?view=both"' in dashboard
-    assert 'data-stream-url="/channel/api/chat/stream?view=commands"' in dashboard
+    assert 'data-stream-url="{{ channel_root }}/api/chat/stream?view=both"' in dashboard
+    assert 'data-stream-url="{{ channel_root }}/api/chat/stream?view=commands"' in dashboard
     assert dashboard.count("data-connection-status-target") == 1
     assert "Waiting for chat messages" not in dashboard
     assert "Waiting for commands" not in dashboard
@@ -1957,7 +1957,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'const feedScroller = createTopScroller(feedContent);' in dashboard
     assert 'const modActionScroller = createTopScroller(modActionContent);' in dashboard
     assert 'const automodScroller = createTopScroller(automodContent);' in dashboard
-    assert 'const activityEndpoint = "/channel/api/redemptions";' in dashboard
+    assert 'const activityEndpoint = "{{ channel_root }}/api/redemptions";' in dashboard
     assert 'window.setInterval(refreshActivity, 2000);' in dashboard
     assert 'renderModeration(data);' in dashboard
     assert 'const anchor = atTop ? null : [...element.querySelectorAll("[data-activity-key]")]' in dashboard
@@ -2034,12 +2034,13 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'data-activity-link="commands"' not in dashboard
     assert "Stream activity" not in dashboard
     assert "Viewer games" not in dashboard
-    assert 'data-refresh-url="/channel/api/dashboard-stats"' in dashboard
+    assert 'data-refresh-url="{{ channel_root }}/api/dashboard-stats"' in dashboard
     assert "Back to Overview" not in features
     assert dashboard.index("dashboard-chat-compose-row") < dashboard.index("data-chat-target-cycle") < dashboard.index("data-chat-send-status") < dashboard.index("chat-send-button")
     assert "dashboard-chat-composer-actions" not in dashboard
-    assert 'fetch("/channel/api/chat/emotes")' in composer_script
-    assert 'fetch("/channel/api/chat/users"' in composer_script
+    assert "'/api/chat/emotes'" in composer_script
+    assert 'globalThis.document?.body?.dataset?.channelRoot' in composer_script
+    assert "'/api/chat/users'" in composer_script
     assert 'const twitchCommands = [' in composer_script
     autocomplete_script = open("web/static/js/chat-autocomplete.js", encoding="utf-8").read()
     shared_composer_script = open("web/static/js/chat-composer.js", encoding="utf-8").read()
@@ -2094,8 +2095,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'data-ad-status' in dashboard
     assert dashboard.count("<h3>Viewer queue</h3>") == 1
     assert "data-channel-metadata" in dashboard
-    assert 'data-games-url="/channel/api/games"' in dashboard
-    assert 'contenteditable="plaintext-only"' in dashboard
+    assert 'data-games-url="{{ channel_root }}/api/games"' in dashboard
+    assert "'plaintext-only' if not moderator_mode or can_customize else 'false'" in dashboard
     assert dashboard.count('spellcheck="false"') >= 2
     assert "dashboard-channel-metadata.js" in dashboard
     assert "dashboard-viewer-queue.js" in dashboard
@@ -2108,7 +2109,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '#viewer-queue-content { width: calc(100% + 8px); max-height: 430px; margin-right: -8px; padding-right: 8px;' in dashboard_styles
     assert 'range(1, 11)' in dashboard
     assert 'data-queue-action="clear"' in dashboard
-    assert 'href="/channel/viewer-queue/blacklist"' in dashboard
+    assert 'href="{{ channel_root }}/viewer-queue/blacklist"' in dashboard
     assert 'data-queue-count' in dashboard
     assert '.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-left: auto; padding: 5px 9px; border: 0;' in dashboard_styles
     assert 'color: var(--text); font-size: 13px; font-weight: 800;' in dashboard_styles
@@ -2191,8 +2192,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'window.setTimeout(() => status.classList.add("is-fading"), 3000)' in metadata_script
     assert 'window.setTimeout(() => status.classList.add("is-fading"), 3000)' in queue_script
     assert 'data-activity-notify="commands"' in dashboard
-    assert 'data-moderation-url="/channel/api/chat/moderate"' in dashboard
-    assert 'data-pinned-url="/channel/api/chat/pinned"' in dashboard
+    assert 'data-moderation-url="{{ channel_root }}/api/chat/moderate"' in dashboard
+    assert 'data-pinned-url="{{ channel_root }}/api/chat/pinned"' in dashboard
     assert "live-chat-message-actions" in chat_script
     assert "refreshPinned" in chat_script
     assert 'source.onopen = () => showConnectionStatus(true)' in chat_script
@@ -2307,9 +2308,9 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.twitch-game-field:focus-within .channel-metadata-status { opacity: 0; }' in dashboard_styles
     assert 'setStatusSpace(Math.ceil(status.getBoundingClientRect().width))' in metadata_script
     assert 'statusSpaceTimer = window.setTimeout(() => setStatusSpace(0), 450)' in metadata_script
-    assert '.dashboard-video-header { --metadata-label-width: 88px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header { --metadata-label-width: 64px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr);' in dashboard_styles
     assert '.dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: var(--metadata-label-width) minmax(0,1fr);' in dashboard_styles
-    assert '.dashboard-video-header .twitch-channel-field > h3 { margin: 0; line-height: 1.2; text-align: right;' in dashboard_styles
+    assert '.dashboard-video-header .twitch-channel-field > h3 { margin: 0; font-size: 14px; line-height: 1.2; text-align: left;' in dashboard_styles
     assert '.dashboard-video-header .twitch-channel-field strong { box-sizing: border-box; width: 100%;' in dashboard_styles
     assert 'updateTitleEditingWidth' not in metadata_script
     assert 'range.selectNodeContents(field)' in metadata_script
@@ -2344,7 +2345,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'aspect-ratio: 16 / 9;' in dashboard_styles
     assert 'grid-template-columns: minmax(0,1.3fr) minmax(0,1fr)' in dashboard_styles
     assert dashboard.index('<div class="channel-dashboard-layout" data-dashboard-carousel>') < dashboard.index('<header class="page-header dashboard-channel-profile" hidden>')
-    assert 'body class="dashboard-page channel-page channel-page-{{ active_page }}"' in channel_layout
+    assert 'class="dashboard-page channel-page channel-page-{{ active_page }}' in channel_layout
+    assert 'data-channel-root="{{ channel_root }}"' in channel_layout
     assert "data-sidebar-toggle" in channel_layout
     assert "channel-sidebar.js" in channel_layout
     assert 'localStorage.setItem(storageKey, String(desktopCollapsed))' in sidebar_script

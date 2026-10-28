@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 APP_NAME = "RatsBoomBot"
-APP_VERSION = "15.2.3"
+APP_VERSION = "16.1.8"
 
 PROJECT_DIRECTORY = Path(__file__).resolve().parent.parent
 DEPLOYMENT_STAMP_PATH = PROJECT_DIRECTORY / ".data" / "deployment.txt"

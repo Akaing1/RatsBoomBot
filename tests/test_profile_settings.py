@@ -266,3 +266,32 @@ async def test_seeded_developer_currency_defaults_refresh_but_user_edits_remain(
         assert effective.points.display_name == "Points"
         assert effective.points.messages.balance_self == "{username}, you have {points} {currency}!"
         assert effective.points.messages.balance_other == "My saved response"
+
+@pytest.mark.asyncio
+async def test_league_identity_invalidation_persists_and_preserves_newer_edits(tmp_path):
+    from bot.profiles import LeagueConfig
+    base = ChannelProfile(channel_name="example", league=LeagueConfig(enabled=True))
+    activate_profile("1", base)
+    async with asqlite.create_pool(str(tmp_path / "league-settings.db")) as database:
+        service = ProfileSettingsService(database)
+        await service.setup()
+        service.apply_overrides("1", base)
+        await service.set_override("1", "league.game_name", "Old", "test")
+        await service.set_override("1", "league.tag_line", "TAG", "test")
+        old = get_active_profile("1").league
+        await service.set_override("1", "league.game_name", "New", "test")
+        assert not await service.invalidate_league_identity("1", old)
+        assert get_active_profile("1").league.game_name == "New"
+        current = get_active_profile("1").league
+        assert await service.invalidate_league_identity("1", current)
+        assert get_active_profile("1").league.game_name == ""
+        assert get_active_profile("1").league.tag_line == ""
+        restarted = ProfileSettingsService(database)
+        await restarted.setup()
+        assert restarted.apply_overrides("1", base).league.game_name == ""
+        await service.set_override("1", "league.game_name", "Replacement", "test")
+        await service.set_override("1", "league.tag_line", "NEW", "test")
+        await restarted.load_overrides()
+        assert restarted.apply_overrides("1", base).league.game_name == "Replacement"
+        await service.clear_override("1", "league.game_name", "test")
+        assert get_active_profile("1").league.game_name == ""

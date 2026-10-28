@@ -1,9 +1,10 @@
+import asyncio
 import json
 import logging
 from dataclasses import dataclass, fields, replace
 from string import Formatter
 
-from bot.profiles import ChannelProfile, PointsMessages
+from bot.profiles import ChannelProfile, LeagueConfig, PointsMessages
 from bot.timer_messages import format_timers, parse_timers
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -56,7 +57,7 @@ PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("redeems.daily_title", "Redeems", "Daily redeem title", "Exact Twitch reward title used for the daily claim.", maximum_length=100, rows=1),
     ProfileSettingDefinition("redeems.first_title", "Redeems", "First redeem title", "Exact Twitch reward title used for first place.", maximum_length=100, rows=1),
     ProfileSettingDefinition("redeems.vip_title", "Redeems", "VIP redeem title", "Exact Twitch reward title that permanently grants VIP status.", maximum_length=100, rows=1),
-    ProfileSettingDefinition("league.game_name", "League of Legends", "Riot game name", "The game-name portion of the broadcaster's Riot ID.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("league.game_name", "League of Legends", "Riot game name", "Saved in the database. If blank or cleared after an account lookup failure, enter the current Riot game name and verify the tag and region.", maximum_length=100, rows=1),
     ProfileSettingDefinition("league.tag_line", "League of Legends", "Riot tag line", "The tag-line portion of the broadcaster's Riot ID.", maximum_length=20, rows=1),
     ProfileSettingDefinition("league.region", "League of Legends", "Region", "The OP.GG region code, such as NA or EUW.", maximum_length=12, rows=1),
     ProfileSettingDefinition("league.display_name", "League of Legends", "League display name", "Name used when presenting broadcaster League statistics.", maximum_length=100, rows=1),
@@ -99,6 +100,7 @@ DEVELOPER_PROFILE_MIGRATION_VERSION = 2
 class ProfileSettingsService:
 
     def __init__(self, db):
+        self._settings_lock = asyncio.Lock()
         self.db = db
         self.overrides: dict[str, dict[str, str | int]] = {}
         self.protected_users: dict[str, dict[str, ProtectedUser]] = {}
@@ -287,6 +289,10 @@ class ProfileSettingsService:
         return True
 
     async def set_override(self, broadcaster_id: str, setting_name: str, raw_value: str, updated_by: str) -> ProfileSettingState:
+        async with self._settings_lock:
+            return await self._set_override(broadcaster_id, setting_name, raw_value, updated_by)
+
+    async def _set_override(self, broadcaster_id: str, setting_name: str, raw_value: str, updated_by: str) -> ProfileSettingState:
         broadcaster_id = str(broadcaster_id)
         definition = self.get_definition(setting_name)
         value = self.validate_value(definition, raw_value)
@@ -307,6 +313,10 @@ class ProfileSettingsService:
         return self.get_setting_state(broadcaster_id, setting_name)
 
     async def clear_override(self, broadcaster_id: str, setting_name: str, updated_by: str) -> ProfileSettingState:
+        async with self._settings_lock:
+            return await self._clear_override(broadcaster_id, setting_name, updated_by)
+
+    async def _clear_override(self, broadcaster_id: str, setting_name: str, updated_by: str) -> ProfileSettingState:
         broadcaster_id = str(broadcaster_id)
         self.get_definition(setting_name)
 
@@ -318,6 +328,36 @@ class ProfileSettingsService:
         self.refresh_active_profile(broadcaster_id)
         LOGGER.info("[Profiles] Cleared profile setting %s for broadcaster %s by %s.", setting_name, broadcaster_id, updated_by)
         return self.get_setting_state(broadcaster_id, setting_name)
+
+    async def invalidate_league_identity(self, broadcaster_id: str, expected: LeagueConfig) -> bool:
+        """Clear a confirmed obsolete ID without overwriting a newer dashboard edit."""
+        from bot.profiles import get_active_profile
+        from storage.transactions import immediate_transaction
+
+        broadcaster_id = str(broadcaster_id)
+        async with self._settings_lock:
+            profile = get_active_profile(broadcaster_id)
+            if profile is None or (
+                profile.league.game_name, profile.league.tag_line, profile.league.region
+            ) != (expected.game_name, expected.tag_line, expected.region):
+                return False
+            async with self.db.acquire() as connection:
+                async with immediate_transaction(connection):
+                    for key in ("league.game_name", "league.tag_line"):
+                        await connection.execute(
+                            """INSERT INTO channel_profile_overrides
+                            (broadcaster_id, setting_name, setting_value, updated_by, updated_at)
+                            VALUES (?, ?, ?, 'league-account-not-found', CURRENT_TIMESTAMP)
+                            ON CONFLICT(broadcaster_id, setting_name) DO UPDATE SET
+                            setting_value = excluded.setting_value,
+                            updated_by = excluded.updated_by, updated_at = CURRENT_TIMESTAMP""",
+                            (broadcaster_id, key, self.serialize_value(""))
+                        )
+            self.overrides.setdefault(broadcaster_id, {}).update({
+                "league.game_name": "", "league.tag_line": ""
+            })
+            self.refresh_active_profile(broadcaster_id)
+            return True
 
     def apply_overrides(self, broadcaster_id: str, profile: ChannelProfile) -> ChannelProfile:
         broadcaster_id = str(broadcaster_id)
