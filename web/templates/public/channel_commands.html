@@ -12,19 +12,17 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
 <link rel="stylesheet" href="/static/css/channel-help.css?v={{ deployment_stamp() }}">
 <script src="/static/js/channel-help.js?v={{ deployment_stamp() }}" defer></script>
-<link rel="stylesheet" href="/static/css/public-guide-header.css?v={{ deployment_stamp() }}">
+
+<link rel="stylesheet" href="/static/css/public-header.css?v={{ deployment_stamp() }}">
 </head>
 
 <body class="public-command-page channel-help">
-    <header class="public-command-navigation">
-        <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
-            <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
-            <span><strong>RatsBoomBot</strong><small>Channel Help</small></span>
-        </a>
-        <nav class="public-raid-navigation" aria-label="Channel links">
+    {% from "shared/public_header.html" import public_header with context %}
+    {% call public_header("Channel Help") %}
+<nav class="public-raid-navigation" aria-label="Channel links">
             {% if broadcaster.login %}<a class="button primary" href="https://twitch.tv/{{ broadcaster.login }}">Watch on Twitch</a>{% endif %}
         </nav>
-    </header>
+    {% endcall %}
 
     <main class="public-command-content">
         <header class="public-command-hero">
