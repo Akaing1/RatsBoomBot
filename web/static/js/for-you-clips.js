@@ -43,7 +43,7 @@
         status.textContent = 'Loading clips…'; find('[data-clips-signin]').hidden = true; more.disabled = true;
         try {
             const params = new URLSearchParams({days:find('#clip-days').value,after:cursor});
-            const response = await fetch('/channel/api/for-you/clips?' + params, {signal:controller.signal,cache:'no-store',credentials:'same-origin'});
+            const response = await fetch((document.body.dataset.channelRoot || '/channel') + '/api/for-you/clips?' + params, {signal:controller.signal,cache:'no-store',credentials:'same-origin'});
             if (response.status === 401) {
                 throw new Error('Your channel session needs attention. Sign in again, then retry.');
             }
@@ -74,7 +74,7 @@
         find('[data-clip-save]').hidden = true;
         find('[data-clip-message]').textContent = 'Preparing download…';
         try {
-            const response = await fetch('/channel/api/for-you/clips/download', {
+            const response = await fetch((document.body.dataset.channelRoot || '/channel') + '/api/for-you/clips/download', {
                 method:'POST', credentials:'same-origin', cache:'no-store',
                 body: new URLSearchParams({
                     clip_id:selectedClip,

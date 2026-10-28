@@ -9,20 +9,18 @@
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
     <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
+<link rel="stylesheet" href="/static/css/public-header.css?v={{ deployment_stamp() }}">
 </head>
 <body class="chatter-profile-page profile-page channel-chatter-page">
-    <header class="public-command-navigation chatter-channel-navigation">
-        <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
-            <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
-            <span><strong>RatsBoomBot</strong><small>Chatter profiles</small></span>
-        </a>
-        <a class="button secondary chatter-channel-back" href="{{ '/me' if owner_mode else '/chatters/' ~ profile.identity.login }}">Back to global profile</a>
+    {% from "shared/public_header.html" import public_header with context %}
+    {% call public_header("Chatter profiles") %}
+<a class="button secondary chatter-channel-back" href="{{ '/me' if owner_mode else '/chatters/' ~ profile.identity.login }}">Back to global profile</a>
         {% if owner_mode %}
             <form method="post" action="/me/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>
         {% elif not viewer_user_id %}
             <a class="button secondary chatter-channel-auth" href="/me/connect?next={{ ('/chatters/' ~ profile.identity.login ~ '/channels/' ~ profile.channel.login)|urlencode }}">Sign in with Twitch</a>
         {% endif %}
-    </header>
+    {% endcall %}
 
     <main class="chatter-profile-content">
         <header class="chatter-profile-hero channel-profile-hero">

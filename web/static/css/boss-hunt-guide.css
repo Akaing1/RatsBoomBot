@@ -1,0 +1,53 @@
+
+.hunt-guide .public-command-content{width:min(1440px,calc(100% - 40px));max-width:1440px;gap:24px}
+.hunt-guide .public-command-hero{padding:24px 0;border:0}
+.hunt-guide .public-command-hero h1{font-size:clamp(28px,4vw,44px)}
+.hunt-arena{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:24px;align-items:start}
+.hunt-guide .panel{border-radius:20px}
+.hunt-guide .public-raid-panel{background:radial-gradient(ellipse at top left,#44325b88,transparent 65%),var(--surface,#181c24);padding:28px;min-width:0}
+.hunt-guide .public-raid-panel h2{font-size:clamp(24px,3vw,38px)}
+.hunt-guide .raid-monitor-heading{margin-top:28px}
+.hunt-guide .raid-hp-track{height:22px;border-radius:20px;background:#090c1280;overflow:hidden;margin:16px 0 24px}
+.hunt-guide .raid-hp-track span{background:linear-gradient(90deg,#a855f7,#fb7185);border-radius:20px;transition:width .4s ease}
+.hunt-guide .public-raid-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.hunt-guide .public-raid-stats article{background:#0c101850;padding:16px;border:1px solid #ffffff12;border-radius:14px}
+.hunt-guide .public-raid-stats strong{font-size:24px;color:#e9d5ff}
+.hunt-guide .public-raid-contributors{margin-top:24px;border-top:1px solid #ffffff18;padding-top:20px}
+.hunt-guide #public-raid-top-contributors{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px}
+.hunt-guide #public-raid-top-contributors li{background:#ffffff05;padding:10px;border-radius:10px;gap:12px}
+.hunt-ready{background:linear-gradient(145deg,#253342,#19212c);padding:24px}
+.hunt-ready h2{margin:4px 0 24px}.hunt-step{display:flex;gap:14px;margin-bottom:24px}.hunt-step>b{color:#7dd3fc;font-size:13px;border:1px solid #7dd3fc44;border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex-shrink:0}
+.hunt-step h3{margin:0;font-size:15px}.hunt-step p{color:var(--muted);font-size:13px;line-height:1.6;margin:6px 0 10px}
+.hunt-ready>.button{width:100%;box-sizing:border-box}.hunt-copy-status{font-size:12px;color:#a7f3d0;min-height:18px;margin-bottom:0}
+.hunt-section-nav{display:flex;flex-wrap:wrap;gap:8px;padding:8px;background:#121720;border:1px solid var(--border);border-radius:16px;position:sticky;top:12px;z-index:3;margin:24px 0}
+.hunt-section-nav[hidden]{display:none}.hunt-section-nav button{border:0;border-radius:10px;padding:12px 20px;color:var(--muted);background:transparent;font:inherit;cursor:pointer}.hunt-section-nav button[aria-pressed=true]{background:#6d43aa;color:white}
+.hunt-guide .public-raid-guide>details{background:#191f29}.hunt-guide .public-raid-guide>details[hidden]{display:none}
+.hunt-guide .public-raid-shop-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.hunt-guide .public-raid-shop-grid article{background:linear-gradient(145deg,#283044,#1d2430);border:1px solid #ffffff14;border-radius:16px;padding:20px;transition:transform .16s,border-color .16s}
+.hunt-guide .public-raid-shop-grid article:hover{transform:translateY(-3px);border-color:#a78bfa88}
+.hunt-guide .public-raid-shop-category:nth-of-type(2) article{background:linear-gradient(145deg,#233936,#1b292a)}
+.hunt-guide .public-raid-shop-category:nth-of-type(3) article{background:linear-gradient(145deg,#3a3040,#272330)}
+.hunt-guide .public-raid-shop-grid article>strong{color:#fcd68b;font-size:18px}.hunt-guide .public-raid-item-type{color:#c4b5fd}
+.hunt-copy{display:inline-flex;align-items:center;gap:8px;max-width:100%;background:#0d121b;border:1px solid #ffffff22;border-radius:8px;color:#c4b5fd;padding:8px 10px;cursor:pointer;text-align:left}
+.hunt-copy code{white-space:normal;overflow-wrap:anywhere;background:none!important;padding:0!important}.hunt-copy span{font-size:10px;color:var(--muted)}
+.hunt-guide .public-raid-history-list{display:grid;grid-template-columns:1fr 1fr;gap:16px}.hunt-guide .public-raid-history-list>article{padding:20px!important;border:1px solid var(--border);border-radius:14px;background:#232a37;grid-template-columns:1fr auto}
+.hunt-guide button:focus-visible,.hunt-guide summary:focus-visible{outline:2px solid #c4b5fd;outline-offset:4px}
+@media(max-width:1000px){.hunt-arena{grid-template-columns:1fr}.hunt-ready{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.hunt-ready>.eyebrow,.hunt-ready>h2,.hunt-ready>.button,.hunt-copy-status{grid-column:1/-1}.hunt-step{margin:0}.hunt-guide .public-raid-shop-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.hunt-guide .public-raid-panel{padding:18px}.hunt-ready{display:block}.hunt-step{margin:20px 0}.hunt-guide .public-raid-stats{grid-template-columns:1fr 1fr}.hunt-guide #public-raid-top-contributors,.hunt-guide .public-raid-shop-grid,.hunt-guide .public-raid-history-list{grid-template-columns:1fr}.hunt-section-nav{position:static}.hunt-section-nav button{flex:1 0 28%;padding:10px 8px;font-size:13px}}
+@media(prefers-reduced-motion:reduce){.hunt-guide *{transition:none!important}}
+
+@media(min-width:1200px){
+.hunt-guide .public-raid-panel:has(.public-raid-contributors){display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:0 24px;align-content:start}
+.hunt-guide .public-raid-panel>.panel-header,.hunt-guide .raid-monitor-heading,.hunt-guide .raid-hp-track,.hunt-guide .public-raid-stats{grid-column:1}
+.hunt-guide .public-raid-panel>.public-raid-contributors{grid-column:2;grid-row:1/5;border-top:0;border-left:1px solid #ffffff18;padding:0 0 0 20px;margin:0}
+.hunt-guide #public-raid-top-contributors{grid-template-columns:1fr}
+.hunt-guide .public-raid-stats{grid-template-columns:1fr 1fr;align-content:start}
+}
+
+.hunt-guide .public-raid-contributors li{display:grid;grid-template-columns:1fr;gap:4px}
+.hunt-guide .public-raid-contributors li span{overflow-wrap:anywhere}
+.hunt-guide .public-raid-contributors li b{font-size:12px;padding-left:44px;color:#c4b5fd}
+.hunt-guide .public-raid-shop-category[hidden]{display:none}
+.hunt-shop-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.hunt-shop-filters button{border:1px solid #ffffff22;background:#111822;color:var(--muted);border-radius:24px;padding:9px 16px;cursor:pointer}
+.hunt-shop-filters button[aria-pressed=true]{border-color:#a78bfa;color:#e9d5ff;background:#342646}

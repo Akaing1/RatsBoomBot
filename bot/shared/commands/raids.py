@@ -10,6 +10,18 @@ from bot.shared.pending_raids import raid_lock, remember_raid
 LOGGER = logging.getLogger("RatBoomBot")
 
 
+def outgoing_raid_messages(profile, target):
+    """Shared !startraid validation/rendering for chat and the raid browser."""
+    if profile is None:
+        raise ValueError("No channel profile is available for starting a raid.")
+    values = {"target_name": target.name, "target_url": f"https://twitch.tv/{target.name}"}
+    messages = tuple(render_profile_message(template, **values) for template in
+                     (profile.raid_messages.outgoing, profile.raid_messages.outgoing_subscriber))
+    if not all(messages):
+        raise ValueError("Both outgoing raid messages must be configured before starting a raid.")
+    return messages
+
+
 class RaidCommands(commands.Component):
 
     def __init__(self, bot):
@@ -59,11 +71,10 @@ class RaidCommands(commands.Component):
             await ctx.reply("You cannot raid your own channel.")
             return
 
-        outgoing = render_profile_message(profile.raid_messages.outgoing, target_name=target.name, target_url=f"https://twitch.tv/{target.name}")
-        outgoing_subscriber = render_profile_message(profile.raid_messages.outgoing_subscriber, target_name=target.name, target_url=f"https://twitch.tv/{target.name}")
-
-        if not outgoing or not outgoing_subscriber:
-            await ctx.reply("Both outgoing raid messages must be configured before starting a raid.")
+        try:
+            outgoing, outgoing_subscriber = outgoing_raid_messages(profile, target)
+        except ValueError as error:
+            await ctx.reply(str(error))
             return
 
         broadcaster = self.bot.create_partialuser(broadcaster_id)

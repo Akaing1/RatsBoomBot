@@ -7,12 +7,13 @@
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
     <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
+<link rel="stylesheet" href="/static/css/public-header.css?v={{ deployment_stamp() }}">
 </head>
 <body class="chatter-profile-page account-page">
-    <header class="public-command-navigation">
-        <a class="landing-brand" href="/"><img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon"><span><strong>RatsBoomBot</strong><small>Chatter profiles</small></span></a>
-        <form action="/me/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>
-    </header>
+    {% from "shared/public_header.html" import public_header with context %}
+    {% call public_header("My account") %}
+<form action="/me/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>
+    {% endcall %}
 <div class="mod-account-layout account-layout">
     <main class="chatter-profile-content">
         <section class="account-empty-profile">

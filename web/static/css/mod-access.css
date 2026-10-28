@@ -227,3 +227,5 @@ select.access-badge { cursor: pointer; font: inherit; font-size: 12px; padding: 
     .activity-panel .chatter-gamble-form form { width: 100%; }
     .activity-panel .chatter-gamble-form input[name="amount"] { max-width: none; }
 }
+
+.access-role-guide { border-top: 1px solid var(--border-color, #343a46); margin-top: 1rem; padding-top: .5rem; }

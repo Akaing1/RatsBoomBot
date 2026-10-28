@@ -10,6 +10,10 @@
 <noscript><button class="button secondary" type="submit">Save role</button></noscript><p data-role-status role="status" aria-live="polite"></p></form></div>
 <form method="post" action="/channel/access"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" value="{{ entry.user_id }}"><input type="hidden" name="permission" value="revoke"><button class="button danger" type="submit">Revoke</button></form></div>
 {% else %}<p>No one has access yet.</p>{% endfor %}
+<div class="access-role-guide">
+<p class="access-help"><strong class="role-edit">Moderator</strong><br>View the Overview, send chat as their own account, manage chat and the viewer queue, and leave notes for you.</p>
+<p class="access-help"><strong class="role-super">Super moderator</strong><br>All moderator access, plus ads, bot settings and customization, and For You: manage the notes collection and quotes, and browse and download clips.</p>
+</div>
 
 </section><aside class="panel access-settings"><h3>Grant or update access</h3>
 <form class="protected-user-search" data-access-search>
@@ -21,7 +25,7 @@
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="user_id" data-access-id>
 <div><span>Verified Twitch user</span><strong data-access-label></strong></div>
 <label for="access-level">Access level</label><select class="profile-setting-input" id="access-level" name="permission"><option value="edit">Moderator</option><option value="super">Super moderator</option></select>
-<p class="access-help">Moderators can manage chat, the viewer queue and notes. Super moderators can also manage ads and customize bot settings.</p>
+
 <button class="button primary" type="submit">Save access</button></form>
 <p class="access-help">Search for a Twitch user, confirm the account, then choose their access.</p>
 <noscript><p>Enable JavaScript to search and confirm a Twitch user.</p></noscript>
