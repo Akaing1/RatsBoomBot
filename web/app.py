@@ -8,6 +8,7 @@ from config.settings import settings
 from config.version import APP_NAME, APP_VERSION
 from web.admin.routers import router as admin_router
 from web.channel.routers import dashboard_router as channel_dashboard_router
+from web.channel.routers.engagement import router as engagement_router
 from web.channel.routers import oauth_router as channel_oauth_router
 from web.channel.routers import youtube_router as channel_youtube_router
 from web.channel.routers.workspace import router as workspace_router
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
 
     application.include_router(admin_router)
     application.include_router(channel_dashboard_router)
+    application.include_router(engagement_router)
     application.include_router(channel_oauth_router)
     application.include_router(channel_youtube_router)
     application.include_router(workspace_router)

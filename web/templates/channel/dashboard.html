@@ -4,6 +4,10 @@
     {{ broadcaster.name or "Your Channel" }} | RatsBoomBot
 {% endblock %}
 
+{% block page_styles %}
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard-engagement.css') }}?v={{ deployment_stamp() }}">
+{% endblock %}
+
 {% block content %}
 
 <link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard-for-you.css') }}?v={{ deployment_stamp() }}">
@@ -212,6 +216,7 @@
             </div>
             <div class="dashboard-raid-progress" data-pending-raid-progress aria-hidden="true"></div>
         </div>
+        <div class="dashboard-engagement-cards" data-engagement-cards data-channel-id="{{ broadcaster.id }}" data-csrf-token="{{ csrf_token }}" aria-label="Polls and predictions"></div>
         <div
                 class="live-chat-feed dashboard-chat-feed"
                 data-live-chat-feed
@@ -349,10 +354,10 @@
     </section>
     </div>
 
-<section class="dashboard-actions-panel" role="group" aria-label="Dashboard actions">{% if not moderator_mode %}
+        <section class="dashboard-actions-panel" role="group" aria-label="Dashboard actions">{% if not moderator_mode %}
+            <button class="dashboard-action-placeholder" type="button" data-engagement-open="polls" aria-haspopup="dialog" aria-controls="dashboard-engagement" title="Polls" aria-label="Polls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10h3v10m3 0V4h3v16m3 0v-7h3v7M3 20h19"/></svg><span class="sr-only">Polls</span></button>
+            <button class="dashboard-action-placeholder" type="button" data-engagement-open="predictions" aria-haspopup="dialog" aria-controls="dashboard-engagement" title="Predictions" aria-label="Predictions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="8"/><path d="m7 17-2 5h14l-2-5M9.5 8a2.5 2.5 0 0 1 5 0c0 1.5-2.5 1.5-2.5 3"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg><span class="sr-only">Predictions</span></button>
             <button class="dashboard-action-placeholder" type="button" data-raid-browser-open aria-haspopup="dialog" aria-controls="dashboard-raid-browser" title="Raid browser" aria-label="Raid browser"><svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(40 12 12)"><path d="M12 1c.5 2.5 3.5 3 4 5.5.3 1.5-.5 3-2 3.5.5-1.5-.5-2.5-1.5-3.5 0 1.5-.5 2.5-2 3.5C8 9 7.5 7 8.5 5.5c.5 1 1 1.5 1.5 1.5-1-2 0-4.5 2-6ZM8 11h8l-2.5 2h-3L8 11Zm2.5 2h3L13 23h-2l-.5-10Z"/></g></svg><span class="sr-only">Raid browser</span></button>
-            <button class="dashboard-action-placeholder" type="button" disabled title="Polls — coming soon" aria-label="Polls — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10h3v10m3 0V4h3v16m3 0v-7h3v7M3 20h19"/></svg><span class="sr-only">Polls</span></button>
-            <button class="dashboard-action-placeholder" type="button" disabled title="Predictions — coming soon" aria-label="Predictions — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="8"/><path d="m7 17-2 5h14l-2-5M9.5 8a2.5 2.5 0 0 1 5 0c0 1.5-2.5 1.5-2.5 3"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg><span class="sr-only">Predictions</span></button>
             <button class="dashboard-action-placeholder" type="button" disabled title="Stream Together — coming soon" aria-label="Stream Together — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m1-17a3 3 0 0 1 0 6m3 11v-3a6 6 0 0 0-3-5"/></svg><span class="sr-only">Stream Together</span></button>
             <button class="dashboard-action-placeholder" type="button" disabled title="Shouts — coming soon" aria-label="Shouts — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 6-3v18l-6-3H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h9V5Zm-7 12 2 5h4l-2-5M14 7v10"/></svg><span class="sr-only">Shouts</span></button>
             <button class="dashboard-action-placeholder" type="button" disabled title="Whispers — coming soon" aria-label="Whispers — coming soon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v9ZM7 8h10M7 12h7"/></svg><span class="sr-only">Whispers</span></button>
@@ -1126,6 +1131,69 @@
         <section id="raid-blacklist-panel" role="tabpanel" aria-labelledby="raid-blacklist-tab" data-raid-list-panel="blacklist" hidden><div data-raid-blocked-list></div></section>
         <p class="raid-lists-note">Saved for this connected channel in this browser. The blacklist only affects this raid browser, not Twitch follows or chat bans.</p>
     </dialog>
+    <dialog id="dashboard-engagement" class="engagement-dialog" data-engagement data-channel-id="{{ broadcaster.id }}" data-csrf-token="{{ csrf_token }}" aria-labelledby="engagement-title">
+        <header class="engagement-header">
+            <h3 id="engagement-title" class="sr-only">Polls &amp; predictions</h3>
+            <div class="engagement-header-mode">
+                <div class="engagement-tabs" role="tablist" aria-label="Polls and predictions">
+                    <button id="engagement-polls-tab" type="button" role="tab" aria-controls="engagement-editor" aria-selected="false" tabindex="-1" data-engagement-tab="polls">Polls</button>
+                    <button id="engagement-predictions-tab" type="button" role="tab" aria-controls="engagement-editor" aria-selected="true" tabindex="0" data-engagement-tab="predictions">Predictions</button>
+                </div>
+            </div>
+            <div class="engagement-header-actions">
+            <button class="button secondary" type="button" data-engagement-save>Save this prediction</button>
+            <button class="button secondary engagement-archive-toggle" type="button" data-engagement-show-archived aria-pressed="false" aria-label="Show archived" title="Show archived"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8v12h16V8M3 3h18v5H3ZM9 12h6"/></svg></button>
+            <button class="raid-browser-close" type="button" data-engagement-close aria-label="Close polls and predictions" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+            </div>
+        </header>
+        <div class="engagement-body">
+            <section class="engagement-main">
+                <div id="engagement-editor" class="engagement-editor" role="tabpanel" aria-labelledby="engagement-predictions-tab">
+                    <form data-engagement-form>
+                        <label>Title<input name="title" type="text" maxlength="60" required placeholder="What will happen?" autocomplete="off"></label>
+                        <fieldset><legend>Choices</legend><div class="engagement-choice-area"><div class="engagement-choices" data-engagement-choices></div><span class="engagement-excluded-mark" data-engagement-excluded-mark aria-hidden="true" hidden><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="m1 1 98 98M99 1 1 99" vector-effect="non-scaling-stroke"/></svg></span></div></fieldset>
+                        <p id="engagement-choice-warning" class="engagement-choice-warning" data-engagement-choice-warning role="status" hidden>Twitch only allows 5 choices. Extra choices will be deleted when you post this poll.</p>
+                        <span class="engagement-add-control" data-engagement-add-control><button class="button secondary" type="button" data-engagement-add>+ Add choice</button></span>
+                        <div class="engagement-duration">
+                            <label for="engagement-duration-slider">Duration</label>
+                            <div class="engagement-duration-row">
+                                <div class="engagement-duration-track">
+                                    <input id="engagement-duration-slider" type="range" min="0" max="6" step="any" value="2" data-engagement-duration-slider aria-label="Duration" aria-describedby="engagement-duration-hint" list="engagement-duration-marks">
+                                    <div class="engagement-duration-labels" aria-hidden="true" data-engagement-duration-labels></div>
+                                </div>
+                                <label class="engagement-duration-value"><input name="duration" type="text" value="2m0s" maxlength="32" required aria-label="Duration in minutes and seconds" aria-describedby="engagement-duration-hint" title="Duration" autocomplete="off" spellcheck="false"></label>
+                            </div>
+                            <datalist id="engagement-duration-marks"></datalist>
+                            <p id="engagement-duration-hint" class="engagement-hint" data-engagement-duration-hint></p>
+                        </div>
+                        <fieldset class="engagement-poll-options" data-engagement-poll-options hidden>
+                            <legend>Voting</legend>
+                            <label class="engagement-additional-toggle"><input type="checkbox" name="channel_points_voting_enabled" data-engagement-additional-votes aria-controls="engagement-vote-cost">Allow additional votes</label>
+                            <label id="engagement-vote-cost" class="engagement-vote-cost" data-engagement-vote-cost hidden>Channel Points per additional vote<input type="number" name="channel_points_per_vote" min="1" max="1000000" step="1" value="100" disabled></label>
+                        </fieldset>
+                        <p class="engagement-hint" data-engagement-hint></p>
+                        <footer class="engagement-editor-footer"><p data-engagement-status role="status" aria-live="polite"></p><button class="button primary" type="submit" data-engagement-start>Start prediction</button></footer>
+                    </form>
+                </div>
+            </section>
+            <aside class="engagement-sidebar" aria-label="Saved and recent templates">
+                <section><h3 data-engagement-saved-label>Saved predictions</h3><div class="engagement-library" data-engagement-saved></div></section>
+                <section><div class="engagement-recent-heading"><h3 data-engagement-recent-label>Recent predictions</h3><button type="button" class="button secondary" data-engagement-refresh aria-label="Refresh recent items" title="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg></button></div><p data-engagement-history-status role="status"></p><div class="engagement-library" data-engagement-recent></div></section>
+            </aside>
+        </div>
+    </dialog>
+    <dialog class="engagement-summary-dialog" data-engagement-summary aria-labelledby="engagement-summary-title">
+        <header class="engagement-summary-header"><h3 id="engagement-summary-title" data-engagement-summary-heading>Summary</h3><button class="raid-browser-close" type="button" data-engagement-summary-close aria-label="Close summary" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+        <div class="engagement-summary-content">
+            <h4 data-engagement-summary-title></h4><p data-engagement-summary-state></p><p data-engagement-summary-details><span data-engagement-summary-duration></span><span data-engagement-summary-times></span></p>
+            <fieldset class="engagement-summary-options"><legend class="sr-only">Outcomes and results</legend><div data-engagement-summary-options></div></fieldset>
+            <p data-engagement-summary-status role="status" aria-live="polite"></p>
+            <div class="engagement-summary-confirm" data-engagement-summary-confirm hidden><p data-engagement-summary-confirm-text></p><button class="button primary" type="button" data-engagement-summary-confirm-yes>Confirm</button><button class="button secondary" type="button" data-engagement-summary-confirm-no>Cancel</button></div>
+        </div>
+        <footer class="engagement-summary-actions"><a class="button secondary" href="#polls" data-engagement-summary-new>New poll</a><button class="button secondary" type="button" data-engagement-summary-repeat>Run again</button><button class="button secondary" type="button" data-engagement-summary-delete>Delete</button><button class="button secondary" type="button" data-engagement-summary-lock>Close voting</button><button class="button primary" type="button" data-engagement-summary-resolve>Choose outcome</button></footer>
+    </dialog>
+    <script src="{{ url_for('static', path='/js/dashboard-engagement-status.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-engagement.js') }}?v={{ deployment_stamp() }}" defer></script>
 
 {% endif %}
     <script src="{{ url_for('static', path='/js/chat-name-colors.js') }}?v={{ deployment_stamp() }}" defer></script>
