@@ -2,7 +2,7 @@ import asyncio
 import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 from fastapi import HTTPException
 import pytest
@@ -24,6 +24,11 @@ def runtime(monkeypatch):
         create_partialuser=lambda id_: broadcaster,
         fetch_user=AsyncMock(return_value=SimpleNamespace(id="2", name="target", display_name="Target",
             profile_image=SimpleNamespace(url="https://static-cdn.jtvnw.net/jtv_user_pictures/target.png"))))
+    bot.services.features = SimpleNamespace(is_enabled=Mock(return_value=True))
+    bot.services.chat_identity = SimpleNamespace(send_message=AsyncMock())
+    from bot.profiles import ChannelProfile, RaidMessages
+    monkeypatch.setattr(dashboard, "get_active_profile", lambda _: ChannelProfile(channel_name="streamer",
+        raid_messages=RaidMessages(outgoing="Raid @{target_name}!", outgoing_subscriber="Sub raid @{target_name}!")))
     monkeypatch.setattr(dashboard, "get_bot", lambda: bot)
     return bot, broadcaster
 
@@ -156,3 +161,31 @@ async def test_slash_raid_failure_does_not_show_popup(runtime):
     with pytest.raises(RuntimeError):
         await dashboard.execute_twitch_slash_command(bot, "1", "/raid target")
     assert not bot._dashboard_pending_raids
+
+
+@pytest.mark.asyncio
+async def test_browser_sends_startraid_messages_once(runtime):
+    bot, broadcaster = runtime
+    responses = await asyncio.gather(*(dashboard.channel_raid_action(request(), action="start", target_id="2", csrf_token="valid") for _ in range(2)))
+    assert sorted(r.status_code for r in responses) == [200, 409]
+    assert [c.args[1] for c in bot.services.chat_identity.send_message.await_args_list] == ["Raid @target!", "Sub raid @target!"]
+
+
+@pytest.mark.asyncio
+async def test_browser_requires_startraid_messages_before_start(runtime, monkeypatch):
+    bot, broadcaster = runtime
+    from bot.profiles import ChannelProfile
+    monkeypatch.setattr(dashboard, "get_active_profile", lambda _: ChannelProfile(channel_name="streamer"))
+    response = await dashboard.channel_raid_action(request(), action="start", target_id="2", csrf_token="valid")
+    assert response.status_code == 400
+    broadcaster.start_raid.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_message_failure_preserves_successful_raid(runtime):
+    bot, broadcaster = runtime
+    bot.services.chat_identity.send_message.side_effect = RuntimeError("chat unavailable")
+    response = await dashboard.channel_raid_action(request(), action="start", target_id="2", csrf_token="valid")
+    assert response.status_code == 200
+    assert json.loads(response.body)["warning"]
+    assert bot._dashboard_pending_raids["1"]["target_id"] == "2"
