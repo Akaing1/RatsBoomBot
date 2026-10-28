@@ -5,18 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Active RatsBoomBot commands and raid information for {{ broadcaster.name or broadcaster.id }}.">
 
-    <title>Commands | {{ broadcaster.name or broadcaster.id }} | RatsBoomBot</title>
+    <title>Help | {{ broadcaster.name or broadcaster.id }} | RatsBoomBot</title>
 
     <link rel="canonical" href="{{ public_base_url }}/help/{{ broadcaster.login or broadcaster.id }}">
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
+<link rel="stylesheet" href="/static/css/channel-help.css?v={{ deployment_stamp() }}">
+<script src="/static/js/channel-help.js?v={{ deployment_stamp() }}" defer></script>
 </head>
 
-<body class="public-command-page">
+<body class="public-command-page channel-help">
     <header class="public-command-navigation">
         <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
             <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
-            <span><strong>RatsBoomBot</strong><small>Channel command reference</small></span>
+            <span><strong>RatsBoomBot</strong><small>Channel Help</small></span>
         </a>
     </header>
 
@@ -31,16 +33,17 @@
             <div>
                 <p class="eyebrow">{{ command_count }} active commands</p>
                 <h1>{{ broadcaster.name or broadcaster.id }}</h1>
-                <p>Everything currently available in this channel. Disabled commands are automatically hidden.</p>
+                <p>Find your next command. Explore what you can do in this channel.</p>
             </div>
 
             {% if broadcaster.login %}<a class="button primary" href="https://twitch.tv/{{ broadcaster.login }}">Watch on Twitch</a>{% endif %}
         </header>
 
         {% if command_groups %}
+            <div class="help-layout">
             <section class="public-command-groups" aria-label="Active channel commands">
                 {% for group in command_groups %}
-                    <details class="panel public-command-group">
+                    <details class="panel public-command-group" data-help-group="{{ group.name }}" open>
                         <summary class="public-command-group-summary">
                             <span class="public-command-group-copy"><span class="eyebrow">{{ group.commands | length }} commands</span><span class="public-command-group-title">{{ group.name }}</span><span class="public-command-group-description">{{ group.description }}</span></span>
                             <span class="public-command-chevron" aria-hidden="true">&#8964;</span>
@@ -48,15 +51,29 @@
 
                         <div class="public-command-list">
                             {% for command in group.commands %}
-                                <div class="public-command-row">
+                                <article class="public-command-row" data-help-command data-permission="{{ command.permission }}">
                                     <code>{{ command.syntax }}</code>
-                                    <div><p>{{ command.description }}</p><span>{{ command.permission }}</span></div>
-                                </div>
+                                    <div><p>{{ command.description }}</p><span class="help-permission">{{ command.permission }}</span></div>
+                                </article>
                             {% endfor %}
                         </div>
                     </details>
                 {% endfor %}
+            <p class="panel help-empty" data-help-empty hidden>No matching commands. Try another search or category.</p>
             </section>
+            <aside class="panel help-tools">
+                <p class="eyebrow">Command finder</p><h2>What will you try?</h2>
+                <div data-help-filters hidden>
+                    <label for="help-search">Search commands</label><input id="help-search" type="search" placeholder="Try points, queue, or pets" autocomplete="off" maxlength="200">
+                    <label for="help-permission">Who can use it?</label><select id="help-permission"><option value="">All permissions</option></select>
+                    <nav class="help-categories" data-help-categories aria-label="Command categories"></nav>
+                    <p class="help-count" data-help-count role="status" aria-live="polite"></p>
+                </div>
+                <div class="help-tip"><h3>Make it yours</h3><p>Replace &lt;required&gt; values with your own. Values in [brackets] are optional.</p><p>Copy a command, then paste it into Twitch chat.</p></div>
+                <a class="button secondary" href="/me">Open My account</a>
+                <p class="help-copy-status" data-help-copy-status role="status" aria-live="polite"></p>
+            </aside>
+            </div>
         {% else %}
             <section class="panel compact-empty-state"><h2>No commands are active</h2><p>This channel does not currently have any public commands enabled.</p></section>
         {% endif %}
