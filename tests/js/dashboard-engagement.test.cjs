@@ -8,11 +8,12 @@ const skip = !chromium || !fs.existsSync(executablePath || '');
 const script = fs.readFileSync('web/static/js/dashboard-engagement.js', 'utf8');
 const template = fs.readFileSync('web/templates/channel/dashboard.html', 'utf8');
 const markup = '<dialog id="dashboard-engagement"' + template.split('<dialog id="dashboard-engagement"')[1].split('</dialog>')[0] + '</dialog>';
-async function setup(browser, width = 1100, storage, route = '/') {
+async function setup(browser, width = 1100, storage, route = '/', archivedStorage) {
     const page = await browser.newPage({viewport: {width, height: 850}});
     await page.route('https://test.local/**', route => route.fulfill({contentType: 'text/html', body: '<html></html>'}));
     await page.goto(`https://test.local${route}`);
     await page.setContent(`<style>${fs.readFileSync('web/static/css/style.css', 'utf8')}\n${fs.readFileSync('web/static/css/dashboard-engagement.css', 'utf8')}</style><button data-engagement-open="predictions">Predictions</button><button data-engagement-open="polls">Polls</button>${markup}`);
+    if (archivedStorage) await page.evaluate(value => localStorage.setItem('dashboard-engagement-archived:1:v1', value), archivedStorage);
     await page.evaluate(storage => {
         if (storage) localStorage.setItem('dashboard-engagement:1:v1', storage);
         document.querySelector('[data-engagement]').dataset.channelId = '1';
@@ -667,6 +668,7 @@ test('overlay fits desktop and mobile without horizontal overflow', {skip}, asyn
         for (const width of [1200, 800, 750, 514, 375]) {
             const page = await setup(browser, width);
             await page.click('[data-engagement-open="predictions"]');
+            await page.locator('[data-engagement]').evaluate(node => Promise.all(node.getAnimations().map(animation => animation.finished)));
             const layout = await page.evaluate(() => {
                 const dialog = document.querySelector('[data-engagement]'), body = dialog.querySelector('.engagement-body');
                 const toggle = dialog.querySelector('.engagement-tabs');
@@ -741,5 +743,190 @@ test('pending creation prevents duplicate starts and shows permission errors wit
         await page.click('[data-engagement-open="polls"]');
         assert.equal(await page.inputValue('[name="title"]'), 'Question');
         assert.equal(await page.locator('[data-engagement-choices] input').nth(0).inputValue(), 'A');
+    } finally { await browser.close(); }
+});
+
+
+test('recent results keep separate IDs for identical templates and refresh stays circular', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser);
+        await page.evaluate(() => {
+            const original = window.fetch;
+            window.fetch = (url, options) => (!options?.method || options.method === 'GET')
+                ? Promise.resolve({ok: true, json: async () => ({items: ['first', 'second'].map(id => ({id, title: 'Same question', choices: ['Yes', 'No'], duration: 120}))})})
+                : original(url, options);
+        });
+        for (const kind of ['predictions', 'polls']) {
+            await page.click(`[data-engagement-open="${kind}"]`);
+            const links = page.locator('[data-engagement-recent] .engagement-library-results');
+            await links.nth(1).waitFor();
+            assert.deepEqual(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))), [`#${kind}-summary=first`, `#${kind}-summary=second`]);
+            const circle = await page.locator('[data-engagement-refresh]').evaluate(node => ({width: node.offsetWidth, height: node.offsetHeight, radius: getComputedStyle(node).borderRadius}));
+            assert.equal(circle.width, 32); assert.equal(circle.height, 32);
+            assert.ok(circle.radius === '50%' || parseFloat(circle.radius) >= circle.width / 2);
+            await page.click('[data-engagement-refresh]');
+            assert.equal(await links.count(), 2);
+            await links.last().click();
+            await page.waitForFunction(kind => location.hash === `#${kind}-summary=second` && !document.querySelector('[data-engagement]').open, kind);
+            assert.equal(await page.locator('[name="title"]').inputValue(), '', 'Results does not load the template into the draft');
+        }
+    } finally { await browser.close(); }
+});
+
+
+test('recent items archive locally by ID and type, and can be shown and restored', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser);
+        for (const kind of ['predictions', 'polls']) {
+            const isOpen = await page.locator('[data-engagement]').evaluate(node => node.open);
+            await page.click(isOpen ? `[data-engagement-tab="${kind}"]` : `[data-engagement-open="${kind}"]`);
+            const archive = page.locator('[data-engagement-recent] .engagement-archive');
+            await archive.waitFor();
+            const bounds = await archive.boundingBox(), row = await page.locator('[data-engagement-recent] .engagement-library-row').boundingBox();
+            assert.ok(bounds.x + bounds.width <= row.x + row.width && bounds.y >= row.y && bounds.y < row.y + 10);
+            await archive.click();
+            await page.locator('[data-engagement-recent] .engagement-library-row').waitFor({state: 'detached'});
+            assert.equal(await page.locator('[data-engagement-recent] .engagement-library-row').count(), 0);
+        }
+        assert.equal(await page.evaluate(() => calls.filter(call => call.method === 'POST').length), 0);
+        assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('dashboard-engagement-archived:1:v1'))), ['predictions:old', 'polls:old']);
+        await page.click('[data-engagement-show-archived]');
+        assert.equal(await page.locator('[data-engagement-recent] .is-archived').count(), 1);
+        await page.click('[data-engagement-tab="predictions"]');
+        const restore = page.locator('[data-engagement-recent] .engagement-archive');
+        assert.match(await restore.getAttribute('aria-label'), /^Restore prediction:/);
+        await restore.click();
+        await page.locator('[data-engagement-recent] .is-archived').waitFor({state: 'detached'});
+        assert.equal(await page.locator('[data-engagement-recent] .is-archived').count(), 0);
+        await page.click('[data-engagement-show-archived]');
+        assert.equal(await page.locator('[data-engagement-recent] .engagement-library-row').count(), 1);
+        const archived = await page.evaluate(() => localStorage.getItem('dashboard-engagement-archived:1:v1'));
+        const restored = await setup(browser, 1100, undefined, '/#polls', archived);
+        await restored.waitForFunction(() => document.querySelector('[data-engagement-recent] p')?.textContent === 'No recent polls.');
+        await restored.click('[data-engagement-show-archived]');
+        await restored.locator('[data-engagement-recent] .is-archived').waitFor();
+        assert.equal(await restored.locator('[data-engagement-recent] .engagement-library-results').getAttribute('href'), '#polls-summary=old');
+    } finally { await browser.close(); }
+});
+
+
+test('archiving and restoring slide straight left at full size before removing the row', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser);
+        await page.click('[data-engagement-open="predictions"]');
+        await page.locator('[data-engagement-recent] .engagement-archive').waitFor();
+        await page.evaluate(() => {
+            const original = Element.prototype.animate;
+            Element.prototype.animate = function(...args) {
+                const animation = original.apply(this, args);
+                if (this.matches('.engagement-library-row')) { animation.pause(); window.archiveAnimation = animation; }
+                return animation;
+            };
+        });
+        for (const restoring of [false, true]) {
+            if (restoring) await page.click('[data-engagement-show-archived]');
+            const row = page.locator('[data-engagement-recent] .engagement-library-row');
+            const initial = await row.boundingBox();
+            await row.locator('.engagement-archive').click();
+            assert.equal(await row.count(), 1, 'Row remains during its exit animation');
+            const middle = await row.evaluate(node => {
+                window.archiveAnimation.currentTime = 120;
+                const transform = new DOMMatrix(getComputedStyle(node).transform);
+                return {height: node.getBoundingClientRect().height, opacity: Number(getComputedStyle(node).opacity), x: transform.m41, y: transform.m42};
+            });
+            assert.ok(Math.abs(middle.height - initial.height) < 1);
+            assert.equal(middle.opacity, 1);
+            assert.ok(middle.x < 0);
+            assert.equal(middle.y, 0);
+            await page.evaluate(() => window.archiveAnimation.finish());
+            await row.waitFor({state: 'detached'});
+        }
+        await page.emulateMedia({reducedMotion: 'reduce'});
+        await page.click('[data-engagement-show-archived]');
+        await page.locator('[data-engagement-recent] .engagement-archive').click();
+        await page.locator('[data-engagement-recent] .engagement-library-row').waitFor({state: 'detached'});
+    } finally { await browser.close(); }
+});
+
+
+test('history refresh shares pending reads but mutations invalidate outdated responses', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser);
+        await page.evaluate(() => {
+            const original = window.fetch;
+            window.historyJobs = [];
+            window.fetch = (url, options = {}) => /\/(polls|predictions)$/.test(url) && options.method !== 'POST'
+                ? new Promise(resolve => historyJobs.push({resolve, signal: options.signal})) : original(url, options);
+            window.historyResponse = title => ({ok: true, json: async () => ({items: [{id: title.replaceAll(' ', '-'), title, choices: ['Yes', 'No'], duration: 120}]})});
+        });
+        await page.click('[data-engagement-open="predictions"]');
+        await page.click('[data-engagement-refresh]');
+        await page.click('[data-engagement-refresh]');
+        await page.click('[data-engagement-tab="predictions"]');
+        assert.equal(await page.evaluate(() => historyJobs.length), 1);
+        assert.equal(await page.evaluate(() => historyJobs[0].signal.aborted), false);
+        await page.evaluate(() => historyJobs[0].resolve(historyResponse('First result')));
+        await page.waitForFunction(() => document.querySelector('[data-engagement-recent] strong')?.textContent === 'First result');
+        await page.click('[data-engagement-refresh]');
+        await page.evaluate(() => document.dispatchEvent(new CustomEvent('dashboard-engagement-updated', {detail: {kind: 'predictions'}})));
+        assert.equal(await page.evaluate(() => historyJobs.length), 3);
+        assert.equal(await page.evaluate(() => historyJobs[1].signal.aborted), true);
+        await page.evaluate(() => { historyJobs[2].resolve(historyResponse('Newest result')); historyJobs[1].resolve(historyResponse('Outdated result')); });
+        await page.waitForFunction(() => document.querySelector('[data-engagement-recent] strong')?.textContent === 'Newest result');
+        assert.equal(await page.locator('[data-engagement-recent] .engagement-library-row').count(), 1);
+    } finally { await browser.close(); }
+});
+
+
+test('unchanged draft events leave template highlighting untouched', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser);
+        await page.click('[data-engagement-open="predictions"]');
+        await page.locator('[data-engagement-recent] .engagement-library-row').waitFor();
+        await page.evaluate(() => {
+            window.matchChanges = 0;
+            new MutationObserver(changes => { window.matchChanges += changes.length; }).observe(document.querySelector('[data-engagement-recent]'), {attributes: true, subtree: true});
+            const form = document.querySelector('[data-engagement-form]');
+            form.dispatchEvent(new Event('input', {bubbles: true}));
+            form.dispatchEvent(new Event('change', {bubbles: true}));
+        });
+        assert.equal(await page.evaluate(() => matchChanges), 0);
+    } finally { await browser.close(); }
+});
+
+
+test('reused history rows load and save the latest refreshed template data', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser);
+        await page.click('[data-engagement-open="polls"]');
+        const row = page.locator('[data-engagement-recent] .engagement-library-row');
+        await row.waitFor();
+        await row.evaluate(node => { node.dataset.retained = 'true'; });
+        await page.evaluate(() => {
+            const original = window.fetch;
+            window.fetch = (url, options = {}) => url.endsWith('/polls') && options.method !== 'POST'
+                ? Promise.resolve({ok: true, json: async () => ({items: [{id: 'old', title: 'Updated question', choices: ['Up', 'Down'], duration: 300, channel_points_voting_enabled: true, channel_points_per_vote: 250}]})})
+                : original(url, options);
+        });
+        await page.click('[data-engagement-refresh]');
+        await page.waitForFunction(() => document.querySelector('[data-engagement-recent] strong').textContent === 'Updated question');
+        assert.equal(await row.getAttribute('data-retained'), 'true');
+        await row.locator('.engagement-load').click();
+        assert.equal(await page.locator('[name="title"]').inputValue(), 'Updated question');
+        assert.deepEqual(await page.locator('[data-engagement-choices] input').evaluateAll(nodes => nodes.map(node => node.value)), ['Up', 'Down']);
+        assert.equal(await page.locator('[name="duration"]').inputValue(), '5m0s');
+        assert.equal(await page.locator('[data-engagement-additional-votes]').isChecked(), true);
+        assert.equal(await page.locator('[name="channel_points_per_vote"]').inputValue(), '250');
+        await row.locator('.engagement-star').click();
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('dashboard-engagement:1:v1'))[0].title), 'Updated question');
+        await row.locator('.engagement-star').click();
+        await row.locator('.engagement-delete').click();
+        await page.waitForFunction(() => JSON.parse(localStorage.getItem('dashboard-engagement:1:v1')).length === 0);
     } finally { await browser.close(); }
 });

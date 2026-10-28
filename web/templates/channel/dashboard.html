@@ -1142,6 +1142,7 @@
             </div>
             <div class="engagement-header-actions">
             <button class="button secondary" type="button" data-engagement-save>Save this prediction</button>
+            <button class="button secondary engagement-archive-toggle" type="button" data-engagement-show-archived aria-pressed="false" aria-label="Show archived" title="Show archived"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8v12h16V8M3 3h18v5H3ZM9 12h6"/></svg></button>
             <button class="raid-browser-close" type="button" data-engagement-close aria-label="Close polls and predictions" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
             </div>
         </header>
@@ -1177,19 +1178,19 @@
             </section>
             <aside class="engagement-sidebar" aria-label="Saved and recent templates">
                 <section><h3 data-engagement-saved-label>Saved predictions</h3><div class="engagement-library" data-engagement-saved></div></section>
-                <section><div class="engagement-recent-heading"><h3 data-engagement-recent-label>Recent predictions</h3><button type="button" class="button secondary" data-engagement-refresh aria-label="Refresh recent items" title="Refresh">↻</button></div><p data-engagement-history-status role="status"></p><div class="engagement-library" data-engagement-recent></div></section>
+                <section><div class="engagement-recent-heading"><h3 data-engagement-recent-label>Recent predictions</h3><button type="button" class="button secondary" data-engagement-refresh aria-label="Refresh recent items" title="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/></svg></button></div><p data-engagement-history-status role="status"></p><div class="engagement-library" data-engagement-recent></div></section>
             </aside>
         </div>
     </dialog>
     <dialog class="engagement-summary-dialog" data-engagement-summary aria-labelledby="engagement-summary-title">
         <header class="engagement-summary-header"><h3 id="engagement-summary-title" data-engagement-summary-heading>Summary</h3><button class="raid-browser-close" type="button" data-engagement-summary-close aria-label="Close summary" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
         <div class="engagement-summary-content">
-            <h4 data-engagement-summary-title></h4><p data-engagement-summary-state></p><p data-engagement-summary-details></p>
+            <h4 data-engagement-summary-title></h4><p data-engagement-summary-state></p><p data-engagement-summary-details><span data-engagement-summary-duration></span><span data-engagement-summary-times></span></p>
             <fieldset class="engagement-summary-options"><legend class="sr-only">Outcomes and results</legend><div data-engagement-summary-options></div></fieldset>
             <p data-engagement-summary-status role="status" aria-live="polite"></p>
             <div class="engagement-summary-confirm" data-engagement-summary-confirm hidden><p data-engagement-summary-confirm-text></p><button class="button primary" type="button" data-engagement-summary-confirm-yes>Confirm</button><button class="button secondary" type="button" data-engagement-summary-confirm-no>Cancel</button></div>
         </div>
-        <footer class="engagement-summary-actions"><button class="button secondary" type="button" data-engagement-summary-delete>Delete</button><button class="button secondary" type="button" data-engagement-summary-refresh>Refresh</button><button class="button secondary" type="button" data-engagement-summary-lock>Close voting</button><button class="button primary" type="button" data-engagement-summary-resolve>Choose outcome</button></footer>
+        <footer class="engagement-summary-actions"><a class="button secondary" href="#polls" data-engagement-summary-new>New poll</a><button class="button secondary" type="button" data-engagement-summary-repeat>Run again</button><button class="button secondary" type="button" data-engagement-summary-delete>Delete</button><button class="button secondary" type="button" data-engagement-summary-lock>Close voting</button><button class="button primary" type="button" data-engagement-summary-resolve>Choose outcome</button></footer>
     </dialog>
     <script src="{{ url_for('static', path='/js/dashboard-engagement-status.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-engagement.js') }}?v={{ deployment_stamp() }}" defer></script>

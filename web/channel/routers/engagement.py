@@ -122,7 +122,7 @@ def engagement_summary(item, kind):
     def count(value):
         return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
 
-    return {"id": str(item["id"]), "kind": kind, "title": str(item.get("title", "")),
+    result = {"id": str(item["id"]), "kind": kind, "title": str(item.get("title", "")),
         "status": str(item.get("status", "ACTIVE")),
         "duration": item.get("duration" if kind == "polls" else "prediction_window", 120),
         "created_at": item.get("created_at", item.get("started_at", "")),
@@ -132,6 +132,10 @@ def engagement_summary(item, kind):
             "votes": count(option.get("votes" if kind == "polls" else "users")),
             "points": count(option.get("channel_points"))}
             for option in item.get("choices" if kind == "polls" else "outcomes", [])]}
+    if kind == "polls":
+        result.update(channel_points_voting_enabled=bool(item.get("channel_points_voting_enabled", False)),
+            channel_points_per_vote=count(item.get("channel_points_per_vote")))
+    return result
 
 
 def valid_engagement_id(value):
@@ -139,9 +143,19 @@ def valid_engagement_id(value):
 
 
 async def fetch_engagement(bot, user_id, kind, item_id):
+    params = {"broadcaster_id": user_id}
+    if item_id == "latest":
+        params["first"] = 20
+    else:
+        params["id"] = item_id
     payload = await bot._http.request_json(Route("GET", kind, token_for=user_id,
-        params={"broadcaster_id": user_id, "id": item_id}))
-    return next((item for item in payload.get("data", []) if str(item.get("id")) == item_id), None)
+        params=params))
+    items = payload.get("data", [])
+    if item_id == "latest":
+        return max(items, key=lambda item: (
+            item.get("status") == "ACTIVE", item.get("status") == "LOCKED",
+            item.get("created_at") or item.get("started_at") or ""), default=None)
+    return next((item for item in items if str(item.get("id")) == item_id), None)
 
 
 @router.get("/channel/api/engagement/{kind}/{item_id}")
@@ -167,7 +181,7 @@ async def manage_engagement(request: Request, kind: str, item_id: str, action: s
     if error is not None:
         return error
     validate_csrf_token(request, csrf_token)
-    if kind not in LIMITS or not valid_engagement_id(item_id) or action not in {"close", "resolve", "delete"}:
+    if kind not in LIMITS or not valid_engagement_id(item_id) or item_id == "latest" or action not in {"close", "resolve", "delete"}:
         return JSONResponse({"detail": "Invalid action."}, status_code=400)
     if action == "resolve" and (kind != "predictions" or not valid_engagement_id(winning_outcome_id)):
         return JSONResponse({"detail": "Select a prediction outcome."}, status_code=400)

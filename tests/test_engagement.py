@@ -163,6 +163,35 @@ async def test_summary_is_channel_scoped_and_only_exposes_aggregate_results(api,
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["polls", "predictions"])
+async def test_latest_summary_prefers_current_then_most_recent(api, kind):
+    newest = {**running_item(kind, "COMPLETED" if kind == "polls" else "RESOLVED"),
+        "id": "newest", "created_at": "2026-10-27T12:00:00Z"}
+    older = {**newest, "id": "older", "created_at": "2026-10-26T12:00:00Z"}
+    current = {**older, "id": "current", "status": "ACTIVE"}
+    api.return_value = {"data": [older, newest, current]}
+    response = await engagement.get_engagement(request(), kind, "latest")
+    assert json.loads(response.body)["item"]["id"] == "current"
+    assert api.call_args.args[0].params == {"broadcaster_id": "1", "first": 20}
+    if kind == "predictions":
+        current["status"] = "LOCKED"
+        response = await engagement.get_engagement(request(), kind, "latest")
+        assert json.loads(response.body)["item"]["id"] == "current"
+    api.return_value = {"data": [older, newest]}
+    response = await engagement.get_engagement(request(), kind, "latest")
+    assert json.loads(response.body)["item"]["id"] == "newest"
+    api.return_value = {"data": []}
+    assert (await engagement.get_engagement(request(), kind, "latest")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_latest_summary_cannot_be_used_as_a_mutation_target(api):
+    response = await engagement.manage_engagement(request(), "polls", "latest", "close", "csrf")
+    assert response.status_code == 400
+    api.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("kind,action,expected", [
     ("polls", "close", "TERMINATED"), ("polls", "delete", "ARCHIVED"),
     ("predictions", "close", "LOCKED"), ("predictions", "resolve", "RESOLVED"),
@@ -209,3 +238,11 @@ async def test_management_authentication_csrf_missing_items_and_invalid_ids(api)
     api.return_value = {"data": []}
     assert (await engagement.manage_engagement(request(), "polls", "item-1", "delete", "csrf")).status_code == 404
     assert api.await_count == 1
+
+
+def test_poll_summary_preserves_settings_for_running_again():
+    item = {**running_item('polls'), 'channel_points_voting_enabled': True, 'channel_points_per_vote': 250}
+    summary = engagement.engagement_summary(item, 'polls')
+    assert summary['channel_points_voting_enabled'] is True
+    assert summary['channel_points_per_vote'] == 250
+    assert 'channel_points_voting_enabled' not in engagement.engagement_summary(running_item('predictions'), 'predictions')

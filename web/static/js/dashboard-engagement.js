@@ -20,6 +20,7 @@
     const tabs = [...dialog.querySelectorAll('[data-engagement-tab]')];
     const tabStrip = dialog.querySelector('.engagement-tabs');
     const save = dialog.querySelector('[data-engagement-save]');
+    const showArchived = dialog.querySelector('[data-engagement-show-archived]');
     const add = dialog.querySelector('[data-engagement-add]');
     const addControl = dialog.querySelector('[data-engagement-add-control]');
     const start = dialog.querySelector('[data-engagement-start]');
@@ -27,13 +28,22 @@
     const historyStatus = dialog.querySelector('[data-engagement-history-status]');
     const refresh = dialog.querySelector('[data-engagement-refresh]');
     const storageKey = `dashboard-engagement:${dialog.dataset.channelId}:v1`;
+    const archiveStorageKey = `dashboard-engagement-archived:${dialog.dataset.channelId}:v1`;
+    let archived = new Set(), includeArchived = false;
+    try {
+        const stored = JSON.parse(localStorage.getItem(archiveStorageKey) || '[]');
+        if (Array.isArray(stored)) archived = new Set(stored.filter(value => typeof value === 'string' && /^(polls|predictions):[A-Za-z0-9_-]{1,100}$/.test(value)));
+    } catch (_) {}
     const starIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z"/></svg>';
-    let mode = 'predictions', busy = false, opener = null, historyController = null, backdropPress = false;
+    let mode = 'predictions', busy = false, opener = null, historyRequest = null, backdropPress = false;
     const recent = new Map();
     let saved = [];
     let deleteRow = null;
     let dismissedDeletePress = false;
     const removingSaved = new Set();
+    const archiving = new Set();
+    const libraryItems = new WeakMap();
+    let lastDraftKey = null;
     function validTemplate(item) {
         return item && typeof item.title === 'string' && item.title.length <= 60 &&
             Array.isArray(item.choices) && item.choices.length >= 2 && item.choices.length <= 10 &&
@@ -60,12 +70,15 @@
     function key(item) { return JSON.stringify([item.kind, item.title, item.choices, item.duration,
         ...(item.kind === 'polls' ? [item.channel_points_voting_enabled === true,
             item.channel_points_voting_enabled === true ? item.channel_points_per_vote : null] : [])]); }
-    function syncTemplateMatches() {
+    function syncTemplateMatches(force = false) {
         const currentKey = key(draft());
+        if (force !== true && currentKey === lastDraftKey) return;
+        lastDraftKey = currentKey;
         dialog.querySelectorAll('.engagement-library-row').forEach(row => {
             const matches = row.dataset.templateKey === currentKey;
             row.classList.toggle('is-matching', matches);
-            row.querySelector('.engagement-load').setAttribute('aria-pressed', String(matches));
+            const load = row.querySelector('.engagement-load');
+            if (load.getAttribute('aria-pressed') !== String(matches)) load.setAttribute('aria-pressed', String(matches));
         });
     }
     function durationText(seconds) {
@@ -208,12 +221,13 @@
         addControl.title = addReason;
         start.disabled = busy;
         save.disabled = busy;
+        showArchived.disabled = busy;
         const singular = mode === 'polls' ? 'poll' : 'prediction';
         start.textContent = busy ? 'Starting…' : `Start ${singular}`;
         save.textContent = `Save this ${singular}`;
         syncTemplateMatches();
     }
-    function addChoice(value = '') {
+    function addChoice(value = '', update = true) {
         const row = document.createElement('div'); row.className = 'engagement-choice';
         const number = document.createElement('span'); number.className = 'engagement-choice-number'; number.setAttribute('aria-hidden', 'true');
         const label = document.createElement('label');
@@ -226,7 +240,8 @@
             const next = row.nextElementSibling || row.previousElementSibling;
             row.remove(); updateControls(); next.querySelector('input').focus();
         });
-        row.append(number, label, remove); choices.append(row); updateControls();
+        row.append(number, label, remove); choices.append(row);
+        if (update) updateControls();
         return input;
     }
     function persist(next) {
@@ -242,10 +257,11 @@
         deleteRow.querySelector('.engagement-star').setAttribute('aria-expanded', 'false');
         deleteRow = null;
     }
-    function animateSavedRow(row, removing = false) {
+    function animateLibraryRow(row, removing = false, sideways = false) {
         if (!row || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
-        const expanded = {height: `${row.getBoundingClientRect().height}px`, opacity: 1, transform: 'translateY(0)', marginBottom: '0px'};
-        const collapsed = {height: '0px', opacity: 0, transform: 'translateY(-14px)', marginBottom: '-8px'};
+        const expanded = {height: `${row.getBoundingClientRect().height}px`, opacity: 1, transform: sideways ? 'translateX(0)' : 'translateY(0)', marginBottom: '0px'};
+        const collapsed = sideways ? {...expanded, transform: 'translateX(-100%)'}
+            : {height: '0px', opacity: 0, transform: 'translateY(-14px)', marginBottom: '-8px'};
         return row.animate(removing ? [expanded, collapsed] : [collapsed, expanded],
             {duration: 240, easing: 'cubic-bezier(.22,1,.36,1)', fill: removing ? 'forwards' : 'none'});
     }
@@ -260,7 +276,7 @@
             row.classList.add('is-removing');
             row.querySelectorAll('button').forEach(button => { button.disabled = true; });
         }
-        const animation = animateSavedRow(row, true);
+        const animation = animateLibraryRow(row, true);
         if (animation) await animation.finished.catch(() => {});
         const removed = persist(saved.filter(value => key(value) !== itemKey));
         animation?.cancel();
@@ -297,71 +313,138 @@
             voteCost.value = String(Number.isInteger(item.channel_points_per_vote) && item.channel_points_per_vote > 0 ? item.channel_points_per_vote : 100);
         }
         syncDuration();
-        choices.replaceChildren(); item.choices.forEach(addChoice); updateControls();
+        choices.replaceChildren(); item.choices.forEach(value => addChoice(value, false)); updateControls();
         message('Loaded.'); title.focus();
     }
-    function renderList(container, items, empty, animateKey = '') {
-        const previous = new Map([...container.children].filter(node => node.dataset.templateKey).map(row => [row.dataset.templateKey, row]));
-        const nextKeys = new Set(items.map(key));
+    async function toggleArchive(item, row) {
+        const id = `${item.kind}:${item.id}`;
+        if (busy || archiving.has(id)) return;
+        const next = new Set(archived);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        try { localStorage.setItem(archiveStorageKey, JSON.stringify([...next])); }
+        catch (_) { message('Could not update archived items in this browser.', true); return; }
+        archived = next;
+        archiving.add(id);
+        const hadFocus = row.contains(document.activeElement);
+        clearDeleteConfirmation();
+        row.classList.add('is-removing');
+        row.querySelectorAll('button').forEach(button => { button.disabled = true; });
+        row.querySelectorAll('a').forEach(link => { link.tabIndex = -1; link.setAttribute('aria-disabled', 'true'); });
+        const animation = animateLibraryRow(row, true, true);
+        if (animation) await animation.finished.catch(() => {});
+        animation?.cancel();
+        archiving.delete(id);
+        row.classList.remove('is-removing');
+        renderLibrary();
+        if (hadFocus && dialog.open && mode === item.kind) showArchived.focus({preventScroll: true});
+    }
+    function renderList(container, items, empty, savedKeys, animateKey = '') {
+        if (!items.length) {
+            if (container.children.length === 1 && container.firstChild.tagName === 'P' && container.firstChild.textContent === empty) return;
+            if (deleteRow && container.contains(deleteRow)) clearDeleteConfirmation();
+            const note = document.createElement('p'); note.textContent = empty; container.replaceChildren(note); return;
+        }
+        const isRecent = container.hasAttribute('data-engagement-recent');
+        const entryKey = item => isRecent && /^[A-Za-z0-9_-]{1,100}$/.test(item.id || '') ? `${item.kind}:${item.id}` : key(item);
+        const previous = new Map([...container.children].filter(node => node.dataset.entryKey).map(row => [row.dataset.entryKey, row]));
+        const nextKeys = new Set(items.map(entryKey));
         for (const node of [...container.children]) {
-            if (!nextKeys.has(node.dataset.templateKey)) {
+            if (!nextKeys.has(node.dataset.entryKey)) {
                 if (deleteRow === node) clearDeleteConfirmation();
                 node.remove();
             }
         }
-        if (!items.length) { const note = document.createElement('p'); note.textContent = empty; container.append(note); return; }
         items.forEach((item, index) => {
-            const itemKey = key(item), existing = previous.get(itemKey);
+            const itemKey = key(item), rowKey = entryKey(item), existing = previous.get(rowKey);
             const row = existing || document.createElement('div');
+            const changed = row.dataset.templateKey !== itemKey;
+            libraryItems.set(row, item);
             row.dataset.templateKey = itemKey;
+            row.dataset.entryKey = rowKey;
             if (!existing) {
                 row.className = 'engagement-library-row';
                 const content = document.createElement('div'); content.className = 'engagement-library-content';
                 const load = document.createElement('button'); load.type = 'button'; load.className = 'engagement-load'; load.disabled = busy;
                 const heading = document.createElement('strong'); heading.textContent = item.title;
                 const detail = document.createElement('small'); detail.textContent = item.choices.join(' · ');
-                load.append(heading, detail); load.addEventListener('click', () => { clearDeleteConfirmation(); loadTemplate(item); });
+                load.append(heading, detail);
                 const star = document.createElement('button'); star.type = 'button'; star.className = 'engagement-star'; star.innerHTML = starIcon; star.disabled = busy;
-                star.addEventListener('click', () => toggleSaved(item, row));
                 star.setAttribute('aria-expanded', 'false');
                 const confirm = document.createElement('button'); confirm.type = 'button'; confirm.className = 'engagement-delete';
                 confirm.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
                 confirm.title = 'Are you sure you want to delete it?';
                 confirm.setAttribute('aria-label', `Delete saved ${item.kind === 'polls' ? 'poll' : 'prediction'}: ${item.title}`);
                 confirm.setAttribute('aria-hidden', 'true'); confirm.tabIndex = -1; confirm.disabled = true;
-                confirm.addEventListener('click', () => deleteSaved(item));
                 content.append(load, star); row.append(confirm, content);
+                if (isRecent && /^[A-Za-z0-9_-]{1,100}$/.test(item.id || '')) {
+                    const archive = document.createElement('button'); archive.type = 'button'; archive.className = 'engagement-archive';
+                    content.append(archive);
+                    const results = document.createElement('a'); results.className = 'engagement-library-results';
+                    results.textContent = 'See results'; results.href = `#${item.kind}-summary=${item.id}`;
+                    results.setAttribute('aria-label', `See results: ${item.title}`);
+                    content.insertBefore(results, star);
+                }
+            }
+            if (existing && changed) {
+                row.querySelector('.engagement-load strong').textContent = item.title;
+                row.querySelector('.engagement-load small').textContent = item.choices.join(' · ');
+                row.querySelector('.engagement-delete').setAttribute('aria-label', `Delete saved ${item.kind === 'polls' ? 'poll' : 'prediction'}: ${item.title}`);
+                row.querySelector('.engagement-library-results')?.setAttribute('aria-label', `See results: ${item.title}`);
             }
             const star = row.querySelector('.engagement-star');
-            const isSaved = saved.some(value => key(value) === key(item));
+            const isSaved = savedKeys.has(itemKey);
             if ((!isSaved || busy) && deleteRow === row) clearDeleteConfirmation();
             star.setAttribute('aria-pressed', String(isSaved));
             star.setAttribute('aria-label', `${isSaved ? 'Unsave' : 'Save'} ${item.title}`); star.title = isSaved ? 'Unsave' : 'Save';
             row.querySelectorAll('.engagement-load, .engagement-star').forEach(button => { button.disabled = busy || removingSaved.has(itemKey); });
+            const results = row.querySelector('.engagement-library-results');
+            if (results) { results.setAttribute('aria-disabled', String(busy)); results.tabIndex = busy ? -1 : 0; }
+            const archive = row.querySelector('.engagement-archive');
+            if (archive) {
+                const isArchived = archived.has(rowKey);
+                row.classList.toggle('is-archived', isArchived);
+                if (archive.dataset.archived !== String(isArchived)) {
+                    archive.dataset.archived = String(isArchived);
+                    archive.innerHTML = isArchived
+                        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4-5 5 5 5M3 9h11a7 7 0 0 1 0 14"/></svg>'
+                        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
+                }
+                archive.title = isArchived ? 'Restore' : 'Archive';
+                archive.setAttribute('aria-label', `${isArchived ? 'Restore' : 'Archive'} ${item.kind === 'polls' ? 'poll' : 'prediction'}: ${item.title}`);
+                archive.disabled = busy;
+            }
             if (container.children[index] !== row) container.insertBefore(row, container.children[index] || null);
-            if (!existing && itemKey === animateKey) animateSavedRow(row);
+            if (!existing && itemKey === animateKey) animateLibraryRow(row);
         });
     }
     function renderLibrary(animateKey = '') {
-        renderList(dialog.querySelector('[data-engagement-saved]'), saved.filter(item => item.kind === mode), `No saved ${mode} yet.`, animateKey);
-        renderList(dialog.querySelector('[data-engagement-recent]'), recent.get(mode)?.items || [], `No recent ${mode}.`);
-        syncTemplateMatches();
+        const savedKeys = new Set(saved.map(key));
+        renderList(dialog.querySelector('[data-engagement-saved]'), saved.filter(item => item.kind === mode), `No saved ${mode} yet.`, savedKeys, animateKey);
+        const items = recent.get(mode)?.items || [];
+        renderList(dialog.querySelector('[data-engagement-recent]'), items.filter(item => archived.has(`${item.kind}:${item.id}`) === includeArchived), includeArchived ? `No archived ${mode}.` : `No recent ${mode}.`, savedKeys);
+        dialog.querySelector('[data-engagement-recent-label]').textContent = `${includeArchived ? 'Archived' : 'Recent'} ${mode}`;
+        syncTemplateMatches(true);
     }
-    async function loadRecent(force = false) {
-        historyController?.abort();
+    function loadRecent(force = false, invalidate = false) {
         const cached = recent.get(mode);
         renderLibrary();
+        if (!invalidate && historyRequest?.mode === mode && !historyRequest.controller.signal.aborted) return historyRequest.promise;
+        historyRequest?.controller.abort();
         if (!force && cached && Date.now() - cached.loaded < 30_000) { historyStatus.textContent = ''; return; }
-        const request = new AbortController(), requestedMode = mode;
-        historyController = request; historyStatus.textContent = 'Loading…';
-        try {
-            const response = await fetch(`/channel/api/engagement/${requestedMode}`, {signal: request.signal, cache: 'no-store', headers: {Accept: 'application/json'}});
-            const payload = await response.json();
-            if (request.signal.aborted || !dialog.open || mode !== requestedMode) return;
-            if (!response.ok) throw new Error(payload.detail || 'Recent items could not be loaded.');
-            const items = (payload.items || []).map(item => ({...item, kind: requestedMode})).filter(validTemplate);
-            recent.set(requestedMode, {items, loaded: Date.now()}); renderLibrary(); historyStatus.textContent = '';
-        } catch (error) { if (!request.signal.aborted) historyStatus.textContent = error.message; }
+        const request = {controller: new AbortController(), mode, promise: null};
+        historyRequest = request; historyStatus.textContent = 'Loading…';
+        request.promise = (async () => {
+            try {
+                const response = await fetch(`/channel/api/engagement/${request.mode}`, {signal: request.controller.signal, cache: 'no-store', headers: {Accept: 'application/json'}});
+                const payload = await response.json();
+                if (request.controller.signal.aborted || !dialog.open || mode !== request.mode) return;
+                if (!response.ok) throw new Error(payload.detail || 'Recent items could not be loaded.');
+                const items = (payload.items || []).map(item => ({...item, kind: request.mode})).filter(validTemplate);
+                recent.set(request.mode, {items, loaded: Date.now()}); renderLibrary(); historyStatus.textContent = '';
+            } catch (error) { if (!request.controller.signal.aborted) historyStatus.textContent = error.message; }
+            finally { if (historyRequest === request) historyRequest = null; }
+        })();
+        return request.promise;
     }
     function setMode(next, updateHash = true) {
         if (busy) return;
@@ -388,6 +471,16 @@
         });
     });
     add.addEventListener('click', () => { if (!add.disabled) addChoice().focus(); });
+    dialog.addEventListener('click', event => {
+        const row = event.target.closest('.engagement-library-row');
+        const item = row && libraryItems.get(row);
+        if (!item) return;
+        if (busy || row.classList.contains('is-removing')) { event.preventDefault(); return; }
+        if (event.target.closest('.engagement-load')) { clearDeleteConfirmation(); loadTemplate(item); }
+        else if (event.target.closest('.engagement-star')) toggleSaved(item, row);
+        else if (event.target.closest('.engagement-delete')) deleteSaved(item);
+        else if (event.target.closest('.engagement-archive')) toggleArchive(item, row);
+    });
     additionalVotes.addEventListener('change', updateControls);
     form.addEventListener('input', syncTemplateMatches);
     form.addEventListener('change', syncTemplateMatches);
@@ -398,6 +491,14 @@
         toggleSaved(item);
     });
     refresh.addEventListener('click', () => loadRecent(true));
+    showArchived.addEventListener('click', () => {
+        if (busy) return;
+        includeArchived = !includeArchived;
+        showArchived.setAttribute('aria-pressed', String(includeArchived));
+        showArchived.title = includeArchived ? 'Hide archived' : 'Show archived';
+        showArchived.setAttribute('aria-label', showArchived.title);
+        clearDeleteConfirmation(); renderLibrary();
+    });
     form.addEventListener('submit', async event => {
         event.preventDefault();
         if (busy) return;
@@ -419,13 +520,14 @@
             if (item.kind === 'polls') [...choices.children].slice(5).forEach(row => row.remove());
             recent.delete(item.kind);
             message(`${item.kind === 'polls' ? 'Poll' : 'Prediction'} started.`);
-            const source = dialog.querySelector('.engagement-editor');
-            const flyer = source.cloneNode(true);
-            for (const node of [flyer, ...flyer.querySelectorAll('*')]) node.removeAttribute('id');
-            document.dispatchEvent(new CustomEvent('dashboard-engagement-started', {detail: {
-                item: {...item, ...payload.item, kind: item.kind}, sourceRect: source.getBoundingClientRect(), sourceScrollTop: source.scrollTop, flyer
-            }}));
-            if (dialog.open) loadRecent(true);
+            const detail = {item: {...item, ...payload.item, kind: item.kind}};
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                const source = dialog.querySelector('.engagement-editor'), flyer = source.cloneNode(true);
+                for (const node of [flyer, ...flyer.querySelectorAll('*')]) node.removeAttribute('id');
+                Object.assign(detail, {sourceRect: source.getBoundingClientRect(), sourceScrollTop: source.scrollTop, flyer});
+            }
+            document.dispatchEvent(new CustomEvent('dashboard-engagement-started', {detail}));
+            if (dialog.open) loadRecent(true, true);
         } catch (error) { message(error.message || 'Could not confirm creation. Check Twitch before trying again.', true); }
         finally {
             busy = false; tabs.forEach(tab => { tab.disabled = false; });
@@ -479,17 +581,31 @@
     dialog.addEventListener('click', event => { if (backdropPress && event.target === dialog && outside(event)) dialog.close(); backdropPress = false; });
     dialog.addEventListener('close', () => {
         if (dialog.open) return; // A newer history navigation may already have reopened it.
-        clearDeleteConfirmation(); dismissedDeletePress = false; historyController?.abort(); backdropPress = false;
+        clearDeleteConfirmation(); dismissedDeletePress = false; historyRequest?.controller.abort(); backdropPress = false;
         document.documentElement.classList.remove('engagement-open');
         if (engagementRoute()) window.history.replaceState(null, '', window.location.pathname + window.location.search);
         opener?.focus({preventScroll: true});
     });
-    new ResizeObserver(updateIndicator).observe(tabStrip);
-    new ResizeObserver(updateExcludedMark).observe(choices);
-    new ResizeObserver(layoutDurationLabels).observe(durationSlider);
+    const resizeObservers = [[updateIndicator, tabStrip], [updateExcludedMark, choices], [layoutDurationLabels, durationSlider]]
+        .map(([callback, element]) => ({observer: new ResizeObserver(callback), element}));
+    function observeLayout() { resizeObservers.forEach(({observer, element}) => observer.observe(element)); }
+    observeLayout();
+    window.addEventListener('pagehide', () => {
+        historyRequest?.controller.abort();
+        resizeObservers.forEach(({observer}) => observer.disconnect());
+    });
+    window.addEventListener('pageshow', event => { if (event.persisted) observeLayout(); });
     document.addEventListener('dashboard-engagement-updated', event => {
         recent.delete(event.detail.kind);
-        if (dialog.open && mode === event.detail.kind) loadRecent(true);
+        if (dialog.open && mode === event.detail.kind) loadRecent(true, true);
+    });
+    document.addEventListener('dashboard-engagement-repeat', event => {
+        const item = event.detail;
+        if (busy || !validTemplate(item)) return;
+        window.history.pushState(null, '', `#${item.kind}`);
+        openEngagement(item.kind);
+        loadTemplate(item);
+        form.requestSubmit();
     });
     addChoice(); addChoice(); setMode(mode);
     window.addEventListener('hashchange', syncEngagementHash);

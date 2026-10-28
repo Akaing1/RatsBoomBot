@@ -10,13 +10,19 @@
     const lock = dialog.querySelector('[data-engagement-summary-lock]');
     const resolve = dialog.querySelector('[data-engagement-summary-resolve]');
     const remove = dialog.querySelector('[data-engagement-summary-delete]');
+    const createNew = dialog.querySelector('[data-engagement-summary-new]');
+    const repeat = dialog.querySelector('[data-engagement-summary-repeat]');
     const confirmation = dialog.querySelector('[data-engagement-summary-confirm]');
     const records = new Map();
+    const requests = new Map();
+    const totalsCache = new WeakMap();
     const storageKey = `dashboard-engagement-active:${host.dataset.channelId}:v1`;
     let current = null, pendingAction = null, busy = false, backdropPress = false;
+    let summaryReturn = null, summaryOpener = null;
     const valid = item => ['polls', 'predictions'].includes(item?.kind) && /^[A-Za-z0-9_-]{1,100}$/.test(item?.id || '');
     const label = item => item.kind === 'polls' ? 'Poll' : 'Prediction';
     const active = item => ['ACTIVE', 'LOCKED'].includes(item.status);
+    function setText(node, value) { if (node.textContent !== value) node.textContent = value; }
     function remember() {
         try { localStorage.setItem(storageKey, JSON.stringify([...records.values()].map(({item}) => ({kind: item.kind, id: item.id})))); } catch (_) {}
     }
@@ -31,14 +37,26 @@
             COMPLETED: 'Completed', TERMINATED: 'Closed', ARCHIVED: 'Archived'}[item.status] || item.status;
     }
     function updateCard(record) {
-        record.card.querySelector('strong').textContent = record.item.title || label(record.item);
-        record.card.querySelector('span').textContent = `${label(record.item)} · ${record.error || description(record.item)}`;
-        record.card.querySelectorAll('button').forEach(button => { button.disabled = busy; });
+        if (!record.card) return;
+        setText(record.heading, record.item.title || label(record.item));
+        updateCardDescription(record);
+        record.buttons.forEach(button => { if (button.disabled !== busy) button.disabled = busy; });
         renderMiniChart(record);
         renderQuickPreview(record);
     }
+    function updateCardDescription(record) {
+        if (record.card) setText(record.description, `${label(record.item)} · ${record.error || description(record.item)}`);
+    }
     function resultTotals(item) {
-        return (item.options || []).reduce((total, option) => ({votes: total.votes + (option.votes || 0), points: total.points + (option.points || 0)}), {votes: 0, points: 0});
+        if (!item.options) return {votes: 0, points: 0};
+        let totals = totalsCache.get(item.options);
+        if (!totals) {
+            totals = item.options.reduce((total, option) => {
+                total.votes += option.votes || 0; total.points += option.points || 0; return total;
+            }, {votes: 0, points: 0});
+            totalsCache.set(item.options, totals);
+        }
+        return totals;
     }
     function summaryDescription(item) {
         const totals = resultTotals(item);
@@ -124,7 +142,8 @@
             preview.id = `engagement-quick-${item.kind}`;
             card.setAttribute('aria-controls', preview.id); card.setAttribute('aria-expanded', 'false');
             card.append(chart, actions, preview);
-            record = {item, card, reading: null}; records.set(item.kind, record); host.append(card);
+            record = {item, card, reading: null, heading: card.querySelector('strong'), description: card.querySelector('span'), buttons: [...actions.children]};
+            records.set(item.kind, record); host.append(card);
             card.addEventListener('click', event => {
                 if (busy) return;
                 const action = event.target.closest('[data-engagement-card-action]')?.dataset.engagementCardAction;
@@ -142,75 +161,169 @@
         record.item = item; updateCard(record); remember();
         return record;
     }
+    function requestSummary(kind, id) {
+        const url = `/channel/api/engagement/${kind}/${encodeURIComponent(id)}`;
+        if (requests.has(url)) return requests.get(url).promise;
+        const controller = new AbortController();
+        const promise = (async () => {
+            const response = await fetch(url, {signal: controller.signal, cache: 'no-store', headers: {Accept: 'application/json'}});
+            return {ok: response.ok, status: response.status, payload: await response.json()};
+        })().finally(() => { if (requests.get(url)?.promise === promise) requests.delete(url); });
+        requests.set(url, {promise, controller});
+        return promise;
+    }
     async function read(record) {
-        if (record.reading) return record.reading;
-        record.reading = (async () => {
-            const {kind, id} = record.item;
-            record.lastRead = Date.now();
-            const response = await fetch(`/channel/api/engagement/${kind}/${encodeURIComponent(id)}`, {cache: 'no-store', headers: {Accept: 'application/json'}});
-            const payload = await response.json();
-            if (!response.ok) {
-                record.unavailable = [401, 403, 404].includes(response.status);
-                record.error = payload.detail || 'Could not refresh the summary.'; updateCard(record);
+        const {kind, id} = record.item;
+        const summary = dialog.open && current === record;
+        const routeHash = window.location.hash;
+        const requestedId = summary ? summaryRoute()?.id || 'latest' : id;
+        if (record.reading && record.readingId === requestedId) return record.reading;
+        const revision = record.readRevision = (record.readRevision || 0) + 1;
+        record.lastRead = Date.now();
+        const reading = (async () => {
+            const {ok, status: responseStatus, payload} = await requestSummary(kind, requestedId);
+            if (record.readRevision !== revision) return;
+            if (summary && (!dialog.open || current !== record || window.location.hash !== routeHash)) return;
+            if (!summary && (records.get(kind) !== record || record.item.id !== id)) return;
+            if (!ok) {
+                record.unavailable = [401, 403, 404].includes(responseStatus);
+                record.error = payload.detail || 'Could not refresh the summary.';
+                if (record.card) updateCard(record);
                 throw new Error(record.error);
             }
-            if (records.get(kind) !== record || record.item.id !== id) return;
+            if (summary && record.error) message('');
+            if (summary && payload.item.id !== id) {
+                current = rememberItem(payload.item); resetConfirmation(); renderSummary(); return;
+            }
             const previousStatus = record.item.status;
-            record.item = payload.item; record.error = ''; record.unavailable = false; updateCard(record);
+            record.item = payload.item; record.error = ''; record.unavailable = false;
+            if (record.card) updateCard(record);
             if (current === record && previousStatus !== record.item.status) resetConfirmation();
             if (current === record && dialog.open) renderSummary();
-        })();
-        try { await record.reading; } finally { record.reading = null; }
+        })().catch(error => {
+            if (record.readRevision === revision && error.name !== 'AbortError') throw error;
+        });
+        record.reading = reading; record.readingId = requestedId;
+        try { await reading; } finally { if (record.reading === reading) record.reading = null; }
     }
     function resetConfirmation() { pendingAction = null; confirmation.hidden = true; }
     function renderSummary() {
         if (!current) return;
         const item = current.item;
-        const selected = options.querySelector('input:checked')?.value;
-        const focused = options.contains(document.activeElement) ? document.activeElement.value : null;
-        title.textContent = item.title;
-        dialog.querySelector('[data-engagement-summary-heading]').textContent = `${label(item)} summary`;
-        state.textContent = summaryDescription(item);
+        setText(title, item.title);
+        setText(dialog.querySelector('[data-engagement-summary-heading]'), `${label(item)} summary`);
+        setText(state, summaryDescription(item));
         const seconds = Number(item.duration);
-        const details = Number.isFinite(seconds) ? [`Voting duration: ${Math.floor(seconds / 60)}m${seconds % 60}s`] : [];
-        for (const [field, text] of [['created_at', 'Started'], ['locked_at', 'Locked'], ['ended_at', 'Ended']]) {
+        dialog.querySelector('[data-engagement-summary-duration]').textContent = Number.isFinite(seconds)
+            ? `Voting duration: ${Math.floor(seconds / 60)}m${seconds % 60}s` : '';
+        const details = [];
+        for (const [field, prefix] of [['created_at', ''], ['locked_at', 'Locked: ']]) {
             const timestamp = Date.parse(item[field]);
-            if (Number.isFinite(timestamp)) details.push(`${text}: ${new Date(timestamp).toLocaleString()}`);
+            if (Number.isFinite(timestamp)) details.push(`${prefix}${new Date(timestamp).toLocaleString()}`);
         }
-        dialog.querySelector('[data-engagement-summary-details]').textContent = details.join(' · ');
-        options.replaceChildren();
-        for (const option of item.options || []) {
-            const row = document.createElement('label'); row.className = 'engagement-summary-option';
-            if (item.kind === 'predictions' && active(item) && option.id) {
-                const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'engagement-winning-outcome';
-                radio.value = option.id; radio.checked = selected === option.id; radio.disabled = busy;
-                radio.addEventListener('change', () => { resetConfirmation(); resolve.disabled = busy || !options.querySelector('input:checked'); });
-                row.append(radio);
+        const ended = Date.parse(item.ended_at);
+        if (Number.isFinite(ended)) {
+            const endTime = new Date(ended).toLocaleTimeString();
+            if (details.length) details[details.length - 1] += ` - ${endTime}`;
+            else details.push(`- ${endTime}`);
+        }
+        dialog.querySelector('[data-engagement-summary-times]').textContent = details.join(' ');
+        const previous = new Map([...options.children].map(row => [row.dataset.optionKey, row]));
+        const itemKey = `${item.kind}:${item.id}`;
+        const results = item.options || [];
+        for (const [index, option] of results.entries()) {
+            const optionKey = `${itemKey}:${option.id || index}`;
+            let row = previous.get(optionKey);
+            if (!row) {
+                row = document.createElement('label'); row.className = 'engagement-summary-option'; row.dataset.optionKey = optionKey;
+                const track = document.createElement('div'); track.className = 'engagement-quick-track';
+                track.setAttribute('role', 'progressbar'); track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', '100');
+                track.append(document.createElement('div'));
+                row.append(document.createElement('span'), document.createElement('small'), track);
             }
-            const text = document.createElement('span'); text.textContent = option.title;
-            const totals = document.createElement('small');
-            totals.textContent = `${resultShare(item, option)}% · ` + (item.kind === 'polls' ? `${option.votes || 0} votes` : `${option.votes || 0} viewers · ${(option.points || 0).toLocaleString()} points`);
-            if (item.winning_outcome_id === option.id) { row.classList.add('is-winner'); text.textContent += ' · Winner'; }
-            row.append(text, totals); options.append(row);
+            previous.delete(optionKey);
+            let radio = row.querySelector('input');
+            if (item.kind === 'predictions' && active(item) && option.id) {
+                if (!radio) {
+                    radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'engagement-winning-outcome';
+                    radio.value = option.id; row.prepend(radio);
+                }
+                if (radio.disabled !== busy) radio.disabled = busy;
+            } else radio?.remove();
+            const share = resultShare(item, option);
+            const winner = item.winning_outcome_id === option.id;
+            row.classList.toggle('is-winner', winner);
+            setText(row.querySelector('span'), option.title + (winner ? ' · Winner' : ''));
+            setText(row.querySelector('small'), `${share}% · ` + (item.kind === 'polls' ? `${option.votes || 0} votes` : `${option.votes || 0} viewers · ${(option.points || 0).toLocaleString()} points`));
+            const track = row.querySelector('.engagement-quick-track');
+            if (track.style.getPropertyValue('--result-share') !== `${share}%`) track.style.setProperty('--result-share', `${share}%`);
+            if (track.getAttribute('aria-label') !== option.title) track.setAttribute('aria-label', option.title);
+            if (track.getAttribute('aria-valuenow') !== String(share)) track.setAttribute('aria-valuenow', String(share));
+            if (options.children[index] !== row) options.insertBefore(row, options.children[index] || null);
         }
+        previous.forEach(row => row.remove());
         lock.hidden = item.status !== 'ACTIVE'; lock.textContent = item.kind === 'polls' ? 'Close poll' : 'Lock voting';
         resolve.hidden = item.kind !== 'predictions' || !active(item);
-        remove.textContent = active(item) ? 'Delete' : 'Remove summary';
+        remove.hidden = !active(item);
+        createNew.textContent = item.kind === 'polls' ? 'New poll' : 'New prediction';
+        createNew.href = `#${item.kind}`;
+        createNew.setAttribute('aria-disabled', String(busy));
         dialog.querySelectorAll('.engagement-summary-header button, .engagement-summary-actions button, .engagement-summary-confirm button').forEach(button => { button.disabled = busy; });
         resolve.disabled = busy || !options.querySelector('input:checked');
-        if (focused) [...options.querySelectorAll('input')].find(input => input.value === focused)?.focus({preventScroll: true});
+        repeat.disabled = busy || active(item) || (item.options || []).length < 2;
+        repeat.title = active(item) ? `Finish the current ${label(item).toLowerCase()} first.` : '';
     }
-    async function openSummary(record) {
+    function summaryRoute() {
+        const match = /^#(polls|predictions)-summary(?:=([A-Za-z0-9_-]{1,100}))?$/.exec(window.location.hash);
+        return match ? {kind: match[1], id: match[2]} : null;
+    }
+    async function openSummary(record, updateHash = true) {
         if (busy) return;
+        if (!dialog.open) {
+            const previousReturn = window.history.state?.engagementSummaryReturn;
+            summaryReturn = !updateHash && previousReturn !== undefined ? previousReturn
+                : creator?.open ? creator.querySelector('[data-engagement-tab][aria-selected="true"]')?.dataset.engagementTab : null;
+            if (!['polls', 'predictions'].includes(summaryReturn)) summaryReturn = null;
+            summaryOpener = summaryReturn ? document.activeElement : record.card;
+        }
+        const hash = `#${record.item.kind}-summary=${record.item.id}`;
+        const historyState = {...window.history.state, engagementSummaryReturn: summaryReturn};
+        if (updateHash && window.location.hash !== hash) window.history.pushState(historyState, '', hash);
+        else window.history.replaceState(historyState, '', window.location.href);
+        creator?.close();
         current = record; resetConfirmation(); message(''); renderSummary();
         if (!dialog.open) dialog.showModal();
         try {
             await read(record);
         } catch (error) { if (current === record && dialog.open) message(error.message, true); }
     }
+    function closeSummary() {
+        if (busy) return;
+        dialog.close();
+        if (summaryReturn) {
+            document.querySelector(`[data-engagement-open="${summaryReturn}"]`)?.click();
+            if (creator?.open && summaryOpener?.isConnected && creator.contains(summaryOpener))
+                summaryOpener.focus({preventScroll: true});
+        }
+    }
+    function syncSummaryHash() {
+        const route = summaryRoute();
+        if (!route) { if (dialog.open) dialog.close(); return; }
+        if (busy) return;
+        const record = records.get(route.kind);
+        openSummary(record && (!route.id || record.item.id === route.id) ? record : {item: {
+            ...route, id: route.id || 'latest', title: `${label(route)} summary`, status: '', options: []
+        }}, false);
+    }
     async function act(action, outcome = '') {
         if (busy || !current) return;
         const record = current;
+        const actionHash = window.location.hash;
+        record.readRevision = (record.readRevision || 0) + 1;
+        record.reading = null;
+        for (const [url, request] of requests) if (url.startsWith(`/channel/api/engagement/${record.item.kind}/`)) {
+            requests.delete(url); request.controller.abort();
+        }
         busy = true; resetConfirmation(); renderSummary(); message('Updating…');
         for (const item of records.values()) updateCard(item);
         try {
@@ -219,18 +332,19 @@
                 {method: 'POST', body, headers: {Accept: 'application/json'}});
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.detail || 'Could not confirm the change. Refresh before retrying.');
-            // An older read cannot overwrite the confirmed action below.
-            if (record.reading) await record.reading.catch(() => {});
             record.item = payload.item; record.error = ''; record.unavailable = false;
             document.dispatchEvent(new CustomEvent('dashboard-engagement-updated', {detail: {kind: record.item.kind}}));
             if (payload.dismissed) {
-                record.card.remove(); records.delete(record.item.kind); remember(); dialog.close();
+                record.card?.remove();
+                if (records.get(record.item.kind) === record) records.delete(record.item.kind);
+                remember(); dialog.close();
             } else { updateCard(record); message('Updated.'); }
         } catch (error) { record.error = error.message; message(error.message, true); }
         finally {
             busy = false;
             for (const item of records.values()) updateCard(item);
             if (dialog.open) renderSummary();
+            if (window.location.hash !== actionHash) syncSummaryHash();
         }
     }
     function confirm(action) {
@@ -240,8 +354,7 @@
         pendingAction = {action, outcome};
         const text = action === 'resolve'
             ? `Choose “${item.options.find(option => option.id === outcome)?.title}” as the winner? This awards Channel Points and cannot be undone.`
-            : !active(item) ? 'Remove this summary from the dashboard? Twitch history will be kept.'
-                : item.kind === 'polls' ? 'Delete this poll? It will end and be archived on Twitch.'
+            : item.kind === 'polls' ? 'Delete this poll? It will end and be archived on Twitch.'
                     : 'Delete this prediction? It will be cancelled and all Channel Points refunded.';
         dialog.querySelector('[data-engagement-summary-confirm-text]').textContent = text;
         confirmation.hidden = false;
@@ -249,7 +362,10 @@
     }
     function animateIntoChat(detail, record) {
         const flyer = detail.flyer, from = detail.sourceRect;
-        if (!flyer || !from) return;
+        if (!flyer || !from) {
+            requestAnimationFrame(() => { if (record.card.isConnected && !creator?.open && !dialog.open) record.card.focus({preventScroll: true}); });
+            return;
+        }
         requestAnimationFrame(() => requestAnimationFrame(() => {
             record.card.scrollIntoView({block: 'nearest', behavior: 'instant'});
             const to = record.card.getBoundingClientRect();
@@ -277,13 +393,30 @@
         creator?.close(); animateIntoChat(event.detail, record);
     });
     lock.addEventListener('click', () => act('close'));
+    options.addEventListener('change', event => {
+        if (!event.target.matches('input[name="engagement-winning-outcome"]')) return;
+        resetConfirmation(); resolve.disabled = busy || !options.querySelector('input:checked');
+    });
     resolve.addEventListener('click', () => confirm('resolve'));
     remove.addEventListener('click', () => confirm('delete'));
     dialog.querySelector('[data-engagement-summary-confirm-yes]').addEventListener('click', () => { if (pendingAction) act(pendingAction.action, pendingAction.outcome); });
     dialog.querySelector('[data-engagement-summary-confirm-no]').addEventListener('click', resetConfirmation);
-    dialog.querySelector('[data-engagement-summary-refresh]').addEventListener('click', () => { if (!busy) openSummary(current); });
-    dialog.querySelector('[data-engagement-summary-close]').addEventListener('click', () => dialog.close());
-    dialog.addEventListener('cancel', event => { if (busy || pendingAction) { event.preventDefault(); resetConfirmation(); } });
+    createNew.addEventListener('click', event => { if (busy) event.preventDefault(); });
+    repeat.addEventListener('click', () => {
+        if (repeat.disabled || !current) return;
+        const item = current.item;
+        dialog.close();
+        document.dispatchEvent(new CustomEvent('dashboard-engagement-repeat', {detail: {
+            kind: item.kind, title: item.title, duration: item.duration, choices: item.options.map(option => option.title),
+            ...(item.kind === 'polls' ? {channel_points_voting_enabled: item.channel_points_voting_enabled === true,
+                channel_points_per_vote: item.channel_points_per_vote} : {})
+        }}));
+    });
+    dialog.querySelector('[data-engagement-summary-close]').addEventListener('click', closeSummary);
+    dialog.addEventListener('cancel', event => {
+        event.preventDefault();
+        if (busy || pendingAction) resetConfirmation(); else closeSummary();
+    });
     dialog.addEventListener('pointerdown', event => {
         const rect = dialog.getBoundingClientRect();
         backdropPress = event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom);
@@ -291,28 +424,50 @@
     dialog.addEventListener('pointercancel', () => { backdropPress = false; });
     dialog.addEventListener('click', event => {
         const rect = dialog.getBoundingClientRect();
-        if (!busy && backdropPress && event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) dialog.close();
+        if (!busy && backdropPress && event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) closeSummary();
         backdropPress = false;
     });
     dialog.addEventListener('close', () => {
+        if (dialog.open) return;
         resetConfirmation(); backdropPress = false;
-        const target = current?.card.isConnected ? current.card : document.querySelector(`[data-engagement-open="${current?.item.kind}"]`);
+        const route = summaryRoute();
+        if (route && route.kind === current?.item.kind && (!route.id || route.id === current.item.id))
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        if (['#polls', '#predictions'].includes(window.location.hash)) return;
+        const target = current?.card?.isConnected ? current.card : document.querySelector(`[data-engagement-open="${current?.item.kind}"]`);
         target?.focus({preventScroll: true});
     });
     function refreshVisible() {
         if (document.visibilityState !== 'visible' || busy) return;
-        for (const record of records.values()) if (active(record.item) && !record.unavailable &&
+        const targets = new Set(records.values());
+        if (dialog.open && current) targets.add(current);
+        for (const record of targets) if (((dialog.open && current === record) || (active(record.item) && !record.unavailable)) &&
             (record.expanded || (dialog.open && current === record) || Date.now() - (record.lastRead || 0) >= 15000)) read(record).catch(error => {
             if (dialog.open && current === record) message(error.message, true);
         });
     }
-    const clock = setInterval(() => {
-        for (const record of records.values()) updateCard(record);
-        if (dialog.open && current) state.textContent = summaryDescription(current.item);
-    }, 1000);
-    const polling = setInterval(refreshVisible, 5000);
+    function tickClock() {
+        if (document.visibilityState !== 'visible') return;
+        for (const record of records.values()) if (active(record.item)) updateCardDescription(record);
+        if (dialog.open && current) setText(state, summaryDescription(current.item));
+    }
+    let clock = null, polling = null;
+    function startTimers() {
+        if (clock === null) clock = setInterval(tickClock, 1000);
+        if (polling === null) polling = setInterval(refreshVisible, 5000);
+    }
+    startTimers();
     document.addEventListener('visibilitychange', refreshVisible);
-    window.addEventListener('pagehide', () => { clearInterval(clock); clearInterval(polling); });
+    window.addEventListener('pagehide', () => {
+        clearInterval(clock); clearInterval(polling);
+        clock = null; polling = null;
+        requests.forEach(request => request.controller.abort());
+        requests.clear();
+        const targets = new Set(records.values());
+        if (current) targets.add(current);
+        targets.forEach(record => { record.readRevision = (record.readRevision || 0) + 1; record.reading = null; });
+    });
+    window.addEventListener('pageshow', event => { if (event.persisted) { startTimers(); refreshVisible(); } });
     try {
         const stored = JSON.parse(localStorage.getItem(storageKey) || '[]');
         if (Array.isArray(stored)) for (const item of stored.filter(valid).slice(0, 2)) {
@@ -320,4 +475,7 @@
             read(record).catch(error => { record.card.querySelector('span').textContent = `${error.message} · Click to retry`; });
         }
     } catch (_) {}
+    window.addEventListener('hashchange', syncSummaryHash);
+    window.addEventListener('popstate', syncSummaryHash);
+    syncSummaryHash();
 })();
