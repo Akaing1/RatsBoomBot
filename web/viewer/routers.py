@@ -154,6 +154,18 @@ async def viewer_channel_context(request: Request, channel_name: str, destinatio
     return runtime_db, services, profile, channel_profile, token
 
 
+@router.get("/me/channels/{channel_name}/profile")
+async def viewer_community_profile(request: Request, channel_name: str):
+    context = await viewer_channel_context(request, channel_name, "profile")
+    if isinstance(context, RedirectResponse):
+        return context
+    _, _, profile, _, _ = context
+    return RedirectResponse(
+        f"/chatters/{profile['identity']['login']}/channels/{profile['channel']['login']}",
+        status_code=303, headers=PRIVATE_HEADERS,
+    )
+
+
 async def shop_context(request: Request, channel_name: str):
     context = await viewer_channel_context(request, channel_name, "shop")
     if isinstance(context, RedirectResponse):

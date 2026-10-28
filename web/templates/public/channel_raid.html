@@ -14,6 +14,7 @@
 <script src="/static/js/boss-hunt-guide.js?v={{ deployment_stamp() }}" defer></script>
 
 <link rel="stylesheet" href="/static/css/public-header.css?v={{ deployment_stamp() }}">
+<link rel="stylesheet" href="/static/css/community-nav.css?v={{ deployment_stamp() }}">
 </head>
 
 <body class="public-command-page hunt-guide">
@@ -24,6 +25,7 @@
             {% if broadcaster.login %}<a class="button primary" href="https://twitch.tv/{{ broadcaster.login }}">Watch on Twitch</a>{% endif %}
         </nav>
     {% endcall %}
+    {% include "shared/community_nav.html" %}
 
     <main class="public-command-content">
         <header class="public-command-hero">
