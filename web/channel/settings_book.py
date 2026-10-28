@@ -53,11 +53,24 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
         **{('feature', name): 'Community messages' for name in (
             'follow_responses', 'subscription_responses', 'resubscription_responses', 'gifted_subscription_responses')},
     }
+    setting_controls = {
+        ('feature', 'follow_responses'): 'community_messages.follow',
+        ('feature', 'subscription_responses'): 'community_messages.subscription',
+        ('feature', 'resubscription_responses'): 'community_messages.resubscription',
+        ('feature', 'gifted_subscription_responses'): 'community_messages.gifted_subscription',
+        ('global_command', 'lurk'): 'lurk_message',
+    }
     for section in sections.values():
         section['group_toggles'] = {}
+        section['setting_toggles'] = {}
+        setting_keys = {entry.definition.key for entries in section['groups'].values() for entry in entries}
         section['standalone_toggles'] = []
         section['blocked'] = any(getattr(t['state'], 'blocked_by_profile', False) or getattr(t['state'], 'blocked_by_globals', False) for t in section['toggles'])
         for toggle in section['toggles']:
+            setting_key = setting_controls.get((toggle['kind'], toggle['name']))
+            if setting_key in setting_keys:
+                section['setting_toggles'][setting_key] = toggle
+                continue
             group = group_controls.get((toggle['kind'], toggle['name']))
             if group in section['groups']:
                 section['group_toggles'].setdefault(group, []).append(toggle)

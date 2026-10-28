@@ -1,6 +1,6 @@
 <section class="panel profile-settings-panel" id="dashboard-settings">
     <h3>Raid preferences</h3>
-    <form method="post" action="/channel/customization">
+    <form method="post" action="{{ customization_action | default('/channel/customization') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="setting_name" value="dashboard.follow_raid">
         <label for="follow-raid-default">Follow raids by default</label>

@@ -82,7 +82,7 @@ def test_header_controls_are_not_duplicated_in_standalone_rows():
     try:
         context, _, _ = settings_context()
         for section in context['settings_sections']:
-            assigned = section['standalone_toggles'] + [t for group in section['group_toggles'].values() for t in group]
+            assigned = section['standalone_toggles'] + list(section['setting_toggles'].values()) + [t for group in section['group_toggles'].values() for t in group]
             assert Counter((t['kind'], t['name']) for t in assigned) == Counter((t['kind'], t['name']) for t in section['toggles'])
         timers = next(s for s in context['settings_sections'] if s['key'] == 'timers')
         assert timers['standalone_toggles'] == []
@@ -128,5 +128,25 @@ def test_games_only_contains_enabled_integrations():
         assert 'Overwatch' not in games['groups']
         general = next(s for s in sections if s['key'] == 'general')
         assert any(t['name'] == 'league' for t in general['toggles'])
+    finally:
+        clear_profiles()
+
+
+def test_related_response_switches_render_inside_their_message_cards():
+    from dataclasses import replace
+    try:
+        context, _, _ = settings_context('events')
+        events = next(section for section in context['settings_sections'] if section['key'] == 'events')
+        assert events['setting_toggles']['community_messages.follow']['name'] == 'follow_responses'
+        entries = events['groups']['Community messages']
+        entries[0] = replace(entries[0], override_value='A custom follow response', effective_value='A custom follow response')
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        card = html.split('data-setting-key="community_messages.follow"', 1)[1].split('</article>', 1)[0]
+        assert 'form="settings-toggle-feature-follow_responses"' in card
+        assert 'A custom follow response</textarea>' in card
+        assert html.count('form="settings-toggle-feature-follow_responses"') == 1
+        assert 'value="reset"' not in html
+        assert 'Leave empty to send nothing.' not in html
+        assert 'data-settings-finder' in html
     finally:
         clear_profiles()

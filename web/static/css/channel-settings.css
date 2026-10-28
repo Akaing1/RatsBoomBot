@@ -168,3 +168,37 @@
 @media (max-width: 900px) {
     .settings-page .settings-group .settings-switch-list { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Settings finder and compact, related controls. Scoped away from For You tabs. */
+.channel-page-settings .settings-workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;flex:1;min-height:0;width:100%;align-items:stretch}
+.channel-page-settings .settings-workspace:has(.settings-finder:not([hidden])){grid-template-columns:minmax(0,1fr) 290px}
+.channel-page-settings .settings-pages{box-sizing:border-box;border-radius:0 0 16px 16px;padding:22px}
+.channel-page-settings .settings-finder{box-sizing:border-box;min-width:0;min-height:0;overflow-y:auto;scrollbar-width:thin;padding:22px;background:linear-gradient(145deg,#252d3d,#1a202b);border:1px solid var(--border);border-radius:14px;margin-top:12px}
+.channel-page-settings .settings-finder[hidden]{display:none}
+.settings-finder h3{margin:4px 0 22px;font-size:20px}.settings-finder label{display:block;color:var(--muted);font-size:12px;margin-bottom:8px}
+.settings-finder input{box-sizing:border-box;width:100%;min-width:0;background:var(--background);color:var(--text);font:inherit;font-size:13px;padding:12px;border:1px solid var(--border);border-radius:9px}
+.settings-finder h4{font-size:12px;color:var(--muted);margin:22px 0 10px;text-transform:uppercase;letter-spacing:.05em}
+.settings-finder-results,.settings-finder-shortcuts{display:grid;gap:6px}.settings-finder-results[hidden]{display:none}
+.settings-finder button{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;background:#10172255;border:1px solid transparent;border-radius:9px;padding:11px 12px;color:var(--text);cursor:pointer;font:inherit;font-size:13px;overflow-wrap:anywhere}
+.settings-finder button:hover{border-color:#a78bfa66;background:#754baa22}.settings-finder button small{color:#b6a4d6;font-size:11px}
+.settings-finder-count,.settings-finder-note{font-size:12px;color:var(--muted);line-height:1.65}.settings-finder-note{border-top:1px solid var(--border);padding-top:16px;margin-top:22px}
+.settings-finder :is(button,input):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.channel-page-settings .settings-command-clusters{display:grid;gap:14px;margin-bottom:22px}
+.channel-page-settings .settings-command-cluster{padding:16px 18px;border:1px solid var(--border);border-radius:12px;background:#20273566}
+.channel-page-settings .settings-command-cluster h4{margin:0 0 6px;font-size:14px;color:#c4b5fd}
+.channel-page-settings .settings-command-cluster .settings-switch-list{margin:0;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:0 24px}
+.channel-page-settings .settings-switch-row{min-height:44px;font-size:12px}
+.channel-page-settings .profile-setting-card{background:#202735!important;padding:16px!important;gap:10px}
+.channel-page-settings .profile-setting-card .toggle-card-heading{min-height:0;align-items:flex-start;gap:12px}
+.channel-page-settings .profile-setting-card .toggle-card-heading h4{font-size:14px}.channel-page-settings .profile-setting-card .toggle-card-heading p{font-size:12px}
+.channel-page-settings .profile-setting-card .settings-inline-switch{flex-shrink:0}.channel-page-settings .profile-setting-card form{height:auto;gap:12px}
+.channel-page-settings .settings-group{margin-top:20px}.channel-page-settings .settings-group>summary{padding:16px}
+.channel-page-settings .settings-page .profile-settings-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:14px}
+.channel-page-settings .settings-search-highlight{outline:2px solid #b794f4;outline-offset:3px;scroll-margin:24px}
+@media(max-width:1100px){.channel-page-settings .settings-workspace:has(.settings-finder:not([hidden])){grid-template-columns:minmax(0,1fr) 250px}.channel-page-settings .settings-finder{padding:16px}.channel-page-settings .settings-pages{padding:16px}}
+@media(max-width:900px){
+.channel-page-settings .settings-workspace:has(.settings-finder:not([hidden])){display:flex;flex-direction:column;overflow-y:auto}
+.channel-page-settings .settings-finder{order:-1;flex-shrink:0;max-height:330px;margin-top:12px}
+.channel-page-settings .settings-pages{flex:1 0 auto;overflow:visible;min-height:0}
+.channel-page-settings .settings-finder-shortcuts{display:flex;flex-wrap:wrap}.channel-page-settings .settings-finder-shortcuts button{width:auto}
+}
