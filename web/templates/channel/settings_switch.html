@@ -3,6 +3,5 @@
 <span class="settings-inline-switch">
     {% if labeled %}<span class="settings-switch-label">{{ toggle.label }}</span>{% endif %}
     <button class="settings-status-switch {{ 'enabled' if toggle.state.effective_enabled else 'disabled' }}" type="submit" form="settings-toggle-{{ toggle.kind }}-{{ toggle.name }}" name="action" value="{{ 'disable' if toggle.state.effective_enabled else 'enable' }}" role="switch" aria-checked="{{ 'true' if toggle.state.effective_enabled else 'false' }}" aria-label="{{ toggle.label }}"{% if blocked %} disabled title="Enable the channel profile and global commands in General first."{% else %} title="{{ 'Disable' if toggle.state.effective_enabled else 'Enable' }} {{ toggle.label }}"{% endif %}>{{ 'Enabled' if toggle.state.effective_enabled else 'Disabled' }}</button>
-    {% if toggle.state.override_enabled is not none %}<button class="settings-switch-reset" type="submit" form="settings-toggle-{{ toggle.kind }}-{{ toggle.name }}" name="action" value="reset" aria-label="Use default for {{ toggle.label }}" title="Use default">↺</button>{% endif %}
 </span>
 {% endmacro %}

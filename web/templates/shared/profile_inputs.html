@@ -73,7 +73,7 @@
         <div{% if group_name == "Commands" and not settings_notebook | default(false) %} data-command-panel="responses"{% if command_tab | default('responses') == 'protected' %} hidden{% endif %}{% endif %}>
         <div class="profile-settings-grid">
             {% for setting in settings %}
-                <article class="toggle-card profile-setting-card{% if setting.definition.key == 'timer_messages' %} full-width{% endif %}">
+                <article data-setting-key="{{ setting.definition.key }}" class="toggle-card profile-setting-card{% if setting.definition.key == 'timer_messages' %} full-width{% endif %}">
                     <form method="post" action="{{ customization_action | default('/channel/customization') }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="setting_name" value="{{ setting.definition.key }}">
@@ -81,13 +81,13 @@
                         <div class="toggle-card-heading">
                             <div>
                                 <h4>{{ setting.definition.label }}</h4>
-                                <p>{{ setting.definition.description }}</p>
+                                <p>{{ setting.definition.description | replace("Leave empty to send nothing.", "") if settings_notebook | default(false) else setting.definition.description }}</p>
                             </div>
 
-                            {% if setting.override_value is not none %}
-                                <span class="toggle-status enabled">Override</span>
-                            {% else %}
-                                <span class="toggle-status">Default</span>
+                            {% set control = (setting_toggles | default({})).get(setting.definition.key) %}
+                            {% if control %}{{ status_switch(control) }}{% endif %}
+                            {% if not settings_notebook | default(false) %}
+                            <span class="toggle-status{% if setting.override_value is not none %} enabled{% endif %}">{{ 'Override' if setting.override_value is not none else 'Default' }}</span>
                             {% endif %}
                         </div>
 
@@ -107,19 +107,19 @@
                                 <button class="button secondary timer-add-button" type="button" data-add-timer>+ Add Timer</button>
                             </div>
                         {% elif setting.definition.value_type == "integer" %}
-                            <input class="profile-setting-input" type="number" name="value" value="{{ setting.effective_value }}" min="{{ setting.definition.minimum }}" max="{{ setting.definition.maximum }}">
+                            <input class="profile-setting-input" type="number" name="value" value="{{ (setting.override_value if setting.override_value is not none else '') if settings_notebook | default(false) else setting.effective_value }}" placeholder="{{ setting.default_value }}" aria-label="{{ setting.definition.label }}" min="{{ setting.definition.minimum }}" max="{{ setting.definition.maximum }}">
                         {% elif setting.definition.rows == 1 %}
-                            <input class="profile-setting-input" type="text" name="value" value="{{ setting.effective_value }}" maxlength="{{ setting.definition.maximum_length }}">
+                            <input class="profile-setting-input" type="text" name="value" value="{{ (setting.override_value if setting.override_value is not none else '') if settings_notebook | default(false) else setting.effective_value }}" placeholder="{{ setting.default_value }}" aria-label="{{ setting.definition.label }}" maxlength="{{ setting.definition.maximum_length }}">
                         {% else %}
-                            <textarea class="profile-setting-input" name="value" rows="{{ setting.definition.rows }}" maxlength="{{ setting.definition.maximum_length }}">{{ setting.effective_value }}</textarea>
+                            <textarea class="profile-setting-input" name="value" rows="{{ setting.definition.rows }}" maxlength="{{ setting.definition.maximum_length }}" placeholder="{{ setting.default_value }}" aria-label="{{ setting.definition.label }}">{{ (setting.override_value if setting.override_value is not none else '') if settings_notebook | default(false) else setting.effective_value }}</textarea>
                         {% endif %}
 
-                        <p class="toggle-meta"{% if settings_notebook | default(false) and setting.override_value is none %} hidden{% endif %}>Channel default: {{ setting.default_value if setting.default_value != "" else "Not configured" }}</p>
+                        {% if not settings_notebook | default(false) %}<p class="toggle-meta">Channel default: {{ setting.default_value if setting.default_value != "" else "Not configured" }}</p>{% endif %}
 
                         <div class="toggle-actions profile-setting-actions">
                             <button class="button primary" type="submit" name="action" value="save">Save Changes</button>
 
-                            {% if setting.override_value is not none %}
+                            {% if setting.override_value is not none and not settings_notebook | default(false) %}
                                 <button class="button secondary" type="submit" name="action" value="reset">Use Default</button>
                             {% endif %}
                         </div>

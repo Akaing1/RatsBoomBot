@@ -2437,7 +2437,10 @@ async def update_channel_customization(request: Request, setting_name: str = For
         else:
             definition = services.profile_settings.get_definition(setting_name)
 
-            if action == "save":
+            if action == "save" and not value.strip() and setting_name != "timer_messages":
+                await services.profile_settings.clear_override(broadcaster_id, setting_name, settings_actor(request))
+                message = f"{definition.label} now uses its channel default."
+            elif action == "save":
                 await services.profile_settings.set_override(broadcaster_id, setting_name, value, settings_actor(request))
                 message = f"{definition.label} was updated."
             elif action == "reset":

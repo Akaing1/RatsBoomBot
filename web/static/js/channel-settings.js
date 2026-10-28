@@ -21,6 +21,7 @@
         });
         pages.forEach(page => { page.hidden = page.dataset.settingsPage !== key; });
         scroller.scrollTop = scrollPositions.get(key) || 0;
+        book.dispatchEvent(new CustomEvent('settings-section-changed', {detail: {key}}));
         try { sessionStorage.setItem(storageKey, key); } catch { /* Storage may be disabled. */ }
         if (updateURL) {
             const url = new URL(window.location.href);
