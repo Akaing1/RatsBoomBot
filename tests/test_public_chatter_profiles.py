@@ -196,7 +196,7 @@ def test_public_channel_chatter_profile_renders(monkeypatch) -> None:
     assert '<h2>Mod Bar</h2>' not in response.text
     assert '/me/logout' not in response.text
     assert "/me/connect?next=/chatters/alice/channels/testchannel" in response.text
-    assert 'class="public-command-navigation chatter-channel-navigation"' in response.text
+    assert 'class="site-header"' in response.text
     assert 'class="button secondary chatter-channel-back"' in response.text
     assert 'data-chatter-tab="overview"' in response.text
     assert 'data-chatter-tab="raids"' in response.text

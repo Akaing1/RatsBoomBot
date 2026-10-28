@@ -9,15 +9,12 @@
     <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
     <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
+<link rel="stylesheet" href="/static/css/public-header.css?v={{ deployment_stamp() }}">
 </head>
 <body class="chatter-profile-page profile-page{% if account_mode %} account-page{% endif %}">
-    <header class="public-command-navigation">
-        <a class="landing-brand" href="/" aria-label="RatsBoomBot home">
-            <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="RatsBoomBot icon">
-            <span><strong>RatsBoomBot</strong><small>Chatter profiles</small></span>
-        </a>
-
-        <form class="chatter-search" method="get" action="/chatters">
+    {% from "shared/public_header.html" import public_header with context %}
+    {% call public_header("Chatter profiles") %}
+<form class="chatter-search" method="get" action="/chatters">
             <input type="search" name="q" placeholder="Find a chatter" aria-label="Find a chatter" required>
             <button class="button secondary" type="submit">Search</button>
         </form>
@@ -26,7 +23,7 @@
         {% else %}
             <a class="button secondary" href="{{ '/me' if viewer_user_id else '/me/connect?next=' ~ ('/chatters/' ~ profile.identity.login)|urlencode }}">{{ 'My account' if viewer_user_id else 'Sign in with Twitch' }}</a>
         {% endif %}
-    </header>
+    {% endcall %}
 
 <div class="mod-account-layout account-layout">
     <main class="chatter-profile-content">
