@@ -1254,6 +1254,7 @@
                 }
                 if (dialog.open) dialog.close();
                 document.dispatchEvent(new CustomEvent("dashboard-raid-started", {detail: {raid: payload.raid, sourceRect, flyer, avatarRect, avatarFlyer}}));
+                if (payload.warning) document.dispatchEvent(new CustomEvent("dashboard-raid-error", {detail: {message: payload.warning}}));
             } catch (error) {
                 showStatus(error.message, true);
                 if (!dialog.open) document.dispatchEvent(new CustomEvent("dashboard-raid-error", {detail: {message: error.message}}));

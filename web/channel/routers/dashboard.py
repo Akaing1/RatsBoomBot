@@ -637,9 +637,26 @@ async def channel_raid_action(request: Request, action: str = Form(...),
             target = await runtime_bot.fetch_user(id=target_id)
             if target is None:
                 return JSONResponse({"detail": "Twitch could not find that channel."}, status_code=404)
+            from bot.shared.commands.raids import outgoing_raid_messages
+            if not runtime_bot.services.features.is_enabled(broadcaster_id, FeatureName.RAID_RESPONSES):
+                return JSONResponse({"detail": "Enable raid responses before using !startraid from the raid browser."}, status_code=400)
+            try:
+                outgoing_messages = outgoing_raid_messages(get_active_profile(broadcaster_id), target)
+            except ValueError as error:
+                return JSONResponse({"detail": str(error)}, status_code=400)
             result = await broadcaster.start_raid(target_id)
             raid = remember_raid(runtime_bot, broadcaster_id, target, getattr(result, "created_at", None))
-            return JSONResponse({"raid": raid})
+            # Twitch has accepted the raid. Chat delivery failure must not invite a second raid.
+            warnings = []
+            for message in outgoing_messages:
+                try:
+                    sent = await runtime_bot.services.chat_identity.send_message(broadcaster, message)
+                    if getattr(sent, "is_sent", True) is False:
+                        raise RuntimeError("Twitch rejected the outgoing raid message")
+                except Exception:
+                    LOGGER.warning("[Dashboard] Outgoing raid message failed for %s after raid started.", broadcaster_id)
+                    warnings.append("Raid started, but an outgoing raid message could not be sent.")
+            return JSONResponse({"raid": raid, "warning": warnings[0] if warnings else None})
         except Exception as error:
             status = getattr(error, "status", None)
             if action == "cancel" and status == 404:
