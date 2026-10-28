@@ -1,0 +1,20 @@
+.public-command-page:is(.channel-help,.hunt-guide) .public-command-navigation {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 20px 24px;
+    flex-wrap: nowrap;
+}
+.public-command-page:is(.channel-help,.hunt-guide) .public-raid-navigation {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+@media (max-width: 600px) {
+    .public-command-page:is(.channel-help,.hunt-guide) .public-command-navigation { padding: 16px 14px; gap: 12px; }
+    .public-command-page:is(.channel-help,.hunt-guide) .public-command-navigation .landing-brand { gap: 8px; min-width: 0; flex-shrink: 1; }
+    .public-command-page:is(.channel-help,.hunt-guide) .public-command-navigation .landing-brand img { width: 36px; height: 36px; }
+    .public-command-page:is(.channel-help,.hunt-guide) .public-command-navigation .landing-brand strong { font-size: 14px; }
+    .public-command-page:is(.channel-help,.hunt-guide) .public-command-navigation .landing-brand small { font-size: 10px; }
+    .public-command-page:is(.channel-help,.hunt-guide) .public-command-navigation .button { padding: 10px 12px; font-size: 12px; white-space: nowrap; }
+}
