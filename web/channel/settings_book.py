@@ -35,25 +35,30 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
     for kind, states in (("feature", channel_features), ("profile_feature", profile_features), ("global_group", global_groups), ("global_command", global_commands)):
         for name, state in states.items():
             value = name.value
+            if kind == "feature" and value == "redeems":
+                continue
             if kind == "profile_feature":
                 section = "general"
             elif kind == "global_command":
                 section = "pets" if value == "pets" else "chat"
             else:
-                section = TOGGLE_SECTION.get(kind, {}).get(value, "general")
+                section = "events" if kind == "feature" and value.startswith("redeem_") else TOGGLE_SECTION.get(kind, {}).get(value, "general")
             label = "!" + value if kind == "global_command" else LABELS.get(value, value.replace("_", " ").title())
+            if kind == "feature" and value.startswith("redeem_"):
+                label = value.removeprefix("redeem_").title() + " redeem"
             if kind == "global_group" and value != "globals":
                 label += " commands"
             sections[section]["toggles"].append(dict(kind=kind, name=value, label=label, state=state))
     group_controls = {
         ('feature', 'points'): 'Loyalty points', ('global_group', 'points'): 'Loyalty points',
         ('feature', 'timers'): 'Timers', ('feature', 'raid_bosses'): 'Raid boss names',
-        ('feature', 'redeems'): 'Redeems', ('feature', 'raid_responses'): 'Raid messages',
+        ('feature', 'redeem_second'): 'Redeems', ('feature', 'raid_responses'): 'Raid messages',
         ('global_group', 'shoutouts'): 'Shoutouts', ('global_command', 'lurk'): 'Commands',
         **{('feature', name): 'Community messages' for name in (
             'follow_responses', 'subscription_responses', 'resubscription_responses', 'gifted_subscription_responses')},
     }
     setting_controls = {
+        **{("feature", f"redeem_{name}"): f"redeems.{name}_title" for name in ("daily", "first", "vip")},
         ('feature', 'follow_responses'): 'community_messages.follow',
         ('feature', 'subscription_responses'): 'community_messages.subscription',
         ('feature', 'resubscription_responses'): 'community_messages.resubscription',

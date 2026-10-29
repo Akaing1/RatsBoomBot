@@ -37,7 +37,7 @@ def test_every_setting_and_toggle_is_assigned_exactly_once():
         context, groups, states = settings_context()
         sections = context['settings_sections']
         assert Counter(entry.definition.key for section in sections for entries in section['groups'].values() for entry in entries) == Counter(entry.definition.key for name, entries in groups.items() if name not in ('League of Legends', 'Overwatch') for entry in entries)
-        assert sum(len(section['toggles']) for section in sections) == sum(map(len, states))
+        assert sum(len(section['toggles']) for section in sections) == sum(map(len, states)) - 1
         chat = next(s for s in sections if s['key'] == 'chat')
         assert any(t['name'] == 'kamikaze' for t in chat['toggles'])
         loyalty = next(s for s in sections if s['key'] == 'loyalty')
@@ -109,7 +109,7 @@ def test_reorganized_sections_and_forms():
         assert 'dashboard.follow_raid' in events
         for key, next_key in [('timers', 'connections'), ('loyalty', 'queue')]:
             page = html.split(f'id="settings-{key}"')[1].split(f'id="settings-{next_key}"')[0]
-            assert '<details' not in page
+            assert '<details class="settings-group"' not in page
     finally:
         clear_profiles()
 
@@ -148,5 +148,10 @@ def test_related_response_switches_render_inside_their_message_cards():
         assert 'value="reset"' not in html
         assert 'Leave empty to send nothing.' not in html
         assert 'data-settings-finder' in html
+        assert '<details class="settings-field-editor">' in card
+        assert 'settings-finder-note' not in html
+        for name in ('daily', 'first', 'second', 'vip'):
+            assert f'form="settings-toggle-feature-redeem_{name}"' in html
+        assert 'settings-toggle-feature-redeems' not in html
     finally:
         clear_profiles()
