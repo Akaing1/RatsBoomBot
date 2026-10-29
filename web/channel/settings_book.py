@@ -58,7 +58,7 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
     for kind, states in (("feature", channel_features), ("profile_feature", profile_features), ("global_group", global_groups), ("global_command", global_commands)):
         for name, state in states.items():
             value = name.value
-            if kind == "feature" and value == "redeems":
+            if kind == "feature" and value in {"redeems", "timers"}:
                 continue
             if kind == "profile_feature":
                 section = "general"
@@ -76,18 +76,26 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
                 or getattr(command, kind, None) == name
             )]
             description = TOGGLE_DESCRIPTIONS.get((kind, value)) or (commands[0].description if commands else f"Enable {label.lower()} for this channel.")
-            sections[section]["toggles"].append(dict(kind=kind, name=value, label=label, state=state, description=description,
-                commands=commands if kind == "global_group" else []))
+            if section == "pets":
+                panel = "Pets" if kind == "global_command" else "Boss Hunt"
+            elif section == "general" and kind == "global_group":
+                panel = "Commands"
+            elif value == "quote" or kind == "global_group":
+                panel = "Command groups"
+            else:
+                panel = {"feature": "Feature controls", "profile_feature": "Game integrations", "global_command": "Chat commands"}[kind]
+            show_commands = (kind == "global_group" and value != "globals") or (kind == "global_command" and value == "quote")
+            sections[section]["toggles"].append(dict(kind=kind, name=value, label=label, state=state,
+                description=description, commands=commands if show_commands else [], panel=panel))
     group_controls = {
         ('feature', 'points'): 'Loyalty points', ('global_group', 'points'): 'Loyalty points',
-        ('feature', 'timers'): 'Timers', ('feature', 'raid_bosses'): 'Raid boss names',
-        ('feature', 'redeem_second'): 'Redeems', ('feature', 'raid_responses'): 'Raid messages',
+        ('feature', 'raid_responses'): 'Raid messages',
         ('global_group', 'shoutouts'): 'Shoutouts', ('global_command', 'lurk'): 'Commands',
         **{('feature', name): 'Community messages' for name in (
             'follow_responses', 'subscription_responses', 'resubscription_responses', 'gifted_subscription_responses')},
     }
     setting_controls = {
-        **{("feature", f"redeem_{name}"): f"redeems.{name}_title" for name in ("daily", "first", "vip")},
+        **{("feature", f"redeem_{name}"): f"redeems.{name}_title" for name in ("daily", "first", "second", "vip")},
         ('feature', 'follow_responses'): 'community_messages.follow',
         ('feature', 'subscription_responses'): 'community_messages.subscription',
         ('feature', 'resubscription_responses'): 'community_messages.resubscription',

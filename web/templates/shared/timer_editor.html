@@ -12,7 +12,7 @@
         const editor = document.querySelector("[data-timer-editor]");
         const template = document.getElementById("timer-message-template");
 
-        if (!editor || !template) return;
+        if (!editor || !template || editor.hasAttribute("data-timer-manager")) return;
 
         const list = editor.querySelector("[data-timer-list]");
         const hiddenValue = editor.querySelector("[data-timer-value]");
@@ -42,7 +42,7 @@
         });
         editor.closest("form").addEventListener("submit", () => {
             hiddenValue.value = JSON.stringify(Array.from(list.querySelectorAll(".timer-message-row"))
-                .map((row) => [row.querySelector("[data-timer-message]").value.trim(), row.querySelector("[data-timer-kind]").value, row.querySelector("[data-timer-color]").value])
+                .map((row) => [row.querySelector("[data-timer-message]").value.trim(), row.querySelector("[data-timer-kind]").value, row.querySelector("[data-timer-color]").value, row.querySelector("[data-timer-enabled]")?.checked ?? true])
                 .filter((entry) => entry[0]));
         });
 

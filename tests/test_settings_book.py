@@ -37,7 +37,7 @@ def test_every_setting_and_toggle_is_assigned_exactly_once():
         context, groups, states = settings_context()
         sections = context['settings_sections']
         assert Counter(entry.definition.key for section in sections for entries in section['groups'].values() for entry in entries) == Counter(entry.definition.key for name, entries in groups.items() if name not in ('League of Legends', 'Overwatch') for entry in entries)
-        assert sum(len(section['toggles']) for section in sections) == sum(map(len, states)) - 1
+        assert sum(len(section['toggles']) for section in sections) == sum(map(len, states)) - 2
         chat = next(s for s in sections if s['key'] == 'chat')
         assert any(t['name'] == 'kamikaze' for t in chat['toggles'])
         loyalty = next(s for s in sections if s['key'] == 'loyalty')
@@ -86,11 +86,12 @@ def test_header_controls_are_not_duplicated_in_standalone_rows():
             assert Counter((t['kind'], t['name']) for t in assigned) == Counter((t['kind'], t['name']) for t in section['toggles'])
         timers = next(s for s in context['settings_sections'] if s['key'] == 'timers')
         assert timers['standalone_toggles'] == []
-        assert timers['group_toggles']['Timers'][0]['name'] == 'timers'
+        assert timers['group_toggles'] == {}
+        assert timers['toggles'] == []
         html = templates.env.get_template('channel/settings.html').render(**context)
         assert html.index('<div class="settings-pages"') < html.index('<nav class="settings-tabs"')
-        assert 'form="settings-toggle-feature-timers"' in html
-        assert 'id="settings-toggle-feature-timers"' in html
+        assert 'form="settings-toggle-feature-timers"' not in html
+        assert 'data-timer-manager' in html
         assert '>Enable\n' not in html
     finally:
         clear_profiles()

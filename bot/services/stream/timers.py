@@ -237,6 +237,8 @@ class TimerService:
 
         for entry in templates:
             timer = normalize_timer(entry)
+            if not timer.enabled:
+                continue
             template = timer.message
             if "{discord_url}" in template and not settings.discord_url:
                 continue

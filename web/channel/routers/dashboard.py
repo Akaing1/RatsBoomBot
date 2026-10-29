@@ -2374,6 +2374,7 @@ async def channel_customization_page(request: Request):
         context={
             "active_page": "settings",
             "customization_action": f"/me/mod/{broadcaster_id}/customization" if getattr(getattr(request, "state", None), "channel_access", None) else "/channel/customization",
+            "timers_active": services.features.is_enabled(broadcaster_id, FeatureName.TIMERS) and (await services.broadcaster_settings.get_settings(broadcaster_id)).timers_enabled,
             "settings_sections": visible_settings_sections(request, build_settings_sections(
                 groups, services.features.get_channel_features(broadcaster_id),
                 services.features.get_profile_features(broadcaster_id),
@@ -2430,6 +2431,11 @@ async def update_channel_customization(request: Request, setting_name: str = For
                 raise ValueError("Choose On or Off.")
             await services.broadcaster_settings.set_follow_raid(broadcaster_id, value == "1")
             message = "Follow raid preference saved."
+        elif setting_name in {"social.tiktok_url", "social.x_url", "social.kofi_url", "social.vgen_url"}:
+            if action != "save":
+                raise ValueError("Unknown social action.")
+            await services.broadcaster_settings.set_social_url(broadcaster_id, setting_name.removeprefix("social.").removesuffix("_url"), value)
+            message = "Social URL was updated."
         elif setting_name == "social.discord_url":
             await services.broadcaster_settings.set_discord_url(broadcaster_id, value.strip())
             message = "Discord URL was updated."
@@ -2444,6 +2450,9 @@ async def update_channel_customization(request: Request, setting_name: str = For
                 message = f"{definition.label} now uses its channel default."
             elif action == "save":
                 await services.profile_settings.set_override(broadcaster_id, setting_name, value, settings_actor(request))
+                if setting_name == "timer_messages":
+                    await services.features.set_enabled(broadcaster_id, FeatureName.TIMERS, True, settings_actor(request))
+                    await services.broadcaster_settings.set_timers_enabled(broadcaster_id, True)
                 message = f"{definition.label} was updated."
             elif action == "reset":
                 await services.profile_settings.clear_override(broadcaster_id, setting_name, settings_actor(request))

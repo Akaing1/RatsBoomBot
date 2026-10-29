@@ -1,0 +1,12 @@
+<article class="settings-timer-row">
+    <div class="settings-timer-heading"><span data-timer-preview>{{ entry.message if entry else 'New timer' }}</span>
+        <input type="checkbox" data-timer-enabled hidden{% if not entry or (entry.enabled and timers_active | default(true)) %} checked{% endif %}>
+        <button type="button" class="settings-status-switch" role="switch" data-toggle-timer aria-label="Enable timer" aria-checked="{{ 'true' if not entry or (entry.enabled and timers_active | default(true)) else 'false' }}">{{ 'Enabled' if not entry or (entry.enabled and timers_active | default(true)) else 'Disabled' }}</button>
+    </div>
+    <details><summary>Configure</summary><div class="settings-field-body">
+        <label>Type<select data-timer-kind class="profile-setting-input">{% for kind in ['message', 'announcement'] %}<option value="{{ kind }}"{% if entry and entry.kind == kind %} selected{% endif %}>{{ kind | title }}</option>{% endfor %}</select></label>
+        <label data-timer-color-label{% if not entry or entry.kind != 'announcement' %} hidden{% endif %}>Color<select data-timer-color class="profile-setting-input">{% for color in ['primary', 'blue', 'green', 'orange', 'purple'] %}<option value="{{ color }}"{% if entry and entry.color == color %} selected{% endif %}>{{ color | title }}</option>{% endfor %}</select></label>
+        <label>Message<textarea data-timer-message class="profile-setting-input" rows="3" maxlength="500">{{ entry.message if entry else '' }}</textarea></label>
+        <button type="button" class="button danger" data-remove-timer>Remove timer</button>
+    </div></details>
+</article>
