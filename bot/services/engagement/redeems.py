@@ -2,7 +2,7 @@ import asyncio
 import logging
 import random
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
 from bot.profiles import FeatureName, RedeemConfig, TargetTimeoutRedeemConfig, get_active_profile, render_profile_message
@@ -844,10 +844,18 @@ class RedeemService:
         if services is None:
             return None
 
-        if not services.features.is_enabled(broadcaster_id, FeatureName.REDEEMS):
+        if not services.features.is_enabled(broadcaster_id, FeatureName.CHANNEL):
             return None
 
-        return profile.redeems
+        config = profile.redeems
+        changes = {
+            f"{name}_title": getattr(config, f"{name}_title") if services.features.is_enabled(broadcaster_id, FeatureName(f"redeem_{name}")) else ""
+            for name in ("daily", "first", "second", "vip")
+        }
+        # Legacy custom timeout rewards retain their existing availability.
+        if not services.features.is_enabled(broadcaster_id, FeatureName.REDEEMS):
+            changes.update(timeout=replace(config.timeout, title=""), target_timeouts=())
+        return replace(config, **changes)
 
     @staticmethod
     def is_daily_double(config: RedeemConfig) -> bool:

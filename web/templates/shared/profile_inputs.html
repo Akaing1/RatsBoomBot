@@ -33,8 +33,10 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="setting_name" value="{{ key }}">
                     <div class="toggle-card-heading"><div><h4>{{ label }}</h4><p>{{ description }}</p></div></div>
+                    {% if settings_notebook | default(false) %}<details class="settings-field-editor"><summary>Customize</summary><div class="settings-field-body">{% endif %}
                     <input class="profile-setting-input" type="url" name="value" value="{{ current_value or '' }}" placeholder="https://">
                     <div class="toggle-actions profile-setting-actions"><button class="button primary" type="submit" name="action" value="save">Save Changes</button></div>
+                    {% if settings_notebook | default(false) %}</div></details>{% endif %}
                 </form>
             </article>
         {% endfor %}
@@ -52,10 +54,10 @@
 
 {% for group_name, settings in setting_groups.items() %}
     {% set flat = flat_settings | default(false) %}
-    {% if settings_notebook | default(false) and not flat %}<details class="settings-group"{% if loop.first %} open{% endif %}><summary><span class="settings-group-title">{{ group_name }}</span>{% set controls = (group_toggles | default({})).get(group_name, []) %}<span class="settings-header-switches">{% if controls | length == 1 %}{{ status_switch(controls[0]) }}{% endif %}</span></summary>{% endif %}
+    {% if settings_notebook | default(false) and not flat %}<details class="settings-group"{% if loop.first %} open{% endif %}><summary><span class="settings-group-title">{{ group_name }}</span>{% set controls = (group_toggles | default({})).get(group_name, []) %}<span class="settings-header-switches">{% if controls | length == 1 and group_name != "Redeems" %}{{ status_switch(controls[0]) }}{% endif %}</span></summary>{% endif %}
     <section class="panel toggle-management-panel profile-settings-panel">
         {% set controls = (group_toggles | default({})).get(group_name, []) %}
-        {% if controls | length > 1 or flat %}<div class="settings-switch-list">{% for toggle in controls %}<div class="settings-switch-row"><span>{{ toggle.label }}</span>{{ status_switch(toggle) }}</div>{% endfor %}</div>{% endif %}
+        {% if controls | length > 1 or flat or group_name == "Redeems" %}<div class="settings-switch-list">{% for toggle in controls %}<div class="settings-switch-row"><span>{{ toggle.label }}</span>{{ status_switch(toggle) }}</div>{% endfor %}</div>{% endif %}
         <div class="panel-header">
             <div>
                 <p class="eyebrow">Editable profile details</p>
@@ -91,6 +93,7 @@
                             {% endif %}
                         </div>
 
+                        {% if settings_notebook | default(false) %}<details class="settings-field-editor"><summary>Customize</summary><div class="settings-field-body">{% endif %}
                         {% if setting.definition.key == "timer_messages" %}
                             <div class="timer-message-editor" data-timer-editor>
                                 <input type="hidden" name="value" data-timer-value>
@@ -123,6 +126,7 @@
                                 <button class="button secondary" type="submit" name="action" value="reset">Use Default</button>
                             {% endif %}
                         </div>
+                        {% if settings_notebook | default(false) %}</div></details>{% endif %}
                     </form>
                 </article>
             {% endfor %}

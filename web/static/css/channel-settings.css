@@ -219,3 +219,17 @@
 .channel-page-settings .settings-workspace{min-height:65vh}
 .channel-page-settings .settings-finder{position:absolute;z-index:5;right:44px;top:0;bottom:0;width:min(320px,calc(100% - 44px));padding:16px;box-shadow:-12px 0 28px #0006}
 }
+
+/* Compact controls and expandable customization fields. */
+.channel-page-settings .settings-command-clusters{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.channel-page-settings .settings-command-cluster .settings-switch-list{grid-template-columns:minmax(0,1fr)}
+.channel-page-settings .settings-command-cluster{padding:12px 16px}
+.channel-page-settings .settings-page .profile-settings-grid{align-items:start}
+.channel-page-settings .profile-setting-card .toggle-card-heading p{margin-bottom:0}
+.channel-page-settings .settings-field-editor{margin-top:2px;border-top:1px solid var(--border);padding-top:10px}
+.channel-page-settings .settings-field-editor>summary{cursor:pointer;color:#c4b5fd;font-size:12px;font-weight:600;padding:4px 0}
+.channel-page-settings .settings-field-body{display:flex;flex-direction:column;gap:12px;padding-top:12px}
+.channel-page-settings .settings-field-body textarea{min-height:84px;resize:vertical}
+.channel-page-settings .settings-finder{margin-top:8px;overflow-x:hidden}
+.channel-page-settings .settings-finder-toggle{margin-top:8px;border-radius:10px 0 0 0}
+@media(max-width:700px){.channel-page-settings .settings-command-clusters{grid-template-columns:minmax(0,1fr)}}

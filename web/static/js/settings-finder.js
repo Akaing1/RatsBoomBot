@@ -5,15 +5,28 @@
     if (!finder) return;
     const search = finder.querySelector('input');
     const toggle = book.querySelector('[data-settings-finder-toggle]');
+    let drawerAnimation;
     function setOpen(open, restoreFocus = false) {
-        finder.hidden = !open;
+        const startWidth = finder.hidden ? 0 : finder.getBoundingClientRect().width;
+        drawerAnimation?.cancel();
+        finder.hidden = false;
+        finder.inert = !open;
         toggle?.setAttribute('aria-expanded', String(open));
+        const targetWidth = open ? finder.getBoundingClientRect().width : 0;
+        const finish = () => { finder.hidden = !open; drawerAnimation = null; };
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && finder.animate) {
+            drawerAnimation = finder.animate([
+                {width: `${startWidth}px`, flexBasis: `${startWidth}px`, opacity: open ? 0 : 1, paddingLeft: startWidth ? '20px' : '0px', paddingRight: startWidth ? '20px' : '0px'},
+                {width: `${targetWidth}px`, flexBasis: `${targetWidth}px`, opacity: open ? 1 : 0, paddingLeft: open ? '20px' : '0px', paddingRight: open ? '20px' : '0px'}
+            ], {duration: 220, easing: 'ease-in-out'});
+            drawerAnimation.onfinish = finish;
+        } else finish();
         if (open) search.focus({preventScroll: true});
         else if (restoreFocus) toggle?.focus({preventScroll: true});
     }
     if (toggle) {
         toggle.hidden = false;
-        toggle.addEventListener('click', () => setOpen(finder.hidden));
+        toggle.addEventListener('click', () => setOpen(toggle.getAttribute('aria-expanded') !== 'true'));
         finder.querySelector('[data-settings-finder-close]').addEventListener('click', () => setOpen(false, true));
         book.addEventListener('keydown', event => {
             if (event.key === 'Escape' && !finder.hidden) { event.preventDefault(); setOpen(false, true); }
@@ -53,6 +66,7 @@
         highlighted = entry.target;
         highlighted.classList.add('settings-search-highlight');
         if (toggle && matchMedia('(max-width: 900px)').matches) setOpen(false);
+        entry.target.querySelectorAll('.settings-field-editor').forEach(editor => { editor.open = true; });
         const focus = entry.target.matches('summary') ? entry.target
             : entry.target.querySelector('textarea, input:not([type="hidden"]), select, button, a') || entry.target;
         if (!focus.matches('input, textarea, select, button, a, summary')) focus.tabIndex = -1;
