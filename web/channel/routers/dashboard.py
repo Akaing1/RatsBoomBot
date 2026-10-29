@@ -2376,7 +2376,7 @@ async def channel_customization_page(request: Request):
                 groups, services.features.get_channel_features(broadcaster_id),
                 services.features.get_profile_features(broadcaster_id),
                 services.features.get_global_groups(broadcaster_id),
-                services.features.get_global_commands(broadcaster_id),
+                services.features.get_global_commands(broadcaster_id), profile=profile,
             )),
             "toggle_result": request.query_params.get("toggle_result"),
             "toggle_message": request.query_params.get("toggle_message"),

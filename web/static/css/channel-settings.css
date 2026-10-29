@@ -233,3 +233,32 @@
 .channel-page-settings .settings-finder{margin-top:8px;overflow-x:hidden}
 .channel-page-settings .settings-finder-toggle{margin-top:8px;border-radius:10px 0 0 0}
 @media(max-width:700px){.channel-page-settings .settings-command-clusters{grid-template-columns:minmax(0,1fr)}}
+
+/* Category navigation and search live together beside the editor. */
+.channel-page-settings .settings-book{background:transparent;border:0;border-radius:0;overflow:visible}
+.channel-page-settings .settings-workspace,.channel-page-settings .settings-workspace:has(.settings-finder:not([hidden])){gap:18px;overflow:visible}
+.channel-page-settings .settings-main{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#181d25}
+.channel-page-settings .settings-tools{box-sizing:border-box;flex:0 0 270px;min-width:0;min-height:0;overflow-y:auto;scrollbar-width:thin;border:1px solid var(--border);border-radius:14px;background:#202735;padding:14px}
+.channel-page-settings .settings-tools .settings-tabs{display:flex;flex-direction:column;order:0;gap:5px;overflow:visible;background:transparent;padding:0;min-height:0;width:100%;border:0}
+.channel-page-settings .settings-tools .settings-tab{box-sizing:border-box;flex:none;justify-content:flex-start;width:100%;min-height:40px;margin:0;padding:10px 12px;border:1px solid transparent;border-radius:8px;background:transparent;white-space:normal;font-size:12px}
+.channel-page-settings .settings-tools .settings-tab[aria-selected=true]{margin:0;padding:10px 12px;background:#8b5cf622;border-color:#a78bfa66;box-shadow:inset 3px 0 var(--accent)}
+.channel-page-settings .settings-tools .settings-finder{position:static;box-sizing:border-box;width:100%;margin:16px 0 0;padding:18px 0 0;border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;box-shadow:none;overflow:visible}
+.channel-page-settings .settings-tools .settings-finder h3{font-size:15px;margin-bottom:14px}
+.channel-page-settings .settings-toggle-copy{flex:1;min-width:0;padding:10px 0}
+.channel-page-settings .settings-switch-row{align-items:flex-start}
+.channel-page-settings .settings-switch-row>.settings-inline-switch{margin-top:12px}
+.settings-toggle-description{font-size:12px;line-height:1.5;color:var(--muted);margin:6px 0 0}
+.settings-command-members{font-size:12px;margin-top:8px;min-width:0}
+.settings-command-members>summary{color:#c4b5fd;cursor:pointer;padding:4px 0}
+.settings-command-members ul{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px}
+.settings-command-members li{display:grid;gap:3px;overflow-wrap:anywhere}
+.settings-command-members code{white-space:normal;color:#ddd6fe;font-size:11px}
+.settings-command-members li>span{color:var(--muted);line-height:1.45}
+@media(max-width:1100px){.channel-page-settings .settings-tools{flex-basis:240px}}
+@media(max-width:900px){
+.channel-page-settings .settings-workspace{flex-direction:column}
+.channel-page-settings .settings-tools{order:-1;flex:none;max-height:48vh;width:100%}
+.channel-page-settings .settings-tools .settings-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.channel-page-settings .settings-main{flex:none;min-height:60vh}
+.channel-page-settings .settings-pages{overflow:visible}
+}

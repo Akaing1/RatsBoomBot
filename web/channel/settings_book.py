@@ -1,5 +1,8 @@
 """Presentation groups for the channel settings notebook."""
 
+from bot.command_registry import get_registered_definitions, CommandVisibility
+from bot.profiles import ChannelProfile
+
 SECTIONS = (
     ("general", "General", "Channel-wide switches and dashboard preferences.", "M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1M5.6 18.4l2.1-2.1m8.6-8.6 2.1-2.1M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0"),
     ("chat", "Chat", "Commands and chat responses.", "M21 11a8 8 0 0 1-8 8H7l-4 3V11a9 9 0 0 1 18 0ZM7 10h10M7 14h6"),
@@ -23,9 +26,29 @@ TOGGLE_SECTION = {
 LABELS = {"raid_bosses": "Boss Hunt", "globals": "All global commands", "channel": "Channel profile", "points": "Loyalty Points", "league": "League of Legends"}
 
 
-def build_settings_sections(groups, channel_features, profile_features, global_groups, global_commands):
+TOGGLE_DESCRIPTIONS = {
+    ("feature", "channel"): "Enable this channel's bot profile and its features.",
+    ("feature", "timers"): "Send your scheduled chat messages and announcements.",
+    ("feature", "ad_announcements"): "Notify chat before a scheduled ad break starts.",
+    ("feature", "points"): "Enable the channel's loyalty points features.",
+    ("feature", "raid_bosses"): "Enable Boss Hunt battles and progression.",
+    ("global_group", "globals"): "Allow shared bot commands; individual command switches still apply.",
+    ("global_group", "points"): "Balance, gifting, gambling and points management commands.",
+    ("global_group", "viewer_queue"): "Let viewers join the queue and moderators manage it.",
+    ("global_group", "shoutouts"): "Promote another channel with a shoutout.",
+    ("global_group", "socials"): "Share your configured community and social links.",
+    ("global_group", "settings"): "Manage supported channel settings from chat.",
+    ("global_group", "clips"): "Create clips and share clip links from chat.",
+    ("profile_feature", "league"): "Enable League of Legends builds, ranks and lobby tools.",
+    ("profile_feature", "overwatch"): "Enable commands for your configured Overwatch player.",
+    **{("feature", f"redeem_{name}"): f"Let the bot process the channel's {name.upper() if name == 'vip' else name} reward." for name in ("daily", "first", "second", "vip")},
+}
+
+
+def build_settings_sections(groups, channel_features, profile_features, global_groups, global_commands, profile=None):
     sections = {key: dict(key=key, label=label, description=description, icon=icon, groups={}, toggles=[]) for key, label, description, icon in SECTIONS}
     sections['games'] = dict(key='games', label='Games', description='Settings for your enabled game integrations.', icon=sections['pets']['icon'], groups={}, toggles=[])
+    definitions = [command for command in get_registered_definitions(profile or ChannelProfile(channel_name="settings")) if command.visibility is CommandVisibility.PUBLIC]
     enabled_games = {name.value for name, state in profile_features.items() if state.effective_enabled}
     for name, entries in groups.items():
         game = {'League of Legends': 'league', 'Overwatch': 'overwatch'}.get(name)
@@ -48,7 +71,13 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
                 label = value.removeprefix("redeem_").title() + " redeem"
             if kind == "global_group" and value != "globals":
                 label += " commands"
-            sections[section]["toggles"].append(dict(kind=kind, name=value, label=label, state=state))
+            commands = [command for command in definitions if (
+                (kind == "global_group" and value == "globals" and (command.global_group is not None or command.global_command is not None))
+                or getattr(command, kind, None) == name
+            )]
+            description = TOGGLE_DESCRIPTIONS.get((kind, value)) or (commands[0].description if commands else f"Enable {label.lower()} for this channel.")
+            sections[section]["toggles"].append(dict(kind=kind, name=value, label=label, state=state, description=description,
+                commands=commands if kind == "global_group" else []))
     group_controls = {
         ('feature', 'points'): 'Loyalty points', ('global_group', 'points'): 'Loyalty points',
         ('feature', 'timers'): 'Timers', ('feature', 'raid_bosses'): 'Raid boss names',

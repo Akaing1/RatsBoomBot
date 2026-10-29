@@ -9,7 +9,7 @@
     let activeSection = book.dataset.selected;
     const tablist = book.querySelector('.settings-tabs');
     const storageKey = `ratsboombot-settings:${book.dataset.channel}`;
-    tablist.setAttribute('aria-orientation', 'horizontal');
+    const verticalTabs = tablist.getAttribute('aria-orientation') === 'vertical';
     function select(key, updateURL = true) {
         if (!tabs.some(tab => tab.dataset.settingsTab === key)) return;
         scrollPositions.set(activeSection, scroller.scrollTop);
@@ -36,8 +36,8 @@
             if (book.getBoundingClientRect().top < 0) book.scrollIntoView({block: 'start'});
         });
         tab.addEventListener('keydown', event => {
-            const previous = 'ArrowLeft';
-            const next = 'ArrowRight';
+            const previous = verticalTabs ? 'ArrowUp' : 'ArrowLeft';
+            const next = verticalTabs ? 'ArrowDown' : 'ArrowRight';
             if (![previous, next, 'Home', 'End'].includes(event.key)) return;
             event.preventDefault();
             const target = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs.at(-1) : tabs[(index + (event.key === next ? 1 : tabs.length - 1)) % tabs.length];

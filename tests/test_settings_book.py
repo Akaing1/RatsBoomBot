@@ -88,7 +88,7 @@ def test_header_controls_are_not_duplicated_in_standalone_rows():
         assert timers['standalone_toggles'] == []
         assert timers['group_toggles']['Timers'][0]['name'] == 'timers'
         html = templates.env.get_template('channel/settings.html').render(**context)
-        assert html.index('<nav class="settings-tabs"') < html.index('<div class="settings-pages"')
+        assert html.index('<div class="settings-pages"') < html.index('<nav class="settings-tabs"')
         assert 'form="settings-toggle-feature-timers"' in html
         assert 'id="settings-toggle-feature-timers"' in html
         assert '>Enable\n' not in html
@@ -153,5 +153,24 @@ def test_related_response_switches_render_inside_their_message_cards():
         for name in ('daily', 'first', 'second', 'vip'):
             assert f'form="settings-toggle-feature-redeem_{name}"' in html
         assert 'settings-toggle-feature-redeems' not in html
+    finally:
+        clear_profiles()
+
+
+def test_sidebar_navigation_and_group_descriptions_use_command_registry():
+    from bot.command_registry import get_registered_definitions, CommandVisibility
+    from bot.profiles import GlobalCommandGroup
+    try:
+        context, _, _ = settings_context()
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        assert html.index('class="settings-tools"') < html.index('class="settings-tabs"') < html.index('data-settings-finder hidden')
+        assert 'aria-orientation="vertical"' in html
+        assert 'Included commands (' in html
+        toggles = [toggle for section in context['settings_sections'] for toggle in section['toggles']]
+        assert all(toggle['description'] for toggle in toggles)
+        queue = next(toggle for toggle in toggles if toggle['kind'] == 'global_group' and toggle['name'] == 'viewer_queue')
+        expected = [command.syntax for command in get_registered_definitions(ChannelProfile(channel_name='example')) if command.global_group is GlobalCommandGroup.VIEWER_QUEUE and command.visibility is CommandVisibility.PUBLIC]
+        assert [command.syntax for command in queue['commands']] == expected
+        assert '!join' in expected
     finally:
         clear_profiles()

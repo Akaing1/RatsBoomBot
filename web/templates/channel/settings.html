@@ -1,5 +1,5 @@
 {% extends "channel/layout.html" %}
-{% from "channel/settings_switch.html" import status_switch %}
+{% from "channel/settings_switch.html" import status_switch, toggle_details %}
 {% block title %}Settings | RatsBoomBot{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}">
@@ -14,14 +14,7 @@
 <div class="settings-book" data-settings-book data-channel="{{ broadcaster.id }}" data-selected="{{ selected }}">
     <div class="settings-workspace">
     <div class="settings-main">
-    <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="horizontal">
-        {% for section in settings_sections %}
-        <a class="settings-tab" id="settings-tab-{{ section.key }}" href="{{ channel_root }}/settings?section={{ section.key }}" role="tab" aria-controls="settings-{{ section.key }}" aria-selected="{{ 'true' if section.key == selected else 'false' }}" tabindex="{{ '0' if section.key == selected else '-1' }}" data-settings-tab="{{ section.key }}" title="{{ section.label }}">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ section.icon }}"/></svg>
-            <span>{{ section.label }}</span><span class="settings-dirty-dot" hidden aria-label="Unsaved changes">●</span>
-        </a>
-        {% endfor %}
-    </nav>
+
     <div class="settings-pages">
         {% for section in settings_sections %}
         <section class="settings-page" id="settings-{{ section.key }}" role="tabpanel" aria-labelledby="settings-tab-{{ section.key }}" tabindex="0" data-settings-page="{{ section.key }}"{% if section.key != selected %} hidden{% endif %}>
@@ -33,7 +26,7 @@
                 <section class="settings-command-cluster">
                     <h4>{{ {'feature': 'Feature controls', 'profile_feature': 'Game integrations', 'global_group': 'Command groups', 'global_command': 'Chat commands'}[kind] }}</h4>
                     <div class="settings-switch-list">
-                    {% for toggle in toggles %}<div class="settings-switch-row"><span>{{ toggle.label }}</span>{{ status_switch(toggle) }}</div>{% endfor %}
+                    {% for toggle in toggles %}<div class="settings-switch-row"><div class="settings-toggle-copy"><span>{{ toggle.label }}</span>{{ toggle_details(toggle) }}</div>{{ status_switch(toggle) }}</div>{% endfor %}
                     </div>
                 </section>
                 {% endfor %}
@@ -61,19 +54,24 @@
         {% endfor %}
     </div>
     </div>
-    <button class="settings-finder-toggle" type="button" data-settings-finder-toggle hidden aria-expanded="false" aria-controls="settings-finder" aria-label="Find settings" title="Find settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-        <span>Find settings</span>
-    </button>
-    <aside id="settings-finder" class="settings-finder" data-settings-finder hidden aria-label="Settings finder">
-        <button type="button" class="settings-finder-close" data-settings-finder-close aria-label="Close settings finder">Close ×</button>
-        <p class="eyebrow">Settings finder</p><h3>Find a setting</h3>
+    <aside class="settings-tools" aria-label="Settings navigation and search">
+    <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+        {% for section in settings_sections %}
+        <a class="settings-tab" id="settings-tab-{{ section.key }}" href="{{ channel_root }}/settings?section={{ section.key }}" role="tab" aria-controls="settings-{{ section.key }}" aria-selected="{{ 'true' if section.key == selected else 'false' }}" tabindex="{{ '0' if section.key == selected else '-1' }}" data-settings-tab="{{ section.key }}" title="{{ section.label }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ section.icon }}"/></svg>
+            <span>{{ section.label }}</span><span class="settings-dirty-dot" hidden aria-label="Unsaved changes">●</span>
+        </a>
+        {% endfor %}
+    </nav>
+    <div class="settings-finder" data-settings-finder hidden aria-label="Settings finder">
+        <h3>Search settings</h3>
         <label for="settings-search">Search all tabs</label>
         <input id="settings-search" type="search" placeholder="Try follow message or raid" autocomplete="off" maxlength="160">
         <p class="settings-finder-count" data-settings-result-count role="status" aria-live="polite"></p>
         <div class="settings-finder-results" data-settings-results></div>
         <h4 data-settings-shortcuts-heading>On this tab</h4>
         <nav class="settings-finder-shortcuts" data-settings-shortcuts aria-label="Sections on this tab"></nav>
+    </div>
     </aside>
     </div>
 </div>
