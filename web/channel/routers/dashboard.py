@@ -2357,7 +2357,9 @@ async def channel_customization_page(request: Request):
     services = runtime_bot.services
     broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
 
-    if broadcaster is None or get_active_profile(broadcaster_id) is None:
+    profile = get_active_profile(broadcaster_id)
+
+    if broadcaster is None or profile is None:
         logout_channel_user(request)
         return RedirectResponse(url="/connect", status_code=303)
 
@@ -2376,11 +2378,11 @@ async def channel_customization_page(request: Request):
                 groups, services.features.get_channel_features(broadcaster_id),
                 services.features.get_profile_features(broadcaster_id),
                 services.features.get_global_groups(broadcaster_id),
-                services.features.get_global_commands(broadcaster_id),
+                services.features.get_global_commands(broadcaster_id), profile=profile,
             )),
             "toggle_result": request.query_params.get("toggle_result"),
             "toggle_message": request.query_params.get("toggle_message"),
-            "loyalty_alias": get_active_profile(broadcaster_id).points.command_alias,
+            "loyalty_alias": profile.points.command_alias,
             "broadcaster": broadcaster,
             "channel_settings": await services.broadcaster_settings.get_settings(broadcaster_id),
             "chat_identity": None if getattr(getattr(request, "state", None), "channel_access", None) else services.chat_identity.get_state(broadcaster_id),

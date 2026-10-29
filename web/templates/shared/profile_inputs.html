@@ -1,4 +1,4 @@
-{% from "channel/settings_switch.html" import status_switch %}
+{% from "channel/settings_switch.html" import status_switch, toggle_details %}
 {% if setting_message %}
     <div class="toggle-feedback {% if setting_result == 'success' %}success{% else %}error{% endif %}" role="status">
         <span class="toggle-feedback-icon">{% if setting_result == "success" %}&#10003;{% else %}!{% endif %}</span>
@@ -57,7 +57,8 @@
     {% if settings_notebook | default(false) and not flat %}<details class="settings-group"{% if loop.first %} open{% endif %}><summary><span class="settings-group-title">{{ group_name }}</span>{% set controls = (group_toggles | default({})).get(group_name, []) %}<span class="settings-header-switches">{% if controls | length == 1 and group_name != "Redeems" %}{{ status_switch(controls[0]) }}{% endif %}</span></summary>{% endif %}
     <section class="panel toggle-management-panel profile-settings-panel">
         {% set controls = (group_toggles | default({})).get(group_name, []) %}
-        {% if controls | length > 1 or flat or group_name == "Redeems" %}<div class="settings-switch-list">{% for toggle in controls %}<div class="settings-switch-row"><span>{{ toggle.label }}</span>{{ status_switch(toggle) }}</div>{% endfor %}</div>{% endif %}
+        {% if controls | length > 1 or flat or group_name == "Redeems" %}<div class="settings-switch-list">{% for toggle in controls %}<div class="settings-switch-row"><div class="settings-toggle-copy"><span>{{ toggle.label }}</span>{{ toggle_details(toggle) }}</div>{{ status_switch(toggle) }}</div>{% endfor %}</div>{% endif %}
+        {% if settings_notebook | default(false) and not flat and controls | length == 1 and group_name != "Redeems" %}{{ toggle_details(controls[0]) }}{% endif %}
         <div class="panel-header">
             <div>
                 <p class="eyebrow">Editable profile details</p>

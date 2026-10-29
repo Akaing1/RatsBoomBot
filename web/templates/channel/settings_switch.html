@@ -5,3 +5,8 @@
     <button class="settings-status-switch {{ 'enabled' if toggle.state.effective_enabled else 'disabled' }}" type="submit" form="settings-toggle-{{ toggle.kind }}-{{ toggle.name }}" name="action" value="{{ 'disable' if toggle.state.effective_enabled else 'enable' }}" role="switch" aria-checked="{{ 'true' if toggle.state.effective_enabled else 'false' }}" aria-label="{{ toggle.label }}"{% if blocked %} disabled title="Enable the channel profile and global commands in General first."{% else %} title="{{ 'Disable' if toggle.state.effective_enabled else 'Enable' }} {{ toggle.label }}"{% endif %}>{{ 'Enabled' if toggle.state.effective_enabled else 'Disabled' }}</button>
 </span>
 {% endmacro %}
+
+{% macro toggle_details(toggle) %}
+{% if toggle.description %}<p class="settings-toggle-description">{{ toggle.description }}</p>{% endif %}
+{% if toggle.commands %}<details class="settings-command-members"><summary>Included commands ({{ toggle.commands | length }})</summary><ul>{% for command in toggle.commands %}<li><code>{{ command.syntax }}</code><span>{{ command.description }}</span></li>{% endfor %}</ul></details>{% endif %}
+{% endmacro %}
