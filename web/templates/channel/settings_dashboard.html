@@ -1,14 +1,9 @@
-<section class="panel profile-settings-panel" id="dashboard-settings">
-    <h3>Raid preferences</h3>
+<article class="toggle-card profile-setting-card" id="dashboard-settings">
     <form method="post" action="{{ customization_action | default('/channel/customization') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="setting_name" value="dashboard.follow_raid">
-        <label for="follow-raid-default">Follow raids by default</label>
-        <select class="profile-setting-input" id="follow-raid-default" name="value">
-            <option value="1"{% if channel_settings.follow_raid %} selected{% endif %}>On</option>
-            <option value="0"{% if not channel_settings.follow_raid %} selected{% endif %}>Off</option>
-        </select>
-        <button class="button primary" type="submit" name="action" value="save">Save Changes</button>
+        <input type="hidden" name="action" value="save">
+        <div class="toggle-card-heading"><div><h4>Follow Raids By Default</h4><p>Follow the destination channel when opening a raid.</p></div>
+        <button class="settings-status-switch {{ 'enabled' if channel_settings.follow_raid else 'disabled' }}" type="submit" name="value" value="{{ '0' if channel_settings.follow_raid else '1' }}" role="switch" aria-label="Follow Raids By Default" aria-checked="{{ 'true' if channel_settings.follow_raid else 'false' }}">{{ 'Enabled' if channel_settings.follow_raid else 'Disabled' }}</button></div>
     </form>
-</section>
-
+</article>

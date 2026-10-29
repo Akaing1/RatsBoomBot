@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -9,6 +10,10 @@ class BroadcasterSettings:
     broadcaster_id: str
     discord_url: str | None = None
     youtube_url: str | None = None
+    tiktok_url: str | None = None
+    x_url: str | None = None
+    kofi_url: str | None = None
+    vgen_url: str | None = None
     timers_enabled: bool = True
     follow_raid: bool = True
 
@@ -34,6 +39,9 @@ class BroadcasterSettingsService:
         try:
             async with self.db.acquire() as connection:
                 await connection.execute(query)
+                await connection.execute("""CREATE TABLE IF NOT EXISTS broadcaster_social_links (
+                    broadcaster_id TEXT NOT NULL, platform TEXT NOT NULL, url TEXT NOT NULL,
+                    PRIMARY KEY (broadcaster_id, platform))""")
         except Exception:
             LOGGER.exception(
                 "[Broadcaster Settings] Failed to prepare broadcaster settings storage."
@@ -54,6 +62,8 @@ class BroadcasterSettingsService:
         try:
             async with self.db.acquire() as connection:
                 row = await connection.fetchone(query, (broadcaster_id,))
+                social_rows = await connection.fetchall("SELECT platform, url FROM broadcaster_social_links WHERE broadcaster_id = ?", (broadcaster_id,))
+                socials = {f"{item['platform']}_url": item['url'] for item in social_rows if item['platform'] in {"tiktok", "x", "kofi", "vgen"}}
         except Exception:
             LOGGER.exception(
                 "[Broadcaster Settings] Failed to load settings for broadcaster %s.",
@@ -66,7 +76,7 @@ class BroadcasterSettingsService:
                 "[Broadcaster Settings] No saved settings found for broadcaster %s. Using defaults.",
                 broadcaster_id
             )
-            return BroadcasterSettings(broadcaster_id=broadcaster_id)
+            return BroadcasterSettings(broadcaster_id=broadcaster_id, **socials)
 
         LOGGER.debug(
             "[Broadcaster Settings] Loaded settings for broadcaster %s.",
@@ -78,8 +88,22 @@ class BroadcasterSettingsService:
             discord_url=row["discord_url"],
             youtube_url=row["youtube_url"],
             timers_enabled=bool(row["timers_enabled"]),
-            follow_raid=bool(row["follow_raid"])
+            follow_raid=bool(row["follow_raid"]), **socials
         )
+
+    async def set_social_url(self, broadcaster_id: str, platform: str, url: str) -> None:
+        if platform not in {"tiktok", "x", "kofi", "vgen"}:
+            raise ValueError("Unknown social platform.")
+        url = url.strip()
+        parsed = urlsplit(url)
+        if url and (parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or len(url) > 2000):
+            raise ValueError("Enter a valid HTTP or HTTPS URL.")
+        async with self.db.acquire() as connection:
+            if url:
+                await connection.execute("""INSERT INTO broadcaster_social_links (broadcaster_id, platform, url) VALUES (?, ?, ?)
+                    ON CONFLICT(broadcaster_id, platform) DO UPDATE SET url = excluded.url""", (str(broadcaster_id), platform, url))
+            else:
+                await connection.execute("DELETE FROM broadcaster_social_links WHERE broadcaster_id = ? AND platform = ?", (str(broadcaster_id), platform))
 
     async def set_follow_raid(self, broadcaster_id: str, enabled: bool) -> None:
         async with self.db.acquire() as connection:

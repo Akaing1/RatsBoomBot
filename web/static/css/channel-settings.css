@@ -262,3 +262,15 @@
 .channel-page-settings .settings-main{flex:none;min-height:60vh}
 .channel-page-settings .settings-pages{overflow:visible}
 }
+.settings-heading-command{font-size:12px;color:#c4b5fd;margin-left:auto;margin-right:14px}
+.channel-page-settings .settings-page #dashboard-settings form{display:block}
+.settings-timer-manager{display:grid;gap:20px}
+.settings-timer-manager>.panel{margin:0;padding:18px;border:1px solid var(--border);border-radius:12px;background:#202735}
+.settings-timer-manager label{display:grid;gap:6px;font-size:12px;color:var(--muted);margin-bottom:12px}
+.settings-timer-manager label[hidden]{display:none}
+.settings-timer-row{padding:14px;border:1px solid var(--border);border-radius:10px;background:#181d25;margin-bottom:12px}
+.settings-timer-heading{display:flex;align-items:center;gap:14px;justify-content:space-between}
+.settings-timer-heading>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:13px}
+.settings-timer-heading>button{flex-shrink:0}
+.settings-timer-row summary{color:#c4b5fd;font-size:12px;cursor:pointer;margin-top:10px}
+.settings-timer-manager h3{font-size:15px;margin:0 0 14px}

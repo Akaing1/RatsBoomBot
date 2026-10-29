@@ -15,6 +15,7 @@ async def test_follow_raid_migration_preserves_settings_and_can_be_run_twice(tmp
             await migrate(connection)
             await migrate(connection)
         service = BroadcasterSettingsService(db)
+        await service.setup()
         settings = await service.get_settings("1")
         assert settings.follow_raid is True and settings.discord_url == "existing"
         await service.set_follow_raid("1", False)

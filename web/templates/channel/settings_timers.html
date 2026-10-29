@@ -1,0 +1,23 @@
+<form method="post" action="{{ customization_action | default('/channel/customization') }}" class="settings-timer-manager" data-timer-editor data-timer-manager>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="setting_name" value="timer_messages">
+    <input type="hidden" name="action" value="save">
+    <input type="hidden" name="value" data-timer-value>
+    <section class="panel" data-timer-create>
+        <h3>Create timer</h3>
+        <label>Type<select data-new-kind class="profile-setting-input"><option value="message">Message</option><option value="announcement">Announcement</option></select></label>
+        <label data-new-color-label hidden>Color<select data-new-color class="profile-setting-input">{% for color in ['primary', 'blue', 'green', 'orange', 'purple'] %}<option value="{{ color }}">{{ color | title }}</option>{% endfor %}</select></label>
+        <label>Message<textarea data-new-message class="profile-setting-input" rows="3" maxlength="500"></textarea></label>
+        <button type="button" class="button primary" data-create-timer>Create timer</button>
+    </section>
+    <section class="panel"><h3>Your timers</h3>
+        <div data-timer-list>
+        {% for entry in timer_setting.timer_entries %}
+            {% include 'channel/settings_timer_row.html' %}
+        {% endfor %}
+        </div>
+        <p data-timer-empty{% if timer_setting.timer_entries %} hidden{% endif %}>No timers yet.</p>
+        <button class="button primary" type="submit">Save timer changes</button>
+    </section>
+</form>
+<template id="settings-timer-row-template">{% with entry=none %}{% include 'channel/settings_timer_row.html' %}{% endwith %}</template>
