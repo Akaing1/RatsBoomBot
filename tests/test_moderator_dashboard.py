@@ -1,3 +1,4 @@
+from bot.profiles import ChannelProfile
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlsplit
@@ -51,7 +52,7 @@ async def env(tmp_path, monkeypatch):
             monkeypatch.setattr(owner,name,AsyncMock(return_value=value))
         monkeypatch.setattr(owner,'get_queue_members',lambda services,channel: [])
         monkeypatch.setattr(owner,'get_protected_user_rows',AsyncMock(return_value=[]))
-        monkeypatch.setattr(owner,'get_active_profile',lambda channel: SimpleNamespace(points=SimpleNamespace(command_alias='points')))
+        monkeypatch.setattr(owner,'get_active_profile',lambda channel: ChannelProfile(channel_name='streamer'))
         app = FastAPI()
         app.mount('/static', StaticFiles(directory='web/static'), name='static')
         app.mount('/assets', StaticFiles(directory='assets'), name='assets')
