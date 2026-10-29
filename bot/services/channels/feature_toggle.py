@@ -521,6 +521,10 @@ class FeatureToggleService:
         key = self.feature_key(feature)
         override_enabled = self.get_override(broadcaster_id, key)
         default_enabled = profile.features.is_enabled(feature)
+        if feature.value.startswith("redeem_"):
+            # Existing channels inherit their former group state until individually changed.
+            legacy = self.get_override(broadcaster_id, self.feature_key(FeatureName.REDEEMS))
+            default_enabled = default_enabled and (legacy if legacy is not None else profile.features.redeems)
         configured_enabled = override_enabled if override_enabled is not None else default_enabled
         profile_enabled = self.get_profile_enabled(broadcaster_id)
 

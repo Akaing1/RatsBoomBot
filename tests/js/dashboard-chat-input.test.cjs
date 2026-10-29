@@ -120,3 +120,36 @@ test('picker groups matches once while preserving alphabetical items and group o
     context.selectedGroup = null; context.emoteSearch.value = 'ze'; context.renderPicker();
     assert.equal(context.emoteGrid.children.length, 1); assert.equal(context.emoteCount.textContent, '1');
 });
+
+
+function localCommands(unavailable = false) {
+    const clicked = [], warnings = [];
+    const context = {document: {querySelector: selector => unavailable ? null : {disabled: false, click() { clicked.push(selector); }}},
+        emotePicker: {hidden: false}, emoteToggle: {setAttribute() {}}, showStatus: message => warnings.push(message)};
+    const declarations = source.slice(source.indexOf('    const overlayCommands = ['), source.indexOf('    function showStatus('));
+    vm.createContext(context);
+    vm.runInContext(declarations + '\nthis.commands = twitchCommands;', context);
+    const handler = source.slice(source.indexOf('        handleLocal(message) {'), source.indexOf('        async send(outgoingMessage, signal) {')).trim().replace(/,$/, '');
+    const handle = vm.runInContext(`({${handler}}).handleLocal`, context);
+    return {handle, clicked, warnings, commands: context.commands, context};
+}
+
+test('dashboard slash commands open the matching overlays and appear in autocomplete', () => {
+    const app = localCommands();
+    for (const command of ['/poll', '/prediction', '/raidbrowser']) {
+        assert.equal(app.handle(command), true);
+        assert.ok(app.commands.some(item => item.value === command));
+    }
+    assert.deepEqual(app.clicked, ['[data-engagement-open="polls"]', '[data-engagement-open="predictions"]', '[data-raid-browser-open]']);
+    assert.equal(app.context.emotePicker.hidden, true);
+    for (const message of ['/prediction/', '/poll extra', '/raid someone', 'hello']) assert.equal(app.handle(message), false);
+    assert.equal(app.handle('/POLL'), true);
+});
+
+test('unavailable overlay commands stay local and are omitted from autocomplete', () => {
+    const app = localCommands(true);
+    assert.equal(app.handle('/poll'), true);
+    assert.equal(app.clicked.length, 0);
+    assert.match(app.warnings[0], /unavailable/);
+    assert.equal(app.commands.some(item => item.value === '/poll'), false);
+});

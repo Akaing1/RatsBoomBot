@@ -47,6 +47,11 @@
         messageHistory = [];
     }
     historyIndex = messageHistory.length;
+    const overlayCommands = [
+        {name: "poll", selector: '[data-engagement-open="polls"]', description: "Open polls."},
+        {name: "prediction", selector: '[data-engagement-open="predictions"]', description: "Open predictions."},
+        {name: "raidbrowser", selector: '[data-raid-browser-open]', description: "Open the raid browser."}
+    ].map(command => ({...command, button: document.querySelector(command.selector)}));
     const twitchCommands = [
         ["announce", "[message]", "Send a highlighted announcement."],
         ["announceblue", "[message]", "Send a blue announcement."],
@@ -76,7 +81,9 @@
         ["vip", "<username>", "Add a VIP."],
         ["warn", "<username> <reason>", "Warn a user."],
         ["uniquechat", "", "Require unique chat messages."],
-        ["uniquechatoff", "", "Disable unique chat mode."]
+        ["uniquechatoff", "", "Disable unique chat mode."],
+        ...overlayCommands.filter(command => command.button && !command.button.disabled)
+            .map(command => [command.name, "", command.description])
     ].map(([name, usage, description]) => ({
         kind: "command",
         name,
@@ -334,6 +341,20 @@
         onInput() { browsingHistory = false; historyIndex = messageHistory.length; },
         onKey: handleComposerKey,
         focusAfterSend: true,
+        handleLocal(message) {
+            if (!message.startsWith("/")) return false;
+            const name = message.slice(1).toLowerCase();
+            const command = overlayCommands.find(command => command.name === name);
+            if (!command) return false;
+            if (!command.button || command.button.disabled) {
+                showStatus("This dashboard control is unavailable.", "warning", true);
+            } else {
+                emotePicker.hidden = true;
+                emoteToggle.setAttribute("aria-expanded", "false");
+                command.button.click();
+            }
+            return true;
+        },
         async send(outgoingMessage, signal) {
           const target = selectedTarget;
           let failureReported = false;

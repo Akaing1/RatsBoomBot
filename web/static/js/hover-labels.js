@@ -32,15 +32,17 @@
     function positionTooltip() {
         if (!activeElement) return;
         const rect = activeElement.getBoundingClientRect();
+        const section = activeElement.closest('.engagement-sidebar section');
+        const horizontalAnchor = section ? section.getBoundingClientRect() : rect;
         const size = tooltip.getBoundingClientRect();
         const viewport = window.visualViewport;
         const left = viewport?.offsetLeft || 0;
         const top = viewport?.offsetTop || 0;
         const width = viewport?.width || window.innerWidth;
         const height = viewport?.height || window.innerHeight;
-        let textLeft = rect.left;
-        let textRight = rect.right;
-        if (document.createRange && document.createTreeWalker) {
+        let textLeft = horizontalAnchor.left;
+        let textRight = horizontalAnchor.right;
+        if (!section && document.createRange && document.createTreeWalker) {
             const anchor = activeElement.querySelector('.nav-link-label, .sidebar-button-label, .chat-filter-button-label') || activeElement;
             const walker = document.createTreeWalker(anchor, NodeFilter.SHOW_TEXT);
             const bounds = [];
@@ -99,6 +101,9 @@
     function labelFor(element) {
         const navigationLabel = element.querySelector('.nav-link-label, .sidebar-button-label');
         if (navigationLabel) return text(navigationLabel.textContent);
+        if (element.matches('.engagement-load')) return [
+            text(element.querySelector('strong')?.textContent), text(element.querySelector('small')?.textContent)
+        ].filter(Boolean).join('\n');
         if (element.matches('.chat-filter-row')) return text(element.textContent);
         if (element.matches(values)) return text(element.textContent);
         if (element.dataset.channelField) return text(element.textContent);

@@ -54,9 +54,10 @@ PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("raid_messages.outgoing_subscriber", "Raid messages", "Subscriber raid message", "Optional subscriber variation for outgoing raids."),
     ProfileSettingDefinition("shoutout_messages.with_game", "Shoutouts", "Shoutout with game", "Shoutout used when Twitch provides the target's last game."),
     ProfileSettingDefinition("shoutout_messages.without_game", "Shoutouts", "Shoutout without game", "Shoutout used when no game is available."),
-    ProfileSettingDefinition("redeems.daily_title", "Redeems", "Daily redeem title", "Exact Twitch reward title used for the daily claim.", maximum_length=100, rows=1),
-    ProfileSettingDefinition("redeems.first_title", "Redeems", "First redeem title", "Exact Twitch reward title used for first place.", maximum_length=100, rows=1),
-    ProfileSettingDefinition("redeems.vip_title", "Redeems", "VIP redeem title", "Exact Twitch reward title that permanently grants VIP status.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("redeems.daily_title", "Redeems", "Daily redeem", "Exact Twitch reward title used for the daily claim.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("redeems.first_title", "Redeems", "First redeem", "Exact Twitch reward title used for first place.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("redeems.second_title", "Redeems", "Second redeem", "Exact Twitch reward title used for second place.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("redeems.vip_title", "Redeems", "VIP redeem", "Exact Twitch reward title that permanently grants VIP status.", maximum_length=100, rows=1),
     ProfileSettingDefinition("league.game_name", "League of Legends", "Riot game name", "Saved in the database. If blank or cleared after an account lookup failure, enter the current Riot game name and verify the tag and region.", maximum_length=100, rows=1),
     ProfileSettingDefinition("league.tag_line", "League of Legends", "Riot tag line", "The tag-line portion of the broadcaster's Riot ID.", maximum_length=20, rows=1),
     ProfileSettingDefinition("league.region", "League of Legends", "Region", "The OP.GG region code, such as NA or EUW.", maximum_length=12, rows=1),
@@ -484,7 +485,7 @@ class ProfileSettingsService:
                     raise ValueError("Each timer message must be 500 characters or fewer.")
                 if "\n" in entry.message or "\r" in entry.message:
                     raise ValueError("Each timer must contain a single message.")
-            value = format_timers(tuple(type(entry)(entry.message.strip(), entry.kind, entry.color) for entry in entries if entry.message.strip()))
+            value = format_timers(tuple(type(entry)(entry.message.strip(), entry.kind, entry.color, entry.enabled) for entry in entries if entry.message.strip()))
             if len(value) > definition.maximum_length:
                 raise ValueError("Timer messages are too long.")
             return value

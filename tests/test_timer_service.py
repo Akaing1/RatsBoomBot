@@ -71,3 +71,16 @@ def test_timer_editor_round_trip_and_legacy_text():
     assert parse_timers("First\nSecond") == (TimerMessage("First"), TimerMessage("Second"))
     with pytest.raises(ValueError):
         ProfileSettingsService.validate_value(definition, '[["Promo", "invalid"]]')
+
+
+def test_disabled_timers_round_trip_and_are_excluded_from_rotation():
+    entries = (TimerMessage('Off', enabled=False), TimerMessage('On', 'announcement', 'green'))
+    definition = ProfileSettingsService.get_definition('timer_messages')
+    saved = ProfileSettingsService.validate_value(definition, format_timers(entries))
+    assert parse_timers(saved) == entries
+    settings = SimpleNamespace(discord_url=None, youtube_url=None)
+    assert TimerService.get_messages(entries, settings) == [entries[1]]
+    assert TimerService.get_messages((entries[0],), settings) == []
+    assert parse_timers('[["Legacy", "announcement", "blue"]]')[0].enabled
+    with pytest.raises(ValueError):
+        parse_timers('[["Bad", "message", "primary", "false"]]')

@@ -146,7 +146,7 @@ async def test_developer_profile_migration_is_idempotent(tmp_path) -> None:
 def test_streamer_editable_settings_protect_points_and_custom_redeems() -> None:
     assert "points.points_per_message" not in PROFILE_SETTINGS_BY_KEY
     assert "points.message_cooldown_seconds" not in PROFILE_SETTINGS_BY_KEY
-    assert "redeems.second_title" not in PROFILE_SETTINGS_BY_KEY
+    assert "redeems.second_title" in PROFILE_SETTINGS_BY_KEY
     assert "redeems.second_amount" not in PROFILE_SETTINGS_BY_KEY
     assert "redeems.daily_amount" not in PROFILE_SETTINGS_BY_KEY
     assert "redeems.first_amount" not in PROFILE_SETTINGS_BY_KEY

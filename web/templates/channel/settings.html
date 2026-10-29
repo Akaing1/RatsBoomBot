@@ -1,5 +1,5 @@
 {% extends "channel/layout.html" %}
-{% from "channel/settings_switch.html" import status_switch %}
+{% from "channel/settings_switch.html" import status_switch, toggle_details %}
 {% block title %}Settings | RatsBoomBot{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}">
@@ -12,33 +12,36 @@
 {% set selected = 'connections' if identity_message else 'general' %}
 {% endif %}
 <div class="settings-book" data-settings-book data-channel="{{ broadcaster.id }}" data-selected="{{ selected }}">
-    <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="horizontal">
-        {% for section in settings_sections %}
-        <a class="settings-tab" id="settings-tab-{{ section.key }}" href="{{ channel_root }}/settings?section={{ section.key }}" role="tab" aria-controls="settings-{{ section.key }}" aria-selected="{{ 'true' if section.key == selected else 'false' }}" tabindex="{{ '0' if section.key == selected else '-1' }}" data-settings-tab="{{ section.key }}" title="{{ section.label }}">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ section.icon }}"/></svg>
-            <span>{{ section.label }}</span><span class="settings-dirty-dot" hidden aria-label="Unsaved changes">●</span>
-        </a>
-        {% endfor %}
-    </nav>
+    <div class="settings-workspace">
+    <div class="settings-main">
+
     <div class="settings-pages">
         {% for section in settings_sections %}
         <section class="settings-page" id="settings-{{ section.key }}" role="tabpanel" aria-labelledby="settings-tab-{{ section.key }}" tabindex="0" data-settings-page="{{ section.key }}"{% if section.key != selected %} hidden{% endif %}>
             <header class="settings-page-heading"><div><p class="eyebrow">Channel settings</p><h3>{{ section.label }}</h3><p>{{ section.description }}</p></div><span class="settings-page-number" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span></header>
             {% if section.blocked %}<p class="settings-blocked-notice">Some features are inactive because a parent switch is off. Enable the channel profile or global commands in <a href="{{ channel_root }}/settings?section=general">General</a>.</p>{% endif %}
             {% if section.standalone_toggles %}
-            <div class="settings-switch-list">
-                {% for toggle in section.standalone_toggles %}<div class="settings-switch-row"><span>{{ toggle.label }}</span>{{ status_switch(toggle) }}</div>{% endfor %}
+            <div class="settings-command-clusters">
+                {% for panel, toggles in section.standalone_toggles | groupby('panel') %}
+                <section class="settings-command-cluster">
+                    <h4>{{ panel }}</h4>
+                    <div class="settings-switch-list">
+                    {% for toggle in toggles %}<div class="settings-switch-row"><div class="settings-toggle-copy"><span>{{ toggle.label }}</span>{{ toggle_details(toggle) }}</div>{{ status_switch(toggle) }}</div>{% endfor %}
+                    </div>
+                </section>
+                {% endfor %}
             </div>
             {% endif %}
-            {% with setting_groups=section.groups, show_social_links=section.key == 'connections', setting_message=none, settings_notebook=true, group_toggles=section.group_toggles, flat_settings=section.key in ['timers', 'loyalty'] %}
+            {% with setting_groups=section.groups, show_social_links=section.key == 'connections', setting_message=none, settings_notebook=true, group_toggles=section.group_toggles, setting_toggles=section.setting_toggles, flat_settings=section.key in ['timers', 'loyalty'] %}
                 {% include "shared/profile_inputs.html" %}
             {% endwith %}
             {% if section.key == 'general' %}
-            <details class="settings-group"{% if command_tab == 'protected' or protected_message %} open{% endif %}><summary>Protected users</summary><div class="panel">{% with protected_search_url=channel_root ~ '/protected-users/search', protected_add_url=channel_root ~ '/protected-users/add', protected_remove_url=channel_root ~ '/protected-users/remove' %}{% include 'shared/protected_settings.html' %}{% endwith %}</div></details>
             {% if not moderator_mode %}<details class="settings-group"{% if social_tab == 'youtube' or youtube_message %} open{% endif %}><summary>YouTube chat connection</summary><div class="panel" id="youtube-integration">{% with settings_notebook=true %}{% include "shared/youtube_settings.html" %}{% endwith %}</div></details>{% endif %}
+            <details class="settings-group"{% if command_tab == 'protected' or protected_message %} open{% endif %}><summary>Protected users</summary><div class="panel">{% with protected_search_url=channel_root ~ '/protected-users/search', protected_add_url=channel_root ~ '/protected-users/add', protected_remove_url=channel_root ~ '/protected-users/remove' %}{% include 'shared/protected_settings.html' %}{% endwith %}</div></details>
             {% endif %}
             {% if section.key == 'events' %}{% include "channel/settings_redeems.html" %}{% endif %}
-            {% if section.key == 'connections' %}{% include "channel/settings_identity.html" %}{% include "shared/widget_settings.html" %}{% endif %}
+            {% if section.key == 'connections' %}{% include "channel/settings_identity.html" %}{% endif %}
+            {% if section.key == 'general' and not moderator_mode %}{% include "shared/widget_settings.html" %}{% endif %}
             {% if section.key == 'queue' %}
             <section class="panel profile-settings-panel"><h3>Queue blacklist</h3><p>Manage viewers who cannot join your channel’s queue.</p><a class="button secondary" href="{{ channel_root }}/viewer-queue/blacklist">Manage blacklist</a></section>
             {% endif %}
@@ -51,7 +54,27 @@
         </section>
         {% endfor %}
     </div>
-
+    </div>
+    <aside class="settings-tools" aria-label="Settings navigation and search">
+    <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+        {% for section in settings_sections %}
+        <a class="settings-tab" id="settings-tab-{{ section.key }}" href="{{ channel_root }}/settings?section={{ section.key }}" role="tab" aria-controls="settings-{{ section.key }}" aria-selected="{{ 'true' if section.key == selected else 'false' }}" tabindex="{{ '0' if section.key == selected else '-1' }}" data-settings-tab="{{ section.key }}" title="{{ section.label }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ section.icon }}"/></svg>
+            <span>{{ section.label }}</span><span class="settings-dirty-dot" hidden aria-label="Unsaved changes">●</span>
+        </a>
+        {% endfor %}
+    </nav>
+    <div class="settings-finder" data-settings-finder hidden aria-label="Settings finder">
+        <h3>Search settings</h3>
+        <label for="settings-search">Search all tabs</label>
+        <input id="settings-search" type="search" placeholder="Try follow message or raid" autocomplete="off" maxlength="160">
+        <p class="settings-finder-count" data-settings-result-count role="status" aria-live="polite"></p>
+        <div class="settings-finder-results" data-settings-results></div>
+        <h4 data-settings-shortcuts-heading>On this tab</h4>
+        <nav class="settings-finder-shortcuts" data-settings-shortcuts aria-label="Sections on this tab"></nav>
+    </div>
+    </aside>
+    </div>
 </div>
 {% include "shared/timer_editor.html" %}
 {% endblock %}
@@ -59,5 +82,7 @@
 {{ super() }}
 <script src="/static/js/social-integrations.js" defer></script>
 <script src="/static/js/protected-users.js" defer></script>
+<script src="/static/js/settings-timers.js?v={{ deployment_stamp() }}" defer></script>
 <script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}" defer></script>
+<script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}" defer></script>
 {% endblock %}

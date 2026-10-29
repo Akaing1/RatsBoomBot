@@ -2357,7 +2357,9 @@ async def channel_customization_page(request: Request):
     services = runtime_bot.services
     broadcaster = services.broadcasters.get_broadcasters().get(str(broadcaster_id))
 
-    if broadcaster is None or get_active_profile(broadcaster_id) is None:
+    profile = get_active_profile(broadcaster_id)
+
+    if broadcaster is None or profile is None:
         logout_channel_user(request)
         return RedirectResponse(url="/connect", status_code=303)
 
@@ -2372,15 +2374,16 @@ async def channel_customization_page(request: Request):
         context={
             "active_page": "settings",
             "customization_action": f"/me/mod/{broadcaster_id}/customization" if getattr(getattr(request, "state", None), "channel_access", None) else "/channel/customization",
+            "timers_active": services.features.is_enabled(broadcaster_id, FeatureName.TIMERS) and (await services.broadcaster_settings.get_settings(broadcaster_id)).timers_enabled,
             "settings_sections": visible_settings_sections(request, build_settings_sections(
                 groups, services.features.get_channel_features(broadcaster_id),
                 services.features.get_profile_features(broadcaster_id),
                 services.features.get_global_groups(broadcaster_id),
-                services.features.get_global_commands(broadcaster_id),
+                services.features.get_global_commands(broadcaster_id), profile=profile,
             )),
             "toggle_result": request.query_params.get("toggle_result"),
             "toggle_message": request.query_params.get("toggle_message"),
-            "loyalty_alias": get_active_profile(broadcaster_id).points.command_alias,
+            "loyalty_alias": profile.points.command_alias,
             "broadcaster": broadcaster,
             "channel_settings": await services.broadcaster_settings.get_settings(broadcaster_id),
             "chat_identity": None if getattr(getattr(request, "state", None), "channel_access", None) else services.chat_identity.get_state(broadcaster_id),
@@ -2428,6 +2431,11 @@ async def update_channel_customization(request: Request, setting_name: str = For
                 raise ValueError("Choose On or Off.")
             await services.broadcaster_settings.set_follow_raid(broadcaster_id, value == "1")
             message = "Follow raid preference saved."
+        elif setting_name in {"social.tiktok_url", "social.x_url", "social.kofi_url", "social.vgen_url"}:
+            if action != "save":
+                raise ValueError("Unknown social action.")
+            await services.broadcaster_settings.set_social_url(broadcaster_id, setting_name.removeprefix("social.").removesuffix("_url"), value)
+            message = "Social URL was updated."
         elif setting_name == "social.discord_url":
             await services.broadcaster_settings.set_discord_url(broadcaster_id, value.strip())
             message = "Discord URL was updated."
@@ -2437,8 +2445,14 @@ async def update_channel_customization(request: Request, setting_name: str = For
         else:
             definition = services.profile_settings.get_definition(setting_name)
 
-            if action == "save":
+            if action == "save" and not value.strip() and setting_name != "timer_messages":
+                await services.profile_settings.clear_override(broadcaster_id, setting_name, settings_actor(request))
+                message = f"{definition.label} now uses its channel default."
+            elif action == "save":
                 await services.profile_settings.set_override(broadcaster_id, setting_name, value, settings_actor(request))
+                if setting_name == "timer_messages":
+                    await services.features.set_enabled(broadcaster_id, FeatureName.TIMERS, True, settings_actor(request))
+                    await services.broadcaster_settings.set_timers_enabled(broadcaster_id, True)
                 message = f"{definition.label} was updated."
             elif action == "reset":
                 await services.profile_settings.clear_override(broadcaster_id, setting_name, settings_actor(request))

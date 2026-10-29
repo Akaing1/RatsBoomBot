@@ -14,11 +14,13 @@
 <script src="/static/js/channel-help.js?v={{ deployment_stamp() }}" defer></script>
 
 <link rel="stylesheet" href="/static/css/public-header.css?v={{ deployment_stamp() }}">
+<link rel="stylesheet" href="/static/css/community-nav.css?v={{ deployment_stamp() }}">
 </head>
 
 <body class="public-command-page channel-help">
     {% from "shared/public_header.html" import public_header with context %}
     {% call public_header("Channel Help") %}
+        {% include "shared/community_nav.html" %}
 <nav class="public-raid-navigation" aria-label="Channel links">
             {% if broadcaster.login %}<a class="button primary" href="https://twitch.tv/{{ broadcaster.login }}">Watch on Twitch</a>{% endif %}
         </nav>

@@ -19,6 +19,10 @@ class FeatureName(Enum):
     AD_ANNOUNCEMENTS = "ad_announcements"
     POINTS = "points"
     REDEEMS = "redeems"
+    REDEEM_DAILY = "redeem_daily"
+    REDEEM_FIRST = "redeem_first"
+    REDEEM_SECOND = "redeem_second"
+    REDEEM_VIP = "redeem_vip"
     FOLLOW_RESPONSES = "follow_responses"
     SUBSCRIPTION_RESPONSES = "subscription_responses"
     RESUBSCRIPTION_RESPONSES = "resubscription_responses"
@@ -68,6 +72,10 @@ class FeatureDefaults:
     ad_announcements: bool = False
     points: bool = True
     redeems: bool = True
+    redeem_daily: bool = True
+    redeem_first: bool = True
+    redeem_second: bool = True
+    redeem_vip: bool = True
     follow_responses: bool = True
     subscription_responses: bool = True
     resubscription_responses: bool = True

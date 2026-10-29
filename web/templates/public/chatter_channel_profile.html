@@ -10,10 +10,12 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}">
     <link rel="stylesheet" href="/static/css/mod-access.css?v={{ deployment_stamp() }}">
 <link rel="stylesheet" href="/static/css/public-header.css?v={{ deployment_stamp() }}">
+<link rel="stylesheet" href="/static/css/community-nav.css?v={{ deployment_stamp() }}">
 </head>
 <body class="chatter-profile-page profile-page channel-chatter-page">
     {% from "shared/public_header.html" import public_header with context %}
     {% call public_header("Chatter profiles") %}
+        {% include "shared/community_nav.html" %}
 <a class="button secondary chatter-channel-back" href="{{ '/me' if owner_mode else '/chatters/' ~ profile.identity.login }}">Back to global profile</a>
         {% if owner_mode %}
             <form method="post" action="/me/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button secondary" type="submit">Sign out</button></form>

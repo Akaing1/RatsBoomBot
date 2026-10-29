@@ -2,7 +2,7 @@
     // Both chats use the same input lifecycle; callers provide only their transport
     // and optional dashboard features (platform selection, replies and history).
     window.createChatComposer = ({form, input, sendButton, status, autocomplete: options,
-        send, onSent = () => {}, onInput = () => {}, onKey = () => false, focusAfterSend = false}) => {
+        send, handleLocal, onSent = () => {}, onInput = () => {}, onKey = () => false, focusAfterSend = false}) => {
         let closed = false, sending = false, request = null, statusTimer = null, width = 0;
         const listeners = [];
         function listen(element, type, handler) {
@@ -51,6 +51,11 @@
             if (closed || sending || !message) return;
             if (draft.length > input.maxLength) {
                 showStatus("Messages can contain up to 500 characters.", "warning", true);
+                return;
+            }
+            if (handleLocal?.(message)) {
+                if (input.value === draft) { input.value = ""; resize(); onInput(); }
+                autocomplete.hide();
                 return;
             }
             sending = true; sendButton.disabled = true;

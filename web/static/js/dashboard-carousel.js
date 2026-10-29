@@ -245,6 +245,7 @@
 
     previous.addEventListener("click", () => showCard(activeIndex - 1, true));
     document.addEventListener("dashboard-raid-started", () => { if (media.matches) showCard(0); });
+    document.addEventListener("dashboard-engagement-started", () => { if (media.matches) showCard(0); });
     next.addEventListener("click", () => showCard(activeIndex + 1, true));
     deck.addEventListener("keydown", event => {
         if (!media.matches || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;

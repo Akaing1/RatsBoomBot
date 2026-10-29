@@ -84,3 +84,29 @@ test('fading send status restores a persistent disconnected warning', () => {
     [...app.timers.values()][0]();
     assert.equal(app.status.textContent, 'Not connected'); assert.match(app.status.className, /error/);
 });
+
+
+test('local commands clear the input without sending, reporting delivery or stealing focus', async () => {
+    const opened = []; let delivered = 0, cleared = 0;
+    const app = setup({handleLocal: message => { opened.push(message); return true; }, onSent: () => delivered++, onInput: () => cleared++, focusAfterSend: true});
+    app.input.value = ' /poll ';
+    await app.submit();
+    assert.deepEqual(opened, ['/poll']);
+    assert.deepEqual(app.sent, []);
+    assert.equal(delivered, 0);
+    assert.equal(app.input.value, '');
+    assert.equal(cleared, 1);
+    assert.notEqual(app.input.focused, true);
+    assert.equal(app.status.textContent, undefined);
+    assert.equal(app.signal(), undefined);
+});
+
+test('a local handler preserves a replacement draft and its input state', async () => {
+    let resets = 0;
+    const app = setup({handleLocal() { app.input.value = 'new draft'; return true; }, onInput: () => resets++});
+    app.input.value = '/poll';
+    await app.submit();
+    assert.equal(app.input.value, 'new draft');
+    assert.equal(resets, 0);
+    assert.deepEqual(app.sent, []);
+});

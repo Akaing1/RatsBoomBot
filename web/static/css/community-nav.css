@@ -1,0 +1,13 @@
+.community-header-links{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.community-header-links a{display:block;padding:10px 12px;border:1px solid transparent;border-radius:9px;color:#abb7cb;text-decoration:none;font-size:13px;white-space:nowrap}
+.community-header-links a:hover{color:#fff;background:#ffffff08}
+.community-header-links a[aria-current=page]{color:#e9d5ff;background:#774baa33;border-color:#a78bfa55}
+.community-header-links a:focus-visible{outline:2px solid #c4b5fd;outline-offset:3px}
+.site-header:has(.community-header-links){flex-wrap:wrap}
+.site-header:has(.community-header-links) .site-header-actions{flex-wrap:wrap}
+@media(max-width:1000px){
+.site-header:has(.community-header-links) .site-header-actions{display:contents}
+.site-header .community-header-links{order:3;flex-basis:100%;justify-content:flex-end}
+.site-header:has(.community-header-links) .public-raid-navigation,.site-header:has(.community-header-links) .site-header-actions>form{margin-left:auto}
+}
+@media(max-width:600px){.site-header .community-header-links{justify-content:flex-start;gap:4px}.community-header-links a{font-size:12px;padding:9px 8px}}

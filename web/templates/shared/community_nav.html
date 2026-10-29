@@ -1,0 +1,5 @@
+<nav class="community-header-links" aria-label="Community navigation">
+        <a href="/me/channels/{{ community_login|urlencode }}/profile"{% if community_page == 'profile' and owner_mode %} aria-current="page"{% endif %}>My channel profile</a>
+        <a href="/help/{{ community_login|urlencode }}"{% if community_page == 'help' %} aria-current="page"{% endif %}>Command Help</a>
+        {% if community_boss_enabled %}<a href="/raid/{{ community_login|urlencode }}"{% if community_page == 'raid' %} aria-current="page"{% endif %}>Boss Hunt guide</a>{% endif %}
+</nav>
