@@ -19,12 +19,22 @@ test('settings finder opens groups across tabs without losing drafts or searchin
                     <article class="profile-setting-card" data-setting-key="${setting}"><form method="post">
                     <div class="toggle-card-heading"><h4>${title}</h4></div><textarea name="value">private_saved_message</textarea></form></article>
                 </details></section>`).join('')}</div>
-            <aside data-settings-finder hidden><input><p data-settings-result-count></p><div data-settings-results></div><nav data-settings-shortcuts></nav></aside>
+            <button data-settings-finder-toggle hidden aria-expanded="false">Find settings</button><aside data-settings-finder hidden><button data-settings-finder-close>Close</button><input><p data-settings-result-count></p><div data-settings-results></div><nav data-settings-shortcuts></nav></aside>
         </div>`);
         for (const file of ['channel-settings.js', 'settings-finder.js']) {
             await page.addScriptTag({content: fs.readFileSync(`web/static/js/${file}`, 'utf8')});
         }
+        const toggle = page.locator('[data-settings-finder-toggle]');
+        const drawer = page.locator('[data-settings-finder]');
+        assert.equal(await drawer.isVisible(), false);
+        await toggle.click();
+        assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
         const search = page.locator('[data-settings-finder] input');
+        assert.equal(await search.evaluate(node => node === document.activeElement), true);
+        await page.keyboard.press('Escape');
+        assert.equal(await drawer.isVisible(), false);
+        assert.equal(await toggle.evaluate(node => node === document.activeElement), true);
+        await toggle.click();
         await search.fill('follow');
         await page.locator('[data-settings-results] button').filter({hasText: 'Follow message'}).last().click();
         const draft = page.locator('[data-settings-page="events"] textarea');
@@ -45,5 +55,14 @@ test('settings finder opens groups across tabs without losing drafts or searchin
         await search.fill('');
         assert.equal(await page.locator('[data-settings-results]').isVisible(), false);
         assert.match(await page.locator('[data-settings-shortcuts]').textContent(), /Follow message group/);
+        await page.setViewportSize({width: 390, height: 844});
+        await search.fill('lurk');
+        await page.locator('[data-settings-results] button').filter({hasText: 'Lurk message'}).last().click();
+        assert.equal(await drawer.isVisible(), false);
+        assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
+        assert.equal(await page.locator('[data-settings-page="chat"] textarea').evaluate(node => node === document.activeElement), true);
+        await toggle.click();
+        await page.locator('[data-settings-finder-close]').click();
+        assert.equal(await drawer.isVisible(), false);
     } finally { await browser.close(); }
 });

@@ -59,7 +59,12 @@
         </section>
         {% endfor %}
     </div>
-    <aside class="settings-finder" data-settings-finder hidden aria-label="Settings finder">
+    <button class="settings-finder-toggle" type="button" data-settings-finder-toggle hidden aria-expanded="false" aria-controls="settings-finder" aria-label="Find settings" title="Find settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+        <span>Find settings</span>
+    </button>
+    <aside id="settings-finder" class="settings-finder" data-settings-finder hidden aria-label="Settings finder">
+        <button type="button" class="settings-finder-close" data-settings-finder-close aria-label="Close settings finder">Close ×</button>
         <p class="eyebrow">Settings finder</p><h3>Find a setting</h3>
         <label for="settings-search">Search all tabs</label>
         <input id="settings-search" type="search" placeholder="Try follow message or raid" autocomplete="off" maxlength="160">

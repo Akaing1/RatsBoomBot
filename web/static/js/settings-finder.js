@@ -4,6 +4,21 @@
     const finder = book?.querySelector('[data-settings-finder]');
     if (!finder) return;
     const search = finder.querySelector('input');
+    const toggle = book.querySelector('[data-settings-finder-toggle]');
+    function setOpen(open, restoreFocus = false) {
+        finder.hidden = !open;
+        toggle?.setAttribute('aria-expanded', String(open));
+        if (open) search.focus({preventScroll: true});
+        else if (restoreFocus) toggle?.focus({preventScroll: true});
+    }
+    if (toggle) {
+        toggle.hidden = false;
+        toggle.addEventListener('click', () => setOpen(finder.hidden));
+        finder.querySelector('[data-settings-finder-close]').addEventListener('click', () => setOpen(false, true));
+        book.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !finder.hidden) { event.preventDefault(); setOpen(false, true); }
+        });
+    }
     const results = finder.querySelector('[data-settings-results]');
     const count = finder.querySelector('[data-settings-result-count]');
     const shortcuts = finder.querySelector('[data-settings-shortcuts]');
@@ -37,6 +52,7 @@
         highlighted?.classList.remove('settings-search-highlight');
         highlighted = entry.target;
         highlighted.classList.add('settings-search-highlight');
+        if (toggle && matchMedia('(max-width: 900px)').matches) setOpen(false);
         const focus = entry.target.matches('summary') ? entry.target
             : entry.target.querySelector('textarea, input:not([type="hidden"]), select, button, a') || entry.target;
         if (!focus.matches('input, textarea, select, button, a, summary')) focus.tabIndex = -1;
@@ -63,5 +79,5 @@
     }
     search.addEventListener('input', updateResults);
     book.addEventListener('settings-section-changed', updateShortcuts);
-    finder.hidden = false; updateShortcuts(); updateResults();
+    finder.hidden = Boolean(toggle); updateShortcuts(); updateResults();
 })();
