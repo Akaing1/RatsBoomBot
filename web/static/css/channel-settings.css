@@ -195,10 +195,21 @@
 .channel-page-settings .settings-group{margin-top:20px}.channel-page-settings .settings-group>summary{padding:16px}
 .channel-page-settings .settings-page .profile-settings-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:14px}
 .channel-page-settings .settings-search-highlight{outline:2px solid #b794f4;outline-offset:3px;scroll-margin:24px}
-@media(max-width:1100px){.channel-page-settings .settings-workspace:has(.settings-finder:not([hidden])){grid-template-columns:minmax(0,1fr) 250px}.channel-page-settings .settings-finder{padding:16px}.channel-page-settings .settings-pages{padding:16px}}
-@media(max-width:900px){
-.channel-page-settings .settings-workspace:has(.settings-finder:not([hidden])){display:flex;flex-direction:column;overflow-y:auto}
-.channel-page-settings .settings-finder{order:-1;flex-shrink:0;max-height:330px;margin-top:12px}
-.channel-page-settings .settings-pages{flex:1 0 auto;overflow:visible;min-height:0}
-.channel-page-settings .settings-finder-shortcuts{display:flex;flex-wrap:wrap}.channel-page-settings .settings-finder-shortcuts button{width:auto}
-}
+
+/* One attached tabbed panel, with an optional drawer over its right edge. */
+.channel-page-settings .settings-book{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--panel,#181d25)}
+.channel-page-settings .settings-tabs{box-sizing:border-box;background:#202530;border-bottom:1px solid var(--border);gap:0}
+.channel-page-settings .settings-tab{border:0;border-right:1px solid var(--border);border-radius:0;margin:0;background:transparent}
+.channel-page-settings .settings-workspace,.channel-page-settings .settings-workspace:has(.settings-finder:not([hidden])){position:relative;display:flex;gap:0;overflow:hidden}
+.channel-page-settings .settings-pages{flex:1;min-width:0;min-height:0;border:0;border-radius:0;overflow-y:auto}
+.channel-page-settings .settings-finder-toggle{flex:0 0 44px;display:flex;align-items:center;flex-direction:column;gap:14px;padding:18px 10px;border:0;border-left:1px solid var(--border);background:#242b39;color:#c4b5fd;cursor:pointer;font:inherit}
+.channel-page-settings .settings-finder-toggle[hidden]{display:none}
+.channel-page-settings .settings-finder-toggle svg{width:22px;height:22px;flex-shrink:0}
+.channel-page-settings .settings-finder-toggle span{writing-mode:vertical-rl;font-size:12px;font-weight:600;letter-spacing:.04em}
+.channel-page-settings .settings-finder-toggle:hover,.channel-page-settings .settings-finder-toggle[aria-expanded=true]{background:#333047}
+.channel-page-settings .settings-finder-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.channel-page-settings .settings-finder{position:absolute;z-index:5;right:44px;top:0;bottom:0;width:min(320px,calc(100% - 44px));margin:0;border-radius:0;border-top:0;border-bottom:0;padding:20px;box-shadow:-12px 0 28px #0006;animation:settings-drawer-in .16s ease-out}
+.channel-page-settings .settings-finder .settings-finder-close{width:auto;margin-left:auto;margin-bottom:12px;padding:6px 10px}
+@keyframes settings-drawer-in{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:translateX(0)}}
+@media(prefers-reduced-motion:reduce){.channel-page-settings .settings-finder{animation:none}}
+@media(max-width:900px){.channel-page-settings .settings-pages{padding:16px}.channel-page-settings .settings-workspace{min-height:65vh}.channel-page-settings .settings-finder{padding:16px;max-height:none}}
