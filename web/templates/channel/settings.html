@@ -12,6 +12,8 @@
 {% set selected = 'connections' if identity_message else 'general' %}
 {% endif %}
 <div class="settings-book" data-settings-book data-channel="{{ broadcaster.id }}" data-selected="{{ selected }}">
+    <div class="settings-workspace">
+    <div class="settings-main">
     <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="horizontal">
         {% for section in settings_sections %}
         <a class="settings-tab" id="settings-tab-{{ section.key }}" href="{{ channel_root }}/settings?section={{ section.key }}" role="tab" aria-controls="settings-{{ section.key }}" aria-selected="{{ 'true' if section.key == selected else 'false' }}" tabindex="{{ '0' if section.key == selected else '-1' }}" data-settings-tab="{{ section.key }}" title="{{ section.label }}">
@@ -20,7 +22,6 @@
         </a>
         {% endfor %}
     </nav>
-    <div class="settings-workspace">
     <div class="settings-pages">
         {% for section in settings_sections %}
         <section class="settings-page" id="settings-{{ section.key }}" role="tabpanel" aria-labelledby="settings-tab-{{ section.key }}" tabindex="0" data-settings-page="{{ section.key }}"{% if section.key != selected %} hidden{% endif %}>
@@ -58,6 +59,7 @@
             {% endfor %}
         </section>
         {% endfor %}
+    </div>
     </div>
     <button class="settings-finder-toggle" type="button" data-settings-finder-toggle hidden aria-expanded="false" aria-controls="settings-finder" aria-label="Find settings" title="Find settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
