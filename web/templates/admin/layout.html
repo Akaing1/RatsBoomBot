@@ -18,6 +18,7 @@
         rel="stylesheet"
         href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}"
     >
+    {% block page_styles %}{% endblock %}
 </head>
 
 <body class="dashboard-page admin-page admin-page-{{ active_page }}{% if channel_section == 'overview' %} admin-channel-overview{% endif %}">
@@ -38,7 +39,7 @@
                     class="nav-link {% if active_page == 'dashboard' %}active{% endif %}"
                     href="/admin"
                 >
-                    <span class="nav-link-icon" aria-hidden="true">⌂</span><span class="nav-link-label">Dashboard</span>
+                    <span class="nav-link-icon" aria-hidden="true">⌂</span><span class="nav-link-label">Overview</span>
                 </a>
 
                 <a
