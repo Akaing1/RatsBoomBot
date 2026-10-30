@@ -249,7 +249,7 @@ async def public_patch_notes(request: Request):
 @router.get("/patch-notes/{slug}", response_class=HTMLResponse)
 async def public_patch_note(request: Request, slug: str):
     note = await get_note(get_db(), slug)
-    if note is None or note["published_at"] is None: return templates.TemplateResponse(request=request, name="public/patch_notes.html", context={"patch_notes": [], "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")}, status_code=404)
+    if note is None or note["published_at"] is None: return templates.TemplateResponse(request=request, name="public/patch_notes.html", context={"patch_notes": await list_notes(get_db(), True), "note_not_found": True, "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")}, status_code=404)
     return templates.TemplateResponse(request=request, name="public/patch_note.html", context={"note": note, "body_html": render_markdown(note["body"]), "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")})
 
 

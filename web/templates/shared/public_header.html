@@ -4,6 +4,6 @@
         <img src="{{ url_for('assets', path='/NinjaDoro.ico') }}" alt="" width="42" height="42">
         <span><strong>RatsBoomBot</strong><small>{{ subtitle }}</small></span>
     </a>
-    <div class="site-header-actions">{{ caller() }}</div>
+    <div class="site-header-actions"><a class="button secondary" href="/patch-notes"{% if subtitle == "Patch notes" %} aria-current="page"{% endif %}>Patch notes</a>{{ caller() }}</div>
 </header>
 {%- endmacro %}
