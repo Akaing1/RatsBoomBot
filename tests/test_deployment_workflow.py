@@ -25,7 +25,9 @@ def test_uat_workflow_validates_before_guarded_deployment() -> None:
     assert "github.event.pull_request.draft == false" in workflow
     assert "github.event.pull_request.head.repo.full_name == github.repository" in workflow
     assert "github.event.pull_request.head.sha || github.sha" in workflow
-    assert 'run: /opt/ratsboombot-uat/deploy/linux/deploy-uat.sh "$UAT_DEPLOY_SHA"' in workflow
+    assert 'ref: ${{ env.UAT_DEPLOY_SHA }}' in workflow
+    assert 'persist-credentials: false' in workflow
+    assert 'run: bash "$GITHUB_WORKSPACE/uat-deployment-source/deploy/linux/deploy-uat.sh" "$UAT_DEPLOY_SHA"' in workflow
     assert "cancel-in-progress: false" in workflow
     assert "gh release" not in workflow
 
