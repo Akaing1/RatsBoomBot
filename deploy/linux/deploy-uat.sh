@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 APP_DIR="/opt/ratsboombot-uat"
 VENV_DIR="$APP_DIR/.venv"
 SERVICE_NAME="ratsboombot-uat"
@@ -31,6 +33,15 @@ if [ "$DEPLOY_REF" != "uat" ] && [[ ! "$DEPLOY_REF" =~ ^[0-9a-f]{40}$ ]]; then
     exit 1
 fi
 
+# Serialize Actions and direct invocations before touching Git or backing up data.
+exec 9>"$APP_DIR/.git/uat-deployment.lock"
+if ! flock -w 60 9; then
+    echo "[UAT Deploy] ERROR: another UAT deployment holds the deployment lock."
+    exit 1
+fi
+
+python3 "$SCRIPT_DIR/recover_git_locks.py" "$APP_DIR/.git"
+
 cd "$APP_DIR"
 
 PREVIOUS_COMMIT="$(git rev-parse HEAD)"
@@ -50,6 +61,12 @@ fi
 
 git fetch --no-tags origin "$DEPLOY_REF"
 NEW_COMMIT="$(git rev-parse FETCH_HEAD)"
+# A previous interrupted checkout can leave tracked files partly updated.
+# Preserve those edits in Git before returning the checkout to a clean state.
+if ! git diff --quiet -- || ! git diff --cached --quiet --; then
+    git stash push -m "uat-pre-deploy-$TIMESTAMP"
+    echo "[UAT Deploy] Preserved tracked checkout changes in git stash (uat-pre-deploy-$TIMESTAMP)."
+fi
 git checkout --detach "$NEW_COMMIT"
 
 "$VENV_DIR/bin/python" -m pip install -r requirements.txt

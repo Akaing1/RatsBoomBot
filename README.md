@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project is privately operated for Ninjakaing and a growing group of stream communities. Core broadcaster onboarding is self-service on the hosted website; specialized integrations and premium features may require maintainer assistance.
 
-Current application version: **16.1.26** (see [`config/version.py`](config/version.py)). Active development targets `release/16.0.0`; the branch name denotes the next release milestone.
+Current application version: **16.1.27** (see [`config/version.py`](config/version.py)). Active development targets `release/16.0.0`; the branch name denotes the next release milestone.
 
 [Website](https://ratsboombot.com) · [My account](https://ratsboombot.com/me) · [Patch notes](https://ratsboombot.com/patch-notes) · [Local development](docs/development.md)
 
