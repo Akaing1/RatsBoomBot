@@ -229,3 +229,8 @@ select.access-badge { cursor: pointer; font: inherit; font-size: 12px; padding: 
 }
 
 .access-role-guide { border-top: 1px solid var(--border-color, #343a46); margin-top: 1rem; padding-top: .5rem; }
+
+.community-more > summary { cursor: pointer; padding: 12px 4px; color: var(--muted); font-size: 13px; }
+.community-more .community-collapse { display: none; }
+.community-more[open] .community-expand { display: none; }
+.community-more[open] .community-collapse { display: inline; }
