@@ -65,11 +65,14 @@ def test_process_inspection_error_preserves_lock(tmp_path):
 def test_deployment_lock_precedes_recovery_and_git_operations():
     script = Path('deploy/linux/deploy-uat.sh').read_text()
     assert script.index('flock -w 60 9') < script.index('python3 "$SCRIPT_DIR/recover_git_locks.py"') < script.index('git rev-parse HEAD')
-    assert script.index('git stash push') < script.index('git checkout --detach "$NEW_COMMIT"')
+    assert script.index('stash push') < script.index('core.filesRefLockTimeout=10000 checkout --detach')
     assert 'git reset --hard' not in script
 
 
-def test_deploy_recovers_interrupted_checkout_without_losing_tracked_edits(tmp_path):
+@pytest.mark.parametrize('checkout_conflict', [False, True])
+def test_deploy_recovers_interrupted_checkout_without_losing_tracked_edits(tmp_path, checkout_conflict):
+    import shutil
+    import shlex
     import subprocess
 
     def git(*args, cwd):
@@ -111,6 +114,29 @@ def test_deploy_recovers_interrupted_checkout_without_losing_tracked_edits(tmp_p
     python.write_text('#!/bin/sh\nif [ "$1" = "-c" ]; then echo 16.1.27; fi\nexit 0\n')
     python.chmod(0o755)
 
+    if checkout_conflict:
+        # Simulate the production failure: the startup check finds no lock,
+        # then checkout creates a lock and partly changes tracked files.
+        (app / '.git/HEAD.lock').unlink()
+        real_git = shutil.which('git')
+        failed_once = tmp_path / 'failed-once'
+        wrapper = tools / 'git'
+        wrapper.write_text(
+            '#!/bin/bash\n'
+            'if [[ "$*" == *"core.filesRefLockTimeout=10000 checkout --detach"* ]] '
+            f'&& [[ ! -f {shlex.quote(str(failed_once))} ]]; then\n'
+            f'  touch {shlex.quote(str(failed_once))} {shlex.quote(str(app / ".git/HEAD.lock"))}\n'
+            f'  printf "partial checkout" > {shlex.quote(str(app / "README.md"))}\n'
+            '  echo "fatal: cannot lock ref HEAD" >&2\n'
+            '  exit 128\nfi\n'
+            f'exec {shlex.quote(real_git)} "$@"\n'
+        )
+        wrapper.chmod(0o755)
+        sleeper = tools / 'sleep'
+        # Simulate the competing Git operation releasing its recent lock.
+        sleeper.write_text('#!/bin/sh\nrm -f ' + shlex.quote(str(app / '.git/HEAD.lock')) + '\n')
+        sleeper.chmod(0o755)
+
     scripts = tmp_path / 'scripts'
     scripts.mkdir()
     script = scripts / 'deploy-uat.sh'
@@ -125,6 +151,13 @@ def test_deploy_recovers_interrupted_checkout_without_losing_tracked_edits(tmp_p
     assert result.returncode == 0, result.stdout + result.stderr
     assert git('rev-parse', 'HEAD', cwd=app) == target
     assert (app / 'README.md').read_text() == 'validated release'
-    assert 'edits from interrupted checkout' in git('stash', 'show', '-p', cwd=app)
+    stashes = git('stash', 'list', '--format=%gd', cwd=app).splitlines()
+    patches = '\n'.join(git('stash', 'show', '-p', stash, cwd=app) for stash in stashes)
+    assert 'edits from interrupted checkout' in patches
+    if checkout_conflict:
+        assert 'partial checkout' in patches
+        assert 'Checkout attempt 1/3 encountered a Git lock.' in result.stdout
+        assert 'Waiting for checkout locks to become safe' in result.stdout
+        assert 'recent' in result.stderr
     assert (app / '.env').read_text() == 'ENVIRONMENT=uat'
     assert not (app / '.git/HEAD.lock').exists()
