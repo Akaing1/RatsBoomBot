@@ -2,6 +2,8 @@
 
 {% block title %}Channels | RatsBoomBot{% endblock %}
 
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/admin-channels.css') }}?v={{ deployment_stamp() }}">{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', path='/js/admin-channels.js') }}?v={{ deployment_stamp() }}" defer></script>{% endblock %}
 {% block content %}
 <header class="page-header">
     <div>
@@ -42,9 +44,15 @@
     </div>
 
     {% if broadcasters %}
+        <div class="admin-channel-filters" hidden data-channel-filters>
+            <label>Find a channel<input type="search" data-channel-search placeholder="Name, username or Twitch ID"></label>
+            <label>Stream status<select data-channel-status><option value="all">All channels</option><option value="live">Live</option><option value="offline">Offline</option></select></label>
+            <button class="button secondary" type="button" data-channel-reset>Clear filters</button>
+        </div>
+        <p class="card-detail" data-channel-count role="status" aria-live="polite"></p>
         <div class="channel-card-grid">
             {% for broadcaster in broadcasters %}
-                <article class="channel-card">
+                <article class="channel-card" data-channel-card data-search="{{ broadcaster.name or '' }} {{ broadcaster.login or '' }} {{ broadcaster.id }}" data-live="{{ 'live' if broadcaster.is_live else 'offline' }}">
                     <div class="channel-card-header">
                         {% if broadcaster.profile_image_url %}
                             <img
@@ -77,10 +85,7 @@
                             <strong>{{ broadcaster.id }}</strong>
                         </div>
 
-                        <div>
-                            <span>Bot status</span>
-                            <strong>Connected</strong>
-                        </div>
+
                     </div>
 
                     <div class="channel-card-actions">
@@ -95,6 +100,7 @@
                             </a>
                         {% endif %}
 
+                        <a class="button secondary" href="/admin/channels/{{ broadcaster.id }}/customization">Customize</a>
                         <a class="button primary" href="/admin/channels/{{ broadcaster.id }}">
                             Manage
                         </a>
@@ -102,6 +108,7 @@
                 </article>
             {% endfor %}
         </div>
+        <div class="empty-state" data-channel-no-results hidden><h4>No matching channels</h4><p>Try another name or change the stream status filter.</p></div>
     {% else %}
         <div class="empty-state">
             <h4>No channels connected</h4>
