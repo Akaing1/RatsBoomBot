@@ -43,6 +43,28 @@ from web.state import get_bot
 from storage.incoming_raids import recent_incoming_raids
 
 router = APIRouter()
+
+
+@router.get("/channel/api/automatic-shoutouts/users")
+async def automatic_shoutout_users(request: Request, query: str = ""):
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    query = query.strip().lstrip("@").casefold()
+    if not re.fullmatch(r"[a-z0-9_]{3,25}", query):
+        return JSONResponse({"users": []}, headers={"Cache-Control": "no-store"})
+    async with context.services.db.acquire() as connection:
+        rows = await connection.fetchall(
+            "SELECT i.user_id, i.login, i.display_name FROM chatter_identities i "
+            "JOIN chatter_channel_observations o ON o.user_id = i.user_id "
+            "WHERE o.broadcaster_id = ? AND i.login LIKE ? ESCAPE '\\' ORDER BY i.login LIMIT 10",
+            (context.broadcaster_id, query.replace("_", "\\_") + "%"))
+    users = [{"id": row["user_id"], "login": row["login"], "display_name": row["display_name"]} for row in rows]
+    if not any(user["login"].casefold() == query for user in users):
+        found = await context.services.automatic_shoutouts.lookup(context.broadcaster_id, "users", login=query)
+        if found:
+            users = [{"id": found[0]["id"], "login": found[0]["login"], "display_name": found[0].get("display_name", found[0]["login"])}, *users][:10]
+    return JSONResponse({"users": users}, headers={"Cache-Control": "no-store"})
 LOGGER = logging.getLogger("RatBoomBot")
 CHAT_SEND_TARGETS = {"twitch", "youtube", "both"}
 CHAT_MESSAGE_MAX_LENGTH = 500
@@ -2423,7 +2445,14 @@ async def update_channel_customization(request: Request, setting_name: str = For
     try:
         if legacy_loyalty and services.profile_settings.get_definition(setting_name).group != LOYALTY_GROUP:
             raise ValueError("Only loyalty point names and responses can be edited here.")
-        if setting_name == "dashboard.follow_raid":
+        if setting_name == "automatic_shoutouts":
+            if action != "save":
+                raise ValueError("Choose Save Changes to update automatic shoutouts.")
+            submitted = await request.form()
+            values = {key: str(submitted[key]) for key in submitted if key.startswith("automatic_shoutouts.")}
+            await services.profile_settings.set_automatic_shoutouts(broadcaster_id, values, settings_actor(request))
+            message = "Automatic shoutout settings saved."
+        elif setting_name == "dashboard.follow_raid":
             if action != "save" or value not in {"0", "1"}:
                 raise ValueError("Choose On or Off.")
             await services.broadcaster_settings.set_follow_raid(broadcaster_id, value == "1")

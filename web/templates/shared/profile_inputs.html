@@ -53,6 +53,9 @@
 {% endif %}
 
 {% for group_name, settings in setting_groups.items() %}
+    {% if group_name == "Automatic shoutouts" and settings_notebook | default(false) %}
+        {# Rendered inside the shared Shoutouts panel below. #}
+    {% else %}
     {% set flat = flat_settings | default(false) %}
     {% if settings_notebook | default(false) and not flat %}<details class="settings-group"{% if loop.first %} open{% endif %}><summary><span class="settings-group-title">{{ group_name }}</span>{% set controls = (group_toggles | default({})).get(group_name, []) %}<span class="settings-header-switches">{% if controls | length == 1 and group_name != "Redeems" %}{{ status_switch(controls[0]) }}{% endif %}</span></summary>{% endif %}
     <section class="panel toggle-management-panel profile-settings-panel">
@@ -64,6 +67,7 @@
                 <h3>{{ group_name }}</h3>
             </div>
         </div>
+        {% if group_name == "Automatic shoutouts" %}<p>Anyone who meets all enabled requirements is eligible. With no requirements enabled, anyone qualifies. The minimum viewer count applies only to raids. The blacklist overrides every automatic trigger.</p>{% endif %}
 
         {% if group_name == "Commands" and not settings_notebook | default(false) %}
             <div class="dashboard-tabs command-customization-tabs" role="tablist" aria-label="Command customization">
@@ -93,7 +97,7 @@
                             {% endif %}
                         </div>
 
-                        {% if settings_notebook | default(false) %}<details class="settings-field-editor"><summary>Customize</summary><div class="settings-field-body">{% endif %}
+                        {% if settings_notebook | default(false) and group_name != "Shoutouts" %}<details class="settings-field-editor"><summary>Customize</summary><div class="settings-field-body">{% endif %}
                         {% if setting.definition.key == "timer_messages" %}
                             <div class="timer-message-editor" data-timer-editor>
                                 <input type="hidden" name="value" data-timer-value>
@@ -109,6 +113,19 @@
                                 </div>
                                 <button class="button secondary timer-add-button" type="button" data-add-timer>+ Add Timer</button>
                             </div>
+                        {% elif setting.definition.value_type == "toggle" %}
+                            <select class="profile-setting-input" name="value" aria-label="{{ setting.definition.label }}"><option value="1"{% if setting.effective_value %} selected{% endif %}>On</option><option value="0"{% if not setting.effective_value %} selected{% endif %}>Off</option></select>
+                        {% elif setting.definition.value_type == "usernames" %}
+                            {% if settings_notebook | default(false) %}
+                            <div data-shoutout-user-list data-search-url="{{ channel_root | default('/channel') }}/api/automatic-shoutouts/users">
+                            {% endif %}
+                                <textarea class="profile-setting-input" name="value" rows="4" maxlength="4000" aria-label="{{ setting.definition.label }}">{{ setting.effective_value }}</textarea>
+                            {% if settings_notebook | default(false) %}
+                                <label>Add a Twitch user<input class="profile-setting-input" type="search" data-shoutout-user-query list="users-{{ setting.definition.key | replace('.', '-') }}" autocomplete="off" maxlength="25" placeholder="Search username…"></label>
+                                <datalist id="users-{{ setting.definition.key | replace('.', '-') }}" data-shoutout-user-options></datalist>
+                                <button class="button secondary" type="button" data-shoutout-user-add>Add user</button><p data-shoutout-user-status role="status"></p>
+                            </div>
+                            {% endif %}
                         {% elif setting.definition.value_type == "integer" %}
                             <input class="profile-setting-input" type="number" name="value" value="{{ (setting.override_value if setting.override_value is not none else '') if settings_notebook | default(false) else setting.effective_value }}" placeholder="{{ setting.default_value }}" aria-label="{{ setting.definition.label }}" min="{{ setting.definition.minimum }}" max="{{ setting.definition.maximum }}">
                         {% elif setting.definition.rows == 1 %}
@@ -126,7 +143,7 @@
                                 <button class="button secondary" type="submit" name="action" value="reset">Use Default</button>
                             {% endif %}
                         </div>
-                        {% if settings_notebook | default(false) %}</div></details>{% endif %}
+                        {% if settings_notebook | default(false) and group_name != "Shoutouts" %}</div></details>{% endif %}
                     </form>
                 </article>
             {% endfor %}
@@ -139,6 +156,10 @@
             </div>
         {% endif %}
         {% if settings_notebook | default(false) and group_name == "Raid messages" %}{% include "channel/settings_dashboard.html" %}{% endif %}
+        {% if settings_notebook | default(false) and group_name == "Shoutouts" %}
+            {% with settings=setting_groups.get('Automatic shoutouts', []) %}{% if settings %}{% include "channel/settings_automatic_shoutouts.html" %}{% endif %}{% endwith %}
+        {% endif %}
     </section>
     {% if settings_notebook | default(false) and not flat %}</details>{% endif %}
+    {% endif %}
 {% endfor %}

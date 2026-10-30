@@ -64,7 +64,10 @@ def test_notebook_renders_existing_forms_once_and_honors_deep_link():
             if name in ('League of Legends', 'Overwatch'):
                 continue
             for entry in entries:
-                assert html.count(f'name="setting_name" value="{entry.definition.key}"') == 1
+                if entry.definition.key.startswith('automatic_shoutouts.'):
+                    assert html.count(f'data-setting-key="{entry.definition.key}"') == 1
+                else:
+                    assert html.count(f'name="setting_name" value="{entry.definition.key}"') == 1
     finally:
         clear_profiles()
 

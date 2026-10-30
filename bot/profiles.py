@@ -161,6 +161,31 @@ class ShoutoutMessages:
 
 
 @dataclass(frozen=True)
+class AutomaticShoutouts:
+    raid: int = 1
+    chat: int = 0
+    redeem: int = 0
+    subscription: int = 0
+    gift: int = 0
+    bits: int = 0
+    streak: int = 0
+    require_following: int = 0
+    require_team: int = 0
+    require_partner: int = 0
+    require_list: int = 0
+    minimum_viewers: int = 0
+    minimum_bits: int = 1
+    minimum_gifts: int = 1
+    cooldown_minutes: int = 60
+    native: int = 1
+    chat_message: int = 1
+    users: str = ""
+    blacklist: str = ""
+    raid_message: str = ""
+    event_message: str = ""
+
+
+@dataclass(frozen=True)
 class SocialMessages:
     overview: str = "Discord: {discord_url} | YouTube: {youtube_url}"
     discord: str = "Join the community on Discord: {discord_url}"
@@ -415,6 +440,7 @@ class ChannelProfile:
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
     shoutout_messages: ShoutoutMessages = ShoutoutMessages()
+    automatic_shoutouts: AutomaticShoutouts = AutomaticShoutouts()
     social_messages: SocialMessages = SocialMessages()
     first_chat_shoutouts: tuple[FirstChatShoutout, ...] = ()
     clips: ClipConfig = ClipConfig()

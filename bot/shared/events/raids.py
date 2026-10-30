@@ -4,7 +4,7 @@ import time
 from twitchio.ext import commands
 
 from bot.profiles import FeatureName, get_active_profile, render_profile_message
-from bot.shared.commands.shoutout import send_shoutout_message
+from bot.services.stream.automatic_shoutouts import automatic_shoutout
 from storage.incoming_raids import record_incoming_raid
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -105,6 +105,7 @@ class RaidEvents(commands.Component):
         )
 
         if not services.features.is_enabled(broadcaster_id, FeatureName.RAID_RESPONSES):
+            await automatic_shoutout(self.bot, broadcaster_id, raider_id, raider_name, "raid", viewer_count)
             LOGGER.debug(
                 "[Events] Raid responses are disabled for %s (%s).",
                 broadcaster_name,
@@ -156,33 +157,4 @@ class RaidEvents(commands.Component):
                 broadcaster_id
             )
 
-        queued, response, position = services.shoutouts.enqueue(broadcaster_id=broadcaster_id, user_id=raider_id,
-                                                                username=raider_name, requested_by="raid")
-
-        if queued:
-            LOGGER.info(
-                "[Shoutouts] Raider %s (%s) was added to broadcaster %s shoutout queue at position %d.",
-                raider_name,
-                raider_id,
-                broadcaster_id,
-                position
-            )
-        else:
-            LOGGER.info(
-                "[Shoutouts] Native shoutout was not queued for raider %s (%s) in broadcaster %s: %s",
-                raider_name,
-                raider_id,
-                broadcaster_id,
-                response
-            )
-
-        try:
-            await send_shoutout_message(self.bot, broadcaster_id, raider_name)
-        except Exception:
-            LOGGER.exception(
-                "[Events] Failed to send shoutout for raider %s in %s (%s).",
-                raider_name,
-                broadcaster_name,
-                broadcaster_id
-            )
-            raise
+        await automatic_shoutout(self.bot, broadcaster_id, raider_id, raider_name, "raid", viewer_count)

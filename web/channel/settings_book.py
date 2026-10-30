@@ -12,6 +12,7 @@ SECTIONS = (
 )
 
 GROUP_SECTION = {
+    "Automatic shoutouts": "events",
     "Commands": "chat", "Loyalty points": "loyalty", "Timers": "timers",
     "Community messages": "events", "Raid messages": "events", "Shoutouts": "events", "Redeems": "events",
     "League of Legends": "games", "Overwatch": "games", "Raid boss names": "pets", "Raid item names": "pets",
