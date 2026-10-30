@@ -45,6 +45,8 @@ from .v074_retire_view_role import migrate as migrate_074
 from .v073_moderator_authorization import migrate as migrate_073
 from .v072_moderator_dashboard import migrate as migrate_072
 
+from .v076_release_16_draft import migrate as migrate_076
+
 MIGRATIONS = (
     Migration(1, "initial_schema", migrate_001),
     Migration(2, "redeem_stats", migrate_002),
@@ -82,4 +84,5 @@ MIGRATIONS = (
     Migration(72, "moderator_dashboard", migrate_072),
     Migration(73, "moderator_authorization", migrate_073),
     Migration(74, "retire_view_role", migrate_074),
+    Migration(76, "release_16_draft", migrate_076),
 )
