@@ -15,11 +15,11 @@ def test_root_is_the_public_landing_page() -> None:
     assert response.status_code == 200
     assert "An all-in-one bot tailored to your needs" in response.text
     assert "What’s new in RatsBoomBot." in response.text
-    assert "v12.2.0" in response.text
-    assert "The streamer dashboard gets sharper" in response.text
-    assert "v12.0.0" in response.text
-    assert "Twitch and YouTube chat come together" in response.text
-    assert "Highlights of the last few patches~" in response.text
+    assert "Your dashboard, shared with your team" in response.text
+    assert "Discover, save, and revisit" in response.text
+    assert "Pets and a home for your community profile" in response.text
+    assert "v15–16" in response.text
+    assert "!pets summon" in response.text
     assert 'href="/patch-notes"' in response.text
     assert "https://github.com/Akaing1/RatsBoomBot/releases" not in response.text
     assert '<details class="landing-feature-card">' in response.text
