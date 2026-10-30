@@ -80,5 +80,3 @@ Settings now has category navigation and a search finder on the right, leaving m
 - Preserved the Mod Bar when returning from a community profile and made headers and navigation more consistent across public pages.
 - Reorganized database migrations and shared service code, including loyalty and viewer queue packages, to make future maintenance easier.
 - Added performance history for reviewing resource usage over time.
-
-The earlier memory-related interruptions are still being monitored. These changes do not claim a confirmed memory-leak fix.
