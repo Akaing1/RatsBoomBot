@@ -1,0 +1,7 @@
+/* Reuse the streamer settings notebook without its full-viewport shell. */
+.admin-page .admin-channel-settings { height: auto; min-height: 0; overflow: visible; }
+.admin-page .admin-channel-settings .settings-workspace { overflow: visible; align-items: flex-start; }
+.admin-page .admin-channel-settings .settings-pages { overflow: visible; }
+.admin-page .admin-channel-settings .settings-tools { position: sticky; top: 16px; max-height: calc(100dvh - 32px); }
+.admin-settings-reset-form { display: inline-block; margin: 12px 8px 0 0; }
+@media (max-width: 900px) { .admin-page .admin-channel-settings .settings-tools { position: static; max-height: none; } }

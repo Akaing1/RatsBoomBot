@@ -1,0 +1,13 @@
+.admin-monitor { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr); gap: 20px; }
+.admin-monitor .panel { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.admin-monitor-player { aspect-ratio: 16 / 9; min-height: 220px; }
+.admin-monitor-player > div { width: 100%; height: 100%; }
+.admin-monitor .live-chat-feed { height: 420px; overflow: auto; }
+.admin-monitor-commands .live-chat-feed { height: 300px; }
+.admin-monitor-feeds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.admin-monitor-feed { max-height: 360px; overflow: auto; }
+.admin-monitor-feed article { padding: 12px 0; border-bottom: 1px solid var(--border, #343644); }
+.admin-monitor-feed p { margin: 6px 0; color: var(--muted); }
+.admin-monitor :focus-visible { outline: 2px solid #b390ff; outline-offset: 3px; }
+@media (max-width: 1100px) { .admin-monitor { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 700px) { .admin-monitor-feeds { grid-template-columns: minmax(0, 1fr); } }

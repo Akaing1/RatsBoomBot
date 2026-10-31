@@ -84,8 +84,10 @@ async def test_admin_customization_save_reset_and_csrf(monkeypatch):
 
 
 def test_shared_editor_uses_admin_action_and_timer_script():
-    html = templates.env.get_template("admin/channel_customization.html").render(
+    html = templates.env.get_template("admin/channel_settings.html").render(
         broadcaster=SimpleNamespace(id="123", name="Test"), administrator=None,
+        request=SimpleNamespace(query_params={}), channel_root="/admin/channels/123", channel_section="settings",
+        settings_sections=channels.build_settings_sections({}, {}, {}, {}, {}), profile_features={}, chat_identity={},
         url_for=lambda *args, **kwargs: "/static/css/style.css",
         customization_action="/admin/channels/123/customization", csrf_token="csrf",
         setting_groups={}, channel_settings=SimpleNamespace(discord_url="", youtube_url="")
@@ -96,8 +98,10 @@ def test_shared_editor_uses_admin_action_and_timer_script():
 
 
 def test_admin_customization_uses_admin_protected_user_endpoints_and_script():
-    html = templates.env.get_template("admin/channel_customization.html").render(
+    html = templates.env.get_template("admin/channel_settings.html").render(
         active_page="channels", broadcaster=SimpleNamespace(id="123", name="Test"), administrator=None,
+        request=SimpleNamespace(query_params={}), channel_root="/admin/channels/123", channel_section="settings",
+        settings_sections=channels.build_settings_sections({}, {}, {}, {}, {}), profile_features={}, chat_identity={},
         url_for=lambda *args, **kwargs: kwargs.get("path", "/static/resource"),
         deployment_stamp=lambda: "test",
         customization_action="/admin/channels/123/customization", csrf_token="csrf",
@@ -111,7 +115,7 @@ def test_admin_customization_uses_admin_protected_user_endpoints_and_script():
     assert 'data-search-url="/admin/channels/123/protected-users/search"' in html
     assert 'action="/admin/channels/123/protected-users/add"' in html
     assert "protected-users.js" in html
-    assert 'data-command-panel="protected"' in html
+    assert '<summary>Protected users</summary>' in html
 
 
 @pytest.mark.asyncio

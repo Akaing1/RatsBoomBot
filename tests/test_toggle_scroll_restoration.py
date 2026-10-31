@@ -5,11 +5,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_admin_channel_toggles_preserve_scroll_position() -> None:
-    template = (PROJECT_ROOT / "web/templates/admin/channel_details.html").read_text(encoding="utf-8")
-
-    assert "data-preserve-scroll" in template
-    assert "window.sessionStorage.setItem(scrollKey" in template
-    assert "window.scrollTo(0, Number(savedScroll))" in template
+    template = (PROJECT_ROOT / "web/templates/admin/channel_settings.html").read_text(encoding="utf-8")
+    assert "channel-settings.js" in template
+    assert 'data-channel="admin:{{ broadcaster.id }}"' in template
 
 
 def test_streamer_settings_preserve_tab_and_panel_scroll() -> None:
@@ -20,10 +18,10 @@ def test_streamer_settings_preserve_tab_and_panel_scroll() -> None:
 
 
 def test_admin_feature_page_lists_unique_profile_integrations() -> None:
-    template = (PROJECT_ROOT / "web/templates/admin/channel_details.html").read_text(encoding="utf-8")
+    template = (PROJECT_ROOT / "web/templates/admin/channel_access_controls.html").read_text(encoding="utf-8")
 
     assert "Unique Features" in template
-    assert '"profile_feature"' in template
+    assert '"capability"' in template
     assert "League of Legends" in template
     assert "Overwatch" in template
     assert "Premium feature" in template
@@ -35,10 +33,10 @@ def test_admin_channel_navigation_has_three_sections() -> None:
     navigation = (PROJECT_ROOT / "web/templates/admin/channel_page_switch.html").read_text(encoding="utf-8")
 
     assert ">Overview</a>" in navigation
-    assert "/features" in navigation
-    assert ">Features</a>" in navigation
-    assert "/customization" in navigation
-    assert ">Customization</a>" in navigation
+    assert "('settings', 'Settings')" in navigation
+    assert "('monitor', 'Monitor')" in navigation
+    assert "/features" not in navigation
+    assert "/customization" not in navigation
     assert "channel-page-switch" not in navigation
 
 
