@@ -3,13 +3,13 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from web.shared.markdown import render_markdown
 
 
-def render(notes):
+def render(notes, editing_note=None):
     env = Environment(loader=FileSystemLoader('web/templates'), autoescape=select_autoescape())
     env.filters['markdown'] = render_markdown
     env.globals.update(url_for=lambda name, path: '/' + name + path,
                        deployment_stamp=lambda: 'test', app_version='17.0.1')
     return env.get_template('admin/patch_notes.html').render(
-        active_page='patch_notes', administrator=None, csrf_token='test-token', notes=notes)
+        active_page='patch_notes', administrator=None, csrf_token='test-token', notes=notes, editing_note=editing_note)
 
 
 def note(**changes):
@@ -42,3 +42,15 @@ def test_empty_archive_still_allows_creating_a_draft():
     html = render([])
     assert 'No patch notes yet' in html
     assert 'action="/admin/patch-notes/save"' in html
+
+
+def test_editor_prefills_content_without_breaking_textarea_and_keeps_slug():
+    editing = note(body='</textarea><script>bad()</script>', published_at='2026-10-30')
+    html = render([editing], editing_note=editing)
+    assert 'action="/admin/patch-notes/test-note/edit"' in html
+    assert '&lt;/textarea&gt;&lt;script&gt;' in html
+    assert '<script>' not in html
+    assert 'Save changes' in html
+    assert 'Saving updates the public note immediately.' in html
+    assert 'action="/admin/patch-notes/test-note/delete"' in html
+    assert 'Existing Discord announcements remain.' in html
