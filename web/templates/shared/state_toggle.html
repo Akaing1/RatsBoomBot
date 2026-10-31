@@ -1,0 +1,3 @@
+{% macro state_toggle_contents(enabled, on='Enabled', off='Disabled', turn_on='Enable', turn_off='Disable') %}
+<span class="state-toggle-current queue-state-current">{{ on if enabled else off }}</span><span class="state-toggle-alternate queue-state-alternate" aria-hidden="true">{{ turn_off if enabled else turn_on }}</span>
+{% endmacro %}

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from dataclasses import replace
 
 from bot.profiles import FeatureName, get_active_profile
 from bot.timer_messages import TimerMessage, normalize_timer
@@ -9,8 +10,6 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 
 class TimerService:
-    INTERVAL_SECONDS = 30 * 60
-    REQUIRED_MESSAGES = 20
     CHECK_EVERY_SECONDS = 5
 
     def __init__(self, bot, broadcasters, broadcaster_settings):
@@ -20,8 +19,7 @@ class TimerService:
         self._task: asyncio.Task | None = None
 
         self.message_counts: dict[str, int] = {}
-        self.last_announcements: dict[str, float] = {}
-        self.message_indexes: dict[str, int] = {}
+        self.timer_progress: dict[str, dict[tuple[TimerMessage, int], tuple[float, int]]] = {}
         self.last_check = 0
 
     async def start(self) -> None:
@@ -67,15 +65,12 @@ class TimerService:
         if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.TIMERS):
             return
 
-        now = time.time()
         self.message_counts[broadcaster_id] = self.message_counts.get(broadcaster_id, 0) + 1
-        self.last_announcements.setdefault(broadcaster_id, now)
         LOGGER.debug(
-            "[Timers] Tracked message for %s (%s). Count: %d/%d.",
+            "[Timers] Tracked message for %s (%s). Count: %d.",
             broadcaster_name,
             broadcaster_id,
-            self.message_counts[broadcaster_id],
-            self.REQUIRED_MESSAGES
+            self.message_counts[broadcaster_id]
         )
 
     async def announcement_loop(self) -> None:
@@ -139,65 +134,35 @@ class TimerService:
                 )
                 continue
 
-            last_announcement = self.last_announcements.get(broadcaster_id, now)
-            message_count = self.message_counts.get(broadcaster_id, 0)
-            elapsed = now - last_announcement
-
-            if elapsed < self.INTERVAL_SECONDS:
+            profile = get_active_profile(broadcaster_id)
+            if profile is None:
                 continue
+            count = self.message_counts.get(broadcaster_id, 0)
+            progress = self.timer_progress.setdefault(broadcaster_id, {})
+            occurrences: dict[TimerMessage, int] = {}
+            active = set()
+            for entry in profile.timer_messages:
+                timer = normalize_timer(entry)
+                messages = self.get_messages((timer,), settings)
+                if not messages:
+                    continue
+                occurrence = occurrences.get(timer, 0)
+                occurrences[timer] = occurrence + 1
+                key = (timer, occurrence)
+                active.add(key)
+                last_sent, last_count = progress.setdefault(key, (now, count))
+                if now - last_sent < timer.interval_minutes * 60:
+                    continue
+                if timer.require_active_chat and count - last_count < timer.minimum_messages:
+                    continue
+                if await self.send_announcement(broadcaster_id, broadcaster_name, messages[0]):
+                    progress[key] = (now, count)
+            for key in progress.keys() - active:
+                del progress[key]
 
-            if message_count < self.REQUIRED_MESSAGES:
-                LOGGER.debug(
-                    "[Timers] %s has %d/%d required messages for an announcement.",
-                    broadcaster_name,
-                    message_count,
-                    self.REQUIRED_MESSAGES
-                )
-                continue
-
-            sent = await self.send_next_announcement(broadcaster_id, broadcaster_name)
-
-            if not sent:
-                continue
-
-            self.message_counts[broadcaster_id] = 0
-            self.last_announcements[broadcaster_id] = now
-
-    async def send_next_announcement(self, broadcaster_id: str, broadcaster_name: str) -> bool:
-        broadcaster_id = str(broadcaster_id)
-
+    async def send_announcement(self, broadcaster_id: str, broadcaster_name: str, message: TimerMessage) -> bool:
         if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.TIMERS):
-            LOGGER.debug(
-                "[Timers] Skipped announcement because timers are disabled for %s (%s).",
-                broadcaster_name,
-                broadcaster_id
-            )
             return False
-
-        settings = await self.broadcaster_settings.get_settings(broadcaster_id)
-        profile = get_active_profile(broadcaster_id)
-
-        if profile is None:
-            LOGGER.warning(
-                "[Timers] No active channel profile is available for %s (%s).",
-                broadcaster_name,
-                broadcaster_id
-            )
-            return False
-
-        messages = self.get_messages(profile.timer_messages, settings)
-
-        if not messages:
-            LOGGER.debug(
-                "[Timers] No timer messages are available for %s (%s).",
-                broadcaster_name,
-                broadcaster_id
-            )
-            return False
-
-        index = self.message_indexes.get(broadcaster_id, 0)
-        message = messages[index % len(messages)]
-
         try:
             channel = self.bot.create_partialuser(broadcaster_id)
             delivery = message.kind
@@ -217,8 +182,6 @@ class TimerService:
                 broadcaster_id
             )
             return False
-
-        self.message_indexes[broadcaster_id] = index + 1
 
         LOGGER.info(
             "[Timers] Sent announcement to %s (%s): %s",
@@ -257,6 +220,6 @@ class TimerService:
                 continue
 
             if message:
-                messages.append(TimerMessage(message, timer.kind, timer.color))
+                messages.append(replace(timer, message=message))
 
         return messages

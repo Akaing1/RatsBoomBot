@@ -1,0 +1,170 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const {execFileSync} = require('node:child_process');
+let chromium;
+try { ({chromium} = require('playwright')); } catch (_) {}
+const executablePath = process.env.CHAT_TEST_BROWSER_PATH || chromium?.executablePath();
+
+test('timer saves and cancels are isolated and deletion requires sliding confirmation', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const python = process.env.PYTHON || (process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python');
+    const editor = execFileSync(fs.existsSync(python) ? path.resolve(python) : 'python', ['-c', `
+from types import SimpleNamespace
+from bot.timer_messages import TimerMessage
+from web.shared.common import templates
+timers = (TimerMessage('First', interval_minutes=5, require_active_chat=False, minimum_messages=7), TimerMessage('Second', interval_minutes=15, minimum_messages=30))
+print(templates.env.get_template('channel/settings_timers.html').render(timer_setting=SimpleNamespace(timer_entries=timers), csrf_token='test'))
+`], {encoding: 'utf8'});
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage({reducedMotion: 'reduce'});
+        await page.route('http://settings.test/**', route => route.fulfill({body: '<html></html>', contentType: 'text/html'}));
+        await page.goto('http://settings.test/channel/settings?section=timers');
+        await page.setContent(`<body class="channel-page-settings"><div data-settings-book data-selected="timers"><nav><details class="settings-menu-section" open><summary><a data-settings-tab="timers">Timers</a><span class="settings-dirty-dot" hidden></span></summary></details></nav><main class="settings-main settings-pages"><section class="settings-page" data-settings-page="timers">${editor}</section></main></div></body>`);
+        await page.addStyleTag({path: 'web/static/css/style.css'});
+        await page.addStyleTag({path: 'web/static/css/channel-settings.css'});
+        await page.evaluate(() => document.querySelector('form').addEventListener('submit', event => {
+            event.preventDefault();
+            const form = event.target;
+            const book = form.closest('[data-settings-book]');
+            const data = new FormData(form);
+            book.dispatchEvent(new CustomEvent('settings-build-save', {detail: {form, data}}));
+            window.submittedTimers = JSON.parse(data.get('value'));
+            window.timerSaveCount = (window.timerSaveCount || 0) + 1;
+            if (window.deferTimerSave) {
+                window.finishTimerSave = () => book.dispatchEvent(new CustomEvent('settings-saved', {detail: {form, snapshot: JSON.stringify([...data])}}));
+                return;
+            }
+            if (window.failNextTimerSave) {
+                window.failNextTimerSave = false;
+                book.dispatchEvent(new CustomEvent('settings-save-failed', {detail: {form}}));
+            } else book.dispatchEvent(new CustomEvent('settings-saved', {detail: {form, snapshot: JSON.stringify([...data])}}));
+        }));
+        for (const file of ['settings-timers.js', 'channel-settings.js']) await page.addScriptTag({path: `web/static/js/${file}`});
+        const rows = page.locator('[data-timer-list] .settings-timer-row');
+        const save = rows.nth(0).locator('[data-save-timer]');
+        const cancel = rows.nth(0).locator('[data-cancel-timer]');
+        assert.equal(await rows.count(), 2);
+        assert.equal(await page.locator('[role="switch"]').evaluateAll(buttons => buttons.every(button => button.classList.contains('state-toggle') && button.querySelector('.state-toggle-current') && button.querySelector('.state-toggle-alternate'))), true);
+        assert.equal(await rows.nth(0).locator('[data-timer-interval]').inputValue(), '5');
+        assert.equal(await rows.nth(0).locator('[data-timer-require-chat]').isChecked(), false);
+        assert.equal(await save.isVisible(), false);
+        await page.evaluate(() => { window.deferTimerSave = true; });
+        await rows.nth(0).locator('[data-toggle-timer]').click();
+        assert.equal(await save.isVisible(), false, 'Immediate toggle saves never reveal draft actions while pending');
+        await page.evaluate(() => { window.finishTimerSave(); window.deferTimerSave = false; });
+        assert.equal(await save.isVisible(), false);
+        await rows.nth(0).locator('[data-toggle-timer]').click();
+        await page.evaluate(() => { window.failNextTimerSave = true; });
+        await rows.nth(0).locator('[data-toggle-timer]').click();
+        assert.equal(await rows.nth(0).locator('[data-toggle-timer]').getAttribute('aria-checked'), 'true');
+        assert.equal(await save.isVisible(), false, 'A failed toggle restores its state without revealing draft actions');
+        await rows.nth(0).locator('[data-timer-interval]').fill('8');
+        assert.equal(await save.isVisible(), true);
+        assert.equal(await cancel.isVisible(), true);
+        await rows.nth(0).locator('[data-timer-interval]').fill('5');
+        assert.equal(await save.isVisible(), false);
+        assert.equal(await cancel.isVisible(), false);
+        await rows.nth(1).locator('[data-timer-message]').fill('Unsaved second');
+        await rows.nth(0).locator('[data-toggle-timer-chat]').click();
+        assert.equal(await rows.nth(0).locator('[data-toggle-timer-chat] .state-toggle-current').textContent(), 'On');
+        assert.equal(await rows.nth(0).locator('[data-toggle-timer-chat] .state-toggle-alternate').textContent(), 'Off');
+        await save.click();
+        let submitted = await page.evaluate(() => submittedTimers);
+        assert.deepEqual(submitted.map(row => row.slice(4)), [[5, true, 7], [15, true, 30]]);
+        assert.equal(submitted[1][0], 'Second');
+        assert.equal(await rows.nth(1).locator('[data-timer-message]').inputValue(), 'Unsaved second');
+        assert.equal(await rows.nth(1).locator('[data-save-timer]').isVisible(), true);
+        assert.equal(await save.isVisible(), false);
+        await rows.nth(1).locator('[data-cancel-timer]').click();
+        assert.equal(await rows.nth(1).locator('[data-timer-message]').inputValue(), 'Second');
+        await rows.nth(0).locator('[data-timer-message]').fill('Unsaved first');
+        await rows.nth(0).locator('[data-toggle-timer]').click();
+        submitted = await page.evaluate(() => submittedTimers);
+        assert.equal(submitted[0][0], 'First');
+        assert.equal(submitted[0][3], false);
+        assert.equal(await rows.nth(0).locator('[data-timer-message]').inputValue(), 'Unsaved first');
+        await cancel.click();
+        assert.equal(await rows.nth(0).locator('[data-timer-message]').inputValue(), 'First');
+        assert.equal(await rows.nth(0).locator('[data-toggle-timer]').getAttribute('aria-checked'), 'false');
+        await rows.nth(0).locator('[data-timer-interval]').fill('0');
+        const beforeInvalid = await page.evaluate(() => timerSaveCount);
+        await save.click();
+        assert.equal(await page.evaluate(() => timerSaveCount), beforeInvalid);
+        await rows.nth(1).locator('[data-timer-minimum-messages]').fill('31');
+        await rows.nth(1).locator('[data-save-timer]').click();
+        submitted = await page.evaluate(() => submittedTimers);
+        assert.equal(submitted[0][4], 5);
+        assert.equal(submitted[1][6], 31);
+        assert.equal(await rows.nth(0).locator('[data-timer-interval]').inputValue(), '0');
+        await cancel.click();
+        await page.locator('[data-new-message]').fill('Third');
+        await page.locator('[data-new-kind]').selectOption('announcement');
+        await page.locator('[data-new-interval]').fill('20');
+        await page.locator('[data-toggle-new-chat]').click();
+        await page.locator('[data-new-minimum-messages]').fill('12');
+        await page.locator('[data-create-timer]').click();
+        assert.equal(await rows.count(), 3);
+        submitted = await page.evaluate(() => submittedTimers);
+        assert.deepEqual(submitted[2], ['Third', 'announcement', 'primary', true, 20, false, 12]);
+        assert.deepEqual(submitted[1], ['Second', 'message', 'primary', true, 15, true, 31]);
+        const layout = await rows.nth(2).evaluate(row => {
+            const message = row.querySelector('[data-timer-message]').getBoundingClientRect();
+            const toggle = row.querySelector('[data-toggle-timer]').getBoundingClientRect();
+            const controls = [...row.querySelector('.settings-timer-controls').children].filter(node => !node.hidden).map(node => node.getBoundingClientRect());
+            return {height: row.getBoundingClientRect().height, rowRight: row.getBoundingClientRect().right, toggleRight: toggle.right, messageBottom: message.bottom, toggleTop: toggle.top, messageTop: message.top, toggleLeft: toggle.left, messageRight: message.right, controlsTop: Math.min(...controls.map(bounds => bounds.top)), bottoms: controls.map(bounds => bounds.bottom)};
+        });
+        assert.ok(layout.height < 170);
+        assert.ok(layout.messageBottom < layout.controlsTop);
+        assert.ok(Math.max(...layout.bottoms) - Math.min(...layout.bottoms) < 1, 'All controls fit on one row');
+        assert.ok(Math.abs(layout.toggleTop - layout.messageTop) < 1);
+        assert.ok(layout.toggleLeft > layout.messageRight);
+        assert.ok(layout.toggleRight < layout.rowRight, 'Toggle remains inside the timer row');
+        const deleteButton = await rows.nth(2).locator('[data-remove-timer]').boundingBox();
+        assert.ok(Math.abs(deleteButton.y - layout.messageTop) < 1);
+        assert.ok(deleteButton.x > layout.toggleRight);
+        await page.setViewportSize({width: 390, height: 844});
+        const mobile = await rows.nth(2).evaluate(row => ({rowRight: row.getBoundingClientRect().right, toggleRight: row.querySelector('[data-toggle-timer]').getBoundingClientRect().right}));
+        assert.ok(mobile.toggleRight < mobile.rowRight, 'Toggle remains inside the row on mobile');
+        await page.setViewportSize({width: 1280, height: 720});
+        const cleanControls = await rows.nth(2).locator('.settings-timer-controls').boundingBox();
+        await rows.nth(2).locator('[data-timer-message]').fill('Third edited');
+        const dirtyBottoms = await rows.nth(2).evaluate(row => [...row.querySelector('.settings-timer-controls').children].filter(node => !node.hidden).map(node => node.getBoundingClientRect().bottom));
+        assert.ok(Math.max(...dirtyBottoms) - Math.min(...dirtyBottoms) < 1, 'The controls remain on one row');
+        const dirtyControls = await rows.nth(2).locator('.settings-timer-controls').boundingBox();
+        const footer = await rows.nth(2).locator('[data-timer-edit-actions]').boundingBox();
+        assert.equal(dirtyControls.width, cleanControls.width);
+        assert.ok(footer.y >= dirtyControls.y + dirtyControls.height, 'Actions appear below the controls');
+        assert.ok(Math.abs(footer.x + footer.width - deleteButton.x - deleteButton.width) < 1, 'Actions align with the same right edge');
+        await rows.nth(2).locator('[data-cancel-timer]').click();
+        await page.emulateMedia({reducedMotion: 'no-preference'});
+        await rows.nth(2).locator('[data-timer-message]').fill('Animated edit');
+        const actions = rows.nth(2).locator('[data-timer-edit-actions]');
+        assert.ok(await actions.evaluate(node => { void getComputedStyle(node).width; return node.getAnimations().length > 0; }));
+        assert.equal(await rows.nth(2).locator('[data-remove-timer]').isVisible(), true);
+        await rows.nth(2).locator('[data-cancel-timer]').click();
+        assert.ok(await actions.evaluate(node => { void getComputedStyle(node).width; return node.getAnimations().length > 0; }));
+        await page.waitForFunction(() => getComputedStyle(document.querySelectorAll('[data-timer-edit-actions]')[2]).visibility === 'hidden');
+        await page.emulateMedia({reducedMotion: 'reduce'});
+        const savesBeforeDelete = await page.evaluate(() => timerSaveCount);
+        await rows.nth(0).locator('[data-remove-timer]').click();
+        assert.equal(await rows.nth(0).evaluate(row => row.classList.contains('is-delete-pending')), true);
+        assert.equal(await rows.count(), 3);
+        assert.equal(await page.evaluate(() => timerSaveCount), savesBeforeDelete);
+        await rows.nth(1).locator('[data-timer-message]').click();
+        assert.equal(await rows.nth(0).evaluate(row => row.classList.contains('is-delete-pending')), false);
+        await rows.nth(0).locator('[data-remove-timer]').click();
+        await page.keyboard.press('Escape');
+        assert.equal(await rows.nth(0).evaluate(row => row.classList.contains('is-delete-pending')), false);
+        await page.evaluate(() => { window.failNextTimerSave = true; });
+        await rows.nth(0).locator('[data-remove-timer]').click();
+        await rows.nth(0).locator('[data-confirm-remove-timer]').click();
+        assert.equal(await rows.count(), 3);
+        await rows.nth(0).locator('[data-remove-timer]').click();
+        await rows.nth(0).locator('[data-confirm-remove-timer]').click();
+        assert.equal(await rows.count(), 2);
+        assert.equal(await rows.nth(0).locator('[data-timer-message]').inputValue(), 'Second');
+        assert.deepEqual((await page.evaluate(() => submittedTimers)).map(value => value[0]), ['Second', 'Third']);
+    } finally { await browser.close(); }
+});

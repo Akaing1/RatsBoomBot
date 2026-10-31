@@ -418,7 +418,7 @@ html.raid-browser-open { overflow: hidden; }
 .raid-browser-tag-input-row { display: grid; grid-template-columns: minmax(0,1fr) 66px; align-items: start; gap: 8px; }
 .raid-browser-tag-input-row > label { min-width: 0; }
 .raid-browser-tag-match { display: flex; min-width: 0; flex-direction: column; gap: 7px; }
-.raid-browser-tag-match .queue-state-toggle { min-width: 0; width: 100%; height: 38px; }
+.raid-browser-tag-match :is(.state-toggle,.queue-state-toggle) { min-width: 0; width: 100%; height: 38px; }
 .raid-browser-tag-match button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .raid-browser-tag-input-row input, .raid-browser-tag-input-row select { box-sizing: border-box; width: 100%; min-width: 0; }
 .raid-browser-filters .raid-browser-tag-limit { color: var(--danger); }
@@ -1989,16 +1989,21 @@ body.landing-page {
 .queue-panel-header { gap: 8px; }
 .queue-panel-header h3 { min-width: 0; }
 .queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-left: auto; padding: 5px 9px; border: 0; border-radius: 7px; background: var(--surface-raised); color: var(--text); font-size: 13px; font-weight: 800; line-height: 1.3; white-space: nowrap; }
-.queue-state-toggle { position: relative; min-width: 70px; height: 34px; overflow: hidden; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-raised); color: var(--muted); font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; transition: border-color .32s ease, background-color .32s ease, color .32s ease; }
-.queue-state-toggle:not(.live):hover, .queue-state-toggle:not(.live):focus-visible { border-color: rgba(139,92,246,.7); background: rgba(139,92,246,.18); color: #ddd6fe; }
-.queue-state-toggle.live { border-color: rgba(53,196,106,.4); background: rgba(53,196,106,.1); color: var(--success); }
-.queue-state-toggle span { position: relative; z-index: 2; display: block; transition: transform .22s ease, opacity .22s ease; }
-.queue-state-toggle .queue-state-alternate { position: absolute; top: 50%; right: 0; left: 0; transform: translateY(130%); opacity: 0; }
-.queue-state-toggle:hover .queue-state-current, .queue-state-toggle:focus-visible .queue-state-current { transform: translateY(-130%); opacity: 0; }
-.queue-state-toggle:hover .queue-state-alternate, .queue-state-toggle:focus-visible .queue-state-alternate { transform: translateY(-50%); opacity: 1; }
-.queue-state-toggle::after { position: absolute; z-index: 1; bottom: -5px; left: 14px; width: 3px; height: 3px; border-radius: 50%; background: currentColor; box-shadow: 11px 3px currentColor, 23px -1px currentColor, 34px 4px currentColor, 43px 0 currentColor; content: ""; opacity: 0; }
-.queue-state-toggle:hover::after, .queue-state-toggle:focus-visible::after { animation: queue-dust-rise .65s ease-out infinite; }
-@keyframes queue-dust-rise { 0% { transform: translateY(4px) scale(.7); opacity: 0; } 25% { opacity: .55; } 100% { transform: translateY(-30px) scale(.2); opacity: 0; } }
+:is(.state-toggle,.queue-state-toggle) { position: relative; display: inline-grid; place-items: center; vertical-align: middle; min-width: 70px; height: 34px; overflow: hidden; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-raised); color: var(--muted); font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; transition: border-color .32s ease, background-color .32s ease, color .32s ease; }
+:is(.state-toggle,.queue-state-toggle):not(.live):hover, :is(.state-toggle,.queue-state-toggle):not(.live):focus-visible { border-color: rgba(139,92,246,.7); background: rgba(139,92,246,.18); color: #ddd6fe; }
+:is(.state-toggle,.queue-state-toggle).live { border-color: rgba(53,196,106,.4); background: rgba(53,196,106,.1); color: var(--success); }
+:is(.state-toggle,.queue-state-toggle) span { position: relative; grid-area: 1 / 1; z-index: 2; display: block; transition: transform .22s ease, opacity .22s ease; }
+:is(.state-toggle,.queue-state-toggle) :is(.state-toggle-alternate,.queue-state-alternate) { transform: translateY(130%); opacity: 0; }
+:is(.state-toggle,.queue-state-toggle):hover :is(.state-toggle-current,.queue-state-current), :is(.state-toggle,.queue-state-toggle):focus-visible :is(.state-toggle-current,.queue-state-current) { transform: translateY(-130%); opacity: 0; }
+:is(.state-toggle,.queue-state-toggle):hover :is(.state-toggle-alternate,.queue-state-alternate), :is(.state-toggle,.queue-state-toggle):focus-visible :is(.state-toggle-alternate,.queue-state-alternate) { transform: translateY(0); opacity: 1; }
+:is(.state-toggle,.queue-state-toggle)::after { position: absolute; z-index: 1; bottom: -5px; left: 14px; width: 3px; height: 3px; border-radius: 50%; background: currentColor; box-shadow: 11px 3px currentColor, 23px -1px currentColor, 34px 4px currentColor, 43px 0 currentColor; content: ""; opacity: 0; }
+:is(.state-toggle,.queue-state-toggle):hover::after, :is(.state-toggle,.queue-state-toggle):focus-visible::after { animation: queue-dust-rise .65s ease-out infinite; }
+@keyframes queue-dust-rise { 0% { transform: translateY(4px); opacity: 0; } 25% { opacity: .55; } 100% { transform: translateY(-30px); opacity: 0; } }
+:is(.state-toggle,.queue-state-toggle):disabled { cursor: not-allowed; opacity: .65; }
+:is(.state-toggle,.queue-state-toggle):disabled:not([aria-busy="true"] *) :is(.state-toggle-current,.queue-state-current) { transform: none; opacity: 1; }
+:is(.state-toggle,.queue-state-toggle):disabled:not([aria-busy="true"] *) :is(.state-toggle-alternate,.queue-state-alternate) { transform: translateY(130%); opacity: 0; }
+:is(.state-toggle,.queue-state-toggle):disabled::after { animation: none; opacity: 0; }
+@media(prefers-reduced-motion:reduce) { :is(.state-toggle,.queue-state-toggle) span { transition: none; } :is(.state-toggle,.queue-state-toggle)::after { animation: none!important; } }
 .queue-toolbar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; margin-bottom: 6px; }
 .queue-toolbar button, .queue-toolbar a { display: inline-flex; width: 100%; min-height: 34px; align-items: center; justify-content: center; padding: 5px 7px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 800; text-align: center; cursor: pointer; }
 .queue-toolbar button:hover, .queue-toolbar button:focus-visible, .queue-toolbar a:hover, .queue-toolbar a:focus-visible { border-color: var(--accent); background: rgba(139,92,246,.12); color: var(--text); }

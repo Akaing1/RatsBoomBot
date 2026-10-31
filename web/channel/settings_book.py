@@ -25,9 +25,15 @@ TOGGLE_SECTION = {
 }
 LABELS = {"raid_bosses": "Boss Hunt", "globals": "All global commands", "channel": "Channel profile", "points": "Loyalty Points", "league": "League of Legends"}
 
+RELATED_SETTINGS = {
+    ("profile_feature", "league"): [("games", "league-of-legends", "Customize League of Legends")],
+    ("profile_feature", "overwatch"): [("games", "overwatch", "Customize Overwatch")],
+    ("global_group", "settings"): [("connections", "socials", "Customize social links"), ("timers", "", "Manage timers")],
+}
+
 
 TOGGLE_DESCRIPTIONS = {
-    ("feature", "channel"): "Enable this channel's bot profile and its features.",
+    ("feature", "channel"): "Enable your channel's bot profile and its features.",
     ("feature", "timers"): "Send your scheduled chat messages and announcements.",
     ("feature", "ad_announcements"): "Notify chat before a scheduled ad break starts.",
     ("feature", "points"): "Enable the channel's loyalty points features.",
@@ -75,7 +81,7 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
                 (kind == "global_group" and value == "globals" and (command.global_group is not None or command.global_command is not None))
                 or getattr(command, kind, None) == name
             )]
-            description = TOGGLE_DESCRIPTIONS.get((kind, value)) or (commands[0].description if commands else f"Enable {label.lower()} for this channel.")
+            description = TOGGLE_DESCRIPTIONS.get((kind, value)) or (commands[0].description if commands else f"Enable {label.lower()} for your channel.")
             if section == "pets":
                 panel = "Pets" if kind == "global_command" else "Boss Hunt"
             elif section == "general" and kind == "global_group":
@@ -85,8 +91,10 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
             else:
                 panel = {"feature": "Feature controls", "profile_feature": "Game integrations", "global_command": "Chat commands"}[kind]
             show_commands = (kind == "global_group" and value != "globals") or (kind == "global_command" and value == "quote")
-            sections[section]["toggles"].append(dict(kind=kind, name=value, label=label, state=state,
-                description=description, commands=commands if show_commands else [], panel=panel))
+            sections[section]["toggles"].append(dict(kind=kind, name=value, label=label, state=state, section=section,
+                description=description, commands=commands if show_commands else [],
+                reference_commands=commands if value not in {'globals', 'channel'} else [], panel=panel,
+                related_settings=[link for link in RELATED_SETTINGS.get((kind, value), []) if link[0] != section and (link[0] != 'games' or value in enabled_games)]))
     group_controls = {
         ('feature', 'points'): 'Loyalty points', ('global_group', 'points'): 'Loyalty points',
         ('feature', 'raid_responses'): 'Raid messages',
@@ -110,10 +118,10 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
         section['blocked'] = any(getattr(t['state'], 'blocked_by_profile', False) or getattr(t['state'], 'blocked_by_globals', False) for t in section['toggles'])
         for toggle in section['toggles']:
             setting_key = setting_controls.get((toggle['kind'], toggle['name']))
+            group = group_controls.get((toggle['kind'], toggle['name']))
             if setting_key in setting_keys:
                 section['setting_toggles'][setting_key] = toggle
                 continue
-            group = group_controls.get((toggle['kind'], toggle['name']))
             if group in section['groups']:
                 section['group_toggles'].setdefault(group, []).append(toggle)
             else:

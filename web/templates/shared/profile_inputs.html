@@ -1,4 +1,4 @@
-{% from "channel/settings_switch.html" import status_switch, toggle_details %}
+{% from "channel/settings_switch.html" import status_switch, toggle_details, command_reference %}
 {% if setting_message %}
     <div class="toggle-feedback {% if setting_result == 'success' %}success{% else %}error{% endif %}" role="status">
         <span class="toggle-feedback-icon">{% if setting_result == "success" %}&#10003;{% else %}!{% endif %}</span>
@@ -38,10 +38,11 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="setting_name" value="{{ key }}">
                     <div class="toggle-card-heading"><div><h4>{{ label }}</h4><p>{{ description }}</p></div></div>
-                    {% if settings_notebook | default(false) %}<details class="settings-field-editor"><summary>Customize</summary><div class="settings-field-body">{% endif %}
+                    {% if settings_notebook | default(false) %}<div class="settings-field-body">{% endif %}
                     <input class="profile-setting-input" type="url" name="value" value="{{ current_value or '' }}" placeholder="https://">
+                    {% if settings_notebook | default(false) and key == 'social.youtube_url' %}<p class="settings-related-links"><a data-settings-link href="?section=general#youtube-chat-connection">Connect YouTube chat</a></p>{% endif %}
                     <div class="toggle-actions profile-setting-actions"><button class="button primary" type="submit" name="action" value="save">Save Changes</button></div>
-                    {% if settings_notebook | default(false) %}</div></details>{% endif %}
+                    {% if settings_notebook | default(false) %}</div>{% endif %}
                 </form>
             </article>
             {% endif %}
@@ -63,11 +64,12 @@
         {% with timer_setting=settings[0] %}{% include "channel/settings_timers.html" %}{% endwith %}
     {% else %}
     {% set flat = flat_settings | default(false) %}
-    {% if settings_notebook | default(false) and not flat %}<details class="settings-group"{% if loop.first %} open{% endif %}><summary><span class="settings-group-title">{{ group_name }}</span>{% if group_name == "Shoutouts" %}<code class="settings-heading-command">!so &lt;channel&gt;</code>{% endif %}{% set controls = (group_toggles | default({})).get(group_name, []) %}<span class="settings-header-switches">{% if controls | length == 1 and group_name != "Redeems" %}{{ status_switch(controls[0]) }}{% endif %}</span></summary>{% endif %}
+    {% set controls = (group_toggles | default({})).get(group_name, []) %}
+    {% if settings_notebook | default(false) and not flat %}<section id="settings-group-{{ group_name | lower | replace(' ', '-') }}" class="settings-group{% if controls | length == 1 and not controls[0].state.effective_enabled and group_name != 'Redeems' %} is-disabled{% endif %}"><header class="settings-group-heading"><h4 class="settings-group-title">{{ group_name }}</h4><span class="settings-header-switches">{% if controls | length == 1 and group_name != "Redeems" %}{{ status_switch(controls[0]) }}{% endif %}</span></header>{% endif %}
     <section class="panel toggle-management-panel profile-settings-panel">
         {% set controls = (group_toggles | default({})).get(group_name, []) %}
         {% if controls | length > 1 or flat or group_name == "Redeems" %}<div class="settings-switch-list">{% for toggle in controls %}<div class="settings-switch-row"><div class="settings-toggle-copy"><span>{{ toggle.label }}</span>{{ toggle_details(toggle) }}</div>{{ status_switch(toggle) }}</div>{% endfor %}</div>{% endif %}
-        {% if settings_notebook | default(false) and not flat and controls | length == 1 and group_name not in ["Redeems", "Shoutouts"] %}{{ toggle_details(controls[0]) }}{% endif %}
+        {% if settings_notebook | default(false) and not flat and controls | length == 1 and group_name != "Redeems" %}{{ toggle_details(controls[0]) }}{% endif %}
         <div class="panel-header">
             <div>
                 <p class="eyebrow">Editable profile details</p>
@@ -85,7 +87,8 @@
         <div{% if group_name == "Commands" and not settings_notebook | default(false) %} data-command-panel="responses"{% if command_tab | default('responses') == 'protected' %} hidden{% endif %}{% endif %}>
         <div class="profile-settings-grid">
             {% for setting in settings %}
-                <article data-setting-key="{{ setting.definition.key }}" class="toggle-card profile-setting-card{% if setting.definition.key == 'timer_messages' %} full-width{% endif %}">
+                {% set control = (setting_toggles | default({})).get(setting.definition.key) %}
+                <article id="setting-{{ setting.definition.key | replace('.', '-') }}" data-setting-key="{{ setting.definition.key }}" class="toggle-card profile-setting-card{% if control and not control.state.effective_enabled %} is-disabled{% endif %}{% if setting.definition.key == 'timer_messages' %} full-width{% endif %}">
                     <form method="post" action="{{ customization_action | default('/channel/customization') }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="setting_name" value="{{ setting.definition.key }}">
@@ -93,7 +96,7 @@
                         <div class="toggle-card-heading">
                             <div>
                                 <h4>{{ setting.definition.label }}</h4>
-                                <p>{{ setting.definition.description | replace("Leave empty to send nothing.", "") if settings_notebook | default(false) else setting.definition.description }}</p>
+                                <p>{{ setting.definition.description | replace("Leave empty to send nothing.", "") | replace("Add one name per line.", "Add names below.") if settings_notebook | default(false) else setting.definition.description }}</p>
                             </div>
 
                             {% set control = (setting_toggles | default({})).get(setting.definition.key) %}
@@ -103,7 +106,8 @@
                             {% endif %}
                         </div>
 
-                        {% if settings_notebook | default(false) %}<details class="settings-field-editor"><summary>Customize</summary><div class="settings-field-body">{% endif %}
+                        {% if settings_notebook | default(false) and control %}{{ command_reference(control) }}{% endif %}
+                        {% if settings_notebook | default(false) %}<div class="settings-field-body">{% endif %}
                         {% if setting.definition.key == "timer_messages" %}
                             <div class="timer-message-editor" data-timer-editor>
                                 <input type="hidden" name="value" data-timer-value>
@@ -119,12 +123,16 @@
                                 </div>
                                 <button class="button secondary timer-add-button" type="button" data-add-timer>+ Add Timer</button>
                             </div>
+                        {% elif settings_notebook | default(false) and setting.definition.value_type == "names" %}
+                            <div class="settings-entry-editor" data-settings-list data-entry-label="{{ setting.definition.label }}" data-entry-placeholder="{{ (setting.default_value | string).splitlines()[0] if setting.default_value else 'Enter a name' }}" data-entry-limit="{{ setting.definition.maximum_length }}">
+                                <textarea class="profile-setting-input" name="value" rows="1" maxlength="{{ setting.definition.maximum_length }}" aria-label="{{ setting.definition.label }}" data-settings-list-value>{{ setting.override_value if setting.override_value is not none else '' }}</textarea>
+                            </div>
                         {% elif setting.definition.value_type == "integer" %}
                             <input class="profile-setting-input" type="number" name="value" value="{{ (setting.override_value if setting.override_value is not none else '') if settings_notebook | default(false) else setting.effective_value }}" placeholder="{{ setting.default_value }}" aria-label="{{ setting.definition.label }}" min="{{ setting.definition.minimum }}" max="{{ setting.definition.maximum }}">
                         {% elif setting.definition.rows == 1 %}
                             <input class="profile-setting-input" type="text" name="value" value="{{ (setting.override_value if setting.override_value is not none else '') if settings_notebook | default(false) else setting.effective_value }}" placeholder="{{ setting.default_value }}" aria-label="{{ setting.definition.label }}" maxlength="{{ setting.definition.maximum_length }}">
                         {% else %}
-                            <textarea class="profile-setting-input" name="value" rows="{{ setting.definition.rows }}" maxlength="{{ setting.definition.maximum_length }}" placeholder="{{ setting.default_value }}" aria-label="{{ setting.definition.label }}">{{ (setting.override_value if setting.override_value is not none else '') if settings_notebook | default(false) else setting.effective_value }}</textarea>
+                            <textarea class="profile-setting-input" name="value" rows="{{ 1 if settings_notebook | default(false) else setting.definition.rows }}"{% if settings_notebook | default(false) %} data-settings-grow{% endif %} maxlength="{{ setting.definition.maximum_length }}" placeholder="{{ setting.default_value }}" aria-label="{{ setting.definition.label }}">{{ (setting.override_value if setting.override_value is not none else '') if settings_notebook | default(false) else setting.effective_value }}</textarea>
                         {% endif %}
 
                         {% if not settings_notebook | default(false) %}<p class="toggle-meta">Channel default: {{ setting.default_value if setting.default_value != "" else "Not configured" }}</p>{% endif %}
@@ -136,11 +144,10 @@
                                 <button class="button secondary" type="submit" name="action" value="reset">Use Default</button>
                             {% endif %}
                         </div>
-                        {% if settings_notebook | default(false) %}</div></details>{% endif %}
+                        {% if settings_notebook | default(false) %}</div>{% endif %}
                     </form>
                 </article>
             {% endfor %}
-            {% if settings_notebook | default(false) and group_name == "Raid messages" %}{% include "channel/settings_dashboard.html" %}{% endif %}
         </div>
         </div>
 
@@ -150,6 +157,12 @@
             </div>
         {% endif %}
     </section>
-    {% if settings_notebook | default(false) and not flat %}</details>{% endif %}
+    {% if settings_notebook | default(false) and not flat %}</section>{% endif %}
+    {% if settings_notebook | default(false) and group_name == "Raid messages" %}
+    <section class="settings-group" id="settings-group-raid-preferences">
+        <header class="settings-group-heading"><h4>Raid preferences</h4></header>
+        <div class="profile-settings-grid">{% include "channel/settings_dashboard.html" %}</div>
+    </section>
+    {% endif %}
 {% endif %}
 {% endfor %}
