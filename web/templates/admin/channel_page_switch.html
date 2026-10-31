@@ -7,7 +7,8 @@
     </div>
     <nav class="channel-page-tabs" aria-label="Channel management sections">
         <a class="channel-page-tab {% if channel_section == 'overview' %}active{% endif %}" href="/admin/channels/{{ broadcaster.id }}" {% if channel_section == 'overview' %}aria-current="page"{% endif %}>Overview</a>
-        <a class="channel-page-tab {% if channel_section == 'features' %}active{% endif %}" href="/admin/channels/{{ broadcaster.id }}/features" {% if channel_section == 'features' %}aria-current="page"{% endif %}>Features</a>
-        <a class="channel-page-tab {% if channel_section == 'customization' %}active{% endif %}" href="/admin/channels/{{ broadcaster.id }}/customization" {% if channel_section == 'customization' %}aria-current="page"{% endif %}>Customization</a>
+        {% for key, label in [('settings', 'Settings'), ('monitor', 'Monitor')] %}
+        <a class="channel-page-tab {% if channel_section == key %}active{% endif %}" href="/admin/channels/{{ broadcaster.id }}/{{ key }}" {% if channel_section == key %}aria-current="page"{% endif %}>{{ label }}</a>
+        {% endfor %}
     </nav>
 </div>

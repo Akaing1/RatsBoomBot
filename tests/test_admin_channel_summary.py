@@ -40,22 +40,18 @@ def test_channel_summary_has_configuration_links_without_operational_widgets():
         twitch_channel_metadata={'title': 'A stream', 'game': 'A game'},
     )
     assert '&lt;Test&gt;' in html
-    assert '/admin/channels/123/features' in html
-    assert '/admin/channels/123/customization' in html
+    assert '/admin/channels/123/settings' in html
+    assert '/admin/channels/123/monitor' in html
     assert 'No channel feature flags are enabled' in html
     for removed in ['viewer-queue-content', 'data-live-chat-feed', 'raid-monitor-details', '/api/activity', 'admin-channel-overview']:
         assert removed not in html
-    templates.env.get_template('admin/channel_details.html')
+    templates.env.get_template('admin/channel_settings.html')
 
 
 def test_features_template_retains_management_forms():
-    html = templates.env.get_template('admin/channel_details.html').render(
-        active_page='channels', channel_section='features', administrator=None, csrf_token='test',
-        url_for=lambda name, path: '/' + name + path,
-        broadcaster=SimpleNamespace(id='123', name='Test', login='test', profile_image_url=None),
-        channel_features={}, profile_features={}, global_groups={}, global_commands={},
-        chat_identity={'connected': False, 'premium_enabled': False},
+    html = templates.env.get_template('admin/channel_access_controls.html').render(
+        administrator=None, csrf_token='test', broadcaster=SimpleNamespace(id='123', name='Test'),
+        profile_features={}, chat_identity={'connected': False, 'premium_enabled': False},
     )
-    assert 'Feature toggles' in html
     assert '/admin/channels/123/delete' in html
-    assert 'data-preserve-scroll' not in html or 'window.sessionStorage' in html
+    assert 'Custom bot identity' in html

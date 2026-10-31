@@ -16,9 +16,9 @@
 </section>
 <div class="admin-channel-summary-columns">
 <section class="panel"><div class="panel-header"><div><p class="eyebrow">Configuration</p><h3>Manage this channel</h3></div></div>
-    <a class="admin-channel-summary-link" href="/admin/channels/{{ broadcaster.id }}/features"><strong>Features & access →</strong><span>Manage feature flags, command groups, premium identity and channel removal.</span></a>
-    <a class="admin-channel-summary-link" href="/admin/channels/{{ broadcaster.id }}/customization"><strong>Customization →</strong><span>Edit messages, timers, social links and protected users.</span></a>
-    <div class="admin-channel-feature-list"><p class="card-label">Enabled features</p>{% for feature in channel_features | sort(attribute='value') %}<span class="channel-state">{{ feature.value | replace('_', ' ') | title }}</span>{% else %}<p class="card-detail">No channel feature flags are enabled. Review Features to configure this channel.</p>{% endfor %}</div>
+    <a class="admin-channel-summary-link" href="/admin/channels/{{ broadcaster.id }}/settings"><strong>Settings →</strong><span>Manage features, messages, timers, social links and channel access together.</span></a>
+    <a class="admin-channel-summary-link" href="/admin/channels/{{ broadcaster.id }}/monitor"><strong>Monitor stream →</strong><span>Watch the stream, follow chat and review live activity.</span></a>
+    <div class="admin-channel-feature-list"><p class="card-label">Enabled features</p>{% for feature in channel_features | sort(attribute='value') %}<span class="channel-state">{{ feature.value | replace('_', ' ') | title }}</span>{% else %}<p class="card-detail">No channel feature flags are enabled. Review Settings to configure this channel.</p>{% endfor %}</div>
 </section>
 <section class="panel"><div class="panel-header"><div><p class="eyebrow">Troubleshooting</p><h3>Channel context</h3></div></div>
     <div class="admin-channel-stream"><p class="card-label">Twitch stream title</p><strong>{{ twitch_channel_metadata.title }}</strong><p class="card-detail">Category: {{ twitch_channel_metadata.game }}</p></div>
