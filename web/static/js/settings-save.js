@@ -39,14 +39,14 @@
             const id = wrapper.querySelector('button[id]')?.id;
             const replacement = id && fresh.getElementById(id)?.closest('.settings-inline-switch');
             if (!replacement) return;
-            wrapper.replaceChildren(...[...replacement.childNodes].map(node => node.cloneNode(true)));
+            if (!wrapper.isEqualNode(replacement)) wrapper.replaceChildren(...[...replacement.childNodes].map(node => node.cloneNode(true)));
             const row = wrapper.closest('.settings-switch-row');
             if (row) row.classList.toggle('is-disabled', Boolean(replacement.closest('.settings-switch-row')?.classList.contains('is-disabled')));
         });
-        const setting = form.querySelector('[name="setting_name"]')?.value;
-        const savedForm = setting && [...fresh.querySelectorAll('[name="setting_name"]')].find(input => input.value === setting)?.form;
         // The follow-raid preference submits its value through the switch itself.
         const switchButton = form.querySelector('button[role="switch"][name="value"]');
+        const setting = switchButton && form.querySelector('[name="setting_name"]')?.value;
+        const savedForm = setting && [...fresh.querySelectorAll('[name="setting_name"]')].find(input => input.value === setting)?.form;
         const savedButton = savedForm?.querySelector('button[role="switch"][name="value"]');
         if (switchButton && savedButton) {
             switchButton.value = savedButton.value;
@@ -54,10 +54,13 @@
             switchButton.replaceChildren(...[...savedButton.childNodes].map(node => node.cloneNode(true)));
             switchButton.setAttribute('aria-checked', savedButton.getAttribute('aria-checked'));
         }
+        const freshPages = new Map([...fresh.querySelectorAll('[data-settings-page]')].map(page => [page.dataset.settingsPage, page]));
         book.querySelectorAll('[data-settings-page]').forEach(page => {
-            const replacement = [...fresh.querySelectorAll('[data-settings-page]')].find(node => node.dataset.settingsPage === page.dataset.settingsPage);
+            const replacement = freshPages.get(page.dataset.settingsPage);
             const notice = replacement?.querySelector('.settings-blocked-notice');
-            page.querySelector('.settings-blocked-notice')?.remove();
+            const current = page.querySelector('.settings-blocked-notice');
+            if ((!notice && !current) || (notice && current?.isEqualNode(notice))) return;
+            current?.remove();
             if (notice) page.querySelector('.settings-page-heading')?.after(notice.cloneNode(true));
         });
     }

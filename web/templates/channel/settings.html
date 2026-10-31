@@ -88,11 +88,11 @@
 {{ super() }}
 <script src="/static/js/social-integrations.js" defer></script>
 <script src="/static/js/protected-users.js" defer></script>
-<script src="/static/js/settings-timers.js?v={{ deployment_stamp() }}-toggle-save-actions" defer></script>
-<script src="/static/js/settings-inputs.js?v={{ deployment_stamp() }}-animated-save-actions" defer></script>
-<script src="/static/js/settings-command-references.js?v={{ deployment_stamp() }}" defer></script>
-<script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}-animated-save-actions" defer></script>
-<script src="/static/js/settings-save.js?v={{ deployment_stamp() }}-timer-row-actions" defer></script>
+<script src="/static/js/settings-timers.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
+<script src="/static/js/settings-inputs.js?v={{ deployment_stamp() }}-batch-field-sizing" defer></script>
+<script src="/static/js/settings-command-references.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
+<script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}-section-dirty-tracking" defer></script>
+<script src="/static/js/settings-save.js?v={{ deployment_stamp() }}-preserve-notices" defer></script>
 <script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}-short-hashes" defer></script>
-<script src="/static/js/settings-menu-highlight.js?v={{ deployment_stamp() }}-short-hashes" defer></script>
+<script src="/static/js/settings-menu-highlight.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
 {% endblock %}

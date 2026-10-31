@@ -18,7 +18,7 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
         const posts = [];
         const html = () => `<body class="channel-page-settings"><div class="toggle-feedback success">Earlier update saved.</div><div data-settings-book data-selected="events" data-channel="1">
             <nav class="settings-menu">${['events', 'chat'].map(key => `<details class="settings-menu-section" open><summary><a href="?section=${key}" data-settings-tab="${key}">${key}</a><span class="settings-dirty-dot" hidden></span></summary></details>`).join('')}</nav>
-            <main class="settings-main settings-pages"><section data-settings-page="events"><header class="settings-page-heading"><h3>Events</h3></header>
+            <main class="settings-main settings-pages"><section data-settings-page="events"><header class="settings-page-heading"><h3>Events</h3></header><p class="settings-blocked-notice">Connection unavailable.</p>
                 <span class="settings-inline-switch"><button id="master" role="switch" type="submit" form="toggle-master" name="action" value="${enabled ? 'disable' : 'enable'}" aria-checked="${enabled}">${enabled ? 'Enabled' : 'Disabled'}</button></span>
                 <form id="save-follow" method="post" action="/channel/customization"><input type="hidden" name="csrf_token" value="test-token"><input type="hidden" name="setting_name" value="follow"><textarea name="value">Follow message</textarea><button name="action" value="save">Save</button></form>
                 <form id="save-raid" method="post" action="/channel/customization"><input type="hidden" name="setting_name" value="dashboard.follow_raid"><input type="hidden" name="action" value="save"><button role="switch" name="value" value="${followRaid ? '0' : '1'}" aria-checked="${followRaid}">Follow raid</button></form>
@@ -48,7 +48,7 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
         await page.addStyleTag({path: 'web/static/css/channel-settings.css'});
         await page.addStyleTag({content: '.settings-menu{position:fixed;left:0;top:0;width:180px}.settings-main{margin-left:200px}'});
         for (const file of ['channel-settings.js', 'settings-save.js']) await page.addScriptTag({path: `web/static/js/${file}`});
-        await page.evaluate(() => { window.samePage = true; });
+        await page.evaluate(() => { window.samePage = true; window.originalNotice = document.querySelector('.settings-blocked-notice'); window.originalMaster = document.querySelector('#master'); window.originalChild = document.querySelector('#child'); });
         assert.equal(await page.locator('.toggle-feedback').count(), 0);
         assert.equal(await page.locator('#save-follow [data-settings-save]').isVisible(), false);
         assert.equal(await page.locator('#master').isVisible(), true);
@@ -66,6 +66,8 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
         await page.locator('[data-settings-tab="chat"]').click();
         await page.waitForFunction(() => !document.querySelector('#save-follow').hasAttribute('aria-busy'));
         assert.equal(await page.evaluate(() => window.samePage), true);
+        assert.equal(await page.evaluate(() => window.originalNotice === document.querySelector('.settings-blocked-notice')), true, 'Unchanged notices remain mounted after saving');
+        assert.equal(await page.evaluate(() => window.originalMaster === document.querySelector('#master') && window.originalChild === document.querySelector('#child')), true, 'Saving text preserves unchanged toggle elements');
         assert.match(page.url(), /section=chat/);
         assert.equal(await page.locator('#save-lurk textarea').inputValue(), 'Unsaved chat draft');
         assert.equal(await page.locator('#save-follow textarea').inputValue(), 'New edit while saving');

@@ -215,6 +215,11 @@
     const forms = [...book.querySelectorAll('form[method="post"]')];
     const snapshot = form => JSON.stringify([...new FormData(form)]);
     const originals = new Map(forms.map(form => [form, snapshot(form)]));
+    const dirtySections = new Map(pages.map(page => {
+        const tab = tabs.find(item => item.dataset.settingsTab === page.dataset.settingsPage);
+        return [page, {forms: forms.filter(form => page.contains(form)), dot: tab.closest('.settings-menu-section').querySelector('.settings-dirty-dot')}];
+    }));
+    const formSections = new Map(forms.map(form => [form, dirtySections.get(form.closest('[data-settings-page]'))]));
     const saveActions = new Map();
     function resetForm(form) {
         const values = new Map(JSON.parse(originals.get(form)));
@@ -265,11 +270,8 @@
             actions.inert = !dirty;
             actions.setAttribute('aria-hidden', String(!dirty));
         });
-        pages.forEach(page => {
-            const dirty = [...dirtyForms].some(item => page.contains(item));
-            const tab = tabs.find(item => item.dataset.settingsTab === page.dataset.settingsPage);
-            tab.closest('.settings-menu-section').querySelector('.settings-dirty-dot').hidden = !dirty;
-        });
+        const section = formSections.get(form);
+        if (section) section.dot.hidden = !section.forms.some(item => dirtyForms.has(item));
     }
     forms.forEach(form => {
         mark(form);

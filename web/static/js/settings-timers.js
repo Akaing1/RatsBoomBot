@@ -12,6 +12,7 @@
     let confirming;
     const rows = () => [...list.querySelectorAll('.settings-timer-row')];
     function renderSwitch(button, enabled, short = false) {
+        if (button.getAttribute('aria-checked') === String(enabled)) return;
         button.setAttribute('aria-checked', String(enabled));
         button.classList.toggle('live', enabled);
         button.querySelector('.queue-state-current').textContent = short ? enabled ? 'On' : 'Off' : enabled ? 'Enabled' : 'Disabled';
@@ -57,7 +58,7 @@
         form.querySelector('[data-new-color-label]').hidden = form.querySelector('[data-new-kind]').value !== 'announcement';
         renderSwitch(form.querySelector('[data-toggle-new-chat]'), form.querySelector('[data-new-require-chat]').checked, true);
     }
-    function changed() { sync(); form.dispatchEvent(new Event('input', {bubbles: true})); }
+    function changed() { form.dispatchEvent(new Event('input', {bubbles: true})); }
     function valid(row) {
         const message = row.querySelector('[data-timer-message]');
         message.setCustomValidity(message.value.trim() ? '' : 'Enter a timer message.');
@@ -134,7 +135,7 @@
         list.append(row); restore(row, value); draft.value = '';
         persist({kind: 'save', row, value});
     });
-    form.addEventListener('submit', event => { sync(); if (!operation) event.preventDefault(); });
+    form.addEventListener('submit', event => { if (!operation) event.preventDefault(); });
     book.addEventListener('settings-build-save', event => {
         if (event.detail.form !== form || !operation) return;
         submitted = operation; operation = null;

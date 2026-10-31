@@ -35,7 +35,7 @@
         rail.append(region);
         region.hidden = true;
         const anchor = [...scope.querySelectorAll(':scope>.settings-group-heading, :scope>.panel-header, :scope>h4, :scope>.settings-page-heading')].find(heading => getComputedStyle(heading).display !== 'none') || scope;
-        return {scope, anchor, region};
+        return {scope, anchor, region, panel};
     });
     if (!references.length) return;
     rail.removeAttribute('aria-hidden');
@@ -89,7 +89,7 @@
     function changeExpansion(nextSelected, nextHovered) {
         if (selected === nextSelected && hovered === nextHovered) return;
         const heights = references.filter(item => !item.region.hidden).map(item => {
-            const panel = item.region.querySelector('.settings-command-reference');
+            const panel = item.panel;
             return {panel, region: item.region, height: panel.getBoundingClientRect().height, regionHeight: item.region.getBoundingClientRect().height};
         });
         heights.forEach(({panel}) => stopAnimation(panel));
@@ -118,7 +118,7 @@
         });
     }
     references.forEach(item => {
-        const panel = item.region.querySelector('.settings-command-reference');
+        const panel = item.panel;
         panel.tabIndex = 0;
         const focus = () => {
             select(item.scope);
@@ -154,7 +154,7 @@
             const next = slots[index + 1];
             item.region.style.setProperty('--settings-command-space', `${next ? Math.max(0, next.top - top - 16) : innerHeight - 32}px`);
             const end = Math.min(bottom, slots[index + 1]?.top ?? bottom);
-            const panel = item.region.querySelector('.settings-command-reference');
+            const panel = item.panel;
             const border = panel.offsetHeight - panel.clientHeight;
             // Reserve its expanded footprint even while collapsed, so reaching
             // the page bottom cannot turn expansion into a scroll/hover loop.

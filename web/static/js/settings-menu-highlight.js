@@ -9,7 +9,11 @@
     indicator.hidden = true;
     menu.prepend(indicator);
     menu.classList.add('has-sliding-highlight');
-    const locations = [...menu.querySelectorAll('[data-settings-location]')].map(button => ({button, target: document.getElementById(button.dataset.settingsLocation)}));
+    const locations = [...menu.querySelectorAll('[data-settings-location]')].map(button => {
+        const target = document.getElementById(button.dataset.settingsLocation);
+        const section = target.closest('.settings-group, .settings-command-cluster, .profile-settings-panel, .settings-timer-manager>.panel') || target;
+        return {button, target, section};
+    });
     let frame;
     let initialized = false;
     let scrollIntent = null;
@@ -24,12 +28,11 @@
         if (!link || !page) { indicator.hidden = true; return; }
         const bar = matchMedia('(max-width: 768px)').matches ? document.querySelector('[data-channel-sidebar]')?.getBoundingClientRect().bottom || 0 : 0;
         let active;
-        locations.forEach(item => {
-            const section = item.target.closest('.settings-group, .settings-command-cluster, .profile-settings-panel, .settings-timer-manager>.panel') || item.target;
-            if (page.contains(item.target) && section.getBoundingClientRect().top <= bar + 1) active = item;
-        });
-        if (scrollIntent) active = scrollIntent.location;
         if (hoverIntent && (!scrollIntent || pointerActive)) active = hoverIntent.location;
+        else if (scrollIntent) active = scrollIntent.location;
+        else locations.forEach(item => {
+            if (page.contains(item.target) && item.section.getBoundingClientRect().top <= bar + 1) active = item;
+        });
         if (active?.target !== currentLocation) {
             currentLocation = active?.target;
             book.dispatchEvent(new CustomEvent('settings-location-changed', {detail: currentLocation}));

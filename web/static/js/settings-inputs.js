@@ -2,14 +2,19 @@
     'use strict';
     const book = document.querySelector('[data-settings-book]');
     if (!book) return;
-    function grow(input) {
-        if (!input.clientWidth) return;
-        input.style.height = 'auto';
-        const style = getComputedStyle(input);
-        input.style.height = `${input.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth)}px`;
+    function grow(inputs) {
+        const visible = [...inputs].filter(input => input.clientWidth);
+        // Reset and measure together so resizing a section does not force a
+        // separate layout for every text field.
+        visible.forEach(input => { input.style.height = 'auto'; });
+        const heights = visible.map(input => {
+            const style = getComputedStyle(input);
+            return input.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+        });
+        visible.forEach((input, index) => { input.style.height = `${heights[index]}px`; });
     }
-    const growVisible = () => book.querySelectorAll('textarea[data-settings-grow]').forEach(grow);
-    book.addEventListener('input', event => { if (event.target.matches('textarea[data-settings-grow]')) grow(event.target); });
+    const growVisible = () => grow(book.querySelectorAll('textarea[data-settings-grow]'));
+    book.addEventListener('input', event => { if (event.target.matches('textarea[data-settings-grow]')) grow([event.target]); });
     book.addEventListener('settings-section-changed', growVisible);
     let width;
     const observer = new ResizeObserver(entries => {
@@ -25,10 +30,10 @@
         const add = document.createElement('button');
         add.type = 'button'; add.className = 'button secondary'; add.textContent = '+ Add entry';
         add.dataset.settingsAddEntry = '';
-        function sync() {
+        function sync(reindex = false) {
             const rows = [...list.children];
             value.value = rows.map(row => row.querySelector('input').value.trim()).filter(Boolean).join('\n');
-            rows.forEach((row, index) => {
+            if (reindex) rows.forEach((row, index) => {
                 row.querySelector('span').textContent = index + 1;
                 row.querySelector('input').setAttribute('aria-label', `${editor.dataset.entryLabel}, entry ${index + 1}`);
                 const remove = row.querySelector('button');
@@ -49,23 +54,23 @@
             remove.type = 'button'; remove.className = 'button secondary settings-entry-remove'; remove.textContent = '×';
             remove.addEventListener('click', () => {
                 const index = [...list.children].indexOf(row);
-                row.remove(); sync();
+                row.remove(); sync(true);
                 list.children[Math.min(index, list.children.length - 1)].querySelector('input').focus();
                 value.dispatchEvent(new Event('input', {bubbles: true}));
             });
-            input.addEventListener('input', sync);
+            input.addEventListener('input', () => sync());
             row.append(number, input, remove); list.append(row);
             return input;
         }
         const initial = value.value.split(/\r?\n/).filter(text => text.trim());
         (initial.length ? initial : ['']).forEach(append);
-        value.hidden = true; editor.append(list, add); sync();
-        add.addEventListener('click', () => { const input = append(); sync(); input.focus(); });
+        value.hidden = true; editor.append(list, add); sync(true);
+        add.addEventListener('click', () => { const input = append(); sync(true); input.focus(); });
         editor.addEventListener('settings-reset-list', () => {
             list.replaceChildren();
             const entries = value.value.split(/\r?\n/).filter(text => text.trim());
             (entries.length ? entries : ['']).forEach(append);
-            sync();
+            sync(true);
         });
     });
     growVisible();
