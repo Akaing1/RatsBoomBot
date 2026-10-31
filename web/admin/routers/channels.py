@@ -281,40 +281,21 @@ async def channel_details_page(request: Request, broadcaster_id: str):
         return await get_runtime_error(request)
 
     services = runtime_bot.services
-    broadcaster_service = services.broadcasters
     broadcaster = get_broadcaster(runtime_bot, broadcaster_id)
 
     if broadcaster is None:
         return await get_channel_error(request)
 
-    await broadcaster_service.refresh_live_statuses()
-
-    viewer_queue = services.viewer_queue
-    redemption_activity = await get_redemption_dashboard_data(services, broadcaster_id)
-    gambling_loss_total = await services.points.get_gambling_loss_total(broadcaster_id)
-    channel_features = services.features.get_channel_features(broadcaster_id)
-    raid_configured = FeatureName.RAID_BOSSES in channel_features
-    raid_metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_configured else None
-
     return templates.TemplateResponse(
         request=request,
-        name="admin/channel_details.html",
+        name="admin/channel_overview.html",
         context=build_admin_context(
-            request,
-            active_page="channels",
-            channel_section="overview",
+            request, active_page="channels", channel_section="overview",
             broadcaster=broadcaster,
-            queue_open=viewer_queue.is_queue_open(broadcaster_id),
-            queue_users=viewer_queue.list_queue(broadcaster_id),
-            queue_size=viewer_queue.size(broadcaster_id),
-            redemption_activity=redemption_activity,
-            gambling_loss_total=gambling_loss_total,
-            raid_configured=raid_configured,
-            raid_metrics=raid_metrics,
+            channel_features=[feature for feature, state in services.features.get_channel_features(broadcaster_id).items() if state.effective_enabled],
+            chat_identity=services.chat_identity.get_state(broadcaster_id),
             twitch_channel_metadata=await get_twitch_channel_metadata(runtime_bot, broadcaster_id),
-            queue_result=request.query_params.get("queue_result"),
-            queue_message=request.query_params.get("queue_message")
-        )
+        ),
     )
 
 
