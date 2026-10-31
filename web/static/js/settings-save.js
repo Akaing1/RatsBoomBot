@@ -2,11 +2,14 @@
     'use strict';
     const book = document.querySelector('[data-settings-book]');
     if (!book) return;
-    const forms = [...book.querySelectorAll('form[method="post"]')].filter(form => {
+    function isInlineForm(form) {
+        if (!(form instanceof HTMLFormElement)) return false;
         const url = new URL(form.getAttribute('action') || location.href, location.href);
-        return url.origin === location.origin && /\/(customization|features\/toggles)$/.test(url.pathname);
+        return form.method === 'post' && url.origin === location.origin && /\/(customization|features\/toggles|viewer-queue\/blacklist)$/.test(url.pathname);
+    }
+    book.querySelectorAll('form[method="post"]').forEach(form => {
+        if (isInlineForm(form)) form.dataset.settingsInlineSave = '';
     });
-    forms.forEach(form => { form.dataset.settingsInlineSave = ''; });
     const status = document.createElement('p');
     status.className = 'settings-floating-status';
     status.setAttribute('role', 'status');
@@ -68,7 +71,7 @@
     let queue = Promise.resolve();
     book.addEventListener('submit', event => {
         const form = event.target;
-        if (event.defaultPrevented || !forms.includes(form)) return;
+        if (event.defaultPrevented || !isInlineForm(form)) return;
         event.preventDefault();
         if (pending.has(form)) return;
         const data = new FormData(form);
@@ -88,6 +91,14 @@
                 if (!response.ok || result === 'error') throw new Error(message || 'Could not save this setting. Try again.');
                 const fresh = new DOMParser().parseFromString(await response.text(), 'text/html');
                 if (result !== 'success' || !fresh.querySelector('[data-settings-book]')) throw Object.assign(new Error('Could not confirm the save. Reload settings before trying again.'), {severity: 'warning'});
+                if (form.hasAttribute('data-settings-immediate-action')) {
+                    const current = book.querySelector('[data-queue-blacklist-members]');
+                    const replacement = fresh.querySelector('[data-queue-blacklist-members]');
+                    if (!current || !replacement) throw new Error('Could not update the blacklist. Reload settings to check it.');
+                    current.replaceChildren(...[...replacement.childNodes].map(node => node.cloneNode(true)));
+                    const username = form.querySelector('input[name="username"]');
+                    if (data.get('action') === 'add' && username.value === data.get('username')) username.value = '';
+                }
                 refreshState(fresh, form);
                 book.dispatchEvent(new CustomEvent('settings-saved', {detail: {form, snapshot}}));
                 notify(message || 'Saved.');

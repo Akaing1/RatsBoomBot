@@ -2244,21 +2244,8 @@ async def channel_viewer_queue_blacklist(request: Request):
     if broadcaster is None:
         logout_channel_user(request)
         return RedirectResponse(url="/connect", status_code=303)
-    return templates.TemplateResponse(
-        request=request,
-        name="channel/viewer_queue_blacklist.html",
-        context={
-            "active_page": "overview",
-            "broadcaster": broadcaster,
-            "blacklist": [
-                {"username": username, "label": format_dashboard_username(runtime_bot.services, broadcaster_id, username)}
-                for username in runtime_bot.services.viewer_queue.list_blacklist(broadcaster_id)
-            ],
-            "blacklist_result": request.query_params.get("result"),
-            "blacklist_message": request.query_params.get("message"),
-            "csrf_token": get_csrf_token(request)
-        }
-    )
+    return RedirectResponse(url="/channel/settings?section=queue#queue-blacklist", status_code=303)
+
 
 
 @router.post("/channel/viewer-queue/blacklist")
@@ -2284,7 +2271,7 @@ async def update_channel_viewer_queue_blacklist(
         changed, message = False, "Unknown blacklist action."
     result = "success" if changed else "error"
     return RedirectResponse(
-        url=f"/channel/viewer-queue/blacklist?result={result}&message={quote_plus(message)}",
+        url=f"/channel/settings?section=queue&setting_result={result}&setting_message={quote_plus(message)}#queue-blacklist",
         status_code=303
     )
 
@@ -2397,6 +2384,10 @@ async def channel_customization_page(request: Request):
             "youtube_message": request.query_params.get("youtube_message"),
             "social_tab": request.query_params.get("social_tab", "links"),
             "command_tab": request.query_params.get("command_tab", "responses"),
+            "blacklist": [
+                {"username": username, "label": format_dashboard_username(services, broadcaster_id, username)}
+                for username in services.viewer_queue.list_blacklist(broadcaster_id)
+            ],
             "protected_users": await get_protected_user_rows(runtime_bot, str(broadcaster_id)),
             "protected_result": request.query_params.get("protected_result"),
             "protected_message": request.query_params.get("protected_message"),

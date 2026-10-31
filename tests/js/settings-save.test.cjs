@@ -15,12 +15,15 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
         let enabled = true;
         let followRaid = true;
         let fail = false;
+        let blacklisted = false;
         const posts = [];
         const html = () => `<body class="channel-page-settings"><div class="toggle-feedback success">Earlier update saved.</div><div data-settings-book data-selected="events" data-channel="1">
             <nav class="settings-menu">${['events', 'chat'].map(key => `<details class="settings-menu-section" open><summary><a href="?section=${key}" data-settings-tab="${key}">${key}</a><span class="settings-dirty-dot" hidden></span></summary></details>`).join('')}</nav>
             <main class="settings-main settings-pages"><section data-settings-page="events"><header class="settings-page-heading"><h3>Events</h3></header><p class="settings-blocked-notice">Connection unavailable.</p>
                 <span class="settings-inline-switch"><button id="master" role="switch" type="submit" form="toggle-master" name="action" value="${enabled ? 'disable' : 'enable'}" aria-checked="${enabled}">${enabled ? 'Enabled' : 'Disabled'}</button></span>
                 <form id="save-follow" method="post" action="/channel/customization"><input type="hidden" name="csrf_token" value="test-token"><input type="hidden" name="setting_name" value="follow"><textarea name="value">Follow message</textarea><button name="action" value="save">Save</button></form>
+                <form id="add-blacklist" data-settings-immediate-action data-settings-inline-save method="post" action="/channel/viewer-queue/blacklist"><input name="action" type="hidden" value="add"><input name="username" required><button>Add</button></form>
+                <div data-queue-blacklist-members>${blacklisted ? '<form id="remove-blacklist" data-settings-immediate-action data-settings-inline-save method="post" action="/channel/viewer-queue/blacklist"><input name="action" type="hidden" value="remove"><input name="username" type="hidden" value="viewer"><button>Remove viewer</button></form>' : 'No blacklisted players'}</div>
                 <form id="save-raid" method="post" action="/channel/customization"><input type="hidden" name="setting_name" value="dashboard.follow_raid"><input type="hidden" name="action" value="save"><button role="switch" name="value" value="${followRaid ? '0' : '1'}" aria-checked="${followRaid}">Follow raid</button></form>
             </section><section data-settings-page="chat" hidden><header class="settings-page-heading"><h3>Chat</h3></header><article id="lurk-card" class="profile-setting-card${enabled ? '' : ' is-disabled'}">
                 <span class="settings-inline-switch"><button id="child" role="switch" type="submit" form="toggle-child" name="action" value="disable" ${enabled ? '' : 'disabled'} aria-checked="${enabled}">${enabled ? 'Enabled' : 'Disabled'}</button></span>
@@ -33,6 +36,7 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
                 const chunks = [];
                 for await (const chunk of request) chunks.push(chunk);
                 posts.push(Buffer.concat(chunks).toString());
+                if (request.url.endsWith('/blacklist')) blacklisted = !posts.at(-1).includes('\r\n\r\nremove\r\n');
                 if (request.url.endsWith('/toggles')) enabled = false;
                 if (posts.at(-1).includes('dashboard.follow_raid')) followRaid = false;
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -108,6 +112,19 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
         const bounds = await status.boundingBox();
         assert.ok(Math.abs(bounds.x + bounds.width - 1280) < 1);
         assert.ok(Math.abs(bounds.y + bounds.height - 880) < 1);
+        fail = false;
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await page.locator('#add-blacklist input[name="username"]').fill('viewer');
+        await page.locator('#add-blacklist button').click();
+        await page.waitForFunction(() => document.querySelector('#remove-blacklist'));
+        assert.equal(await page.locator('#add-blacklist input[name="username"]').inputValue(), '');
+        assert.equal(await page.locator('#save-follow textarea').inputValue(), 'Invalid draft');
+        await page.locator('#remove-blacklist button').click();
+        await page.waitForFunction(() => !document.querySelector('#remove-blacklist'));
+        assert.equal(await page.locator('[data-queue-blacklist-members]').textContent(), 'No blacklisted players');
+        assert.equal(await page.evaluate(() => window.samePage), true);
+        assert.deepEqual(errors, []);
         await page.clock.fastForward(4000);
         assert.equal(await status.evaluate(node => node.classList.contains('is-fading')), false);
         await page.clock.fastForward(1000);

@@ -424,7 +424,7 @@
                     </label>
                 </div>
                 <button type="button" data-queue-action="clear" class="danger">Clear queue</button>
-                {% if can_customize %}<a href="{{ channel_root }}/viewer-queue/blacklist">Blacklist</a>{% endif %}
+                {% if can_customize %}<a href="{{ channel_root }}/settings?section=queue#queue-blacklist">Blacklist</a>{% endif %}
             </div>
             {% endif %}<p class="queue-action-status" data-queue-action-status role="status" aria-live="polite"></p>
 

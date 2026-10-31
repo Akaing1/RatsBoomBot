@@ -46,7 +46,7 @@
             {% if section.key == 'connections' %}{% include "channel/settings_identity.html" %}{% endif %}
             {% if section.key == 'general' and not moderator_mode %}{% include "shared/widget_settings.html" %}{% endif %}
             {% if section.key == 'queue' %}
-            <section class="panel profile-settings-panel"><h3>Queue blacklist</h3><p>Manage viewers who cannot join your channel’s queue.</p><a class="button secondary" href="{{ channel_root }}/viewer-queue/blacklist">Manage blacklist</a></section>
+            <section class="settings-group"><header class="settings-group-heading"><h4>Queue blacklist</h4></header><p>Prevent specific Twitch users from joining your channel’s viewer queue.</p>{% include "channel/viewer_queue_blacklist.html" %}</section>
             {% endif %}
             {% if section.key == 'loyalty' %}<p class="settings-hint">Currency command: <strong>!{{ loyalty_alias }}</strong>. You can also use !points. Income amounts use your channel’s configured defaults.</p>{% endif %}
             {% for toggle in section.toggles %}
@@ -91,8 +91,8 @@
 <script src="/static/js/settings-timers.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
 <script src="/static/js/settings-inputs.js?v={{ deployment_stamp() }}-batch-field-sizing" defer></script>
 <script src="/static/js/settings-command-references.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
-<script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}-section-dirty-tracking" defer></script>
-<script src="/static/js/settings-save.js?v={{ deployment_stamp() }}-preserve-notices" defer></script>
+<script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}-inline-blacklist" defer></script>
+<script src="/static/js/settings-save.js?v={{ deployment_stamp() }}-inline-blacklist" defer></script>
 <script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}-short-hashes" defer></script>
 <script src="/static/js/settings-menu-highlight.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
 {% endblock %}

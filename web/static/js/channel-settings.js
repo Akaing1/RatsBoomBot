@@ -212,7 +212,7 @@
     });
     // Sections stay mounted, so navigating never discards form drafts.
     const dirtyForms = new Set();
-    const forms = [...book.querySelectorAll('form[method="post"]')];
+    const forms = [...book.querySelectorAll('form[method="post"]:not([data-settings-immediate-action])')];
     const snapshot = form => JSON.stringify([...new FormData(form)]);
     const originals = new Map(forms.map(form => [form, snapshot(form)]));
     const dirtySections = new Map(pages.map(page => {
@@ -294,6 +294,7 @@
         });
     });
     book.addEventListener('settings-saved', event => {
+        if (!originals.has(event.detail.form)) return;
         originals.set(event.detail.form, event.detail.snapshot);
         mark(event.detail.form);
     });
