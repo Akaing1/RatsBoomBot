@@ -1,0 +1,12 @@
+.admin-channel-summary-columns { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.admin-channel-summary-columns > .panel, .admin-channel-summary-metrics > .status-card { min-width: 0; }
+.admin-channel-summary-link { display: flex; flex-direction: column; gap: 8px; padding: 18px; margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised); }
+.admin-channel-summary-link:hover { border-color: var(--accent); }
+.admin-channel-summary-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.admin-channel-summary-link span { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.admin-channel-feature-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
+.admin-channel-feature-list .card-label { flex-basis: 100%; margin-bottom: 4px; }
+.admin-channel-stream { margin-bottom: 24px; overflow-wrap: anywhere; }
+.admin-channel-header .dashboard-channel-identity { min-width: 0; }
+.admin-channel-header h2, .admin-channel-summary-metrics strong { overflow-wrap: anywhere; }
+@media (max-width: 1100px) { .admin-channel-summary-columns { grid-template-columns: minmax(0,1fr); } .admin-channel-summary-metrics { grid-template-columns: minmax(0,1fr); } }

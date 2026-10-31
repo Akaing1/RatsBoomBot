@@ -1,0 +1,29 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ broadcaster.name or 'Channel' }} | RatsBoomBot Admin{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/admin-channel-summary.css') }}?v={{ deployment_stamp() }}">{% endblock %}
+{% block content %}
+<header class="page-header admin-channel-header">
+    <div><p class="eyebrow">Channel management</p><div class="dashboard-channel-identity">
+        {% if broadcaster.profile_image_url %}<img class="channel-heading-image" src="{{ broadcaster.profile_image_url }}" alt="">{% else %}<span class="channel-heading-placeholder" aria-hidden="true">{{ (broadcaster.name or broadcaster.id)[0] | upper }}</span>{% endif %}
+        <div><h2>{{ broadcaster.name or 'Unknown channel' }}</h2><p class="page-description">{% if broadcaster.login %}@{{ broadcaster.login }} · {% endif %}Twitch ID: {{ broadcaster.id }}</p></div>
+    </div></div>
+    {% include "admin/channel_page_switch.html" %}
+</header>
+<section class="status-grid admin-channel-summary-metrics" aria-label="Channel summary">
+    <article class="status-card"><p class="card-label">Stream status</p><div class="status-row"><span class="status-indicator {{ 'online' if broadcaster.is_live else 'offline' }}" aria-hidden="true"></span><strong>{{ 'Live' if broadcaster.is_live else 'Offline' }}</strong></div><p class="card-detail">Last known state from the bot runtime.</p></article>
+    <article class="status-card"><p class="card-label">Channel features</p><div class="metric">{{ channel_features | length }}</div><p class="card-detail">Enabled feature flags for this channel.</p></article>
+    <article class="status-card"><p class="card-label">Chat identity</p><div class="status-row"><strong>{{ 'Custom account' if chat_identity.connected else 'Standard bot' }}</strong></div><p class="card-detail">{% if chat_identity.connected %}{{ chat_identity.bot_display_name }}{% else %}Using the shared bot identity.{% endif %}</p></article>
+</section>
+<div class="admin-channel-summary-columns">
+<section class="panel"><div class="panel-header"><div><p class="eyebrow">Configuration</p><h3>Manage this channel</h3></div></div>
+    <a class="admin-channel-summary-link" href="/admin/channels/{{ broadcaster.id }}/settings"><strong>Settings →</strong><span>Manage features, messages, timers, social links and channel access together.</span></a>
+    <a class="admin-channel-summary-link" href="/admin/channels/{{ broadcaster.id }}/monitor"><strong>Monitor stream →</strong><span>Watch the stream, follow chat and review live activity.</span></a>
+    <div class="admin-channel-feature-list"><p class="card-label">Enabled features</p>{% for feature in channel_features | sort(attribute='value') %}<span class="channel-state">{{ feature.value | replace('_', ' ') | title }}</span>{% else %}<p class="card-detail">No channel feature flags are enabled. Review Settings to configure this channel.</p>{% endfor %}</div>
+</section>
+<section class="panel"><div class="panel-header"><div><p class="eyebrow">Troubleshooting</p><h3>Channel context</h3></div></div>
+    <div class="admin-channel-stream"><p class="card-label">Twitch stream title</p><strong>{{ twitch_channel_metadata.title }}</strong><p class="card-detail">Category: {{ twitch_channel_metadata.game }}</p></div>
+    <a class="admin-channel-summary-link" href="/admin/logs"><strong>Stream logs →</strong><span>Search saved sessions by this channel’s name.</span></a>
+    <a class="admin-channel-summary-link" href="/admin/runtime-logs"><strong>Runtime logs →</strong><span>Search application warnings and errors for this channel.</span></a>
+</section>
+</div>
+{% endblock %}

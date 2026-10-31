@@ -1,9 +1,10 @@
+import time
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
-from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName
+from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
 from config.settings import settings
 from storage.database import delete_token
 from web.admin.auth import require_admin, require_owner, validate_csrf_token
@@ -17,6 +18,7 @@ from web.shared.protected_users import (
     remove_protected_user
 )
 from web.state import get_bot, get_db
+from web.channel.settings_book import build_settings_sections
 
 router = APIRouter(prefix="/channels")
 
@@ -26,31 +28,8 @@ async def admin_channel_customization(request: Request, broadcaster_id: str):
     admin_redirect = await require_admin(request)
     if admin_redirect:
         return admin_redirect
-    runtime_bot = get_bot()
-    if runtime_bot is None or runtime_bot.services is None:
-        return await get_runtime_error(request)
-    broadcaster = get_broadcaster(runtime_bot, broadcaster_id)
-    if broadcaster is None:
-        return await get_channel_error(request)
-    services = runtime_bot.services
-    return templates.TemplateResponse(
-        request=request, name="admin/channel_customization.html",
-        context=build_admin_context(
-            request, active_page="channels", broadcaster=broadcaster,
-            customization_action=f"/admin/channels/{broadcaster_id}/customization",
-            channel_settings=await services.broadcaster_settings.get_settings(broadcaster_id),
-            setting_groups=services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)}),
-            setting_result=request.query_params.get("setting_result"),
-            setting_message=request.query_params.get("setting_message"),
-            command_tab=request.query_params.get("command_tab", "responses"),
-            protected_users=await get_protected_user_rows(runtime_bot, str(broadcaster_id)),
-            protected_result=request.query_params.get("protected_result"),
-            protected_message=request.query_params.get("protected_message"),
-            protected_search_url=f"/admin/channels/{broadcaster_id}/protected-users/search",
-            protected_add_url=f"/admin/channels/{broadcaster_id}/protected-users/add",
-            protected_remove_url=f"/admin/channels/{broadcaster_id}/protected-users/remove"
-        )
-    )
+    query = str(request.query_params)
+    return RedirectResponse(f"/admin/channels/{broadcaster_id}/settings" + (f"?{query}" if query else ""), status_code=303)
 
 
 @router.post("/{broadcaster_id}/customization")
@@ -75,6 +54,11 @@ async def save_admin_channel_customization(request: Request, broadcaster_id: str
             setter = services.broadcaster_settings.set_discord_url if setting_name == "social.discord_url" else services.broadcaster_settings.set_youtube_url
             await setter(broadcaster_id, value.strip())
             message = "Social link updated."
+        elif setting_name in {"social.tiktok_url", "social.x_url", "social.kofi_url", "social.vgen_url"}:
+            if action != "save":
+                raise ValueError("Use Save Changes to update or clear a social link.")
+            await services.broadcaster_settings.set_social_url(broadcaster_id, setting_name.removeprefix("social.").removesuffix("_url"), value.strip())
+            message = "Social link updated."
         else:
             definition = services.profile_settings.get_definition(setting_name)
             actor = f"admin:{request.state.administrator.id}"
@@ -87,7 +71,7 @@ async def save_admin_channel_customization(request: Request, broadcaster_id: str
     except (TypeError, ValueError) as error:
         result, message = "error", str(error)
     query = urlencode({"setting_result": result, "setting_message": message})
-    return RedirectResponse(url=f"/admin/channels/{broadcaster_id}/customization?{query}", status_code=303)
+    return RedirectResponse(url=f"/admin/channels/{broadcaster_id}/settings?{query}", status_code=303)
 
 
 def admin_protected_users_redirect(broadcaster_id: str, result: str, message: str) -> RedirectResponse:
@@ -97,7 +81,7 @@ def admin_protected_users_redirect(broadcaster_id: str, result: str, message: st
         "command_tab": "protected"
     })
     return RedirectResponse(
-        url=f"/admin/channels/{broadcaster_id}/customization?{query}#protected-users",
+        url=f"/admin/channels/{broadcaster_id}/settings?{query}#protected-users",
         status_code=303
     )
 
@@ -209,7 +193,7 @@ def redirect_to_channel(broadcaster_id: str, **query_values) -> RedirectResponse
 
 def redirect_to_channel_features(broadcaster_id: str, **query_values) -> RedirectResponse:
     query = urlencode({key: value for key, value in query_values.items() if value is not None})
-    url = f"/admin/channels/{broadcaster_id}/features"
+    url = f"/admin/channels/{broadcaster_id}/settings"
 
     if query:
         url = f"{url}?{query}"
@@ -281,44 +265,30 @@ async def channel_details_page(request: Request, broadcaster_id: str):
         return await get_runtime_error(request)
 
     services = runtime_bot.services
-    broadcaster_service = services.broadcasters
     broadcaster = get_broadcaster(runtime_bot, broadcaster_id)
 
     if broadcaster is None:
         return await get_channel_error(request)
 
-    await broadcaster_service.refresh_live_statuses()
-
-    viewer_queue = services.viewer_queue
-    redemption_activity = await get_redemption_dashboard_data(services, broadcaster_id)
-    gambling_loss_total = await services.points.get_gambling_loss_total(broadcaster_id)
-    channel_features = services.features.get_channel_features(broadcaster_id)
-    raid_configured = FeatureName.RAID_BOSSES in channel_features
-    raid_metrics = await services.raid_bosses.get_dashboard_metrics(broadcaster_id) if raid_configured else None
-
     return templates.TemplateResponse(
         request=request,
-        name="admin/channel_details.html",
+        name="admin/channel_overview.html",
         context=build_admin_context(
-            request,
-            active_page="channels",
-            channel_section="overview",
+            request, active_page="channels", channel_section="overview",
             broadcaster=broadcaster,
-            queue_open=viewer_queue.is_queue_open(broadcaster_id),
-            queue_users=viewer_queue.list_queue(broadcaster_id),
-            queue_size=viewer_queue.size(broadcaster_id),
-            redemption_activity=redemption_activity,
-            gambling_loss_total=gambling_loss_total,
-            raid_configured=raid_configured,
-            raid_metrics=raid_metrics,
+            channel_features=[feature for feature, state in services.features.get_channel_features(broadcaster_id).items() if state.effective_enabled],
+            chat_identity=services.chat_identity.get_state(broadcaster_id),
             twitch_channel_metadata=await get_twitch_channel_metadata(runtime_bot, broadcaster_id),
-            queue_result=request.query_params.get("queue_result"),
-            queue_message=request.query_params.get("queue_message")
-        )
+        ),
     )
 
 
 @router.get("/{broadcaster_id}/features", response_class=HTMLResponse)
+async def channel_features_redirect(request: Request, broadcaster_id: str):
+    return await admin_channel_customization(request, broadcaster_id)
+
+
+@router.get("/{broadcaster_id}/settings", response_class=HTMLResponse)
 async def channel_features_page(request: Request, broadcaster_id: str):
     admin_redirect = await require_admin(request)
 
@@ -336,13 +306,40 @@ async def channel_features_page(request: Request, broadcaster_id: str):
     if broadcaster is None:
         return await get_channel_error(request)
 
+    groups = services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)})
+    sections = build_settings_sections(groups, services.features.get_channel_features(broadcaster_id),
+        services.features.get_profile_features(broadcaster_id), services.features.get_global_groups(broadcaster_id),
+        services.features.get_global_commands(broadcaster_id), profile=get_active_profile(broadcaster_id))
+    # The streamer book hides these master switches; administrators still need them.
+    for feature, section_key in ((FeatureName.TIMERS, "timers"), (FeatureName.REDEEMS, "events")):
+        state = services.features.get_channel_features(broadcaster_id).get(feature)
+        if state is not None:
+            section = next(item for item in sections if item['key'] == section_key)
+            toggle = dict(kind="feature", name=feature.value, label=f"{feature.value.title()} master switch",
+                state=state, description="Control this system for the channel.", commands=[], panel="Feature controls")
+            section['toggles'].append(toggle)
+            section['standalone_toggles'].append(toggle)
+
     return templates.TemplateResponse(
         request=request,
-        name="admin/channel_details.html",
+        name="admin/channel_settings.html",
         context=build_admin_context(
             request,
             active_page="channels",
-            channel_section="features",
+            channel_section="settings",
+            channel_root=f"/admin/channels/{broadcaster_id}",
+            settings_sections=sections,
+            customization_action=f"/admin/channels/{broadcaster_id}/customization",
+            channel_settings=await services.broadcaster_settings.get_settings(broadcaster_id),
+            setting_result=request.query_params.get("setting_result"),
+            setting_message=request.query_params.get("setting_message"),
+            command_tab=request.query_params.get("command_tab", "responses"),
+            protected_users=await get_protected_user_rows(runtime_bot, str(broadcaster_id)),
+            protected_result=request.query_params.get("protected_result"),
+            protected_message=request.query_params.get("protected_message"),
+            protected_search_url=f"/admin/channels/{broadcaster_id}/protected-users/search",
+            protected_add_url=f"/admin/channels/{broadcaster_id}/protected-users/add",
+            protected_remove_url=f"/admin/channels/{broadcaster_id}/protected-users/remove",
             broadcaster=broadcaster,
             channel_features=services.features.get_channel_features(broadcaster_id),
             profile_features=services.features.get_admin_profile_features(broadcaster_id),
@@ -355,6 +352,38 @@ async def channel_features_page(request: Request, broadcaster_id: str):
             identity_message=request.query_params.get("identity_message")
         )
     )
+
+
+@router.get("/{broadcaster_id}/monitor", response_class=HTMLResponse)
+async def channel_monitor_page(request: Request, broadcaster_id: str):
+    admin_redirect = await require_admin(request)
+    if admin_redirect:
+        return admin_redirect
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return await get_runtime_error(request)
+    broadcaster = get_broadcaster(runtime_bot, broadcaster_id)
+    if broadcaster is None:
+        return await get_channel_error(request)
+    return templates.TemplateResponse(request=request, name="admin/channel_monitor.html",
+        context=build_admin_context(request, active_page="channels", channel_section="monitor",
+            broadcaster=broadcaster, twitch_channel_metadata=await get_twitch_channel_metadata(runtime_bot, broadcaster_id)),
+        headers={"Cache-Control": "no-store"})
+
+
+@router.get("/{broadcaster_id}/api/monitor", response_class=JSONResponse)
+async def channel_monitor_state(request: Request, broadcaster_id: str):
+    if await require_admin(request):
+        return JSONResponse({"detail": "Administrator authentication required."}, status_code=401)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster = get_broadcaster(runtime_bot, broadcaster_id)
+    if broadcaster is None:
+        return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+    return JSONResponse({"is_live": broadcaster.is_live,
+        "activity": await get_redemption_dashboard_data(runtime_bot.services, broadcaster_id)},
+        headers={"Cache-Control": "no-store"})
 
 
 @router.post("/{broadcaster_id}/custom-bot/premium")
@@ -454,6 +483,21 @@ async def admin_channel_chat_stream(request: Request, broadcaster_id: str, view:
 
     if get_broadcaster(runtime_bot, broadcaster_id) is None:
         return JSONResponse({"detail": "Connected channel not found."}, status_code=404)
+
+    checked_at = time.monotonic()
+
+    async def check_monitor_access():
+        nonlocal checked_at
+        now = time.monotonic()
+        if now - checked_at < 5:
+            return
+        if await require_admin(request):
+            raise HTTPException(status_code=401, detail="Administrator session ended.")
+        if get_broadcaster(runtime_bot, broadcaster_id) is None:
+            raise HTTPException(status_code=404, detail="Connected channel not found.")
+        checked_at = now
+
+    request.state.check_channel_access = check_monitor_access
 
     return StreamingResponse(
         stream_chat_events(

@@ -1,0 +1,9 @@
+.admin-channel-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; padding: 16px; margin-bottom: 14px; border-radius: 10px; background: var(--surface-raised); }
+.admin-channel-filters[hidden], .admin-page-channels [data-channel-card][hidden], .admin-page-channels [data-channel-no-results][hidden] { display: none; }
+.admin-channel-filters label { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 13px; }
+.admin-channel-filters label:first-child { flex: 1; min-width: 180px; }
+.admin-channel-filters input, .admin-channel-filters select { width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.admin-page-channels .channel-card-actions { flex-wrap: wrap; }
+.admin-page-channels .channel-card { min-width: 0; }
+.admin-page-channels .channel-card-identity p { overflow-wrap: anywhere; }
+.admin-page-channels .channel-card-grid { margin-top: 18px; }

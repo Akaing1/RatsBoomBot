@@ -1,1 +1,54 @@
-{% extends "admin/layout.html" %}{% block title %}Patch Notes | RatsBoomBot{% endblock %}{% block content %}<header class="page-header"><div><p class="eyebrow">Public updates</p><h1>Patch Notes</h1><p class="page-description">Draft, edit, and publish player-facing updates.</p></div></header><section class="panel"><h2>New patch note</h2><form class="patch-notes-form" method="post" action="/admin/patch-notes/save"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>Title<input name="title" required></label><label>Discord synopsis<textarea name="synopsis" required></textarea></label><label>Full patch notes (Markdown supported)<textarea name="body" rows="16" required></textarea></label><button class="button primary">Save draft</button></form></section><section class="panel"><h2>Archive</h2>{% for note in notes %}<article><h3>{{ note.title }}</h3><p>{{ note.version or "Draft" }} · {{ note.published_at or "Not published" }}</p>{% if not note.published_at %}<form method="post" action="/admin/patch-notes/{{ note.slug }}/publish"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button primary">Publish</button></form>{% endif %}</article>{% endfor %}</section>{% endblock %}
+{% extends "admin/layout.html" %}
+{% block title %}Patch Notes | RatsBoomBot{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/admin-patch-notes.css') }}?v={{ deployment_stamp() }}">{% endblock %}
+{% block content %}
+<header class="page-header">
+    <div><p class="eyebrow">Community updates</p><h2>Patch Notes</h2><p class="page-description">Prepare drafts and review the updates shared with your community.</p></div>
+    <div class="header-actions"><a class="button secondary" href="/patch-notes" target="_blank" rel="noopener noreferrer">View public archive</a><a class="button primary" href="/admin/patch-notes#new-patch-note">New draft</a></div>
+</header>
+<section class="channel-summary" aria-label="Patch note totals">
+    <article class="status-card"><p class="card-label">Drafts</p><div class="metric">{{ notes | rejectattr('published_at') | list | length }}</div><p class="card-detail">Waiting to be published.</p></article>
+    <article class="status-card"><p class="card-label">Published</p><div class="metric">{{ notes | selectattr('published_at') | list | length }}</div><p class="card-detail">Available in the public archive.</p></article>
+</section>
+<div class="admin-patch-layout">
+<section class="panel" id="new-patch-note" aria-labelledby="new-note-heading">
+    <div class="panel-header"><div><p class="eyebrow">Compose</p><h3 id="new-note-heading">{{ 'Edit patch note' if editing_note else 'New patch note' }}</h3></div></div>
+    <form class="admin-patch-form" method="post" action="{{ '/admin/patch-notes/' ~ editing_note.slug ~ '/edit' if editing_note else '/admin/patch-notes/save' }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="patch-title">Title</label><input id="patch-title" name="title" placeholder="What’s new in RatsBoomBot?" value="{{ editing_note.title if editing_note else '' }}" required>
+        <label for="patch-synopsis">Discord synopsis</label><textarea id="patch-synopsis" name="synopsis" rows="4" aria-describedby="synopsis-help" required>{{ editing_note.synopsis if editing_note else '' }}</textarea>
+        <p id="synopsis-help" class="card-detail">A short summary used in the Discord announcement when published.</p>
+        <label for="patch-body">Full patch notes</label><textarea id="patch-body" name="body" rows="16" aria-describedby="body-help" required>{{ editing_note.body if editing_note else '' }}</textarea>
+        <p id="body-help" class="card-detail">Markdown supported: use ## for section headings, - for bullet points, and **text** for bold.</p>
+        <div class="admin-patch-save"><p class="card-detail">{% if editing_note and editing_note.published_at %}Saving updates the public note immediately. Its URL and release version stay the same. No Discord announcement is resent.{% else %}Saving does not publish or send an announcement.{% endif %}</p><button class="button primary" type="submit">{{ 'Save changes' if editing_note else 'Save draft' }}</button>{% if editing_note %}<a class="button secondary" href="/admin/patch-notes">Cancel editing</a>{% endif %}</div>
+    </form>
+</section>
+<section class="panel" aria-labelledby="patch-archive-heading">
+    <div class="panel-header"><div><p class="eyebrow">Manage updates</p><h3 id="patch-archive-heading">Archive · {{ notes | length }}</h3></div></div>
+    {% for note in notes %}
+    <article class="admin-patch-card">
+        <div class="admin-patch-meta"><span class="channel-state {{ 'live' if note.published_at else '' }}">{{ 'Published' if note.published_at else 'Draft' }}</span>{% if note.version %}<span>v{{ note.version }}</span>{% endif %}</div>
+        <h4>{{ note.title }}</h4>
+        {% if note.published_at %}<p class="card-detail">Published {{ note.published_at }}</p>{% endif %}
+        <p class="admin-patch-synopsis">{{ note.synopsis }}</p>
+        <details><summary>Preview full notes</summary><div class="admin-patch-preview">{{ note.body | markdown }}</div></details>
+        <div class="admin-patch-actions">
+            <a class="button secondary" href="/admin/patch-notes?edit={{ note.slug | urlencode }}#new-patch-note">Edit</a>
+            <form method="post" action="/admin/patch-notes/{{ note.slug }}/delete" onsubmit="return confirm('Permanently delete this patch note? Published notes will be removed from the public archive. Existing Discord announcements remain.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button danger" type="submit">Delete</button>
+            </form>
+        {% if note.published_at %}
+            <a class="button secondary" href="/patch-notes/{{ note.slug }}" target="_blank" rel="noopener noreferrer">View published note</a>
+        {% else %}
+            <form method="post" action="/admin/patch-notes/{{ note.slug }}/publish" onsubmit="return confirm('Publish this note to the public archive and send its Discord announcement if configured?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button primary" type="submit">Publish</button>
+            </form>
+        {% endif %}
+        </div>
+    </article>
+    {% else %}
+    <div class="empty-state"><h4>No patch notes yet</h4><p>Create a draft to prepare your first community update.</p></div>
+    {% endfor %}
+</section>
+</div>
+{% endblock %}
