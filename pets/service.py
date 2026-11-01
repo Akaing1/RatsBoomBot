@@ -119,6 +119,20 @@ class PetService:
             """, (str(user_id),))
         return [self._from_row(row) for row in rows]
 
+    async def get_unobtained_pets(self, user_id: str) -> list[dict[str, Any]]:
+        async with self.db.acquire() as connection:
+            rows = await connection.fetchall("""
+                SELECT definitions.id AS pet_id, definitions.display_name, definitions.rarity,
+                       definitions.sprite_path, definitions.frame_count
+                FROM pet_definitions AS definitions
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM user_pets AS owned
+                    WHERE owned.user_id = ? AND owned.pet_id = definitions.id
+                )
+                ORDER BY definitions.display_name
+            """, (str(user_id),))
+        return [dict(row) for row in rows]
+
     async def _summon_pools(self, connection) -> dict[str, list[Any]]:
         rows = await connection.fetchall(
             "SELECT id, display_name, rarity FROM pet_definitions ORDER BY display_name"

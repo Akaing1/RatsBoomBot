@@ -131,6 +131,12 @@
             <div class="mod-auth-banner" data-mod-auth-banner{% if not moderator_auth_required %} hidden{% endif %}>
                 <a class="button mod-authorize-button" href="{{ channel_root }}/connect">Authorize Twitch</a>
             </div>
+            {% else %}
+            <div class="channel-auth-banner" data-channel-auth-banner role="status" hidden>
+                <p data-channel-auth-message></p>
+                <a class="button primary" href="/connect/twitch" data-channel-auth-connect hidden>Reauthorize Twitch</a>
+                <button class="button secondary" type="button" data-channel-auth-retry hidden>Retry permission check</button>
+            </div>
             {% endif %}
             {% block content %}{% endblock %}
         </main>
@@ -139,7 +145,7 @@
     <script src="{{ url_for('static', path='/js/hover-labels.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/overlay-scrollbars.js') }}?v={{ deployment_stamp() }}-command-panel-scrollbar-fixes" defer></script>
 
-    {% if moderator_mode %}<script src="/static/js/mod-authorization.js?v={{ deployment_stamp() }}" defer></script>{% endif %}
+    {% if moderator_mode %}<script src="/static/js/mod-authorization.js?v={{ deployment_stamp() }}" defer></script>{% else %}<script src="/static/js/channel-authorization.js?v={{ deployment_stamp() }}" defer></script>{% endif %}
     {% block page_scripts %}{% endblock %}
 </body>
 </html>
