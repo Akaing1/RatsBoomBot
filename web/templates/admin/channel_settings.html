@@ -3,7 +3,7 @@
 {% block title %}Settings | RatsBoomBot{% endblock %}
 {% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/admin-channel-settings.css') }}?v={{ deployment_stamp() }}">{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}-optimized-command-overlap-fade">
+<link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}-settings-heading-links">
 <header class="page-header"><div><p class="eyebrow">Channel management</p><h2>{{ broadcaster.name }} · Settings</h2><p class="page-description">Manage features and their customization together.</p></div>{% include "admin/channel_page_switch.html" %}</header>
 {% for result, message in [(toggle_result, toggle_message), (setting_result, setting_message)] %}
 {% if message %}<div class="toggle-feedback {{ 'success' if result == 'success' else 'error' }}" role="status">{{ message }}</div>{% endif %}
@@ -81,5 +81,5 @@
 <script src="/static/js/protected-users.js?v={{ deployment_stamp() }}-ranked-search-optimized" defer></script>
 <script src="/static/js/settings-timers.js?v={{ deployment_stamp() }}" defer></script>
 <script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}-optimized-context-tracking" defer></script>
-<script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}" defer></script>
+<script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}-ranked-settings-search" defer></script>
 {% endblock %}

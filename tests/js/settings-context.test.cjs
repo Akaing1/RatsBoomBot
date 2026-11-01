@@ -296,6 +296,45 @@ test('command panels expand into available space and the selected list opens ove
     } finally { await browser.close(); }
 });
 
+test('menu clicks open the requested commands and other destinations do not reopen the previous panel', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage({viewport: {width: 1300, height: 700}, reducedMotion: 'reduce'});
+        await page.route('http://settings.test/**', route => route.fulfill({body: '<html></html>', contentType: 'text/html'}));
+        await page.goto('http://settings.test/channel/settings?section=pets');
+        const commands = label => `<div class="settings-switch-row"><div class="settings-command-reference-region" data-settings-command-reference><aside class="settings-command-reference"><h4>${label}</h4><ul>${Array.from({length: 30}, (_, index) => `<li><code>!${label}${index}</code></li>`).join('')}</ul></aside></div></div>`;
+        await page.setContent(`<body class="channel-page-settings"><div data-settings-book data-selected="pets"><div class="settings-workspace">
+            <main class="settings-main settings-pages"><section data-settings-page="pets"><header class="settings-page-heading"><h3>Pets and Boss Hunt</h3></header>
+                <section class="settings-command-cluster" id="pets" style="height:160px"><h4 id="pets-heading">Pets</h4>${commands('Pets')}</section>
+                <section class="settings-command-cluster" style="height:160px"><h4 id="boss-heading">Boss Hunt</h4>${commands('Boss Hunt')}</section>
+                <section class="settings-group" style="height:1200px"><header class="settings-group-heading" id="names-heading"><h4>Raid boss names</h4></header><article class="profile-setting-card"><h4>Names</h4><textarea>Boss</textarea></article></section>
+            </section><section data-settings-page="general" hidden><header class="settings-page-heading"><h3>General</h3></header></section></main>
+            <aside class="settings-tools"><div class="settings-finder" data-settings-finder><input><p data-settings-result-count></p><div data-settings-results></div></div>
+                <nav class="settings-menu">${['pets', 'general'].map(key => `<details class="settings-menu-section" open><summary><a data-settings-tab="${key}">${key}</a><span class="settings-dirty-dot" hidden></span></summary><div data-settings-links="${key}"></div></details>`).join('')}</nav></aside>
+            <div class="settings-extra-panel settings-commands-rail"></div></div></div></body>`);
+        await page.addStyleTag({path: 'web/static/css/channel-settings.css'});
+        await page.addStyleTag({content: '.settings-workspace{display:flex;align-items:flex-start}.settings-tools{position:fixed!important;left:0;top:0;width:190px!important}.settings-main{margin-left:210px;flex:1}'});
+        for (const file of ['settings-command-references.js', 'channel-settings.js', 'settings-finder.js']) await page.addScriptTag({path: `web/static/js/${file}`});
+        const selected = page.locator('.settings-commands-rail .is-selected h4');
+        for (const [heading, label] of [['pets-heading', 'Pets'], ['boss-heading', 'Boss Hunt']]) {
+            await page.locator(`[data-settings-location="${heading}"]`).click();
+            assert.equal(await selected.textContent(), label, 'Clicking a menu shortcut opens its commands immediately');
+            await page.locator('[data-settings-location="names-heading"]').click();
+            await page.evaluate(() => {
+                const book = document.querySelector('[data-settings-book]');
+                book.dispatchEvent(new CustomEvent('settings-context-scroll', {detail: {hovered: null, target: document.querySelector('#pets')}}));
+            });
+            await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+            assert.equal(await selected.count(), 0, 'The old viewport context must not reopen commands after another destination is clicked');
+        }
+        await page.locator('[data-settings-location="pets-heading"]').click();
+        await page.locator('[data-settings-tab="general"]').click();
+        assert.equal(await selected.count(), 0);
+        await page.locator('[data-settings-tab="pets"]').click();
+        assert.equal(await selected.textContent(), 'Pets', 'Clicking the category selects its first commands panel');
+    } finally { await browser.close(); }
+});
+
 test('Boss Hunt commands stay alongside the remaining category settings below Pets', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
     const browser = await chromium.launch({executablePath, headless: true});
     try {

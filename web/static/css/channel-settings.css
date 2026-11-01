@@ -256,6 +256,12 @@
 .settings-menu :is(summary,a,button):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .channel-page-settings .settings-tools .settings-finder{position:static;box-sizing:border-box;width:100%;margin:0 0 12px;padding:0 0 12px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;box-shadow:none;overflow:visible}
 .settings-tools .settings-finder-count:empty{display:none}
+.settings-search-popup[popover]{position:fixed;inset:auto;margin:0;padding:10px;box-sizing:border-box;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);box-shadow:0 12px 28px #0005;overflow:auto;scrollbar-width:none}
+.settings-search-popup[popover]:not(:popover-open){display:none}
+.settings-search-popup::-webkit-scrollbar{display:none}
+.settings-search-popup .settings-finder-count{margin:0 4px 8px}
+.settings-search-popup .settings-finder-results{gap:4px}
+.settings-search-popup button.is-selected{border-color:var(--accent);background:var(--surface-raised);color:var(--text)}
 .channel-page-settings .settings-tools .settings-finder h3{font-size:15px;margin-bottom:14px}
 .channel-page-settings .settings-toggle-copy{flex:1;min-width:0;padding:10px 0}
 .channel-page-settings .settings-switch-row{align-items:flex-start}
@@ -375,6 +381,8 @@
 .settings-related-links{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0;font-size:12px;line-height:1.5}
 .settings-related-links a,.settings-help-link{color:#c4b5fd;text-decoration:underline;text-underline-offset:3px}
 .settings-related-links a:hover,.settings-help-link:hover{color:var(--text)}
+.channel-page-settings .toggle-card-heading:has(>.settings-heading-link){flex-direction:row}
+.settings-heading-link{flex-shrink:0;margin-left:auto;font-size:12px;line-height:1.5;text-align:right}
 .settings-inline-switch:has(>.settings-related-links){flex-direction:column;align-items:flex-end}
 .settings-inline-switch>.settings-related-links{flex-direction:column;align-items:flex-end;max-width:190px;margin:4px 0 0}
 .settings-group-heading{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:16px;border-bottom:1px solid var(--border)}

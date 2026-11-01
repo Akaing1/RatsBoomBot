@@ -63,6 +63,7 @@
     const fadedPanels = new Set();
     let selected;
     let hovered;
+    let allowViewportSelection = true;
     let layoutState;
     let layoutSnapshot;
     let layoutDirty = true;
@@ -106,9 +107,10 @@
         panel.style.removeProperty('overflow-y');
         closing.delete(panel);
     }
-    function select(target) {
-        const match = selected?.scope.contains(target) ? selected : references.find(item => item.scope.contains(target));
-        if (match) changeExpansion(match, null);
+    function select(target, explicit = false) {
+        const match = selected?.scope.contains(target) ? selected : references.find(item => item.scope.contains(target))
+            || (explicit && target.matches('[data-settings-page]') ? references.find(item => target.contains(item.scope)) : null);
+        changeExpansion(match || null, null);
     }
     function changeExpansion(nextSelected, nextHovered) {
         if (selected === nextSelected && hovered === nextHovered) return;
@@ -232,7 +234,9 @@
     }, {passive: true});
     document.addEventListener('pointerleave', () => { pointer = null; changeExpansion(selected, null); });
     document.addEventListener('click', event => {
-        if (!rail.contains(event.target)) changeExpansion(null, null);
+        if (rail.contains(event.target) || event.target.closest('[data-settings-tab], [data-settings-location], [data-settings-results] button, a[data-settings-link]')) return;
+        allowViewportSelection = false;
+        changeExpansion(null, null);
     });
     function update() {
         frame = null;
@@ -299,16 +303,22 @@
     references.forEach(item => observer.observe(item.panel));
     wide.addEventListener('change', resize);
     mobile.addEventListener('change', resize);
-    book.addEventListener('settings-section-changed', () => { [...animations.keys()].forEach(stopAnimation); selected = null; hovered = null; stack(); updateNow(); });
+    book.addEventListener('settings-section-changed', () => { [...animations.keys()].forEach(stopAnimation); selected = null; hovered = null; allowViewportSelection = true; stack(); updateNow(); });
     book.addEventListener('settings-hover', event => select(event.detail));
     book.addEventListener('settings-context-scroll', event => {
         // Viewport tracking may move the menu highlight without dismissing a
         // commands panel the user is reading. A new middle-panel hover wins.
-        if (!event.detail.hovered && (selected || hovered)) return;
+        if (!event.detail.hovered && (!allowViewportSelection || selected || hovered)) return;
         const target = event.detail.hovered || event.detail.target;
         if (target) select(target);
     });
-    book.addEventListener('settings-scroll-start', event => select(event.detail));
+    book.addEventListener('settings-scroll-start', event => {
+        allowViewportSelection = false;
+        select(event.detail, true);
+    });
+    const resumeViewportSelection = () => { allowViewportSelection = true; };
+    window.addEventListener('wheel', resumeViewportSelection, {passive: true});
+    window.addEventListener('touchstart', resumeViewportSelection, {passive: true});
     window.addEventListener('resize', () => { layoutDirty = true; schedule(); }, {passive: true});
     window.addEventListener('scroll', scheduleOverlaps, {passive: true});
     window.addEventListener('pagehide', () => { observer.disconnect(); cancelAnimationFrame(frame); cancelAnimationFrame(overlapFrame); [...animations.keys()].forEach(stopAnimation); stopLayoutAnimations(); }, {once: true});

@@ -37,10 +37,9 @@
                 <form method="post" action="{{ customization_action | default('/channel/customization') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="setting_name" value="{{ key }}">
-                    <div class="toggle-card-heading"><div><h4>{{ label }}</h4><p>{{ description }}</p></div></div>
+                    <div class="toggle-card-heading"><div><h4>{{ label }}</h4><p>{{ description }}</p></div>{% if settings_notebook | default(false) and key == 'social.youtube_url' %}<a class="settings-help-link settings-heading-link" data-settings-link href="?section=general#youtube-chat-connection">Connect YouTube chat</a>{% endif %}</div>
                     {% if settings_notebook | default(false) %}<div class="settings-field-body">{% endif %}
                     <input class="profile-setting-input" type="url" name="value" value="{{ current_value or '' }}" placeholder="https://">
-                    {% if settings_notebook | default(false) and key == 'social.youtube_url' %}<p class="settings-related-links"><a data-settings-link href="?section=general#youtube-chat-connection">Connect YouTube chat</a></p>{% endif %}
                     <div class="toggle-actions profile-setting-actions"><button class="button primary" type="submit" name="action" value="save">Save Changes</button></div>
                     {% if settings_notebook | default(false) %}</div>{% endif %}
                 </form>

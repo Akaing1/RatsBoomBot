@@ -198,7 +198,8 @@ def test_sidebar_navigation_and_group_descriptions_use_command_registry():
         assert 'Included commands (' in html
         assert 'href="?section=events#settings-group-shoutouts"' not in html
         assert 'href="?section=loyalty#setting-points-display_name"' not in html
-        assert 'href="?section=connections#socials"' in html
+        assert 'Customize social links' not in html
+        assert 'Manage timers' not in html
         assert 'href="?section=connections#settings-control-global_group-socials"' not in html
         toggles = [toggle for section in context['settings_sections'] for toggle in section['toggles']]
         assert all(toggle['description'] for toggle in toggles)

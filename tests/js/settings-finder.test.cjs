@@ -5,6 +5,85 @@ let chromium;
 try { ({chromium} = require('playwright')); } catch (_) {}
 const executablePath = process.env.CHAT_TEST_BROWSER_PATH || chromium?.executablePath();
 
+test('settings search ranks close names first and also includes name and category substrings', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage();
+        await page.setContent(`<div data-settings-book><div data-settings-finder><input><p data-settings-result-count></p><div data-settings-results></div></div>
+            ${[['Chat', 'Controls', ['Lurking message', 'Alerts', 'Lurk message', 'Lurk']], ['Lurk tools', 'Utilities', ['Enabled', 'Cooldown']]].map(([category, group, names], index) => `<section data-settings-page="page${index}"><header class="settings-page-heading"><h3>${category}</h3></header><section class="settings-group"><header class="settings-group-heading"><h4>${group}</h4></header>${names.map(name => `<article class="profile-setting-card"><h4>${name}</h4><div class="toggle-card-heading"><p>Contains lurk only in the description.</p></div><textarea>Private lurk value</textarea></article>`).join('')}</section></section>`).join('')}</div>`);
+        await page.addScriptTag({path: 'web/static/js/settings-finder.js'});
+        const input = page.locator('[data-settings-finder] input');
+        const names = () => page.locator('[data-settings-results] button>span').allTextContents();
+        await input.fill('lurk');
+        const matches = await names();
+        assert.equal(matches[0], 'Lurk', 'Exact names come before partial names');
+        assert.ok(matches.indexOf('Lurk message') < matches.indexOf('Lurking message'), 'Closer partial names rank first');
+        assert.ok(matches.indexOf('Lurking message') < matches.indexOf('Enabled'), 'Name matches precede category-only matches');
+        assert.ok(matches.includes('Cooldown'));
+        assert.ok(!matches.includes('Alerts'), 'Descriptions and stored values do not create unrelated name/category matches');
+        await input.fill('lurk mesage');
+        assert.equal((await names())[0], 'Lurk message', 'Small spelling mistakes still find the closest setting name');
+        await input.fill('utilities');
+        assert.ok((await names()).includes('Enabled'), 'Subcategory names are searchable');
+        await input.fill('LURK MESSAGE');
+        assert.equal((await names())[0], 'Lurk message');
+    } finally { await browser.close(); }
+});
+
+test('settings search floats above the menu, supports keyboard selection, and dismisses cleanly', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage({viewport: {width: 1200, height: 800}, reducedMotion: 'reduce'});
+        await page.route('http://settings.test/**', route => route.fulfill({body: '<html></html>', contentType: 'text/html'}));
+        await page.goto('http://settings.test/channel/settings');
+        await page.setContent(`<body class="channel-page-settings"><div data-settings-book data-selected="events">
+            <div class="settings-main settings-pages">${[['events', 'Follow'], ['chat', 'Lurk']].map(([key, title]) => `<section data-settings-page="${key}"><header class="settings-page-heading"><h3>${key}</h3></header><section class="settings-group"><header class="settings-group-heading"><h4>${title} settings</h4></header><article class="profile-setting-card"><h4>${title} message</h4><textarea>Saved value</textarea></article></section></section>`).join('')}</div>
+            <aside class="settings-tools"><div class="settings-finder" data-settings-finder hidden><input placeholder="Search settings"><p data-settings-result-count></p><div class="settings-finder-results" data-settings-results></div></div>
+            <nav class="settings-menu">${['events', 'chat'].map(key => `<details class="settings-menu-section" open><summary><a data-settings-tab="${key}">${key}</a><span class="settings-dirty-dot" hidden></span></summary><div data-settings-links="${key}"></div></details>`).join('')}</nav></aside></div></body>`);
+        await page.addStyleTag({path: 'web/static/css/channel-settings.css'});
+        await page.addStyleTag({content: '.settings-tools{display:block!important;position:fixed!important;left:20px;top:40px;width:260px!important;height:240px;overflow:auto!important}.settings-main{margin-left:320px}'});
+        for (const file of ['channel-settings.js', 'settings-finder.js']) await page.addScriptTag({path: `web/static/js/${file}`});
+        const input = page.locator('[data-settings-finder] input');
+        const popup = page.locator('.settings-search-popup');
+        const menu = page.locator('.settings-menu');
+        const menuText = await menu.textContent();
+        const menuBounds = await menu.boundingBox();
+        const toolsHeight = await page.locator('.settings-tools').evaluate(node => node.scrollHeight);
+        await input.fill('message');
+        assert.equal(await popup.evaluate(node => node.matches(':popover-open')), true);
+        assert.equal(await page.locator('[data-settings-results] button').count(), 2);
+        assert.equal(await menu.textContent(), menuText);
+        assert.deepEqual(await menu.boundingBox(), menuBounds, 'Search results do not push down the menu');
+        assert.equal(await page.locator('.settings-tools').evaluate(node => node.scrollHeight), toolsHeight);
+        const bounds = await popup.boundingBox();
+        assert.ok(bounds.y >= (await input.boundingBox()).y + (await input.boundingBox()).height);
+        await input.press('ArrowDown');
+        await input.press('ArrowDown');
+        await input.press('ArrowUp');
+        assert.equal(await input.evaluate(node => node === document.activeElement), true);
+        await input.press('Enter');
+        assert.equal(await popup.evaluate(node => node.matches(':popover-open')), false);
+        assert.equal(await page.locator('[data-settings-page="chat"]').isVisible(), true);
+        assert.equal(await page.locator('[data-settings-page="chat"] textarea').evaluate(node => node === document.activeElement), true);
+        await input.fill('follow');
+        await input.press('Escape');
+        assert.equal(await input.getAttribute('aria-expanded'), 'false');
+        assert.equal(await popup.isVisible(), false);
+        await input.fill('lurk');
+        await page.mouse.click(1190, 750);
+        await page.waitForFunction(() => document.querySelector('[data-settings-finder] input').getAttribute('aria-expanded') === 'false');
+        assert.equal(await popup.isVisible(), false);
+        await page.setViewportSize({width: 390, height: 844});
+        await input.fill('message');
+        const mobileBounds = await popup.boundingBox();
+        assert.ok(mobileBounds.x >= 0 && mobileBounds.x + mobileBounds.width <= 390);
+        await page.setViewportSize({width: 280, height: 844});
+        await page.waitForFunction(() => document.querySelector('.settings-search-popup').getBoundingClientRect().right <= innerWidth);
+        await input.fill('');
+        assert.equal(await popup.isVisible(), false);
+    } finally { await browser.close(); }
+});
+
 test('scrolling prioritizes the middle-panel pointer including gaps, otherwise the viewport top', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
     const browser = await chromium.launch({executablePath, headless: true});
     try {
@@ -193,7 +272,7 @@ test('expandable settings menu and search preserve drafts and open matching grou
         await page.locator('[data-settings-tab="chat"]').press('ArrowUp');
         assert.equal(await page.locator('[data-settings-page="events"]').isVisible(), true);
         await search.fill('follow');
-        await page.locator('[data-settings-results] button').filter({hasText: 'Follow message'}).last().click();
+        await page.locator('[data-settings-results] button').filter({has: page.locator('span', {hasText: /^Follow message$/})}).click();
         const draft = page.locator('[data-settings-page="events"] textarea');
         await draft.fill('Unsaved draft');
         await page.waitForFunction(() => scrolledSettings.some(entry => entry.key === 'follow' && entry.block === 'start'));
@@ -203,11 +282,11 @@ test('expandable settings menu and search preserve drafts and open matching grou
         assert.equal(await page.locator('[data-settings-page="chat"]').isVisible(), true);
         assert.equal(await page.locator('[data-settings-tab="chat"]').getAttribute('aria-current'), 'page');
         await search.fill('lurk');
-        await page.locator('[data-settings-results] button').filter({hasText: 'Lurk message'}).last().click();
+        await page.locator('[data-settings-results] button').filter({has: page.locator('span', {hasText: /^Lurk message$/})}).click();
         assert.equal(await page.locator('[data-settings-page="chat"] .settings-group').isVisible(), true);
         assert.equal(await page.locator('[data-settings-page="events"]').isVisible(), false);
         await search.fill('follow');
-        await page.locator('[data-settings-results] button').filter({hasText: 'Follow message'}).last().click();
+        await page.locator('[data-settings-results] button').filter({has: page.locator('span', {hasText: /^Follow message$/})}).click();
         assert.equal(await draft.inputValue(), 'Unsaved draft');
         assert.equal(await draft.evaluate(node => node === document.activeElement), true);
         for (const query of ['private_saved_message', 'Unsaved draft', 'nonexistent']) {
@@ -220,7 +299,7 @@ test('expandable settings menu and search preserve drafts and open matching grou
         await page.setViewportSize({width: 390, height: 844});
         await page.locator('[data-settings-links="chat"]').waitFor({state: 'hidden'});
         await search.fill('lurk');
-        await page.locator('[data-settings-results] button').filter({hasText: 'Lurk message'}).last().click();
+        await page.locator('[data-settings-results] button').filter({has: page.locator('span', {hasText: /^Lurk message$/})}).click();
         assert.equal(await drawer.isVisible(), true);
         await page.locator('[data-settings-links="events"]').waitFor({state: 'hidden'});
         assert.equal(await page.locator('[data-settings-page="chat"] textarea').evaluate(node => node === document.activeElement), true);

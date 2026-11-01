@@ -28,7 +28,6 @@ LABELS = {"raid_bosses": "Boss Hunt", "globals": "All global commands", "channel
 RELATED_SETTINGS = {
     ("profile_feature", "league"): [("games", "league-of-legends", "Customize League of Legends")],
     ("profile_feature", "overwatch"): [("games", "overwatch", "Customize Overwatch")],
-    ("global_group", "settings"): [("connections", "socials", "Customize social links"), ("timers", "", "Manage timers")],
 }
 
 
