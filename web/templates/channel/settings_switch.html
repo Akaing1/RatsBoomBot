@@ -5,11 +5,19 @@
 <span class="settings-inline-switch">
     {% if labeled %}<span class="settings-switch-label">{{ toggle.label }}</span>{% endif %}
     <button id="settings-control-{{ toggle.kind }}-{{ toggle.name }}" class="settings-status-switch state-toggle queue-state-toggle{% if toggle.state.effective_enabled %} live{% endif %}" type="submit" form="settings-toggle-{{ toggle.kind }}-{{ toggle.name }}" name="action" value="{{ 'disable' if toggle.state.effective_enabled else 'enable' }}" role="switch" aria-checked="{{ 'true' if toggle.state.effective_enabled else 'false' }}" aria-label="{{ toggle.label }}"{% if blocked %} disabled title="Enable the required settings first."{% else %} title="{{ 'Disable' if toggle.state.effective_enabled else 'Enable' }} {{ toggle.label }}"{% endif %}>{{ switch_contents(toggle.state.effective_enabled) }}</button>
-    {% if blocked and toggle.section != 'general' %}<span class="settings-related-links">
-        {% if toggle.state.blocked_by_profile %}<a data-settings-link href="?section=general#channel-profile">Enable channel profile</a>{% endif %}
-        {% if toggle.state.blocked_by_globals %}<a data-settings-link href="?section=general#all-global-commands">Enable global commands</a>{% endif %}
-    </span>{% endif %}
 </span>
+{% endmacro %}
+
+{% macro blocked_notice(section) %}
+{% if section.blocked %}
+<p class="settings-blocked-notice">Some settings require a parent switch to be enabled.
+    {% if section.key == 'general' %}Enable the required controls below.
+    {% else %}
+        {% if section.blocked_by_profile %}<a data-settings-link href="?section=general#channel-profile">Enable channel profile</a>{% endif %}
+        {% if section.blocked_by_globals %}<a data-settings-link href="?section=general#all-global-commands">Enable global commands</a>{% endif %}
+    {% endif %}
+</p>
+{% endif %}
 {% endmacro %}
 
 {% macro toggle_details(toggle) %}

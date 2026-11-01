@@ -6,6 +6,8 @@
     const pages = [...book.querySelectorAll('[data-settings-page]')];
     const scroller = book.querySelector('.settings-pages');
     const main = book.querySelector('.settings-main');
+    const mobile = matchMedia('(max-width: 768px)');
+    const hoverCapable = matchMedia('(hover: hover)');
     let hoveredSetting;
     let pointer;
     function settingAt(element) {
@@ -22,15 +24,34 @@
         }
         return target?.closest('.settings-command-cluster') || target || null;
     }
+    function contextAt(element, y) {
+        if (!element || !main?.contains(element)) return null;
+        const setting = settingAt(element);
+        if (setting) return setting;
+        const page = element.closest('[data-settings-page]') || pages.find(page => {
+            if (page.hidden) return false;
+            const bounds = page.getBoundingClientRect();
+            return bounds.top <= y && bounds.bottom > y;
+        });
+        if (!page) return null;
+        const container = element.closest('.settings-group, .settings-command-cluster, .profile-settings-panel, .settings-timer-manager>.panel') || page;
+        let target = container;
+        // Padding and gaps still belong to the most recent setting under the pointer.
+        for (const section of container.querySelectorAll('.settings-group, .settings-command-cluster, .profile-settings-panel, .settings-switch-row, .profile-setting-card, .settings-timer-manager>.panel')) {
+            const bounds = section.getBoundingClientRect();
+            if (bounds.height && bounds.top <= y) target = section;
+        }
+        return target.closest('.settings-command-cluster') || target;
+    }
     function setHover(target) {
         if (target === hoveredSetting) return;
         hoveredSetting = target;
         book.dispatchEvent(new CustomEvent(target ? 'settings-hover' : 'settings-hover-end', {detail: target}));
     }
     main?.addEventListener('pointerover', event => {
-        if (event.pointerType === 'touch' || !matchMedia('(hover: hover)').matches) return;
+        if (event.pointerType === 'touch' || !hoverCapable.matches) return;
         pointer = {x: event.clientX, y: event.clientY};
-        setHover(settingAt(event.target));
+        setHover(contextAt(event.target, event.clientY));
     });
     main?.addEventListener('pointerleave', () => setHover(null));
     document.addEventListener('pointermove', event => {
@@ -38,11 +59,13 @@
     }, {passive: true});
     window.addEventListener('scroll', () => {
         if (!main) return;
-        const bounds = main.getBoundingClientRect();
-        const edge = matchMedia('(max-width:768px)').matches ? document.querySelector('[data-channel-sidebar]')?.getBoundingClientRect().bottom || 0 : 0;
-        const element = document.elementFromPoint(bounds.left + bounds.width / 2, edge + 1);
-        const target = settingAt(element) || (main.contains(element) ? element.closest('.settings-group, .settings-command-cluster, .profile-settings-panel, .settings-timer-manager>.panel, [data-settings-page]') : null);
-        if (pointer && matchMedia('(hover:hover)').matches) setHover(settingAt(document.elementFromPoint(pointer.x, pointer.y)));
+        if (pointer && hoverCapable.matches) setHover(contextAt(document.elementFromPoint(pointer.x, pointer.y), pointer.y));
+        let target = hoveredSetting;
+        if (!target) {
+            const bounds = main.getBoundingClientRect();
+            const edge = mobile.matches ? document.querySelector('[data-channel-sidebar]')?.getBoundingClientRect().bottom || 0 : 0;
+            target = contextAt(document.elementFromPoint(bounds.left + bounds.width / 2, edge + 1), edge + 1);
+        }
         book.dispatchEvent(new CustomEvent('settings-context-scroll', {detail: {hovered: hoveredSetting, target}}));
     }, {passive: true});
     book.addEventListener('settings-section-changed', () => { hoveredSetting = null; });
@@ -50,7 +73,6 @@
     const disclosures = new WeakMap();
     const menuToggle = document.querySelector('[data-settings-menu-toggle]');
     const menu = book.querySelector('.settings-tools');
-    const mobile = matchMedia('(max-width: 768px)');
     let menuAnimation;
     function showMenu(open, animate = true) {
         if (!menuToggle || !menu) return;

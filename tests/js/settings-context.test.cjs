@@ -67,7 +67,8 @@ test('expanding commands at the page bottom keeps the scroll position and hover 
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
         await page.waitForTimeout(100);
         const before = await page.evaluate(() => ({height: document.documentElement.scrollHeight, scroll: scrollY}));
-        await page.locator('#groups>h4').hover();
+        const group = await page.locator('#groups').boundingBox();
+        await page.mouse.move(group.x + 30, (Math.max(0, group.y) + Math.min(600, group.y + group.height)) / 2);
         await page.waitForTimeout(700);
         assert.equal(await page.locator('.settings-commands-rail .is-selected h4').textContent(), 'Command groups');
         assert.deepEqual(await page.evaluate(() => ({height: document.documentElement.scrollHeight, scroll: scrollY})), before);
@@ -196,6 +197,10 @@ test('command panels expand into available space and the selected list opens ove
         await page.waitForFunction(() => document.querySelector('.settings-commands-rail').style.height);
         const panels = page.locator('.settings-commands-rail .settings-command-reference');
         assert.equal(await panels.count(), 3);
+        assert.equal(await page.locator('.settings-commands-rail').getAttribute('data-overlay-scrollbars'), 'off');
+        assert.deepEqual(await panels.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-overlay-scrollbars'))), ['off', 'off', 'off']);
+        assert.equal(await panels.nth(0).evaluate(node => getComputedStyle(node).scrollbarWidth), 'none');
+        assert.equal(await panels.nth(0).locator('.settings-command-expand').evaluate(node => node.hidden), true, 'Short command lists do not show an expansion arrow');
         assert.equal(await page.locator('.settings-main').evaluate(node => node.getBoundingClientRect().height), originalHeight);
         const alignment = await page.evaluate(() => [...document.querySelectorAll('.settings-group')].map((section, index) => {
             const heading = section.querySelector('.settings-group-heading').getBoundingClientRect();
@@ -217,13 +222,17 @@ test('command panels expand into available space and the selected list opens ove
         const raidSection = await page.locator('#Raid').boundingBox();
         assert.ok(raid.y + raid.height <= raidSection.y + raidSection.height + 1);
         const short = await panels.nth(2).boundingBox();
-        assert.ok(short.height > 180 && short.height <= 568);
-        assert.equal(await panels.nth(2).evaluate(node => node.scrollHeight > node.clientHeight), true);
+        assert.ok(short.height > 600, 'A tall final list extends beyond the viewport');
+        assert.equal(await panels.nth(2).evaluate(node => node.scrollHeight > node.clientHeight), false);
         assert.equal(await page.locator('.settings-main').evaluate(node => node.getBoundingClientRect().height), originalHeight);
         await page.evaluate(() => window.scrollTo(0, 1100));
         await page.waitForFunction(() => window.scrollY === 1100);
         const upper = await panels.nth(1).boundingBox();
         const lower = await panels.nth(2).boundingBox();
+        await page.waitForFunction(() => !document.querySelectorAll('.settings-command-expand')[1].hidden);
+        const arrow = await panels.nth(1).locator('.settings-command-expand').boundingBox();
+        assert.ok(Math.abs(arrow.x + arrow.width / 2 - (upper.x + upper.width / 2)) < 2, 'Expansion arrow is horizontally centered');
+        assert.ok(arrow.y >= upper.y && arrow.y + arrow.height <= upper.y + upper.height, 'Expansion arrow stays inside the panel bottom');
         assert.ok(upper.y + upper.height <= lower.y - 15, 'Unselected panels leave room for the next sticky');
         const foreground = () => page.evaluate(({x, y}) => document.elementFromPoint(x, y)?.closest('.settings-command-reference')?.querySelector('h4').textContent, {x: lower.x + lower.width / 2, y: lower.y + 20});
         assert.equal(await foreground(), 'Short commands');
@@ -234,20 +243,38 @@ test('command panels expand into available space and the selected list opens ove
         await panels.nth(1).evaluate(node => Promise.all(node.getAnimations().map(animation => animation.finished)));
         await page.waitForFunction(() => document.querySelectorAll('.settings-commands-rail .settings-command-reference')[1].getBoundingClientRect().height > 500);
         assert.equal(await foreground(), 'Shoutouts commands');
+        await page.waitForFunction(() => document.querySelectorAll('.settings-commands-rail .settings-command-reference')[2].classList.contains('has-command-overlap'));
+        assert.equal(await panels.nth(1).evaluate(node => getComputedStyle(node).boxShadow), 'none', 'The expanded panel does not cast a shadow onto empty page space');
+        assert.notEqual(await panels.nth(2).evaluate(node => getComputedStyle(node).maskImage), 'none', 'The underlying panel fades at the overlapping area');
+        assert.equal(await panels.nth(2).evaluate(node => getComputedStyle(node, '::after').content), 'none', 'No shadow overlay remains');
         await page.evaluate(() => document.querySelector('[data-settings-book]').dispatchEvent(new CustomEvent('settings-hover-end')));
         assert.equal(await foreground(), 'Shoutouts commands');
+        await page.evaluate(() => document.querySelector('[data-settings-book]').dispatchEvent(new CustomEvent('settings-context-scroll', {
+            detail: {hovered: null, target: document.querySelector('#Short')},
+        })));
+        assert.equal(await foreground(), 'Shoutouts commands', 'Viewport scrolling does not dismiss the expanded commands');
         assert.equal(await page.evaluate(() => {
             document.querySelector('[data-settings-book]').dispatchEvent(new CustomEvent('settings-hover', {detail: document.querySelector('#Short')}));
-            return document.querySelectorAll('.settings-commands-rail .settings-command-reference')[1].getAnimations().length;
+            const animations = document.querySelectorAll('.settings-commands-rail .settings-command-reference')[1].getAnimations();
+            animations.forEach(animation => animation.pause());
+            return animations.length;
         }), 1);
+        assert.equal(await page.locator('.settings-commands-rail .is-closing h4').textContent(), 'Shoutouts commands');
+        const layers = await page.locator('.settings-commands-rail [data-settings-command-reference]').evaluateAll(nodes => nodes.map(node => Number(node.style.zIndex)));
+        assert.ok(layers[1] > layers[2], 'The outgoing panel retains its foreground layer throughout closing');
+        await panels.nth(1).evaluate(node => node.getAnimations().forEach(animation => animation.play()));
         await page.waitForFunction(height => document.querySelectorAll('.settings-commands-rail .settings-command-reference')[1].getBoundingClientRect().height <= height + 1, upper.height);
+        await page.waitForFunction(() => !document.querySelector('.settings-commands-rail .is-closing'));
+        await page.waitForFunction(() => !document.querySelector('.settings-commands-rail .has-command-overlap'));
+        assert.deepEqual(await panels.evaluateAll(nodes => nodes.map(node => [node.style.getPropertyValue('--settings-command-overlap-start'), node.style.getPropertyValue('--settings-command-overlap-end')])), [['', ''], ['', ''], ['', '']], 'Cleared overlaps do not leave stale fade coordinates behind');
         assert.equal(await foreground(), 'Short commands');
         const shortRegion = panels.nth(2).locator('..');
         const shoutoutsRegion = panels.nth(1).locator('..');
         await panels.nth(1).locator('h4').hover();
         await page.waitForFunction(() => document.querySelectorAll('.settings-commands-rail .settings-command-reference')[1].getBoundingClientRect().height > 500);
         assert.equal(await shoutoutsRegion.evaluate(node => node.classList.contains('is-hovered')), true);
-        assert.equal(await shortRegion.evaluate(node => node.classList.contains('is-selected')), true);
+        assert.equal(await shortRegion.evaluate(node => node.classList.contains('is-selected')), false, 'Hovering another commands panel clears the previously selected panel');
+        assert.equal(await page.locator('.settings-commands-rail .is-selected, .settings-commands-rail .is-hovered').count(), 1, 'Only one panel is expanded at a time');
         await page.mouse.move(0, 100);
         await page.waitForFunction(height => document.querySelectorAll('.settings-commands-rail .settings-command-reference')[1].getBoundingClientRect().height <= height + 1, upper.height);
         assert.equal(await shoutoutsRegion.evaluate(node => node.classList.contains('is-hovered')), false);
@@ -257,6 +284,88 @@ test('command panels expand into available space and the selected list opens ove
         assert.equal(await shoutoutsRegion.evaluate(node => node.classList.contains('is-selected')), true);
         assert.equal(await shoutoutsRegion.evaluate(node => node.classList.contains('is-hovered')), false);
         assert.equal(await shortRegion.evaluate(node => node.classList.contains('is-selected')), false);
+        await panels.nth(1).locator('h4').hover();
+        await panels.nth(1).evaluate(node => { node.scrollTop = node.scrollHeight; });
+        await page.waitForFunction(() => document.querySelectorAll('.settings-command-expand')[1].hidden);
+        const beforeWheel = await page.evaluate(() => scrollY);
+        await page.mouse.wheel(0, 120);
+        await page.waitForFunction(before => scrollY > before, beforeWheel);
+        assert.equal(await shoutoutsRegion.evaluate(node => node.classList.contains('is-selected')), true, 'Scrolling through the panel continues to the page without dismissing it');
+        await page.mouse.click(0, 100);
+        assert.equal(await shoutoutsRegion.evaluate(node => node.classList.contains('is-selected')), false, 'Clicking outside dismisses the expanded panel');
+    } finally { await browser.close(); }
+});
+
+test('menu clicks open the requested commands and other destinations do not reopen the previous panel', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage({viewport: {width: 1300, height: 700}, reducedMotion: 'reduce'});
+        await page.route('http://settings.test/**', route => route.fulfill({body: '<html></html>', contentType: 'text/html'}));
+        await page.goto('http://settings.test/channel/settings?section=pets');
+        const commands = label => `<div class="settings-switch-row"><div class="settings-command-reference-region" data-settings-command-reference><aside class="settings-command-reference"><h4>${label}</h4><ul>${Array.from({length: 30}, (_, index) => `<li><code>!${label}${index}</code></li>`).join('')}</ul></aside></div></div>`;
+        await page.setContent(`<body class="channel-page-settings"><div data-settings-book data-selected="pets"><div class="settings-workspace">
+            <main class="settings-main settings-pages"><section data-settings-page="pets"><header class="settings-page-heading"><h3>Pets and Boss Hunt</h3></header>
+                <section class="settings-command-cluster" id="pets" style="height:160px"><h4 id="pets-heading">Pets</h4>${commands('Pets')}</section>
+                <section class="settings-command-cluster" style="height:160px"><h4 id="boss-heading">Boss Hunt</h4>${commands('Boss Hunt')}</section>
+                <section class="settings-group" style="height:1200px"><header class="settings-group-heading" id="names-heading"><h4>Raid boss names</h4></header><article class="profile-setting-card"><h4>Names</h4><textarea>Boss</textarea></article></section>
+            </section><section data-settings-page="general" hidden><header class="settings-page-heading"><h3>General</h3></header></section></main>
+            <aside class="settings-tools"><div class="settings-finder" data-settings-finder><input><p data-settings-result-count></p><div data-settings-results></div></div>
+                <nav class="settings-menu">${['pets', 'general'].map(key => `<details class="settings-menu-section" open><summary><a data-settings-tab="${key}">${key}</a><span class="settings-dirty-dot" hidden></span></summary><div data-settings-links="${key}"></div></details>`).join('')}</nav></aside>
+            <div class="settings-extra-panel settings-commands-rail"></div></div></div></body>`);
+        await page.addStyleTag({path: 'web/static/css/channel-settings.css'});
+        await page.addStyleTag({content: '.settings-workspace{display:flex;align-items:flex-start}.settings-tools{position:fixed!important;left:0;top:0;width:190px!important}.settings-main{margin-left:210px;flex:1}'});
+        for (const file of ['settings-command-references.js', 'channel-settings.js', 'settings-finder.js']) await page.addScriptTag({path: `web/static/js/${file}`});
+        const selected = page.locator('.settings-commands-rail .is-selected h4');
+        for (const [heading, label] of [['pets-heading', 'Pets'], ['boss-heading', 'Boss Hunt']]) {
+            await page.locator(`[data-settings-location="${heading}"]`).click();
+            assert.equal(await selected.textContent(), label, 'Clicking a menu shortcut opens its commands immediately');
+            await page.locator('[data-settings-location="names-heading"]').click();
+            await page.evaluate(() => {
+                const book = document.querySelector('[data-settings-book]');
+                book.dispatchEvent(new CustomEvent('settings-context-scroll', {detail: {hovered: null, target: document.querySelector('#pets')}}));
+            });
+            await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+            assert.equal(await selected.count(), 0, 'The old viewport context must not reopen commands after another destination is clicked');
+        }
+        await page.locator('[data-settings-location="pets-heading"]').click();
+        await page.locator('[data-settings-tab="general"]').click();
+        assert.equal(await selected.count(), 0);
+        await page.locator('[data-settings-tab="pets"]').click();
+        assert.equal(await selected.textContent(), 'Pets', 'Clicking the category selects its first commands panel');
+    } finally { await browser.close(); }
+});
+
+test('Boss Hunt commands stay alongside the remaining category settings below Pets', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage({viewport: {width: 1300, height: 600}, reducedMotion: 'reduce'});
+        const commands = label => `<div class="settings-command-reference-region" data-settings-command-reference><aside class="settings-command-reference"><h4>${label}</h4><ul>${Array.from({length: label === 'raid' ? 35 : 1}, (_, index) => `<li><code>!${label}${index}</code></li>`).join('')}</ul></aside></div>`;
+        await page.setContent(`<body class="channel-page-settings"><div data-settings-book><div class="settings-workspace">
+            <main class="settings-main settings-pages"><section data-settings-page="pets">
+                <section class="settings-command-cluster" style="height:180px"><h4>Pets</h4><div class="settings-switch-row">${commands('pets')}</div></section>
+                <section class="settings-command-cluster"><h4>Boss Hunt</h4><div class="settings-switch-row"><button id="settings-control-feature-raid_bosses">Enabled</button>${commands('raid')}</div></section>
+                <section class="settings-group" style="height:1800px"><h4>Raid boss names</h4></section>
+            </section></main><div class="settings-extra-panel settings-commands-rail"></div>
+            </div></div></body>`);
+        await page.addStyleTag({path: 'web/static/css/channel-settings.css'});
+        await page.addStyleTag({content: 'body{margin:0}.settings-workspace{display:flex;align-items:flex-start}.settings-main{flex:1}'});
+        await page.addScriptTag({path: 'web/static/js/settings-command-references.js'});
+        const region = page.locator('.settings-commands-rail [data-settings-command-reference]').nth(1);
+        await page.waitForFunction(() => document.querySelector('.settings-commands-rail').style.height);
+        const bounds = await region.boundingBox();
+        const category = await page.locator('[data-settings-page=pets]').boundingBox();
+        assert.ok(Math.abs(bounds.y + bounds.height - category.y - category.height) < 2);
+        const panel = region.locator('.settings-command-reference');
+        const initial = await panel.boundingBox();
+        assert.ok(initial.height > 600);
+        assert.equal(await panel.evaluate(node => node.scrollHeight > node.clientHeight), false);
+        await page.evaluate(() => window.scrollTo(0, 100));
+        await page.waitForFunction(() => scrollY === 100);
+        assert.ok(Math.abs((await panel.boundingBox()).y - (initial.y - 100)) < 2, 'The panel scrolls naturally before reaching its bottom');
+        await page.evaluate(() => window.scrollTo(0, 1000));
+        await page.waitForFunction(() => scrollY === 1000);
+        const pinned = await panel.boundingBox();
+        assert.ok(Math.abs(pinned.y + pinned.height - 584) < 2, 'Tall panels stick with their bottom aligned to the viewport');
     } finally { await browser.close(); }
 });
 

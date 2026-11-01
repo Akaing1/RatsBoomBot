@@ -1,11 +1,11 @@
 {% extends "channel/layout.html" %}
-{% from "channel/settings_switch.html" import status_switch, toggle_details %}
+{% from "channel/settings_switch.html" import status_switch, toggle_details, blocked_notice %}
 {% block title %}Settings | RatsBoomBot{% endblock %}
 {% block mobile_nav_controls %}
 <div class="settings-navbar-controls"><span class="settings-navbar-title">Settings</span><button type="button" class="settings-menu-toggle" data-settings-menu-toggle aria-label="Settings menu" aria-controls="settings-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button></div>
 {% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}-smaller-protected-users">
+<link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}-settings-heading-links">
 <header class="page-header"><div><p class="eyebrow">Your channel, your way</p><h2>Settings</h2></div></header>
 {% for result, message in [(toggle_result, toggle_message), (setting_result, setting_message)] %}
 {% if message %}<div class="toggle-feedback {{ 'success' if result == 'success' else 'error' }}" role="status">{{ message }}</div>{% endif %}
@@ -22,10 +22,10 @@
         {% for section in settings_sections %}
         <section class="settings-page" id="settings-{{ section.key }}" aria-labelledby="settings-section-{{ section.key }}" data-settings-page="{{ section.key }}"{% if section.key != selected %} hidden{% endif %}>
             <header class="settings-page-heading"><div><p class="eyebrow">Channel settings</p><h3>{{ section.label }}</h3><p>{{ section.description }}</p></div><span class="settings-page-number" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span></header>
-            {% if section.blocked %}<p class="settings-blocked-notice">Some features are inactive because a parent switch is off. Enable the channel profile or global commands in {% if section.key == 'general' %}the controls below{% else %}<a href="{{ channel_root }}/settings?section=general">General</a>{% endif %}.</p>{% endif %}
+            {{ blocked_notice(section) }}
             {% if section.standalone_toggles %}
             <div class="settings-command-clusters">
-                {% for panel, toggles in section.standalone_toggles | groupby('panel') %}
+                {% for panel, toggles in section.standalone_panels %}
                 <section class="settings-command-cluster">
                     <h4>{{ panel }}</h4>
                     <div class="settings-switch-list">
@@ -90,9 +90,9 @@
 <script src="/static/js/protected-users.js?v={{ deployment_stamp() }}-ranked-search-optimized" defer></script>
 <script src="/static/js/settings-timers.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
 <script src="/static/js/settings-inputs.js?v={{ deployment_stamp() }}-batch-field-sizing" defer></script>
-<script src="/static/js/settings-command-references.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
-<script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}-inline-blacklist" defer></script>
+<script src="/static/js/settings-command-references.js?v={{ deployment_stamp() }}-menu-command-selection" defer></script>
+<script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}-optimized-context-tracking" defer></script>
 <script src="/static/js/settings-save.js?v={{ deployment_stamp() }}-targeted-list-refresh" defer></script>
-<script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}-short-hashes" defer></script>
+<script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}-ranked-settings-search" defer></script>
 <script src="/static/js/settings-menu-highlight.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
 {% endblock %}

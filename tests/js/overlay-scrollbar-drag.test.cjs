@@ -5,6 +5,32 @@ let chromium;
 try { ({chromium} = require('playwright')); } catch (_) {}
 const executablePath = process.env.CHAT_TEST_BROWSER_PATH || chromium?.executablePath();
 
+test('custom scrollbars stay disabled across panel closing and overflow changes', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage({viewport: {width: 1000, height: 700}});
+        await page.setContent(`<style>${fs.readFileSync('web/static/css/style.css', 'utf8')}</style>
+            <div id="commands" style="position:absolute;left:50px;top:50px;width:250px;height:180px;overflow:auto"><div style="height:1200px">Commands</div></div>
+            <div id="ordinary" style="position:absolute;left:400px;top:50px;width:250px;height:180px;overflow:auto"><div style="height:1200px">Other content</div></div>`);
+        await page.addScriptTag({path: 'web/static/js/overlay-scrollbars.js'});
+        await page.waitForFunction(() => document.querySelectorAll('.overlay-scrollbar.axis-y:not([hidden])').length === 2);
+        await page.locator('#commands').evaluate(node => node.setAttribute('data-overlay-scrollbars', 'off'));
+        await page.waitForFunction(() => document.querySelectorAll('.overlay-scrollbar.axis-y').length === 2);
+        for (const overflow of ['hidden', 'auto', 'scroll', 'auto']) {
+            await page.locator('#commands').evaluate((node, value) => {
+                node.style.overflowY = value;
+                node.style.height = value === 'hidden' ? '500px' : '180px';
+            }, overflow);
+            await page.mouse.move(200, 100);
+            await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+            assert.equal(await page.locator('.overlay-scrollbar.axis-y').count(), 2, 'Closing must not recreate the opted-out panel scrollbar');
+            assert.equal(await page.locator('.overlay-scrollbar.axis-y:not([hidden])').count(), 1, 'Other scrollbars remain available');
+        }
+        await page.locator('#commands').evaluate(node => node.removeAttribute('data-overlay-scrollbars'));
+        await page.waitForFunction(() => document.querySelectorAll('.overlay-scrollbar.axis-y:not([hidden])').length === 2);
+    } finally { await browser.close(); }
+});
+
 test('overlay scrollbar remains reachable across its outset and during a drag', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
     const browser = await chromium.launch({executablePath, headless: true});
     try {
