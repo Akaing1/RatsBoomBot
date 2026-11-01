@@ -115,8 +115,12 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
         section['setting_toggles'] = {}
         setting_keys = {entry.definition.key for entries in section['groups'].values() for entry in entries}
         section['standalone_toggles'] = []
-        section['blocked'] = any(getattr(t['state'], 'blocked_by_profile', False) or getattr(t['state'], 'blocked_by_globals', False) for t in section['toggles'])
+        section['blocked_by_profile'] = False
+        section['blocked_by_globals'] = False
+        panels = {}
         for toggle in section['toggles']:
+            section['blocked_by_profile'] |= bool(getattr(toggle['state'], 'blocked_by_profile', False))
+            section['blocked_by_globals'] |= bool(getattr(toggle['state'], 'blocked_by_globals', False))
             setting_key = setting_controls.get((toggle['kind'], toggle['name']))
             group = group_controls.get((toggle['kind'], toggle['name']))
             if setting_key in setting_keys:
@@ -126,5 +130,8 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
                 section['group_toggles'].setdefault(group, []).append(toggle)
             else:
                 section['standalone_toggles'].append(toggle)
+                panels.setdefault(toggle['panel'], []).append(toggle)
+        section['blocked'] = section['blocked_by_profile'] or section['blocked_by_globals']
+        section['standalone_panels'] = sorted(panels.items(), reverse=section['key'] == 'pets')
     order = ('general', 'chat', 'events', 'timers', 'connections', 'loyalty', 'queue', 'pets', 'games')
     return [sections[key] for key in order if key != 'games' or enabled_games]

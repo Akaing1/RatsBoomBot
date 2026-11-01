@@ -5,6 +5,38 @@ let chromium;
 try { ({chromium} = require('playwright')); } catch (_) {}
 const executablePath = process.env.CHAT_TEST_BROWSER_PATH || chromium?.executablePath();
 
+test('scrolling prioritizes the middle-panel pointer including gaps, otherwise the viewport top', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage({viewport: {width: 1200, height: 800}, reducedMotion: 'reduce'});
+        await page.route('http://settings.test/**', route => route.fulfill({body: '<html></html>', contentType: 'text/html'}));
+        await page.goto('http://settings.test/channel/settings?section=events');
+        await page.setContent(`<style>
+            body{margin:0;padding-bottom:1000px}.settings-menu{position:fixed;left:0;top:0;width:180px}
+            .settings-main{margin-left:220px;width:700px}.settings-group{height:400px}
+            .settings-group-heading{margin:0;height:40px}.profile-setting-card{height:60px}
+            [hidden]{display:none!important}
+            </style><div data-settings-book data-selected="events"><nav class="settings-menu"><details class="settings-menu-section" open>
+            <summary><a data-settings-tab="events">Events</a><span class="settings-dirty-dot" hidden></span></summary><div data-settings-links="events"></div></details></nav>
+            <main class="settings-main settings-pages"><section data-settings-page="events"><header class="settings-page-heading"><h3>Events</h3></header>${['first', 'second'].map(name => `<section class="settings-group" id="${name}"><header class="settings-group-heading" id="${name}-heading"><h4>${name}</h4></header><article class="profile-setting-card" id="${name}-card">Setting</article></section>`).join('')}</section></main>
+            <aside data-settings-finder><input><p data-settings-result-count></p><div data-settings-results></div></aside></div>`);
+        for (const file of ['channel-settings.js', 'settings-finder.js', 'settings-menu-highlight.js']) await page.addScriptTag({path: `web/static/js/${file}`});
+        const selected = () => page.locator('[data-settings-location][aria-current="location"]').getAttribute('data-settings-location');
+        await page.mouse.move(500, 650);
+        await page.evaluate(() => window.scrollTo(0, 30));
+        await page.waitForFunction(() => document.querySelector('[data-settings-location="second-heading"]')?.getAttribute('aria-current') === 'location');
+        assert.equal(await selected(), 'second-heading', 'Empty space in the middle panel retains pointer context');
+        await page.mouse.move(100, 100);
+        await page.evaluate(() => window.scrollTo(0, 50));
+        await page.waitForFunction(() => document.querySelector('[data-settings-location="first-heading"]')?.getAttribute('aria-current') === 'location');
+        assert.equal(await selected(), 'first-heading', 'Scrolling outside the middle panel uses the viewport top');
+        await page.mouse.move(500, 300);
+        await page.evaluate(() => window.scrollTo(0, 200));
+        await page.waitForFunction(() => document.querySelector('[data-settings-location="second-heading"]')?.getAttribute('aria-current') === 'location');
+        assert.equal(await selected(), 'second-heading', 'A stationary pointer follows the section scrolling beneath it');
+    } finally { await browser.close(); }
+});
+
 test('settings hashes use stable short names within their section', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
     const browser = await chromium.launch({executablePath, headless: true});
     try {

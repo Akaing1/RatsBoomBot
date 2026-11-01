@@ -71,6 +71,27 @@ def test_notebook_renders_existing_forms_once_and_honors_deep_link():
         clear_profiles()
 
 
+def test_blocked_commands_share_prerequisite_links_at_category_top():
+    try:
+        context, _, _ = settings_context('chat')
+        chat = next(section for section in context['settings_sections'] if section['key'] == 'chat')
+        chat['blocked'] = True
+        chat['blocked_by_profile'] = True
+        chat['blocked_by_globals'] = True
+        for toggle in chat['toggles']:
+            toggle['state'] = SimpleNamespace(effective_enabled=False, blocked_by_profile=True, blocked_by_globals=True)
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        chat_html = html.split('id="settings-chat"', 1)[1].split('id="settings-events"', 1)[0]
+        assert chat_html.count('>Enable channel profile</a>') == 1
+        assert chat_html.count('>Enable global commands</a>') == 1
+        assert chat_html.index('>Enable channel profile</a>') < chat_html.index('class="settings-command-cluster"')
+        assert 'Enable channel profile' not in templates.env.get_template('channel/settings_switch.html').module.status_switch(chat['toggles'][0])
+        chat['blocked'] = False
+        assert templates.env.get_template('channel/settings_switch.html').module.blocked_notice(chat).strip() == ''
+    finally:
+        clear_profiles()
+
+
 @pytest.mark.parametrize('path', ['/channel/settings', '/channel/features', '/channel/customization'])
 def test_settings_and_legacy_routes_require_authentication(path):
     from web.app import app

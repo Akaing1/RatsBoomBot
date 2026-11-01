@@ -32,10 +32,10 @@
         schedule();
     }
     function register(element) {
-        if (!(element instanceof Element) || element.closest(".overlay-scrollbars")) return;
+        if (!(element instanceof Element) || element.closest('.overlay-scrollbars, [data-overlay-scrollbars="off"]')) return;
+        if (entries.has(element)) return;
         const style = getComputedStyle(element);
         if (element !== root && !/auto|scroll/.test(`${style.overflowX} ${style.overflowY}`)) return;
-        if (entries.has(element)) return;
         const dialog = element.closest("dialog");
         let container = host;
         if (dialog) {
@@ -105,12 +105,12 @@
         register(node);
         node.querySelectorAll?.("*").forEach(register);
     }
-    function visibleRect(element) {
+    function visibleRect(element, style) {
         let rect = element === root
             ? {left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight}
             : element.getBoundingClientRect();
         let {left, top, right, bottom} = rect;
-        if (getComputedStyle(element).visibility === "hidden" || element.closest("[hidden]")) return null;
+        if (style.visibility === "hidden" || element.closest("[hidden]")) return null;
         for (let parent = element.parentElement; parent && element !== root; parent = parent.parentElement) {
             const style = getComputedStyle(parent);
             if (style.visibility === "hidden" || Number(style.opacity) === 0) return null;
@@ -130,13 +130,19 @@
         frame = 0;
         const now = performance.now();
         for (const [element, entry] of entries) {
-            if (!element.isConnected) {
+            if (!element.isConnected || element.closest('[data-overlay-scrollbars="off"]')) {
                 entry.bars.forEach(bar => bar.track.remove());
                 resizeObserver.unobserve(element);
                 entries.delete(element);
                 continue;
             }
-            const rect = visibleRect(element);
+            const style = getComputedStyle(element);
+            const rect = visibleRect(element, style);
+            if (!rect) {
+                entry.bars.forEach(bar => { bar.track.hidden = true; });
+                continue;
+            }
+            const outset = parseFloat(style.getPropertyValue("--overlay-scrollbar-outset")) || 0;
             const visible = element === root || element.contains(pointerTarget) || element.contains(document.activeElement)
                 || entry.bars.some(bar => bar.track.contains(pointerTarget))
                 || entry.activeUntil > now || dragging?.element === element;
@@ -144,12 +150,11 @@
                 const vertical = bar.axis === "y";
                 const content = vertical ? element.scrollHeight : element.scrollWidth;
                 const viewport = vertical ? element.clientHeight : element.clientWidth;
-                const length = rect ? (vertical ? rect.bottom - rect.top : rect.right - rect.left) - 4 : 0;
-                const overflow = element === root || /auto|scroll/.test(getComputedStyle(element)[vertical ? "overflowY" : "overflowX"]);
-                bar.track.hidden = !rect || !overflow || content <= viewport + 1 || length <= 0;
+                const length = (vertical ? rect.bottom - rect.top : rect.right - rect.left) - 4;
+                const overflow = element === root || /auto|scroll/.test(style[vertical ? "overflowY" : "overflowX"]);
+                bar.track.hidden = !overflow || content <= viewport + 1 || length <= 0;
                 if (bar.track.hidden) return;
                 bar.geometry = thumbGeometry(viewport, content, length, element[vertical ? "scrollTop" : "scrollLeft"]);
-                const outset = parseFloat(getComputedStyle(element).getPropertyValue("--overlay-scrollbar-outset")) || 0;
                 Object.assign(bar.track.style, vertical
                     ? {top: `${rect.top + 2}px`, left: `${Math.max(0, Math.min(window.innerWidth - 9, rect.right - 9 + outset))}px`, height: `${length}px`}
                     : {top: `${rect.bottom - 9}px`, left: `${rect.left + 2}px`, width: `${length}px`});
@@ -167,11 +172,12 @@
             if (record.target instanceof Element && record.target.closest(".overlay-scrollbars")) return;
             changed = true;
             if (record.type === "childList") record.addedNodes.forEach(scan);
+            else if (record.attributeName === "data-overlay-scrollbars") scan(record.target);
             else register(record.target);
         });
         if (changed) schedule();
     }).observe(document.body, {subtree: true, childList: true, attributes: true,
-        attributeFilter: ["class", "style", "hidden", "open"]});
+        attributeFilter: ["class", "style", "hidden", "open", "data-overlay-scrollbars"]});
     document.addEventListener("pointerover", event => {
         pointerTarget = event.target;
         schedule();
