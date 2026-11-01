@@ -119,20 +119,22 @@ def test_admin_customization_uses_admin_protected_user_endpoints_and_script():
 
 
 @pytest.mark.asyncio
-async def test_admin_protected_user_search_uses_selected_channel(monkeypatch):
+@pytest.mark.parametrize("cached_only", [False, True])
+async def test_admin_protected_user_search_uses_selected_channel(monkeypatch, cached_only):
     monkeypatch.setattr(channels, "require_admin", AsyncMock(return_value=None))
     services = SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {"123": object()}))
     runtime_bot = SimpleNamespace(services=services)
     resolved = {"id": "456", "login": "viewer", "display_name": "Viewer", "already_protected": False, "automatic": False}
-    lookup = AsyncMock(return_value=resolved)
+    lookup = AsyncMock(return_value=[resolved])
     monkeypatch.setattr(channels, "get_bot", lambda: runtime_bot)
-    monkeypatch.setattr(channels, "lookup_protected_user", lookup)
+    monkeypatch.setattr(channels, "search_protected_users", lookup)
 
-    response = await channels.search_admin_protected_user(make_request(), "123", "@Viewer")
+    response = await channels.search_admin_protected_user(make_request(), "123", "@Viewer", cached_only=cached_only)
 
     assert response.status_code == 200
-    assert json.loads(response.body) == {"user": resolved}
-    lookup.assert_awaited_once_with(runtime_bot, "123", "@Viewer")
+    assert json.loads(response.body) == {"users": [resolved], "followers_loading": False}
+    assert response.headers["cache-control"] == "no-store"
+    lookup.assert_awaited_once_with(runtime_bot, "123", "@Viewer", cached_only=cached_only)
 
 
 @pytest.mark.asyncio
