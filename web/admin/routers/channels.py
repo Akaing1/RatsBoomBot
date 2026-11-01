@@ -14,10 +14,12 @@ from web.shared.protected_users import (
     ProtectedUserError,
     add_protected_user,
     get_protected_user_rows,
-    lookup_protected_user,
+    user_profile_images,
+    search_protected_users,
     remove_protected_user
 )
 from web.state import get_bot, get_db
+from web.channel.routers.dashboard import raid_browser_profiles
 from web.channel.settings_book import build_settings_sections
 
 router = APIRouter(prefix="/channels")
@@ -87,7 +89,7 @@ def admin_protected_users_redirect(broadcaster_id: str, result: str, message: st
 
 
 @router.get("/{broadcaster_id}/protected-users/search", response_class=JSONResponse)
-async def search_admin_protected_user(request: Request, broadcaster_id: str, query: str = ""):
+async def search_admin_protected_user(request: Request, broadcaster_id: str, query: str = "", cached_only: bool = False):
     admin_redirect = await require_admin(request)
 
     if admin_redirect:
@@ -102,11 +104,30 @@ async def search_admin_protected_user(request: Request, broadcaster_id: str, que
         return JSONResponse({"detail": "That Twitch channel is not connected."}, status_code=404)
 
     try:
-        user = await lookup_protected_user(runtime_bot, broadcaster_id, query)
+        users = await search_protected_users(runtime_bot, broadcaster_id, query, cached_only=cached_only)
     except ProtectedUserError as error:
         return JSONResponse({"detail": str(error)}, status_code=error.status_code)
 
-    return JSONResponse({"user": user})
+    name_cache = getattr(runtime_bot, "_follower_names_cache", {}).get(str(broadcaster_id), {})
+    task = name_cache.get("task")
+    return JSONResponse({"users": users, "followers_loading": bool(task and not task.done())}, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/{broadcaster_id}/protected-users/profiles")
+async def admin_protected_user_profiles(request: Request, broadcaster_id: str, ids: str = ""):
+    admin_redirect = await require_admin(request)
+    if admin_redirect:
+        return JSONResponse({"detail": "Administrator authentication required."}, status_code=401)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "The bot runtime is unavailable."}, status_code=503)
+    if get_broadcaster(runtime_bot, broadcaster_id) is None:
+        return JSONResponse({"detail": "That Twitch channel is not connected."}, status_code=404)
+    try:
+        payload = await user_profile_images(runtime_bot, broadcaster_id, ids, raid_browser_profiles)
+    except ProtectedUserError as error:
+        return JSONResponse({"detail": str(error)}, status_code=error.status_code)
+    return JSONResponse(payload, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/{broadcaster_id}/protected-users/add")

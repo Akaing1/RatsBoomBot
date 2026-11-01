@@ -78,7 +78,7 @@
 {% block page_scripts %}
 {{ super() }}
 <script src="/static/js/social-integrations.js" defer></script>
-<script src="/static/js/protected-users.js" defer></script>
+<script src="/static/js/protected-users.js?v={{ deployment_stamp() }}-ranked-search-optimized" defer></script>
 <script src="/static/js/settings-timers.js?v={{ deployment_stamp() }}" defer></script>
 <script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}" defer></script>
 <script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}" defer></script>

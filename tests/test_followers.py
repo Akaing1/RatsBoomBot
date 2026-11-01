@@ -97,6 +97,9 @@ async def test_rank_filters(directory, rank, ids):
 async def test_mutual_followers_paginate_following_cache_and_combine_roles(directory, monkeypatch):
     client, _, _, bot, calls = directory
     await ready(client, bot)
+    bot._followers_directory_cache['1']['following_expires'] = 0
+    bot._raid_browser_cache.clear()
+    calls[:] = [route for route in calls if route.path != 'channels/followed']
     original = bot._http.request_json.side_effect
     async def with_following(route):
         if route.path == 'channels/followed':
@@ -124,6 +127,8 @@ async def test_mutual_followers_paginate_following_cache_and_combine_roles(direc
 async def test_mutual_followers_failure_is_not_an_empty_result(directory):
     client, _, _, bot, _ = directory
     await ready(client, bot)
+    bot._followers_directory_cache['1']['following_expires'] = 0
+    bot._raid_browser_cache.clear()
     original = bot._http.request_json.side_effect
     attempts = 0
     async def fail_following(route):
@@ -372,3 +377,71 @@ async def test_repeated_twitch_cursor_and_missing_follower_permission(directory)
     bot._http.request_json.return_value = {'data': [], 'pagination': {'cursor': 'same'}}
     with pytest.raises(ValueError, match='repeated page'):
         await followers.collect(bot, '1', 'channels/vips')
+
+
+@pytest.mark.asyncio
+async def test_follower_page_reuses_names_updates_new_follows_and_can_refresh(directory):
+    from datetime import datetime, UTC
+    from bot.shared.follower_names import ensure_follower_names, follower_names_state, remember_follower
+    client, _, _, bot, calls = directory
+    ensure_follower_names(bot, '1')
+    await follower_names_state(bot, '1')['task']
+    assert sum(route.path == 'channels/followers' for route in calls) == 2
+    await ready(client, bot)
+    assert sum(route.path == 'channels/followers' for route in calls) == 2, 'The directory reuses the dashboard preload'
+    remember_follower(bot, '1', SimpleNamespace(id='999', name='newviewer', display_name='New Viewer'), datetime.now(UTC))
+    response = await client.get('/channel/api/followers?search=newviewer')
+    assert response.json()['count'] == 1
+    assert response.json()['rows'][0]['user_id'] == '999'
+    assert sum(route.path == 'channels/followers' for route in calls) == 2, 'Follow events update the table without fetching names again'
+    bot._followers_directory_cache['1']['refreshed'] -= 31
+    await client.get('/channel/api/followers?refresh=true')
+    await bot._followers_directory_cache['1']['task']
+    assert sum(route.path == 'channels/followers' for route in calls) == 4, 'Explicit refresh still reloads from Twitch'
+
+
+@pytest.mark.asyncio
+async def test_cached_names_render_without_waiting_for_following_lookup(directory):
+    from bot.shared.follower_names import ensure_follower_names, follower_names_state
+    client, _, _, bot, calls = directory
+    ensure_follower_names(bot, '1')
+    await follower_names_state(bot, '1')['task']
+    release = asyncio.Event()
+    started = asyncio.Event()
+    original = bot._http.request_json.side_effect
+    async def slow_following(route):
+        if route.path == 'channels/followed':
+            started.set()
+            await release.wait()
+        return await original(route)
+    bot._http.request_json.side_effect = slow_following
+    try:
+        response = await asyncio.wait_for(client.get('/channel/api/followers'), 2)
+        data = response.json()
+        assert len(data['rows']) == 25
+        assert data['total'] == 128
+        assert data['loading'] is True
+        await asyncio.wait_for(started.wait(), 2)
+        assert not bot._followers_directory_cache['1']['following_task'].done()
+        assert sum(route.path == 'channels/followers' for route in calls) == 2
+    finally:
+        release.set()
+        if bot._followers_directory_cache['1'].get('task'):
+            await bot._followers_directory_cache['1']['task']
+
+
+@pytest.mark.asyncio
+async def test_new_followers_only_load_missing_metrics_while_existing_metrics_are_fresh(directory, monkeypatch):
+    from bot.shared.follower_names import remember_follower
+    client, _, _, bot, _ = directory
+    await ready(client, bot)
+    metrics = AsyncMock(wraps=followers.follower_metrics)
+    monkeypatch.setattr(followers, 'follower_metrics', metrics)
+    await client.get('/channel/api/followers')
+    assert len(metrics.await_args.args[2]) == 128
+    timestamp = bot._followers_directory_cache['1']['metrics_at']
+    remember_follower(bot, '1', SimpleNamespace(id='999', name='newviewer', display_name='New Viewer'))
+    await client.get('/channel/api/followers')
+    assert metrics.await_count == 2
+    assert metrics.await_args.args[2] == ['999']
+    assert bot._followers_directory_cache['1']['metrics_at'] == timestamp, 'Incremental loads must not extend the lifetime of older balances'

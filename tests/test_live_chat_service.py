@@ -2109,7 +2109,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '#viewer-queue-content { width: calc(100% + 8px); max-height: 430px; margin-right: -8px; padding-right: 8px;' in dashboard_styles
     assert 'range(1, 11)' in dashboard
     assert 'data-queue-action="clear"' in dashboard
-    assert 'href="{{ channel_root }}/viewer-queue/blacklist"' in dashboard
+    assert 'href="{{ channel_root }}/settings?section=queue#queue-blacklist"' in dashboard
     assert 'data-queue-count' in dashboard
     assert '.queue-panel-header [data-queue-count] { display: inline-flex; min-height: 30px; align-items: center; margin-left: auto; padding: 5px 9px; border: 0;' in dashboard_styles
     assert 'color: var(--text); font-size: 13px; font-weight: 800;' in dashboard_styles

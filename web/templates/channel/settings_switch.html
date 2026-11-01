@@ -1,12 +1,36 @@
+{% from "shared/state_toggle.html" import state_toggle_contents as switch_contents %}
+
 {% macro status_switch(toggle, labeled=false) %}
 {% set blocked = toggle.state.blocked_by_profile or toggle.state.blocked_by_globals | default(false) %}
 <span class="settings-inline-switch">
     {% if labeled %}<span class="settings-switch-label">{{ toggle.label }}</span>{% endif %}
-    <button class="settings-status-switch {{ 'enabled' if toggle.state.effective_enabled else 'disabled' }}" type="submit" form="settings-toggle-{{ toggle.kind }}-{{ toggle.name }}" name="action" value="{{ 'disable' if toggle.state.effective_enabled else 'enable' }}" role="switch" aria-checked="{{ 'true' if toggle.state.effective_enabled else 'false' }}" aria-label="{{ toggle.label }}"{% if blocked %} disabled title="Enable the channel profile and global commands in General first."{% else %} title="{{ 'Disable' if toggle.state.effective_enabled else 'Enable' }} {{ toggle.label }}"{% endif %}>{{ 'Enabled' if toggle.state.effective_enabled else 'Disabled' }}</button>
+    <button id="settings-control-{{ toggle.kind }}-{{ toggle.name }}" class="settings-status-switch state-toggle queue-state-toggle{% if toggle.state.effective_enabled %} live{% endif %}" type="submit" form="settings-toggle-{{ toggle.kind }}-{{ toggle.name }}" name="action" value="{{ 'disable' if toggle.state.effective_enabled else 'enable' }}" role="switch" aria-checked="{{ 'true' if toggle.state.effective_enabled else 'false' }}" aria-label="{{ toggle.label }}"{% if blocked %} disabled title="Enable the required settings first."{% else %} title="{{ 'Disable' if toggle.state.effective_enabled else 'Enable' }} {{ toggle.label }}"{% endif %}>{{ switch_contents(toggle.state.effective_enabled) }}</button>
+    {% if blocked and toggle.section != 'general' %}<span class="settings-related-links">
+        {% if toggle.state.blocked_by_profile %}<a data-settings-link href="?section=general#channel-profile">Enable channel profile</a>{% endif %}
+        {% if toggle.state.blocked_by_globals %}<a data-settings-link href="?section=general#all-global-commands">Enable global commands</a>{% endif %}
+    </span>{% endif %}
 </span>
 {% endmacro %}
 
 {% macro toggle_details(toggle) %}
 {% if toggle.description %}<p class="settings-toggle-description">{{ toggle.description }}</p>{% endif %}
-{% if toggle.commands %}<details class="settings-command-members"><summary>Included commands ({{ toggle.commands | length }})</summary><ul>{% for command in toggle.commands %}<li><code>{{ command.syntax }}</code><span>{{ command.description }}</span></li>{% endfor %}</ul></details>{% endif %}
+{% if toggle.related_settings %}<p class="settings-related-links">{% for section, target, label in toggle.related_settings %}<a data-settings-link href="?section={{ section }}{% if target %}#{{ target }}{% endif %}">{{ label }}</a>{% endfor %}</p>{% endif %}
+{{ command_reference(toggle) }}
+{% endmacro %}
+
+{% macro command_list(commands) %}
+<ul>{% for command in commands %}<li><code>{{ command.syntax }}</code><span>{{ command.description | replace("the broadcaster's", "your") | replace("the broadcaster", "you") | replace("mods, broadcaster,", "mods, you,") | replace("this channel", "your channel") | replace("This channel", "Your channel") }}</span></li>{% endfor %}</ul>
+{% endmacro %}
+
+{% macro command_reference(toggle) %}
+{% set commands = toggle.reference_commands | default(toggle.commands) %}
+{% set reference_label = 'Raid commands' if toggle.kind == 'feature' and toggle.name == 'raid_responses' else toggle.label %}
+{% if commands %}
+<details class="settings-command-members"><summary>Included commands ({{ commands | length }})</summary>{{ command_list(commands) }}</details>
+<div class="settings-command-reference-region" data-settings-command-reference>
+    <aside class="settings-command-reference" aria-label="{{ reference_label }}">
+        <h4>{{ reference_label }}</h4><p>Commands</p>{{ command_list(commands) }}
+    </aside>
+</div>
+{% endif %}
 {% endmacro %}

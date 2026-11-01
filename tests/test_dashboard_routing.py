@@ -153,7 +153,8 @@ def test_commands_card_contains_protected_user_management() -> None:
         assert 'data-protected-user-search' in html
         assert 'action="/channel/protected-users/add"' in html
         assert 'action="/channel/protected-users/remove"' in html
-        assert "Viewer <span>(123)</span>" in html
+        assert "<strong>Viewer</strong>" in html
+        assert "<small>123</small>" in html
     finally:
         clear_profiles()
 

@@ -51,7 +51,9 @@ def test_notebook_renders_existing_forms_once_and_honors_deep_link():
     try:
         context, groups, states = settings_context('connections')
         html = templates.env.get_template('channel/settings.html').render(**context)
-        assert html.count('role="tabpanel"') == 8
+        assert html.count('class="settings-menu-section"') == 8
+        assert 'role="tablist"' not in html
+        assert 'role="tabpanel"' not in html
         assert html.count('id="protected-users"') == 1
         assert html.count('id="youtube-integration"') == 1
         assert 'data-settings-page="connections" hidden' not in html
@@ -89,7 +91,7 @@ def test_header_controls_are_not_duplicated_in_standalone_rows():
         assert timers['group_toggles'] == {}
         assert timers['toggles'] == []
         html = templates.env.get_template('channel/settings.html').render(**context)
-        assert html.index('<div class="settings-pages"') < html.index('<nav class="settings-tabs"')
+        assert html.index('<div class="settings-pages"') < html.index('<nav class="settings-menu"')
         assert 'form="settings-toggle-feature-timers"' not in html
         assert 'data-timer-manager' in html
         assert '>Enable\n' not in html
@@ -108,6 +110,10 @@ def test_reorganized_sections_and_forms():
         assert 'id="youtube-integration"' in general
         assert 'dashboard.follow_raid' not in general
         assert 'dashboard.follow_raid' in events
+        raid_messages, raid_preferences = events.split('id="settings-group-raid-preferences"', 1)
+        assert 'dashboard.follow_raid' not in raid_messages
+        assert 'dashboard.follow_raid' in raid_preferences
+        assert 'Follow outgoing raids' in raid_preferences
         for key, next_key in [('timers', 'connections'), ('loyalty', 'queue')]:
             page = html.split(f'id="settings-{key}"')[1].split(f'id="settings-{next_key}"')[0]
             assert '<details class="settings-group"' not in page
@@ -149,7 +155,8 @@ def test_related_response_switches_render_inside_their_message_cards():
         assert 'value="reset"' not in html
         assert 'Leave empty to send nothing.' not in html
         assert 'data-settings-finder' in html
-        assert '<details class="settings-field-editor">' in card
+        assert '<details class="settings-field-editor">' not in card
+        assert '<div class="settings-field-body">' in card
         assert 'settings-finder-note' not in html
         for name in ('daily', 'first', 'second', 'vip'):
             assert f'form="settings-toggle-feature-redeem_{name}"' in html
@@ -164,11 +171,19 @@ def test_sidebar_navigation_and_group_descriptions_use_command_registry():
     try:
         context, _, _ = settings_context()
         html = templates.env.get_template('channel/settings.html').render(**context)
-        assert html.index('class="settings-tools"') < html.index('class="settings-tabs"') < html.index('data-settings-finder hidden')
-        assert 'aria-orientation="vertical"' in html
+        assert html.index('class="settings-tools"') < html.index('data-settings-finder hidden') < html.index('class="settings-menu"')
+        assert '<summary>Settings menu</summary>' not in html
+        assert 'aria-current="page"' in html
         assert 'Included commands (' in html
+        assert 'href="?section=events#settings-group-shoutouts"' not in html
+        assert 'href="?section=loyalty#setting-points-display_name"' not in html
+        assert 'href="?section=connections#socials"' in html
+        assert 'href="?section=connections#settings-control-global_group-socials"' not in html
         toggles = [toggle for section in context['settings_sections'] for toggle in section['toggles']]
         assert all(toggle['description'] for toggle in toggles)
+        assert all(link[0] != toggle['section'] for toggle in toggles for link in toggle['related_settings'])
+        socials = next(toggle for toggle in toggles if toggle['kind'] == 'global_group' and toggle['name'] == 'socials')
+        assert socials['related_settings'] == []
         queue = next(toggle for toggle in toggles if toggle['kind'] == 'global_group' and toggle['name'] == 'viewer_queue')
         expected = [command.syntax for command in get_registered_definitions(ChannelProfile(channel_name='example')) if command.global_group is GlobalCommandGroup.VIEWER_QUEUE and command.visibility is CommandVisibility.PUBLIC]
         assert [command.syntax for command in queue['commands']] == expected

@@ -1,9 +1,10 @@
+{% from "shared/state_toggle.html" import state_toggle_contents as switch_contents %}
 <article class="toggle-card profile-setting-card" id="dashboard-settings">
     <form method="post" action="{{ customization_action | default('/channel/customization') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="setting_name" value="dashboard.follow_raid">
         <input type="hidden" name="action" value="save">
-        <div class="toggle-card-heading"><div><h4>Follow Raids By Default</h4><p>Follow the destination channel when opening a raid.</p></div>
-        <button class="settings-status-switch {{ 'enabled' if channel_settings.follow_raid else 'disabled' }}" type="submit" name="value" value="{{ '0' if channel_settings.follow_raid else '1' }}" role="switch" aria-label="Follow Raids By Default" aria-checked="{{ 'true' if channel_settings.follow_raid else 'false' }}">{{ 'Enabled' if channel_settings.follow_raid else 'Disabled' }}</button></div>
+        <div class="toggle-card-heading"><div><h4>Follow outgoing raids</h4><p>Open the destination channel after your outgoing raid countdown finishes.</p></div>
+        <button class="settings-status-switch state-toggle queue-state-toggle{% if channel_settings.follow_raid %} live{% endif %}" type="submit" name="value" value="{{ '0' if channel_settings.follow_raid else '1' }}" role="switch" aria-label="Follow outgoing raids" aria-checked="{{ 'true' if channel_settings.follow_raid else 'false' }}">{{ switch_contents(channel_settings.follow_raid) }}</button></div>
     </form>
 </article>

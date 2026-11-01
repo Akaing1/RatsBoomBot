@@ -43,14 +43,14 @@ class ProtectedUser:
 
 
 PROFILE_SETTING_DEFINITIONS = (
-    ProfileSettingDefinition("timer_messages", "Timers", "Timer messages", "Add, edit, or remove the automated messages that rotate in chat.", value_type="lines", maximum_length=10000, rows=6),
+    ProfileSettingDefinition("timer_messages", "Timers", "Timer messages", "Add, edit, or remove automated messages and their individual schedules.", value_type="lines", maximum_length=10000, rows=6),
     ProfileSettingDefinition("lurk_message", "Commands", "Lurk message", "Sent when a viewer uses !lurk. Use {username} for the viewer name."),
     ProfileSettingDefinition("community_messages.follow", "Community messages", "Follow message", "Sent when a viewer follows. Leave empty to send nothing."),
     ProfileSettingDefinition("community_messages.subscription", "Community messages", "Subscription message", "Sent for a new subscription. Use {username} for the subscriber. Leave empty to send nothing."),
     ProfileSettingDefinition("community_messages.resubscription", "Community messages", "Resubscription message", "Sent for a returning subscription. Use {username} and {months}. Leave empty to send nothing."),
     ProfileSettingDefinition("community_messages.gifted_subscription", "Community messages", "Gifted subscription message", "Sent once per gift batch, without recipient names. Use {username}, {count}, and {subscription_word}. Leave empty to send nothing."),
-    ProfileSettingDefinition("raid_messages.incoming", "Raid messages", "Incoming raid message", "Sent when another channel raids this channel."),
-    ProfileSettingDefinition("raid_messages.outgoing", "Raid messages", "Outgoing raid message", "Sent when the broadcaster starts a raid."),
+    ProfileSettingDefinition("raid_messages.incoming", "Raid messages", "Incoming raid message", "Sent when another channel raids your channel."),
+    ProfileSettingDefinition("raid_messages.outgoing", "Raid messages", "Outgoing raid message", "Sent when you start a raid."),
     ProfileSettingDefinition("raid_messages.outgoing_subscriber", "Raid messages", "Subscriber raid message", "Optional subscriber variation for outgoing raids."),
     ProfileSettingDefinition("shoutout_messages.with_game", "Shoutouts", "Shoutout with game", "Shoutout used when Twitch provides the target's last game."),
     ProfileSettingDefinition("shoutout_messages.without_game", "Shoutouts", "Shoutout without game", "Shoutout used when no game is available."),
@@ -59,10 +59,10 @@ PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("redeems.second_title", "Redeems", "Second redeem", "Exact Twitch reward title used for second place.", maximum_length=100, rows=1),
     ProfileSettingDefinition("redeems.vip_title", "Redeems", "VIP redeem", "Exact Twitch reward title that permanently grants VIP status.", maximum_length=100, rows=1),
     ProfileSettingDefinition("league.game_name", "League of Legends", "Riot game name", "Saved in the database. If blank or cleared after an account lookup failure, enter the current Riot game name and verify the tag and region.", maximum_length=100, rows=1),
-    ProfileSettingDefinition("league.tag_line", "League of Legends", "Riot tag line", "The tag-line portion of the broadcaster's Riot ID.", maximum_length=20, rows=1),
+    ProfileSettingDefinition("league.tag_line", "League of Legends", "Riot tag line", "The tag-line portion of your Riot ID.", maximum_length=20, rows=1),
     ProfileSettingDefinition("league.region", "League of Legends", "Region", "The OP.GG region code, such as NA or EUW.", maximum_length=12, rows=1),
-    ProfileSettingDefinition("league.display_name", "League of Legends", "League display name", "Name used when presenting broadcaster League statistics.", maximum_length=100, rows=1),
-    ProfileSettingDefinition("overwatch.player_id", "Overwatch", "BattleTag", "The broadcaster's Overwatch BattleTag.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("league.display_name", "League of Legends", "League display name", "Name used when presenting your League statistics.", maximum_length=100, rows=1),
+    ProfileSettingDefinition("overwatch.player_id", "Overwatch", "BattleTag", "Your Overwatch BattleTag.", maximum_length=100, rows=1),
     ProfileSettingDefinition("overwatch.platform", "Overwatch", "Platform", "The OverFast platform code, such as pc.", maximum_length=20, rows=1),
     ProfileSettingDefinition("overwatch.display_name", "Overwatch", "Display name", "Name used in Overwatch command responses.", maximum_length=100, rows=1),
     ProfileSettingDefinition("raid_bosses.names.melee", "Raid boss names", "Main melee boss names", "Add one name per line. A name is chosen at random when a main melee boss spawns.", value_type="names", maximum_length=1000, rows=3),
@@ -485,7 +485,7 @@ class ProfileSettingsService:
                     raise ValueError("Each timer message must be 500 characters or fewer.")
                 if "\n" in entry.message or "\r" in entry.message:
                     raise ValueError("Each timer must contain a single message.")
-            value = format_timers(tuple(type(entry)(entry.message.strip(), entry.kind, entry.color, entry.enabled) for entry in entries if entry.message.strip()))
+            value = format_timers(tuple(replace(entry, message=entry.message.strip()) for entry in entries if entry.message.strip()))
             if len(value) > definition.maximum_length:
                 raise ValueError("Timer messages are too long.")
             return value

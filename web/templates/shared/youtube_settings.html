@@ -32,6 +32,7 @@
                     <a class="button primary" href="/channel/youtube/connect">Connect YouTube Channel</a>
                 {% else %}
                     <p class="panel-description">YouTube integration has not been configured on this deployment yet.</p>
+                    <p class="panel-description">Your bot administrator needs to enable it before you can connect your channel. <a class="settings-help-link" href="{{ channel_root | default('/channel') }}/help#youtube-setup">YouTube setup help</a></p>
                 {% endif %}
             </article>
 

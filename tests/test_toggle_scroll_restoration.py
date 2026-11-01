@@ -10,11 +10,12 @@ def test_admin_channel_toggles_preserve_scroll_position() -> None:
     assert 'data-channel="admin:{{ broadcaster.id }}"' in template
 
 
-def test_streamer_settings_preserve_tab_and_panel_scroll() -> None:
+def test_streamer_settings_use_url_section_without_remembering_scroll() -> None:
     script = (PROJECT_ROOT / "web/static/js/channel-settings.js").read_text(encoding="utf-8")
-    assert 'sessionStorage.setItem(`${storageKey}:scroll`' in script
-    assert 'panelY: scroller.scrollTop' in script
-    assert 'scroller.scrollTop = saved.panelY || 0' in script
+    assert "sessionStorage" not in script
+    assert "url.searchParams.get('section')" in script
+    assert "url.searchParams.set('section', key)" in script
+    assert "scroller.scrollTop = 0" in script
 
 
 def test_admin_feature_page_lists_unique_profile_integrations() -> None:

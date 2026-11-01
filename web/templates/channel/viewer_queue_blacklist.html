@@ -1,38 +1,21 @@
-{% extends "channel/layout.html" %}
-
-{% block title %}Viewer Queue Blacklist | RatsBoomBot{% endblock %}
-
-{% block content %}
-<header class="page-header">
-    <div>
-        <p class="eyebrow">Viewer queue</p>
-        <h2>Blacklist</h2>
-        <p class="page-description">Prevent specific Twitch users from joining this channel's viewer queue.</p>
-    </div>
-    <a class="button secondary" href="{{ channel_root }}">Back to dashboard</a>
-</header>
-
-{% if blacklist_message %}
-    <div class="toggle-feedback {{ blacklist_result }}" role="status">{{ blacklist_message }}</div>
-{% endif %}
-
-<section class="panel queue-blacklist-panel">
-    <form class="queue-blacklist-add" method="post" action="{{ channel_root }}/viewer-queue/blacklist">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="action" value="add">
+{% from "shared/user_identity.html" import user_identity %}
+    <form class="protected-user-search" data-protected-user-search data-search-url="{{ channel_root }}/protected-users/search">
         <label for="queue-blacklist-username">Twitch username</label>
-        <div>
-            <input id="queue-blacklist-username" name="username" required maxlength="50" placeholder="username" autocomplete="off">
-            <button class="button primary" type="submit">Add to blacklist</button>
+        <div class="protected-user-search-controls">
+            <input id="queue-blacklist-username" class="profile-setting-input" name="query" required maxlength="25" placeholder="Enter username" autocomplete="off">
+            <button class="button secondary" type="submit">Search</button>
         </div>
+        <p class="protected-user-search-message" data-protected-search-message aria-live="polite"></p>
     </form>
+    {% with user_search_add_url=channel_root ~ '/viewer-queue/blacklist', user_search_kind='queue-blacklist', user_search_blacklist=true %}{% include 'shared/user_search_result.html' %}{% endwith %}
 
+    <div data-queue-blacklist-members>
     {% if blacklist %}
         <ul class="queue-blacklist-list">
             {% for member in blacklist %}
-                <li>
-                    <strong>{{ member.label }}</strong>
-                    <form method="post" action="{{ channel_root }}/viewer-queue/blacklist">
+                <li class="user-list-row">
+                    {{ user_identity(member.user_id, member.username, member.display_name, member.profile_image_url) }}
+                    <form data-settings-inline-save data-settings-immediate-action="queue-blacklist" method="post" action="{{ channel_root }}/viewer-queue/blacklist">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="action" value="remove">
                         <input type="hidden" name="username" value="{{ member.username }}">
@@ -44,5 +27,4 @@
     {% else %}
         <div class="compact-empty-state"><h4>No blacklisted players</h4><p>Anyone can join while the queue is open.</p></div>
     {% endif %}
-</section>
-{% endblock %}
+    </div>

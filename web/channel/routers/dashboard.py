@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 from twitchio import HTTPException
 from twitchio.http import Route
 
+from bot.shared.follower_names import ensure_follower_names
 from bot.command_registry import build_command_help_groups
 from bot.shared.pending_raids import raid_lock, raid_state, raid_viewer_count, remember_raid
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
@@ -36,7 +37,9 @@ from web.shared.protected_users import (
     ProtectedUserError,
     add_protected_user,
     get_protected_user_rows,
-    lookup_protected_user,
+    user_profile_images,
+    cached_protected_user_candidates,
+    search_protected_users,
     remove_protected_user
 )
 from web.state import get_bot
@@ -368,6 +371,23 @@ async def category_picker_results(runtime_bot, broadcaster_id: str, games: list[
 def format_dashboard_username(services, broadcaster_id: str, username: str) -> str:
     formatter = getattr(getattr(services, "chatters", None), "format_name", None)
     return formatter(str(broadcaster_id), str(username)) if callable(formatter) else str(username)
+
+
+async def get_queue_blacklist_rows(runtime_bot, broadcaster_id):
+    broadcaster_id = str(broadcaster_id)
+    logins = runtime_bot.services.viewer_queue.list_blacklist(broadcaster_id)
+    cached = {user["login"].casefold(): user for user in cached_protected_user_candidates(runtime_bot, broadcaster_id, "").values()}
+    missing = [login for login in logins if login.casefold() not in cached or not cached[login.casefold()].get("profile_image_url")]
+    try:
+        for offset in range(0, len(missing), 100):
+            payload = await raid_browser_cached_request(runtime_bot, broadcaster_id, "users", {"login": missing[offset:offset + 100]})
+            for user in payload.get("data", []):
+                cached[str(user["login"]).casefold()] = user
+    except Exception:
+        LOGGER.warning("[Settings] Queue blacklist profiles could not be loaded for %s.", broadcaster_id)
+    return [{"username": login, "display_name": cached.get(login.casefold(), {}).get("display_name") or login,
+        "user_id": cached.get(login.casefold(), {}).get("id") or "",
+        "profile_image_url": cached.get(login.casefold(), {}).get("profile_image_url") or ""} for login in logins]
 
 
 def get_queue_members(services, broadcaster_id: str) -> list[dict[str, str]]:
@@ -1430,7 +1450,8 @@ async def channel_raid_browser_lists(request: Request, ids: str = ""):
         for offset in range(0, len(user_ids), 100):
             page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "users", {"id": user_ids[offset:offset + 100]})
             users.extend({"id": str(user["id"]), "login": str(user["login"]),
-                          "display_name": str(user.get("display_name") or user["login"])} for user in page.get("data", []))
+                          "display_name": str(user.get("display_name") or user["login"]),
+                          "profile_image_url": str(user.get("profile_image_url") or "")} for user in page.get("data", []))
         return JSONResponse({"channels": users})
     except Exception:
         LOGGER.warning("[Dashboard] Saved raid-browser channel names could not be loaded.")
@@ -2101,6 +2122,8 @@ async def channel_dashboard(request: Request):
         logout_channel_user(request)
         return RedirectResponse(url="/connect", status_code=303)
 
+    ensure_follower_names(runtime_bot, broadcaster_id)
+
     await broadcaster_service.refresh_live_statuses()
     clear_stale_chat_on_refresh(services.live_chat, broadcaster)
 
@@ -2244,21 +2267,8 @@ async def channel_viewer_queue_blacklist(request: Request):
     if broadcaster is None:
         logout_channel_user(request)
         return RedirectResponse(url="/connect", status_code=303)
-    return templates.TemplateResponse(
-        request=request,
-        name="channel/viewer_queue_blacklist.html",
-        context={
-            "active_page": "overview",
-            "broadcaster": broadcaster,
-            "blacklist": [
-                {"username": username, "label": format_dashboard_username(runtime_bot.services, broadcaster_id, username)}
-                for username in runtime_bot.services.viewer_queue.list_blacklist(broadcaster_id)
-            ],
-            "blacklist_result": request.query_params.get("result"),
-            "blacklist_message": request.query_params.get("message"),
-            "csrf_token": get_csrf_token(request)
-        }
-    )
+    return RedirectResponse(url="/channel/settings?section=queue#queue-blacklist", status_code=303)
+
 
 
 @router.post("/channel/viewer-queue/blacklist")
@@ -2284,7 +2294,7 @@ async def update_channel_viewer_queue_blacklist(
         changed, message = False, "Unknown blacklist action."
     result = "success" if changed else "error"
     return RedirectResponse(
-        url=f"/channel/viewer-queue/blacklist?result={result}&message={quote_plus(message)}",
+        url=f"/channel/settings?section=queue&setting_result={result}&setting_message={quote_plus(message)}#queue-blacklist",
         status_code=303
     )
 
@@ -2397,7 +2407,8 @@ async def channel_customization_page(request: Request):
             "youtube_message": request.query_params.get("youtube_message"),
             "social_tab": request.query_params.get("social_tab", "links"),
             "command_tab": request.query_params.get("command_tab", "responses"),
-            "protected_users": await get_protected_user_rows(runtime_bot, str(broadcaster_id)),
+            "blacklist": await get_queue_blacklist_rows(runtime_bot, broadcaster_id),
+            "protected_users": await get_protected_user_rows(runtime_bot, str(broadcaster_id), profile_loader=raid_browser_profiles),
             "protected_result": request.query_params.get("protected_result"),
             "protected_message": request.query_params.get("protected_message"),
             "csrf_token": get_csrf_token(request)
@@ -2466,7 +2477,7 @@ async def update_channel_customization(request: Request, setting_name: str = For
 
 
 @router.get("/channel/protected-users/search")
-async def search_channel_protected_user(request: Request, query: str = ""):
+async def search_channel_protected_user(request: Request, query: str = "", cached_only: bool = False):
     broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
@@ -2478,11 +2489,25 @@ async def search_channel_protected_user(request: Request, query: str = ""):
         return JSONResponse({"detail": "The bot runtime is unavailable."}, status_code=503)
 
     try:
-        user = await lookup_protected_user(runtime_bot, str(broadcaster_id), query)
+        users = await search_protected_users(runtime_bot, str(broadcaster_id), query, cached_only=cached_only)
     except ProtectedUserError as error:
         return JSONResponse({"detail": str(error)}, status_code=error.status_code)
 
-    return JSONResponse({"user": user})
+    name_cache = getattr(runtime_bot, "_follower_names_cache", {}).get(str(broadcaster_id), {})
+    task = name_cache.get("task")
+    return JSONResponse({"users": users, "followers_loading": bool(task and not task.done())}, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/channel/protected-users/profiles")
+async def channel_protected_user_profiles(request: Request, ids: str = ""):
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    try:
+        payload = await user_profile_images(context.runtime_bot, context.broadcaster_id, ids, raid_browser_profiles)
+    except ProtectedUserError as error:
+        return JSONResponse({"detail": str(error)}, status_code=error.status_code)
+    return JSONResponse(payload, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/channel/protected-users/add")
