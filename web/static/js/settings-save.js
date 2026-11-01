@@ -5,7 +5,7 @@
     function isInlineForm(form) {
         if (!(form instanceof HTMLFormElement)) return false;
         const url = new URL(form.getAttribute('action') || location.href, location.href);
-        return form.method === 'post' && url.origin === location.origin && /\/(customization|features\/toggles|viewer-queue\/blacklist)$/.test(url.pathname);
+        return form.method === 'post' && url.origin === location.origin && /\/(customization|features\/toggles|viewer-queue\/blacklist|protected-users\/(add|remove))$/.test(url.pathname);
     }
     book.querySelectorAll('form[method="post"]').forEach(form => {
         if (isInlineForm(form)) form.dataset.settingsInlineSave = '';
@@ -33,6 +33,14 @@
         if (feedback.textContent.trim()) notify(feedback.textContent.trim(), feedback.classList.contains('error') ? 'error' : feedback.classList.contains('warning') ? 'warning' : 'success');
         feedback.remove();
     });
+    // Redirect feedback is a one-time notification, not part of the settings link.
+    const cleanURL = new URL(location.href);
+    for (const name of ['setting', 'toggle', 'protected', 'identity', 'youtube']) {
+        cleanURL.searchParams.delete(`${name}_result`);
+        cleanURL.searchParams.delete(`${name}_message`);
+    }
+    if (cleanURL.href !== location.href) history.replaceState(history.state, '', cleanURL);
+
     function refreshState(fresh, form) {
         book.querySelectorAll('[id]').forEach(node => {
             const replacement = fresh.getElementById(node.id);
@@ -86,20 +94,21 @@
             try {
                 const response = await fetch(form.getAttribute('action'), {method: 'POST', body: data, credentials: 'same-origin'});
                 const url = new URL(response.url);
-                const result = url.searchParams.get('setting_result') || url.searchParams.get('toggle_result');
-                const message = url.searchParams.get('setting_message') || url.searchParams.get('toggle_message');
+                const result = url.searchParams.get('setting_result') || url.searchParams.get('toggle_result') || url.searchParams.get('protected_result');
+                const message = url.searchParams.get('setting_message') || url.searchParams.get('toggle_message') || url.searchParams.get('protected_message');
                 if (!response.ok || result === 'error') throw new Error(message || 'Could not save this setting. Try again.');
                 const fresh = new DOMParser().parseFromString(await response.text(), 'text/html');
                 if (result !== 'success' || !fresh.querySelector('[data-settings-book]')) throw Object.assign(new Error('Could not confirm the save. Reload settings before trying again.'), {severity: 'warning'});
                 if (form.hasAttribute('data-settings-immediate-action')) {
-                    const current = book.querySelector('[data-queue-blacklist-members]');
-                    const replacement = fresh.querySelector('[data-queue-blacklist-members]');
-                    if (!current || !replacement) throw new Error('Could not update the blacklist. Reload settings to check it.');
+                    const selector = form.dataset.settingsImmediateAction === 'protected-users' ? '[data-protected-user-members]' : '[data-queue-blacklist-members]';
+                    const current = book.querySelector(selector);
+                    const replacement = fresh.querySelector(selector);
+                    if (!current || !replacement) throw new Error('Could not update the list. Reload settings to check it.');
                     current.replaceChildren(...[...replacement.childNodes].map(node => node.cloneNode(true)));
                     const username = form.querySelector('input[name="username"]');
-                    if (data.get('action') === 'add' && username.value === data.get('username')) username.value = '';
+                    if (data.get('action') === 'add' && username?.value === data.get('username')) username.value = '';
                 }
-                refreshState(fresh, form);
+                if (!form.hasAttribute('data-settings-immediate-action')) refreshState(fresh, form);
                 book.dispatchEvent(new CustomEvent('settings-saved', {detail: {form, snapshot}}));
                 notify(message || 'Saved.');
             } catch (error) {

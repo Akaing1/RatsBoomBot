@@ -819,9 +819,30 @@
             container.textContent = "";
             for (const id of list) {
                 const row = document.createElement("div");
-                row.className = "raid-lists-row";
-                const name = document.createElement("span");
-                name.textContent = channelLabel(id);
+                row.className = "raid-lists-row user-list-row";
+                const channel = identities.get(id);
+                const avatar = document.createElement("span");
+                avatar.className = "protected-user-avatar";
+                avatar.setAttribute("aria-hidden", "true");
+                avatar.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg>';
+                if (channel?.profile_image_url) {
+                    const picture = document.createElement("img");
+                    picture.src = channel.profile_image_url; picture.alt = "";
+                    picture.width = 28; picture.height = 28; picture.loading = "lazy"; picture.decoding = "async";
+                    picture.addEventListener("error", () => { picture.hidden = true; });
+                    avatar.append(picture);
+                }
+                const name = document.createElement("div");
+                name.className = "user-list-identity";
+                const nameLabel = document.createElement("strong");
+                const display = channel?.display_name || channel?.login;
+                nameLabel.textContent = display || "Unavailable Twitch channel";
+                if (channel?.login && display.toLowerCase() !== channel.login.toLowerCase()) {
+                    const login = document.createElement("span"); login.textContent = ` (${channel.login})`;
+                    nameLabel.append(login);
+                }
+                const userId = document.createElement("small"); userId.textContent = id;
+                name.append(nameLabel, userId);
                 const button = document.createElement("button");
                 button.type = "button"; button.className = "button secondary"; button.textContent = label;
                 button.setAttribute("aria-label", `${label}: ${channelLabel(id)}`);
@@ -830,7 +851,7 @@
                     list.delete(id); saveLists(); renderManager();
                     if (dialog.open && list !== favorites) load();
                 });
-                row.append(name, button); container.append(row);
+                row.append(avatar, name, button); container.append(row);
             }
         }
     }

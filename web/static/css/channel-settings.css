@@ -416,3 +416,13 @@
 .channel-page-settings :is(.settings-group,.settings-command-cluster,.settings-page>.profile-settings-panel,.settings-timer-manager>.panel).settings-search-highlight::before{content:'';position:absolute;z-index:-1;pointer-events:none;inset:3px -14px -14px;border-radius:12px;background:color-mix(in srgb,var(--surface) 80%,var(--accent) 20%);opacity:1;transition:opacity .25s ease}
 .channel-page-settings :is(.settings-group,.settings-command-cluster,.settings-page>.profile-settings-panel,.settings-timer-manager>.panel).settings-highlight-fading::before{opacity:0}
 @media(prefers-reduced-motion:reduce){.channel-page-settings .settings-search-highlight::before{transition:none!important}}
+.channel-page-settings .protected-user-list { gap: 6px; margin-top: 12px; }
+.channel-page-settings .protected-user-row { flex-direction: row; align-items: center; gap: 8px; padding: 6px 10px; }
+.channel-page-settings .protected-user-row > div { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.channel-page-settings .protected-user-row > form { flex-shrink: 0; margin: 0; }
+.channel-page-settings .protected-user-row .button { width: auto; min-height: 30px; padding: 5px 10px; font-size: 12px; }
+.channel-page-settings .protected-user-row .toggle-status { flex-shrink: 0; }
+.channel-page-settings :is(.protected-user-row, .protected-user-result) strong { font-size: 13px; line-height: 1.3; }
+.channel-page-settings :is(.protected-user-row, .protected-user-result) small { font-size: 10px; line-height: 1.3; }
+.channel-page-settings .protected-user-avatar { flex-basis: 28px; width: 28px; height: 28px; }
+.channel-page-settings .protected-user-result { padding: 10px; gap: 10px; }

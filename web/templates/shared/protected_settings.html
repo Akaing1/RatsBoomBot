@@ -1,3 +1,4 @@
+{% from "shared/user_identity.html" import user_identity %}
 <section id="protected-users" class="protected-settings">
                 {% if protected_message %}
                     <div class="toggle-feedback {% if protected_result == 'success' %}success{% else %}error{% endif %}" role="status">
@@ -23,28 +24,17 @@
                         <p class="protected-user-search-message" data-protected-search-message aria-live="polite"></p>
                     </form>
 
-                    <form class="protected-user-result" method="post" action="{{ protected_add_url | default('/channel/protected-users/add') }}" data-protected-user-result hidden>
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <input type="hidden" name="user_id" data-protected-result-id>
-                        <div>
-                            <span>Verified Twitch user</span>
-                            <strong data-protected-result-label></strong>
-                        </div>
-                        <button class="button primary" type="submit" data-protected-add>Add User</button>
-                    </form>
+                    {% with user_search_add_url=protected_add_url | default('/channel/protected-users/add'), user_search_kind='protected-users', user_search_blacklist=false %}{% include 'shared/user_search_result.html' %}{% endwith %}
                 </article>
 
-                <div class="protected-user-list">
+                <div class="protected-user-list" data-protected-user-members>
                     {% for user in protected_users | default([]) %}
-                        <article class="protected-user-row">
-                            <div>
-                                <strong>{{ user.display_name }} <span>({{ user.user_id }})</span></strong>
-                                {% if user.login %}<small>@{{ user.login }}</small>{% endif %}
-                            </div>
+                        <article class="protected-user-row user-list-row">
+                            {{ user_identity(user.user_id, user.login, user.display_name, user.profile_image_url) }}
                             {% if user.is_default %}
                                 <span class="toggle-status">Channel default</span>
                             {% elif user.removable %}
-                                <form method="post" action="{{ protected_remove_url | default('/channel/protected-users/remove') }}" onsubmit="return confirm('Remove {{ user.display_name }} from protected users?');">
+                                <form data-settings-inline-save data-settings-immediate-action="protected-users" method="post" action="{{ protected_remove_url | default('/channel/protected-users/remove') }}" onsubmit="return confirm('Remove {{ user.display_name }} from protected users?');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <input type="hidden" name="user_id" value="{{ user.user_id }}">
                                     <button class="button danger" type="submit">Remove</button>

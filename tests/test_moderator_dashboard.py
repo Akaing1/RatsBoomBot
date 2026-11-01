@@ -97,7 +97,7 @@ async def test_overview_moderator_role_shows_feeds_and_hides_owner_controls(env)
 async def test_role_boundaries_are_enforced_on_every_endpoint(env):
     client, session, db, bot = env
     await set_grant(db,'1','2','Streamer','Alice','edit')
-    for path in ['/for-you','/api/for-you/notes','/api/for-you/quotes','/api/for-you/clips','/settings','/protected-users/search?query=alice','/viewer-queue/blacklist']:
+    for path in ['/for-you','/api/for-you/notes','/api/for-you/quotes','/api/for-you/clips','/settings','/protected-users/search?query=alice','/protected-users/profiles?ids=3','/viewer-queue/blacklist']:
         assert (await client.get('/me/mod/1'+path)).status_code == 403
     for path in ['/api/for-you/notes','/api/for-you/quotes','/api/for-you/clips/download','/customization','/features/toggles','/api/ads/action','/api/channel-metadata']:
         response = await client.post('/me/mod/1'+path,data={'csrf_token':'secret','setting_name':'x','action':'enable', 'toggle_type':'feature','toggle_name':'points'})
