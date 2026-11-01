@@ -129,3 +129,19 @@ async def test_horned_wolf_upgrade_and_repeat_grant_preserve_existing_pets(tmp_p
         assert await pets.bonus_bps('viewer', RAID_DAMAGE) == 1000
         assert len(await pets.get_collection('viewer')) == 2
         assert (await pets.equip('viewer', 'Horned Wolf')).user_pet_id == first.user_pet_id
+
+
+@pytest.mark.asyncio
+async def test_unobtained_catalog_excludes_only_this_viewers_owned_pets(tmp_path):
+    async with asqlite.create_pool(str(tmp_path / 'unobtained.db')) as database:
+        await run_migrations(database)
+        pets = PetService(database)
+        empty_collection = await pets.get_unobtained_pets('viewer')
+        assert empty_collection
+        assert all(pet['sprite_path'] and pet['frame_count'] > 0 for pet in empty_collection)
+        await pets.grant_rat('viewer')
+        remaining = await pets.get_unobtained_pets('viewer')
+        assert 'explosive_rat' not in {pet['pet_id'] for pet in remaining}
+        assert len(remaining) == len(empty_collection) - 1
+        assert await pets.get_unobtained_pets('other') == empty_collection
+        assert [pet['display_name'] for pet in remaining] == sorted(pet['display_name'] for pet in remaining)

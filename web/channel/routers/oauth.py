@@ -1,8 +1,9 @@
 import re
+import httpx
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 
 from config.settings import settings
 from storage.custom_bot_authorization_repository import consume_custom_bot_authorization_request, create_custom_bot_authorization_request, get_custom_bot_authorization_request
@@ -19,6 +20,25 @@ from web.shared.oauth import build_public_channel_oauth_url, build_public_custom
 from web.state import get_bot, get_db
 
 router = APIRouter()
+
+
+@router.get("/channel/api/authorization")
+async def channel_authorization_status(request: Request):
+    from web.channel.authorization import missing_channel_scopes
+
+    channel_id = request.session.get(CHANNEL_USER_ID_KEY)
+    headers = {"Cache-Control": "no-store"}
+    if not channel_id:
+        return JSONResponse({"detail": "Sign in to your channel."}, status_code=401, headers=headers)
+    runtime_bot = get_bot()
+    if runtime_bot is None:
+        return JSONResponse({"detail": "Authorization check unavailable."}, status_code=503, headers=headers)
+    try:
+        missing = await missing_channel_scopes(runtime_bot, str(channel_id))
+    except (httpx.HTTPError, ValueError, TypeError):
+        return JSONResponse({"detail": "Could not check Twitch permissions. Please retry."}, status_code=503, headers=headers)
+    return JSONResponse({"required": bool(missing)}, headers=headers)
+
 
 
 def customization_redirect(result: str, message: str) -> RedirectResponse:

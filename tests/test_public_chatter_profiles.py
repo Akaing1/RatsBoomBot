@@ -351,3 +351,25 @@ def test_public_profile_renders_full_pet_collection(monkeypatch):
     assert "UR" in response.text
     assert "!pets equip Sleepy Fox" in response.text
     assert "/assets/Sleepy%20Fox.png" in response.text
+
+
+@pytest.mark.asyncio
+async def test_account_unobtained_pets_are_silhouettes_without_equip_controls():
+    from web.shared.common import templates
+    profile = await FakeChatterStats().get_global_profile('alice')
+    profile.update(pet=None, pets=[], pet_rates=[], unobtained_pets=[{
+        'pet_id': 'sleepy_fox', 'display_name': '<Sleepy Fox>', 'rarity': 'common',
+        'sprite_path': '/assets/Sleepy%20Fox.png', 'frame_count': 4,
+    }])
+    html = templates.env.get_template('public/chatter_profile.html').render(
+        profile=profile, account_mode=True, public_base_url='https://example.com',
+        url_for=lambda name, path: '/assets' + path,
+    )
+    section = html.split('aria-label="Unobtained pets"')[1].split('</section>')[0]
+    assert 'pet-unobtained' in section
+    assert 'chatter-pet-sprite--fox' in section
+    assert '&lt;Sleepy Fox&gt;' in section
+    assert '1 remaining' in section
+    assert '!pets equip' not in section
+    assert '<form' not in section
+    assert html.index('Your collection starts here') < html.index('Unobtained pets')
