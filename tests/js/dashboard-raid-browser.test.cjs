@@ -1738,7 +1738,13 @@ test('list manager resolves offline names and restores blacklisted recommendatio
     assert.equal(app.manager.open, true);
     assert.equal(app.requests[1].url.pathname, '/channel/api/raid-browser/lists');
     app.requests[1].respond({channels: [channel(), channel('3')]}); await flush();
-    assert.equal(app.favoriteList.children[0].children[0].textContent, 'Viewer2');
+    assert.equal(app.favoriteList.children[0].children[1].children[0].textContent, 'Viewer2');
+    assert.match(app.favoriteList.children[0].className, /user-list-row/);
+    assert.equal(app.favoriteList.children[0].children[1].children[1].textContent, '2');
+    assert.equal(app.favoriteList.children[0].children[0].className, 'protected-user-avatar');
+    assert.equal(app.favoriteList.children[0].querySelector('button').textContent, 'Remove favorite');
+    assert.equal(app.blockedList.children[0].querySelector('button').textContent, 'Allow recommendations');
+    assert.equal(app.favoriteList.children[0].querySelector('button').attributes['aria-label'], 'Remove favorite: Viewer2');
     app.blockedList.children[0].querySelector('button').handlers.click();
     assert.deepEqual(JSON.parse(app.storage.get('ratsboombot:raid-blacklist:1')), []);
     assert.equal(app.blockedList.children.length, 0);

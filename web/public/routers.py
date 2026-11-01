@@ -69,33 +69,33 @@ async def chat_widget_events(request: Request, token: str, view: str = "both"):
 # releases; patch-level fixes remain in the complete public patch-note history.
 HOME_RELEASE_HIGHLIGHTS = (
     {
-        "version": "v12.2.0",
-        "title": "The streamer dashboard gets sharper",
-        "summary": "Run the channel from a faster live workspace with more chat, stream, moderation, and viewer-queue controls close at hand.",
+        "version": "v16",
+        "title": "Your dashboard, shared with your team",
+        "summary": "A refreshed workspace for streamers, moderators, and the communities they look after.",
         "highlights": (
-            "Edit the stream title and category directly from the dashboard.",
-            "Pin and moderate messages, use emotes, and follow live stream and ad status.",
-            "Move, swap, remove, and manage queued viewers without leaving the page."
+            "Give moderators access to your channel and assign extra controls to super moderators.",
+            "Manage polls, predictions, followers, and chat from the dashboard.",
+            "Find settings quickly with category navigation, search, and individual timer and redeem switches."
         )
     },
     {
-        "version": "v12.0.0",
-        "title": "Twitch and YouTube chat come together",
-        "summary": "Follow both communities from one live dashboard, reply without leaving RatsBoomBot, and bring the combined feed into OBS.",
+        "version": "v15–16",
+        "title": "Discover, save, and revisit",
+        "summary": "Raid discovery and your For You workspace bring more of the stream into one place.",
         "highlights": (
-            "Combined Twitch and YouTube messages in one live feed.",
-            "Separate chat, command, and combined OBS browser views.",
-            "Broadcaster replies, emotes, scrolling docks, and live ad status."
+            "Browse live raid targets with filters and previews, then start a raid from the dashboard.",
+            "Keep notes and quotes together, and browse or download channel clips.",
+            "Filter clips from the last 24 hours through all time, with instant search and sorting of loaded clips."
         )
     },
     {
-        "version": "v11.6.5",
-        "title": "Levels, loot, and loyalty",
-        "summary": "Community participation now builds a lasting profile through chatter levels, achievements, raid progress, and channel loyalty.",
+        "version": "v14–16",
+        "title": "Pets and a home for your community profile",
+        "summary": "Collect animated companions and explore your achievements, Boss Hunt history, and channel activity.",
         "highlights": (
-            "Global chatter levels earned from achievements and raids.",
-            "Channel-specific badges and secret challenges.",
-            "Streamer controls for loyalty responses and command slowmode."
+            "Summon and equip pets with passives that follow you across channels.",
+            "Use !me for your account and !stats for your profile in the current community.",
+            "Explore refreshed achievements, pet collections, Boss Hunt guides, and the combined Activity tab."
         )
     }
 )
@@ -249,7 +249,7 @@ async def public_patch_notes(request: Request):
 @router.get("/patch-notes/{slug}", response_class=HTMLResponse)
 async def public_patch_note(request: Request, slug: str):
     note = await get_note(get_db(), slug)
-    if note is None or note["published_at"] is None: return templates.TemplateResponse(request=request, name="public/patch_notes.html", context={"patch_notes": [], "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")}, status_code=404)
+    if note is None or note["published_at"] is None: return templates.TemplateResponse(request=request, name="public/patch_notes.html", context={"patch_notes": await list_notes(get_db(), True), "note_not_found": True, "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")}, status_code=404)
     return templates.TemplateResponse(request=request, name="public/patch_note.html", context={"note": note, "body_html": render_markdown(note["body"]), "public_base_url": settings.PUBLIC_BASE_URL.rstrip("/")})
 
 

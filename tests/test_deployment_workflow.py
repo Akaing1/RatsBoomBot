@@ -25,7 +25,9 @@ def test_uat_workflow_validates_before_guarded_deployment() -> None:
     assert "github.event.pull_request.draft == false" in workflow
     assert "github.event.pull_request.head.repo.full_name == github.repository" in workflow
     assert "github.event.pull_request.head.sha || github.sha" in workflow
-    assert 'run: /opt/ratsboombot-uat/deploy/linux/deploy-uat.sh "$UAT_DEPLOY_SHA"' in workflow
+    assert 'ref: ${{ env.UAT_DEPLOY_SHA }}' in workflow
+    assert 'persist-credentials: false' in workflow
+    assert 'run: bash "$GITHUB_WORKSPACE/uat-deployment-source/deploy/linux/deploy-uat.sh" "$UAT_DEPLOY_SHA"' in workflow
     assert "cancel-in-progress: false" in workflow
     assert "gh release" not in workflow
 
@@ -56,7 +58,8 @@ def test_uat_deploy_script_only_targets_uat_instance() -> None:
     assert 'DEPLOY_REF="${1:-uat}"' in script
     assert '[[ ! "$DEPLOY_REF" =~ ^[0-9a-f]{40}$ ]]' in script
     assert 'git fetch --no-tags origin "$DEPLOY_REF"' in script
-    assert 'git checkout --detach "$NEW_COMMIT"' in script
+    assert 'checkout_commit "$NEW_COMMIT"' in script
+    assert 'core.filesRefLockTimeout=10000 checkout --detach' in script
     assert 'HEALTH_URL="http://127.0.0.1:4346/health"' in script
     assert 'systemctl restart "$SERVICE_NAME"' in script
 

@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 import asqlite
 import pytest
+from unittest.mock import AsyncMock
 from starlette.requests import Request
 from bot.profiles import ChannelProfile, CommunityMessages, FeatureName, activate_profile, clear_profiles, get_active_profile
 from bot.services.channels.profile_settings import ProfileSettingsService
@@ -19,7 +20,7 @@ async def test_blank_restores_channel_default_and_disabling_keeps_text(tmp_path,
             service.apply_overrides('1', profile)
             features = FeatureToggleService(db)
             await features.setup()
-            monkeypatch.setattr(dashboard, 'get_bot', lambda: SimpleNamespace(services=SimpleNamespace(profile_settings=service, features=features)))
+            monkeypatch.setattr(dashboard, 'get_bot', lambda: SimpleNamespace(services=SimpleNamespace(profile_settings=service, features=features, broadcaster_settings=SimpleNamespace(set_timers_enabled=AsyncMock()))))
             request = Request({'type':'http','headers':[],'path':'/channel/customization','session':{'channel_user_id':'1','csrf_token':'test'}})
             await dashboard.update_channel_customization(request, 'community_messages.follow', 'Custom hello', 'save', 'test')
             assert get_active_profile('1').community_messages.follow == 'Custom hello'

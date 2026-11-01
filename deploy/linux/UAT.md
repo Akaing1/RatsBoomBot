@@ -119,3 +119,14 @@ The workflow is guarded by this variable. When enabled, pushes to `uat` and `rel
 7. When the release is verified, open a PR from `release/x.y.z` into `master` with the final version bump.
 
 UAT is shared, so deployments are serialized and the most recently completed release PR or release-branch push is the version available for testing. Draft PRs and PRs from forks never deploy to the self-hosted runner. UAT does not publish GitHub releases and cannot restart `ratsboombot.service`.
+
+
+## Interrupted checkout recovery
+
+Actions checks out deployment scripts from the validated SHA in its own workspace before invoking the UAT deployment. This lets a deployment-script fix run even when the live UAT checkout is stuck on an earlier commit.
+
+The deploy script takes an exclusive `.git/uat-deployment.lock` for the whole deployment, including rollback. Before touching Git, it checks `HEAD.lock` and `index.lock`. It only removes regular lock files at least two minutes old when Linux process inspection finds no running Git processes. Recent locks, active Git processes, changing locks, or inspection errors prevent lock removal; deployment waits up to 180 seconds for recovery before stopping with a diagnostic; do not delete locks while another Git operation is running.
+
+Tracked changes left by an interrupted checkout are preserved in a named `uat-pre-deploy-TIMESTAMP` Git stash before checkout. Inspect them with `git stash list` and `git stash show -p 'stash@{0}'` from `/opt/ratsboombot-uat`. They are not automatically reapplied to a validated deployment. Untracked files are left in place; a conflicting untracked file still causes Git to stop safely. Environment files, the virtual environment, and application data remain in the UAT checkout.
+
+Checkout also gives Git up to ten seconds to acquire a ref lock and retries a lock-conflicted checkout up to three times. Each retry repeats the safe-lock wait and preserves any tracked changes produced by the previous attempt. Other checkout failures stop immediately. The same checkout path is used during rollback. This handles locks that appear after the initial deployment checks, rather than only pre-existing stale locks.

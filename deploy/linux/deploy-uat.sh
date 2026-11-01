@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 APP_DIR="/opt/ratsboombot-uat"
 VENV_DIR="$APP_DIR/.venv"
 SERVICE_NAME="ratsboombot-uat"
@@ -31,6 +33,56 @@ if [ "$DEPLOY_REF" != "uat" ] && [[ ! "$DEPLOY_REF" =~ ^[0-9a-f]{40}$ ]]; then
     exit 1
 fi
 
+# Serialize Actions and direct invocations before touching Git or backing up data.
+exec 9>"$APP_DIR/.git/uat-deployment.lock"
+if ! flock -w 60 9; then
+    echo "[UAT Deploy] ERROR: another UAT deployment holds the deployment lock."
+    exit 1
+fi
+
+wait_for_checkout_locks() {
+    local deadline=$((SECONDS + 180))
+    while ! python3 "$SCRIPT_DIR/recover_git_locks.py" "$APP_DIR/.git"; do
+        if (( SECONDS >= deadline )); then
+            echo "[UAT Deploy] ERROR: Git checkout locks did not become safe within 180 seconds."
+            return 1
+        fi
+        echo "[UAT Deploy] Waiting for checkout locks to become safe; retrying in 10 seconds."
+        sleep 10
+    done
+}
+
+checkout_commit() {
+    local commit="$1"
+    local attempt
+    for attempt in {1..3}; do
+        wait_for_checkout_locks || return 1
+        # A failed checkout can update files before failing to update HEAD.
+        # Preserve both staged and unstaged edits before every attempt.
+        if ! git diff --quiet -- || ! git diff --cached --quiet --; then
+            git -c user.name="RatsBoomBot UAT deployment" -c user.email="uat-deploy@localhost" \
+                stash push -m "uat-pre-deploy-$TIMESTAMP-attempt-$attempt" || return 1
+            echo "[UAT Deploy] Preserved tracked checkout changes in git stash."
+        fi
+        if git -c core.filesRefLockTimeout=10000 checkout --detach "$commit"; then
+            if [[ "$(git rev-parse HEAD)" == "$commit" ]]; then
+                return 0
+            fi
+            echo "[UAT Deploy] ERROR: checkout did not select the validated commit."
+            return 1
+        fi
+        # Retry only a checkout lock failure; surface other Git errors immediately.
+        if [[ ! -e "$APP_DIR/.git/HEAD.lock" && ! -e "$APP_DIR/.git/index.lock" ]]; then
+            return 1
+        fi
+        echo "[UAT Deploy] Checkout attempt $attempt/3 encountered a Git lock."
+    done
+    echo "[UAT Deploy] ERROR: checkout exhausted its retry limit."
+    return 1
+}
+
+wait_for_checkout_locks
+
 cd "$APP_DIR"
 
 PREVIOUS_COMMIT="$(git rev-parse HEAD)"
@@ -50,7 +102,7 @@ fi
 
 git fetch --no-tags origin "$DEPLOY_REF"
 NEW_COMMIT="$(git rev-parse FETCH_HEAD)"
-git checkout --detach "$NEW_COMMIT"
+checkout_commit "$NEW_COMMIT"
 
 "$VENV_DIR/bin/python" -m pip install -r requirements.txt
 "$VENV_DIR/bin/python" -m compileall app bot config storage web rpg_minigame pets loyalty viewer_queue main.py
@@ -76,7 +128,7 @@ for attempt in {1..15}; do
 done
 
 echo "[UAT Deploy] ERROR: UAT did not become healthy. Rolling back to $PREVIOUS_COMMIT."
-git checkout --detach "$PREVIOUS_COMMIT"
+checkout_commit "$PREVIOUS_COMMIT"
 
 if [ -n "$PREVIOUS_DEPLOYMENT_STAMP" ]; then
     printf '%s\n' "$PREVIOUS_DEPLOYMENT_STAMP" > "$DEPLOYMENT_STAMP_PATH"

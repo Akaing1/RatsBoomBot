@@ -1,3 +1,4 @@
+from bot.profiles import ChannelProfile
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from urllib.parse import parse_qs, urlsplit
@@ -36,7 +37,7 @@ async def env(tmp_path, monkeypatch):
         services = SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {'1': broadcaster}, refresh_live_statuses=AsyncMock()),
             live_chat=live, broadcaster_settings=SimpleNamespace(get_settings=AsyncMock(return_value=SimpleNamespace(follow_raid=True))),
             points=SimpleNamespace(get_gambling_loss_total=AsyncMock(return_value=0)), features=features,
-            viewer_queue=SimpleNamespace(is_queue_open=lambda channel: False, list_queue=lambda channel: [], size=lambda channel: 0),
+            viewer_queue=SimpleNamespace(list_blacklist=lambda channel: [], is_queue_open=lambda channel: False, list_queue=lambda channel: [], size=lambda channel: 0),
             profile_settings=SimpleNamespace(get_setting_groups=Mock(return_value={})),
             chat_identity=SimpleNamespace(get_state=Mock(side_effect=AssertionError('Owner identity must stay private'))))
         bot = SimpleNamespace(services=services, tokens={}, _http=SimpleNamespace(request_json=AsyncMock(return_value={'data':[]})),
@@ -51,7 +52,7 @@ async def env(tmp_path, monkeypatch):
             monkeypatch.setattr(owner,name,AsyncMock(return_value=value))
         monkeypatch.setattr(owner,'get_queue_members',lambda services,channel: [])
         monkeypatch.setattr(owner,'get_protected_user_rows',AsyncMock(return_value=[]))
-        monkeypatch.setattr(owner,'get_active_profile',lambda channel: SimpleNamespace(points=SimpleNamespace(command_alias='points')))
+        monkeypatch.setattr(owner,'get_active_profile',lambda channel: ChannelProfile(channel_name='streamer'))
         app = FastAPI()
         app.mount('/static', StaticFiles(directory='web/static'), name='static')
         app.mount('/assets', StaticFiles(directory='assets'), name='assets')
@@ -96,7 +97,7 @@ async def test_overview_moderator_role_shows_feeds_and_hides_owner_controls(env)
 async def test_role_boundaries_are_enforced_on_every_endpoint(env):
     client, session, db, bot = env
     await set_grant(db,'1','2','Streamer','Alice','edit')
-    for path in ['/for-you','/api/for-you/notes','/api/for-you/quotes','/api/for-you/clips','/settings','/protected-users/search?query=alice','/viewer-queue/blacklist']:
+    for path in ['/for-you','/api/for-you/notes','/api/for-you/quotes','/api/for-you/clips','/settings','/protected-users/search?query=alice','/protected-users/profiles?ids=3','/viewer-queue/blacklist']:
         assert (await client.get('/me/mod/1'+path)).status_code == 403
     for path in ['/api/for-you/notes','/api/for-you/quotes','/api/for-you/clips/download','/customization','/features/toggles','/api/ads/action','/api/channel-metadata']:
         response = await client.post('/me/mod/1'+path,data={'csrf_token':'secret','setting_name':'x','action':'enable', 'toggle_type':'feature','toggle_name':'points'})
@@ -483,3 +484,31 @@ async def test_super_workspace_writes_and_clips_use_selected_channel(env, monkey
     assert current.call_args.args[1] == '1'
     assert (await client.post('/me/mod/1/api/for-you', data={
         'csrf_token': 'secret', 'action': 'start', 'minutes': '1'})).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_blacklist_is_managed_inside_settings(env, monkeypatch):
+    client, session, db, bot = env
+    await set_grant(db, '1', '2', 'Streamer', 'Alice', 'super')
+    members = ['blockedviewer']
+    bot.services.viewer_queue.list_blacklist = lambda channel: members
+    monkeypatch.setattr(owner, 'format_dashboard_username', lambda services, channel, username: username)
+    bot.services.viewer_queue.add_to_blacklist = AsyncMock(return_value=(True, 'Viewer added.'))
+    bot.services.viewer_queue.remove_from_blacklist = AsyncMock(return_value=(True, 'Viewer removed.'))
+    page = await client.get('/me/mod/1/settings?section=queue')
+    assert page.status_code == 200
+    assert 'data-queue-blacklist-members' in page.text
+    assert 'blockedviewer' in page.text
+    assert 'action="/me/mod/1/viewer-queue/blacklist"' in page.text
+    assert 'Manage blacklist' not in page.text
+    legacy = await client.get('/me/mod/1/viewer-queue/blacklist')
+    assert legacy.status_code == 303
+    assert legacy.headers['location'] == '/me/mod/1/settings?section=queue#queue-blacklist'
+    for action in ['add', 'remove']:
+        response = await client.post('/me/mod/1/viewer-queue/blacklist', data={'action': action, 'username': 'blockedviewer', 'csrf_token': 'secret'})
+        assert response.status_code == 303
+        assert response.headers['location'].startswith('/me/mod/1/settings?section=queue&setting_result=success')
+        assert response.headers['location'].endswith('#queue-blacklist')
+        getattr(bot.services.viewer_queue, f'{action}_' + ('to' if action == 'add' else 'from') + '_blacklist').assert_awaited_once_with('1', 'blockedviewer')
+    invalid = await client.post('/me/mod/1/viewer-queue/blacklist', data={'action': 'add', 'username': 'blockedviewer', 'csrf_token': 'bad'})
+    assert invalid.status_code == 403

@@ -1,1 +1,33 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Patch Notes | RatsBoomBot</title><link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}"></head><body class="chatter-profile-page"><main class="chatter-profile-content"><a class="landing-brand" href="/"><span><strong>RatsBoomBot</strong><small>Patch notes</small></span></a><header class="chatter-profile-hero"><div><p class="eyebrow">Rats Boom Bot updates</p><h1>Patch Notes</h1></div></header>{% for note in patch_notes %}<article class="panel"><p class="eyebrow">v{{ note.version }} · {{ note.published_at }}</p><h2>{{ note.title }}</h2><div class="patch-note-body">{{ note.synopsis | markdown }}</div><a class="button primary" href="/patch-notes/{{ note.slug }}">Read patch notes</a></article>{% endfor %}</main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Explore RatsBoomBot releases, new features, and improvements for your stream community.">
+    <title>Patch Notes | RatsBoomBot</title>
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ deployment_stamp() }}">
+    <link rel="stylesheet" href="/static/css/public-header.css?v={{ deployment_stamp() }}">
+    <link rel="stylesheet" href="/static/css/patch-notes.css?v={{ deployment_stamp() }}">
+</head>
+<body class="chatter-profile-page release-page">
+{% from "shared/public_header.html" import public_header with context %}
+{% call public_header("Patch notes") %}<a class="button secondary" href="/me">My account</a>{% endcall %}
+<main class="release-shell">
+    <header class="release-intro"><p class="eyebrow">Built with the community</p><h1>{{ 'Update not found' if note_not_found else 'What’s new in RatsBoomBot' }}</h1><p>{{ 'This update is unavailable. Explore the published releases below.' if note_not_found else 'New features, improvements, and fixes for your next stream.' }}</p></header>
+    {% if patch_notes %}
+    {% set latest = patch_notes[0] %}
+    <article class="release-featured">
+        <div class="release-meta"><span class="release-badge">Latest release</span>{% if latest.version %}<span>v{{ latest.version }}</span>{% endif %}<time datetime="{{ latest.published_at[:10] }}">{{ latest.published_at[:10] }}</time></div>
+        <h2><a href="/patch-notes/{{ latest.slug }}">{{ latest.title }}</a></h2>
+        <div class="patch-note-body release-summary">{{ latest.synopsis | markdown }}</div>
+        <a class="button primary" href="/patch-notes/{{ latest.slug }}">Explore this update <span aria-hidden="true">→</span></a>
+    </article>
+    {% if patch_notes|length > 1 %}
+    <section aria-labelledby="release-history-title"><div class="release-history-heading"><h2 id="release-history-title">Previous releases</h2><span>{{ patch_notes|length - 1 }} {{ 'update' if patch_notes|length == 2 else 'updates' }}</span></div>
+        <div class="release-grid">{% for note in patch_notes[1:] %}
+        <article class="release-card"><div class="release-meta">{% if note.version %}<span class="release-badge">v{{ note.version }}</span>{% endif %}<time datetime="{{ note.published_at[:10] }}">{{ note.published_at[:10] }}</time></div><h3><a href="/patch-notes/{{ note.slug }}">{{ note.title }}</a></h3><div class="patch-note-body release-summary">{{ note.synopsis | markdown }}</div><a class="release-read" href="/patch-notes/{{ note.slug }}">Read update <span aria-hidden="true">→</span></a></article>
+        {% endfor %}</div>
+    </section>{% endif %}
+    {% else %}<section class="release-empty"><h2>No published updates yet</h2><p>Check back here for the next release.</p><a class="button secondary" href="/">Explore RatsBoomBot</a></section>{% endif %}
+</main>
+</body></html>

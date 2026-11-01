@@ -84,8 +84,10 @@ async def test_admin_customization_save_reset_and_csrf(monkeypatch):
 
 
 def test_shared_editor_uses_admin_action_and_timer_script():
-    html = templates.env.get_template("admin/channel_customization.html").render(
+    html = templates.env.get_template("admin/channel_settings.html").render(
         broadcaster=SimpleNamespace(id="123", name="Test"), administrator=None,
+        request=SimpleNamespace(query_params={}), channel_root="/admin/channels/123", channel_section="settings",
+        settings_sections=channels.build_settings_sections({}, {}, {}, {}, {}), profile_features={}, chat_identity={},
         url_for=lambda *args, **kwargs: "/static/css/style.css",
         customization_action="/admin/channels/123/customization", csrf_token="csrf",
         setting_groups={}, channel_settings=SimpleNamespace(discord_url="", youtube_url="")
@@ -96,8 +98,10 @@ def test_shared_editor_uses_admin_action_and_timer_script():
 
 
 def test_admin_customization_uses_admin_protected_user_endpoints_and_script():
-    html = templates.env.get_template("admin/channel_customization.html").render(
+    html = templates.env.get_template("admin/channel_settings.html").render(
         active_page="channels", broadcaster=SimpleNamespace(id="123", name="Test"), administrator=None,
+        request=SimpleNamespace(query_params={}), channel_root="/admin/channels/123", channel_section="settings",
+        settings_sections=channels.build_settings_sections({}, {}, {}, {}, {}), profile_features={}, chat_identity={},
         url_for=lambda *args, **kwargs: kwargs.get("path", "/static/resource"),
         deployment_stamp=lambda: "test",
         customization_action="/admin/channels/123/customization", csrf_token="csrf",
@@ -111,24 +115,26 @@ def test_admin_customization_uses_admin_protected_user_endpoints_and_script():
     assert 'data-search-url="/admin/channels/123/protected-users/search"' in html
     assert 'action="/admin/channels/123/protected-users/add"' in html
     assert "protected-users.js" in html
-    assert 'data-command-panel="protected"' in html
+    assert '<summary>Protected users</summary>' in html
 
 
 @pytest.mark.asyncio
-async def test_admin_protected_user_search_uses_selected_channel(monkeypatch):
+@pytest.mark.parametrize("cached_only", [False, True])
+async def test_admin_protected_user_search_uses_selected_channel(monkeypatch, cached_only):
     monkeypatch.setattr(channels, "require_admin", AsyncMock(return_value=None))
     services = SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {"123": object()}))
     runtime_bot = SimpleNamespace(services=services)
     resolved = {"id": "456", "login": "viewer", "display_name": "Viewer", "already_protected": False, "automatic": False}
-    lookup = AsyncMock(return_value=resolved)
+    lookup = AsyncMock(return_value=[resolved])
     monkeypatch.setattr(channels, "get_bot", lambda: runtime_bot)
-    monkeypatch.setattr(channels, "lookup_protected_user", lookup)
+    monkeypatch.setattr(channels, "search_protected_users", lookup)
 
-    response = await channels.search_admin_protected_user(make_request(), "123", "@Viewer")
+    response = await channels.search_admin_protected_user(make_request(), "123", "@Viewer", cached_only=cached_only)
 
     assert response.status_code == 200
-    assert json.loads(response.body) == {"user": resolved}
-    lookup.assert_awaited_once_with(runtime_bot, "123", "@Viewer")
+    assert json.loads(response.body) == {"users": [resolved], "followers_loading": False}
+    assert response.headers["cache-control"] == "no-store"
+    lookup.assert_awaited_once_with(runtime_bot, "123", "@Viewer", cached_only=cached_only)
 
 
 @pytest.mark.asyncio

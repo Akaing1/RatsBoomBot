@@ -1,0 +1,9 @@
+.log-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; padding: 18px; margin-bottom: 20px; background: var(--surface-raised); border-radius: 12px; }
+.log-controls label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--muted); }
+.log-controls label:first-child { flex: 1; min-width: 180px; }
+.log-controls input[type=search], .log-controls select { padding: 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.log-controls .log-follow { flex-direction: row; align-items: center; padding-bottom: 10px; }
+.admin-page-runtime_logs [hidden], .admin-page-logs [hidden] { display: none; }
+.log-session-meta { flex-wrap: wrap; }
+.log-session-details { min-width: 0; overflow-wrap: anywhere; }
+.runtime-log-viewer:focus-visible, .log-viewer:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

@@ -1,1 +1,25 @@
-<!doctype html><html><head><link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}"></head><body class="chatter-profile-page"><main class="chatter-profile-content"><a href="/patch-notes">← Patch Notes</a><article class="panel"><p class="eyebrow">v{{ note.version }} · {{ note.published_at }}</p><h1>{{ note.title }}</h1><div class="patch-note-body">{{ body_html }}</div></article></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ note.title }} | RatsBoomBot Patch Notes</title>
+    <link rel="icon" href="{{ url_for('assets', path='/NinjaDoro.ico') }}">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ deployment_stamp() }}">
+    <link rel="stylesheet" href="/static/css/public-header.css?v={{ deployment_stamp() }}">
+    <link rel="stylesheet" href="/static/css/patch-notes.css?v={{ deployment_stamp() }}">
+    <script src="/static/js/patch-notes.js?v={{ deployment_stamp() }}" defer></script>
+</head>
+<body class="chatter-profile-page release-page">
+{% from "shared/public_header.html" import public_header with context %}
+{% call public_header("Patch notes") %}<a class="button secondary" href="/me">My account</a>{% endcall %}
+<main class="release-shell">
+    <a class="release-back" href="/patch-notes">← All updates</a>
+    <div class="release-article-layout">
+        <article class="release-article">
+            <header class="release-article-header"><div class="release-meta">{% if note.version %}<span class="release-badge">v{{ note.version }}</span>{% endif %}<time datetime="{{ note.published_at[:10] }}">{{ note.published_at[:10] }}</time></div><h1>{{ note.title }}</h1><div class="patch-note-body release-summary">{{ note.synopsis | markdown }}</div></header>
+            <div class="patch-note-body release-prose" data-release-body>{{ body_html }}</div>
+        </article>
+        <aside class="release-outline" data-release-outline hidden><nav aria-label="On this page"><h2>In this update</h2><div data-release-links></div></nav><a class="release-read" href="/patch-notes">All release notes →</a></aside>
+    </div>
+</main>
+</body></html>

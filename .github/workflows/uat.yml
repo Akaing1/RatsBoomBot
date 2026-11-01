@@ -64,5 +64,12 @@ jobs:
     env:
       UAT_DEPLOY_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
     steps:
+      - name: Check out validated deployment scripts
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.UAT_DEPLOY_SHA }}
+          path: uat-deployment-source
+          persist-credentials: false
+
       - name: Deploy validated commit to isolated UAT instance
-        run: /opt/ratsboombot-uat/deploy/linux/deploy-uat.sh "$UAT_DEPLOY_SHA"
+        run: bash "$GITHUB_WORKSPACE/uat-deployment-source/deploy/linux/deploy-uat.sh" "$UAT_DEPLOY_SHA"

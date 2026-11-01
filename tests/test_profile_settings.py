@@ -3,6 +3,7 @@ import pytest
 
 from bot.profiles import ChannelProfile, CommunityMessages, RaidBossConfig, RaidBossNames, RaidItemNames, activate_profile, clear_profiles, create_generic_profile, get_active_profile
 from bot.services.channels.profile_settings import PROFILE_SETTINGS_BY_KEY, ProfileSettingsService
+from bot.timer_messages import TimerMessage, format_timers
 
 
 @pytest.fixture(autouse=True)
@@ -10,6 +11,24 @@ def reset_profiles():
     clear_profiles()
     yield
     clear_profiles()
+
+
+@pytest.mark.asyncio
+async def test_timer_schedule_overrides_persist_and_update_live_profile(tmp_path):
+    profile = ChannelProfile(channel_name='schedule-test')
+    activate_profile('schedule', profile)
+    async with asqlite.create_pool(str(tmp_path / 'schedule.db')) as database:
+        service = ProfileSettingsService(database)
+        await service.setup()
+        service.apply_overrides('schedule', profile)
+        timers = (TimerMessage('First', interval_minutes=5, require_active_chat=False, minimum_messages=7), TimerMessage('Second', interval_minutes=15, minimum_messages=30))
+        await service.set_override('schedule', 'timer_messages', format_timers(timers), 'test')
+        assert get_active_profile('schedule').timer_messages == timers
+        reloaded = ProfileSettingsService(database)
+        await reloaded.setup()
+        assert reloaded.apply_overrides('schedule', profile).timer_messages == timers
+        await reloaded.clear_override('schedule', 'timer_messages', 'test')
+        assert get_active_profile('schedule').timer_messages == profile.timer_messages
 
 
 def test_generic_profile_starts_with_standard_commands() -> None:
@@ -146,7 +165,7 @@ async def test_developer_profile_migration_is_idempotent(tmp_path) -> None:
 def test_streamer_editable_settings_protect_points_and_custom_redeems() -> None:
     assert "points.points_per_message" not in PROFILE_SETTINGS_BY_KEY
     assert "points.message_cooldown_seconds" not in PROFILE_SETTINGS_BY_KEY
-    assert "redeems.second_title" not in PROFILE_SETTINGS_BY_KEY
+    assert "redeems.second_title" in PROFILE_SETTINGS_BY_KEY
     assert "redeems.second_amount" not in PROFILE_SETTINGS_BY_KEY
     assert "redeems.daily_amount" not in PROFILE_SETTINGS_BY_KEY
     assert "redeems.first_amount" not in PROFILE_SETTINGS_BY_KEY

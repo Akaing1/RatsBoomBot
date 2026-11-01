@@ -2,9 +2,11 @@
 
 RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with Python, TwitchIO, FastAPI, and SQLite. It provides shared Twitch automation while allowing each connected broadcaster to have their own commands, messages, loyalty currency, redeems, game integrations, and feature defaults.
 
-The project currently supports Ninjakaing and a small group of invited streamers. It is a privately operated bot rather than a public self-service platform.
+The project is privately operated for Ninjakaing and a growing group of stream communities. Core broadcaster onboarding is self-service on the hosted website; specialized integrations and premium features may require maintainer assistance.
 
-Current application version: **15.3.3** (see [`config/version.py`](config/version.py)). Active development targets `release/15.0.0`; the branch name denotes the next release milestone.
+Current application version: **17.0.5** (see [`config/version.py`](config/version.py)). Active development targets `release/17.0.0`; the branch name denotes the next release milestone.
+
+[Website](https://ratsboombot.com) · [My account](https://ratsboombot.com/me) · [Patch notes](https://ratsboombot.com/patch-notes) · [Local development](docs/development.md)
 
 ## Highlights
 
@@ -28,6 +30,12 @@ Current application version: **15.3.3** (see [`config/version.py`](config/versio
 - Optional game integrations, including Overwatch session tracking and League champion statistics
 - Channel-isolated stream logs with retention, downloads, and manual deletion
 - Real-time server performance and application logs
+- Shared moderator dashboards with revocable Moderator and Super moderator roles
+- For You workspace with notes, quotes, and a filterable clip viewer with downloads
+- Dashboard polls, predictions, follower statistics, and raid favorites
+- Searchable settings with individual timer and redeem controls
+- Connected community profiles, searchable Help, and Boss Hunt guides
+- Public patch-note archive and release articles
 - Administrator and Twitch-authenticated channel dashboards
 - SQLite migrations, deployment backups, health checks, and automated tests
 
@@ -70,7 +78,7 @@ RatsBoomBot
 │   ├── admin/              Administrator authentication and routes
 │   ├── channel/            Broadcaster authentication and routes
 │   ├── public/             Public profiles, guides, and patch notes
-│   ├── viewer/             Chatter sign-in and account actions
+│   ├── viewer/             Chatter sign-in, account actions, and delegated moderator access
 │   ├── shared/             Shared web helpers, raid discovery, and preview chat
 │   ├── templates/          Dashboard pages
 │   └── static/             Styles and assets
@@ -126,13 +134,13 @@ Selectors are `bat`, `rat`, `fox`, `wolf`, `raven`, `cat`, `dog`, and `hen`. Gra
 
 ### Achievements
 
-Achievements track chat, loyalty, gambling, community, channel-specific, and Boss Hunt milestones. Their service currently lives in `bot/services/channels/achievements.py`; Loyalty Points and Achievements have not yet been extracted into standalone packages. See [`docs/achievements.md`](docs/achievements.md) and the related achievement guides.
+Achievements track chat, loyalty, gambling, community, channel-specific, and Boss Hunt milestones. Their service currently lives in `bot/services/channels/achievements.py`; achievements have not yet been extracted into a standalone package. Loyalty Points lives in `loyalty/`. See [`docs/achievements.md`](docs/achievements.md) and the related achievement guides.
 
 ### Redeems and Stream Activity
 
 The redeem service supports one daily claim per user per stream, first and second winners, historical totals, milestones, self-timeouts, reusable fixed-target timeouts, and optional targeted-redeem counters. Successful rewards and other channel-point activity appear on the dashboards.
 
-Redeems are matched by the exact Twitch reward title configured in the channel profile.
+Redeems are matched by the exact configured Twitch reward title. Streamers can independently enable Daily, First, Second, and VIP redeems and edit supported titles in Settings → Stream Events.
 
 ### Viewer Queue
 
@@ -148,7 +156,7 @@ Profiles can automatically shout out selected users when they send their first m
 
 Incoming raids can trigger chat and shoutout behavior. Broadcasters can also start outgoing raids with subscriber and non-subscriber messages configured by profile.
 
-The channel dashboard's raid browser includes Browse, Favorites, and Stream team views; category, language, tag, and relationship filters; compatibility ranking; and video/chat previews. Shared pending-raid state keeps browser actions, `/raid`, `/unraid`, and `!startraid` synchronized with the countdown banner. Follow raid is a persisted channel preference. Favorites and excluded channels are stored locally in each browser.
+The channel dashboard's raid browser includes Browse, Favorites, and Stream team views; category, language, tag, and relationship filters; compatibility ranking; and video/chat previews. Shared pending-raid state keeps browser actions, `/raid`, `/unraid`, and `!startraid` synchronized with the countdown banner. Browser-initiated raids follow the `!startraid` message and validation flow. Follow Raids By Default is a persisted switch in Settings → Stream Events. Favorites and excluded channels are stored locally in each browser.
 
 Some directory sorting and suggested-streamer lookups use Twitch's unsupported public website GraphQL interface, isolated from the official Helix lookups. Existing accounts may need to reconnect Twitch for the newly requested chat-reading, following, and raid-management scopes.
 
@@ -159,6 +167,8 @@ Boss Hunt is the separate RPG minigame with scheduled bosses, attacks, weapons, 
 ### Clips
 
 `!clip` or `!clips` creates a 60-second clip. Adding `short` requests a 30-second clip. Clip creation includes per-channel cooldowns, in-progress protection, live validation, and profile-specific responses.
+
+The **Clips** tab in For You browses channel clips with last-24-hours, 7-day, 1-month, and all-time ranges (all time by default), search, sorting, playback, and downloads. Search and sorting apply to loaded clips; load more to expand the results. Filters apply immediately.
 
 ### Moderation
 
@@ -182,7 +192,48 @@ Third-party game APIs may require public player profiles and do not expose every
 
 The root URL is the public landing page with chatter sign-in. Connected broadcasters use `/channel` for stream status, combined Twitch/YouTube chat, viewer queues, check-ins, redeems, raid discovery, and feature/customization controls.
 
-Channel sessions are isolated by Twitch user ID and persist for the configured session lifetime.
+Channel sessions are isolated by Twitch user ID and persist for the configured session lifetime. The Overview also provides polls and predictions with live summaries and history, subject to Twitch eligibility and authorization. The Followers page adds sortable statistics and raid favorites.
+
+### Moderator Dashboard
+
+Broadcasters grant, change, or revoke roles from **Moderator access**. Delegates sign in to `/me`, select a channel in the right-side **Mod Bar**, and open its shared dashboard.
+
+| Role | Access |
+| --- | --- |
+| Moderator | Overview, chat and viewer queue controls, personal Twitch chat replies, and notes for the streamer |
+| Super moderator | Moderator access plus Ads Manager, Settings/customization, and For You notes, quotes, and clips |
+
+Access is checked per channel and revoked users receive an Unauthorized page. Delegated dashboard access does not grant administrator access. Twitch replies use the moderator's own authorized identity. Connection prompts request reauthorization when a supported connection needs attention.
+
+### My Account and Community Pages
+
+`!me` opens the chatter's global account, while `!stats` links to their profile in the current community. Updated Overview, Achievements, Pets, and Boss Hunt tabs are shared with public and per-channel profiles. Channel profiles combine Shop, Craft, and Gamble in **Activity**.
+
+The right sidebar contains the Mod Bar and Communities, with the five most recently interacted-with communities visible and the rest expandable. Shared headers connect community profiles, Command Help, Boss Hunt guides, and Patch notes.
+
+### Settings
+
+Settings combines feature controls and customization in General, Chat, Stream Events, Timers, Connections, Loyalty Points, Viewer Queue, and Pets and Boss Hunt. Games appears for enabled game integrations. Categories and the search finder sit on the right; expandable inputs keep related switches and messages together. Command groups include usage descriptions.
+
+- General contains command controls, YouTube chat above Protected Users, game switches, and OBS browser sources at the bottom.
+- Stream Events groups community and raid messages, Follow Raids By Default, shoutouts, and individual redeem controls.
+- Timers provides a creation form and an expandable Configure menu per saved timer. Each entry has an enabled state; colors appear only for announcements.
+- Connections stores supported social URLs, including TikTok, X, Ko-Fi, and VGen. These saved URLs do not add new social chat subcommands.
+- Pets and Boss Hunt have separate control panels.
+
+Tabs retain form drafts and mark unsaved changes. Each form saves independently, with a warning before discarding drafts in other forms. Supported blank message fields fall back to channel defaults. Old Features, Customization, and Loyalty Points URLs redirect to Settings; `/channel/settings?section=loyalty` opens a category directly.
+
+### For You and Personal Tools
+
+The For You sidebar workspace contains **Notes, Quotes, and Clips**. Notes can be created, titled, edited, reordered, and deleted; untitled notes receive sequential names. The Overview note editor shares this storage, and delegated moderator notes are available to the streamer. Quote management uses the same channel collection as `!quote`.
+
+The Overview's personal reminder timer uses Minutes : Seconds, survives refreshes, and supports reminders from one second to seven days. Keep the dashboard open for the completion popup; overdue timers appear when you return. These reminders do not post chat messages and are separate from automated chat timers in Settings.
+
+### Patch Notes
+
+`/patch-notes` shows the latest published release and a card archive. Articles provide version/date details and section navigation. Patch notes are linked from the homepage and shared account/community headers.
+
+Administrators create and review drafts in **Admin → Patch notes**. Drafts are not public. Publishing makes an article public and can announce it through the configured Discord patch-note webhook. The combined pets-through-v16 draft is also available in [`docs/release_16_community_dashboard.md`](docs/release_16_community_dashboard.md).
 
 ### Administrator Dashboard
 
@@ -228,7 +279,7 @@ League statistics are stored separately in `.data/league.db`. This database cont
 
 Migrations run automatically during startup. The authoritative ordered registry is [`storage/migrations/__init__.py`](storage/migrations/__init__.py). It includes the original engagement schema, Boss Hunt progression, achievements, YouTube chat, viewer sessions, quotes, global pets, and raid-browser settings.
 
-Recent migrations add incoming-raid recency (65), repair the development migration-number collision that could omit Honey Hen (66), and persist Follow raid (67). Applied migration versions and names are recorded in `schema_migrations`.
+Recent migrations cover For You note management, delegated channel access and authorization, retirement of the View role, follower indexing, and the unpublished combined release-note draft. Applied migration versions and names are recorded in `schema_migrations`.
 
 Migrations are grouped into core, loyalty, achievements, Boss Hunts, and pets while retaining one global version sequence. See the [migration contributor guide](docs/migrations.md) for numbering, registration, upgrade tests, and recovery. Use a new migration for schema changes instead of rebuilding the production database.
 
@@ -307,7 +358,7 @@ UAT uses `https://uat.ratsboombot.com`, an independent Twitch application, and t
 
 Pull requests targeting `uat` or `release/**`, and pushes to those branches, run Python compilation and pytest. When `UAT_DEPLOY_ENABLED` is `true`, eligible pushes and same-repository, non-draft PRs targeting `release/**` deploy UAT after validation. The workflow also supports manual dispatch. UAT deployments do not publish GitHub releases or restart the production service.
 
-Complete the one-time Raspberry Pi, Twitch, Cloudflare, and GitHub setup in [`deploy/linux/UAT.md`](deploy/linux/UAT.md). Open feature and fix PRs against the active release branch (`release/15.0.0`), verify them in UAT, and merge the release branch into `master` when ready to ship.
+Complete the one-time Raspberry Pi, Twitch, Cloudflare, and GitHub setup in [`deploy/linux/UAT.md`](deploy/linux/UAT.md). Open feature and fix PRs against the active release branch (`release/16.0.0`), verify them in UAT, and merge the release branch into `master` when ready to ship.
 
 ## Testing
 
@@ -332,7 +383,7 @@ RatsBoomBot uses a practical three-part version number:
 - Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement.
 - Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone.
 
-The active release branch is `release/15.0.0`. Branch names denote planned milestones; only published GitHub releases belong in the dated changelog. The home page's **What's New** panel is updated for minor and major releases; patch history remains in the changelog and GitHub releases.
+The active release branch is `release/16.0.0`. Branch names denote planned milestones; only published GitHub releases belong in the dated changelog. The homepage’s **What’s New** panel highlights major updates; the public Patch notes archive holds curated published articles. Keep it distinct from the GitHub release/changelog history and unpublished admin drafts.
 
 ## Current Limitations
 
@@ -353,18 +404,6 @@ RatsBoomBot is a privately operated project and is not currently offered under a
 This notice does not revoke existing permissions, override GitHub's terms (including viewing and forking rights for public repositories), or replace the licenses of third-party dependencies and assets. Permission to use the hosted service is separate from permission to reuse its source code. Contact the maintainers about source-code licensing; any future project-wide license must account for contributor and third-party rights.
 
 This is a statement of the current licensing status, not a new open-source license or a transfer of contributors' copyright. See [GitHub's licensing guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository) and [the no-license explanation](https://choosealicense.com/no-permission/).
-
-### Personal dashboard tools
-
-Flip the Moderation card to **For You** for private, account-saved stream notes and a personal reminder timer. Save notes explicitly; timers use Minutes : Seconds and support 1 second to 7 days and survive refreshes. Keep the dashboard open for the popup; overdue timers appear when you return. These tools do not post messages to chat.
-
-### Channel settings notebook
-
-Settings combines feature switches and customization into General, Chat, Stream Events, Timers, Connections, Loyalty Points, Viewer Queue, and Pets and Boss Hunt. Games appears when a channel has an enabled game integration, and contains only enabled game data. General contains protected users, YouTube chat, and game enable switches. Raid preferences live under Stream Events. SVG tabs sit above the settings on desktop and mobile. Single feature status buttons live in expandable group headers; multi-feature controls use aligned rows inside the group. Timers and Loyalty Points show their forms directly, without extra accordions; standalone commands use compact rows. Switch tabs without losing form drafts; a dot marks sections with unsaved edits. Save controls apply to their individual forms. Saving one form warns before discarding drafts in other forms. Expand detailed groups as needed. Loyalty Points is managed inside Settings rather than a separate sidebar page. Old Features, Customization, and Loyalty Points URLs redirect to Settings, and `/channel/settings?section=loyalty` opens a category directly.
-
-### For You
-
-The For You sidebar page contains Notes and Quotes. Notes share the Overview editor: saves update one entry per stream, including streams crossing midnight, or one entry per offline UTC day. Notes can be created, titled, edited, deleted, and reordered using the note list. Untitled entries are displayed as Unnamed note 1, Unnamed note 2, etc., in list order; deleting or titling one closes numbering gaps. Stream/day grouping stays internal. Existing note content is preserved on upgrade. Quote search, addition, editing, and deletion use the same channel quotes as chat commands. Lists paginate in groups of 20; deletion renumbers quotes as usual.
 
 ## Unattended performance history
 

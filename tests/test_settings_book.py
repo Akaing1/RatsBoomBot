@@ -37,7 +37,7 @@ def test_every_setting_and_toggle_is_assigned_exactly_once():
         context, groups, states = settings_context()
         sections = context['settings_sections']
         assert Counter(entry.definition.key for section in sections for entries in section['groups'].values() for entry in entries) == Counter(entry.definition.key for name, entries in groups.items() if name not in ('League of Legends', 'Overwatch') for entry in entries)
-        assert sum(len(section['toggles']) for section in sections) == sum(map(len, states)) - 1
+        assert sum(len(section['toggles']) for section in sections) == sum(map(len, states)) - 2
         chat = next(s for s in sections if s['key'] == 'chat')
         assert any(t['name'] == 'kamikaze' for t in chat['toggles'])
         loyalty = next(s for s in sections if s['key'] == 'loyalty')
@@ -51,7 +51,9 @@ def test_notebook_renders_existing_forms_once_and_honors_deep_link():
     try:
         context, groups, states = settings_context('connections')
         html = templates.env.get_template('channel/settings.html').render(**context)
-        assert html.count('role="tabpanel"') == 8
+        assert html.count('class="settings-menu-section"') == 8
+        assert 'role="tablist"' not in html
+        assert 'role="tabpanel"' not in html
         assert html.count('id="protected-users"') == 1
         assert html.count('id="youtube-integration"') == 1
         assert 'data-settings-page="connections" hidden' not in html
@@ -68,6 +70,27 @@ def test_notebook_renders_existing_forms_once_and_honors_deep_link():
                     assert html.count(f'data-setting-key="{entry.definition.key}"') == 1
                 else:
                     assert html.count(f'name="setting_name" value="{entry.definition.key}"') == 1
+    finally:
+        clear_profiles()
+
+
+def test_blocked_commands_share_prerequisite_links_at_category_top():
+    try:
+        context, _, _ = settings_context('chat')
+        chat = next(section for section in context['settings_sections'] if section['key'] == 'chat')
+        chat['blocked'] = True
+        chat['blocked_by_profile'] = True
+        chat['blocked_by_globals'] = True
+        for toggle in chat['toggles']:
+            toggle['state'] = SimpleNamespace(effective_enabled=False, blocked_by_profile=True, blocked_by_globals=True)
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        chat_html = html.split('id="settings-chat"', 1)[1].split('id="settings-events"', 1)[0]
+        assert chat_html.count('>Enable channel profile</a>') == 1
+        assert chat_html.count('>Enable global commands</a>') == 1
+        assert chat_html.index('>Enable channel profile</a>') < chat_html.index('class="settings-command-cluster"')
+        assert 'Enable channel profile' not in templates.env.get_template('channel/settings_switch.html').module.status_switch(chat['toggles'][0])
+        chat['blocked'] = False
+        assert templates.env.get_template('channel/settings_switch.html').module.blocked_notice(chat).strip() == ''
     finally:
         clear_profiles()
 
@@ -89,11 +112,12 @@ def test_header_controls_are_not_duplicated_in_standalone_rows():
             assert Counter((t['kind'], t['name']) for t in assigned) == Counter((t['kind'], t['name']) for t in section['toggles'])
         timers = next(s for s in context['settings_sections'] if s['key'] == 'timers')
         assert timers['standalone_toggles'] == []
-        assert timers['group_toggles']['Timers'][0]['name'] == 'timers'
+        assert timers['group_toggles'] == {}
+        assert timers['toggles'] == []
         html = templates.env.get_template('channel/settings.html').render(**context)
-        assert html.index('<nav class="settings-tabs"') < html.index('<div class="settings-pages"')
-        assert 'form="settings-toggle-feature-timers"' in html
-        assert 'id="settings-toggle-feature-timers"' in html
+        assert html.index('<div class="settings-pages"') < html.index('<nav class="settings-menu"')
+        assert 'form="settings-toggle-feature-timers"' not in html
+        assert 'data-timer-manager' in html
         assert '>Enable\n' not in html
     finally:
         clear_profiles()
@@ -110,6 +134,10 @@ def test_reorganized_sections_and_forms():
         assert 'id="youtube-integration"' in general
         assert 'dashboard.follow_raid' not in general
         assert 'dashboard.follow_raid' in events
+        raid_messages, raid_preferences = events.split('id="settings-group-raid-preferences"', 1)
+        assert 'dashboard.follow_raid' not in raid_messages
+        assert 'dashboard.follow_raid' in raid_preferences
+        assert 'Follow outgoing raids' in raid_preferences
         for key, next_key in [('timers', 'connections'), ('loyalty', 'queue')]:
             page = html.split(f'id="settings-{key}"')[1].split(f'id="settings-{next_key}"')[0]
             assert '<details class="settings-group"' not in page
@@ -151,10 +179,39 @@ def test_related_response_switches_render_inside_their_message_cards():
         assert 'value="reset"' not in html
         assert 'Leave empty to send nothing.' not in html
         assert 'data-settings-finder' in html
-        assert '<details class="settings-field-editor">' in card
+        assert '<details class="settings-field-editor">' not in card
+        assert '<div class="settings-field-body">' in card
         assert 'settings-finder-note' not in html
         for name in ('daily', 'first', 'second', 'vip'):
             assert f'form="settings-toggle-feature-redeem_{name}"' in html
         assert 'settings-toggle-feature-redeems' not in html
+    finally:
+        clear_profiles()
+
+
+def test_sidebar_navigation_and_group_descriptions_use_command_registry():
+    from bot.command_registry import get_registered_definitions, CommandVisibility
+    from bot.profiles import GlobalCommandGroup
+    try:
+        context, _, _ = settings_context()
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        assert html.index('class="settings-tools"') < html.index('data-settings-finder hidden') < html.index('class="settings-menu"')
+        assert '<summary>Settings menu</summary>' not in html
+        assert 'aria-current="page"' in html
+        assert 'Included commands (' in html
+        assert 'href="?section=events#settings-group-shoutouts"' not in html
+        assert 'href="?section=loyalty#setting-points-display_name"' not in html
+        assert 'Customize social links' not in html
+        assert 'Manage timers' not in html
+        assert 'href="?section=connections#settings-control-global_group-socials"' not in html
+        toggles = [toggle for section in context['settings_sections'] for toggle in section['toggles']]
+        assert all(toggle['description'] for toggle in toggles)
+        assert all(link[0] != toggle['section'] for toggle in toggles for link in toggle['related_settings'])
+        socials = next(toggle for toggle in toggles if toggle['kind'] == 'global_group' and toggle['name'] == 'socials')
+        assert socials['related_settings'] == []
+        queue = next(toggle for toggle in toggles if toggle['kind'] == 'global_group' and toggle['name'] == 'viewer_queue')
+        expected = [command.syntax for command in get_registered_definitions(ChannelProfile(channel_name='example')) if command.global_group is GlobalCommandGroup.VIEWER_QUEUE and command.visibility is CommandVisibility.PUBLIC]
+        assert [command.syntax for command in queue['commands']] == expected
+        assert '!join' in expected
     finally:
         clear_profiles()
