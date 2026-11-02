@@ -25,8 +25,19 @@ def env():
         chat_identity=SimpleNamespace(sender_id=lambda channel: "998")))
     service = AutomaticShoutoutService(bot, shoutouts)
     bot.services.automatic_shoutouts = service
+    seen = set()
+    async def mark_seen(*, broadcaster_id, stream_id, user_id, username):
+        key = (broadcaster_id, stream_id, user_id)
+        if key in seen:
+            return False
+        seen.add(key)
+        return True
+    async def forget_seen(*, broadcaster_id, stream_id, user_id):
+        seen.discard((broadcaster_id, stream_id, user_id))
+    bot.services.first_chat_shoutouts = SimpleNamespace(get_live_stream_id=AsyncMock(return_value='stream-1'),
+        mark_seen=AsyncMock(side_effect=mark_seen), forget_seen=AsyncMock(side_effect=forget_seen))
     def configure(**values):
-        config = replace(AutomaticShoutouts(), **values)
+        config = replace(AutomaticShoutouts(), **{'users': 'alice', **values})
         activate_profile("1", ChannelProfile(channel_name="owner", automatic_shoutouts=config))
         return config
     configure()
@@ -72,18 +83,95 @@ async def test_blacklist_overrides_list_and_does_not_fetch_metadata(env):
 
 
 @pytest.mark.asyncio
-async def test_thresholds_and_cross_trigger_cooldown(env, monkeypatch):
+@pytest.mark.parametrize('trigger', ['chat', 'redeem', 'subscription', 'gift', 'bits', 'streak'])
+async def test_whitelist_interactions_ignore_raid_requirements_and_blacklist(env, trigger):
+    bot, service, shoutouts, configure = env
+    configure(**{trigger: 1}, users='ALICE', blacklist='alice', require_following=1, require_partner=1, require_team=1)
+    assert await service.handle('1', '2', 'alice', trigger, 100)
+    bot._http.request_json.assert_not_awaited()
+    shoutouts.enqueue.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('trigger', ['chat', 'redeem', 'subscription', 'gift', 'bits', 'streak'])
+async def test_interaction_requires_whitelist_membership_even_with_no_raid_requirements(env, trigger):
+    bot, service, shoutouts, configure = env
+    configure(**{trigger: 1}, users='bob')
+    assert not await service.handle('1', '2', 'alice', trigger, 100)
+    bot._http.request_json.assert_not_awaited()
+    bot.services.first_chat_shoutouts.get_live_stream_id.assert_not_awaited()
+    shoutouts.enqueue.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_raid_does_not_require_whitelist_unless_selected(env):
+    _, service, _, configure = env
+    configure(users='')
+    assert await service.handle('1', '2', 'alice', 'raid', 20)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('first,second', [('raid', 'chat'), ('chat', 'raid')])
+async def test_raid_and_whitelist_share_once_per_stream_limit(env, first, second):
+    _, service, shoutouts, configure = env
+    configure(chat=1)
+    assert await service.handle('1', '2', 'alice', first, 20)
+    assert not await service.handle('1', '2', 'alice', second, 20)
+    assert shoutouts.send_chat_message.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_failed_delivery_releases_stream_reservation(env):
+    bot, service, shoutouts, configure = env
+    configure(chat=1, native=0)
+    shoutouts.send_chat_message.return_value = False
+    assert not await service.handle('1', '2', 'alice', 'chat')
+    bot.services.first_chat_shoutouts.forget_seen.assert_awaited_once()
+    shoutouts.send_chat_message.return_value = True
+    assert await service.handle('1', '2', 'alice', 'chat')
+
+
+@pytest.mark.asyncio
+async def test_once_per_stream_marker_survives_restart_and_resets_for_new_stream(env, tmp_path):
+    bot, service, shoutouts, configure = env
+    configure(chat=1)
+    logs = SimpleNamespace(active_sessions={'1': SimpleNamespace(stream_id='stream-1')})
+    async with asqlite.create_pool(str(tmp_path / 'markers.db')) as db:
+        markers = FirstChatShoutoutService(bot, db, shoutouts, logs)
+        await markers.setup()
+        bot.services.first_chat_shoutouts = markers
+        assert await service.handle('1', '2', 'alice', 'raid', 20)
+        restarted = AutomaticShoutoutService(bot, shoutouts)
+        assert not await restarted.handle('1', '2', 'alice', 'chat')
+        logs.active_sessions['1'] = SimpleNamespace(stream_id='stream-2')
+        assert await restarted.handle('1', '2', 'alice', 'chat')
+        assert not await restarted.handle('1', '2', 'alice', 'raid', 20)
+    assert shoutouts.send_chat_message.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_no_live_stream_does_not_reserve_or_send(env):
+    bot, service, shoutouts, configure = env
+    configure(chat=1)
+    bot.services.first_chat_shoutouts.get_live_stream_id.return_value = None
+    assert not await service.handle('1', '2', 'alice', 'chat')
+    bot.services.first_chat_shoutouts.mark_seen.assert_not_awaited()
+    shoutouts.enqueue.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_thresholds_and_once_per_stream_across_triggers(env, monkeypatch):
     bot, service, shoutouts, configure = env
     now = [10.0]
     monkeypatch.setattr(module, "time", SimpleNamespace(monotonic=lambda: now[0]))
-    configure(minimum_viewers=10, chat=1, bits=1, minimum_bits=100, gift=1, minimum_gifts=3)
+    configure(minimum_viewers=10)
     assert not await service.handle("1", "2", "alice", "raid", 9)
-    assert not await service.handle("1", "2", "alice", "bits", 99)
-    assert not await service.handle("1", "2", "alice", "gift", 2)
     # A raid viewer threshold does not exclude eligible chatters.
     assert await service.handle("1", "2", "alice", "chat")
     assert not await service.handle("1", "2", "alice", "raid", 10)
     now[0] += 3600
+    assert not await service.handle("1", "2", "alice", "bits", 100)
+    bot.services.first_chat_shoutouts.get_live_stream_id.return_value = 'stream-2'
     assert await service.handle("1", "2", "alice", "bits", 100)
     assert shoutouts.enqueue.call_count == 2
 
@@ -137,7 +225,7 @@ async def test_simultaneous_events_only_send_once(env):
 
 
 @pytest.mark.asyncio
-async def test_automatic_blacklist_covers_first_chat_and_queued_items(env):
+async def test_raid_blacklist_covers_queued_raids_but_not_whitelist_or_first_chat(env):
     bot, _, _, configure = env
     queue = ShoutoutService(bot)
     assert queue.enqueue("1", "2", "alice", "auto:raid")[0]
@@ -148,10 +236,16 @@ async def test_automatic_blacklist_covers_first_chat_and_queued_items(env):
     assert not queue.queues["1"]
     # Manual moderator shoutouts remain available.
     assert queue.enqueue("1", "2", "alice", "moderator")[0]
+    assert queue.enqueue("1", "3", "alice", "auto:chat")[0]
+    assert queue.enqueue("1", "4", "alice", "first-chat")[0]
+    assert not queue.enqueue("1", "5", "alice", "auto:raid")[0]
     first_chat = FirstChatShoutoutService(bot, None, queue, None)
-    first_chat.get_live_stream_id = AsyncMock()
-    assert not await first_chat.handle_message(broadcaster_id="1", user_id="2", username="alice")
-    first_chat.get_live_stream_id.assert_not_awaited()
+    first_chat.get_configured_user = Mock(return_value=FirstChatShoutout(user_id='2', username='alice'))
+    first_chat.get_live_stream_id = AsyncMock(return_value='stream-1')
+    first_chat.mark_seen = AsyncMock(return_value=True)
+    queue.send_chat_message = AsyncMock(return_value=True)
+    assert await first_chat.handle_message(broadcaster_id="1", user_id="2", username="alice")
+    queue.send_chat_message.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -213,7 +307,7 @@ async def test_bulk_settings_save_together_and_reject_invalid_changes(tmp_path):
         assert loaded.overrides["1"]["automatic_shoutouts.chat"] == 1
         assert loaded.overrides["1"]["automatic_shoutouts.users"] == "alice\nbob"
         previous = loaded.overrides["1"].copy()
-        for invalid in ({**values, "automatic_shoutouts.minimum_bits": "0"}, {"automatic_shoutouts.chat": "0"}):
+        for invalid in ({**values, "automatic_shoutouts.minimum_viewers": "-1"}, {"automatic_shoutouts.chat": "0"}):
             with pytest.raises(ValueError):
                 await service.set_automatic_shoutouts("1", invalid, "owner")
         await loaded.load_overrides()
@@ -311,8 +405,79 @@ def test_controls_render_under_stream_events():
         html = templates.env.get_template("channel/settings.html").render(**context)
         assert 'data-setting-key="automatic_shoutouts.raid"' in html
         assert 'data-setting-key="automatic_shoutouts.minimum_viewers"' in html
-        assert html.count('data-shoutout-user-list ') == 2
-        assert '/api/automatic-shoutouts/users' in html
+        assert html.count('<div data-shoutout-user-list>') == 2
+        assert '/protected-users/search' in html
         assert 'automatic-shoutout-settings.js' in html
+        incoming, whitelist = html.split('<h4>Incoming raid messages</h4>', 1)[1].split('<h4>Interactive shoutouts</h4>', 1)
+        assert 'data-setting-key="automatic_shoutouts.blacklist"' in incoming
+        assert 'data-setting-key="automatic_shoutouts.require_partner"' in incoming
+        assert 'data-setting-key="automatic_shoutouts.users"' not in incoming
+        assert 'data-setting-key="automatic_shoutouts.users"' in whitelist
+        assert 'data-setting-key="automatic_shoutouts.chat"' in whitelist
+        assert 'id="auto-interactions"' in whitelist
+        assert whitelist.index('automatic_shoutouts.event_message') < whitelist.index('automatic_shoutouts.users')
+        assert '<a data-settings-link href="?section=shoutouts#shoutout-messages">standard shoutout message</a>' in whitelist
+        assert '<h4>Message</h4>' not in whitelist
+        assert 'data-setting-key="automatic_shoutouts.blacklist"' not in whitelist
+        assert '<h4>Delivery</h4>' not in html
+        assert '<h4>Who qualifies</h4>' not in html
+        assert 'class="automatic-shoutout-switch"' not in html
+        assert 'automatic-shoutout-switch-form' in html
+        assert 'name="setting_name" value="automatic_shoutouts"' not in html
     finally:
         clear_profiles()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("new_message", [None, "Custom shoutout", ""])
+async def test_legacy_incoming_message_moves_to_single_shoutout_setting(tmp_path, new_message):
+    async with asqlite.create_pool(str(tmp_path / "raid-message.db")) as db:
+        settings = ProfileSettingsService(db)
+        await settings.setup()
+        async with db.acquire() as connection:
+            await connection.execute(
+                "INSERT INTO channel_profile_overrides (broadcaster_id, setting_name, setting_value, updated_by) VALUES (?, ?, ?, ?)",
+                ("1", "raid_messages.incoming", json.dumps("Welcome {raider_name}, {viewer_count} {viewer_word}!"), "test"))
+            if new_message is not None:
+                await connection.execute(
+                    "INSERT INTO channel_profile_overrides (broadcaster_id, setting_name, setting_value, updated_by) VALUES (?, ?, ?, ?)",
+                    ("1", "automatic_shoutouts.raid_message", json.dumps(new_message), "test"))
+        await settings.setup()
+        await settings.setup()
+        profile = settings.apply_overrides("1", ChannelProfile(channel_name="example"))
+        expected = new_message if new_message is not None else "Welcome {username}, {viewer_count} {viewer_word}!"
+        assert profile.automatic_shoutouts.raid_message == expected
+        assert "raid_messages.incoming" not in settings.overrides["1"]
+        async with db.acquire() as connection:
+            assert not await connection.fetchone("SELECT 1 FROM channel_profile_overrides WHERE setting_name = 'raid_messages.incoming'")
+
+
+def test_legacy_profile_incoming_message_is_preserved_as_shoutout_default():
+    from bot.profiles import RaidMessages
+    settings = ProfileSettingsService(None)
+    profile = ChannelProfile(channel_name="example", raid_messages=RaidMessages(incoming="Welcome {raider_name}!"))
+    assert settings.apply_overrides("1", profile).automatic_shoutouts.raid_message == "Welcome {username}!"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("trigger", ["chat", "redeem", "subscription", "gift", "bits", "streak"])
+async def test_interaction_master_toggle_preserves_triggers_and_does_not_disable_raids(env, trigger):
+    bot, service, shoutouts, configure = env
+    config = configure(interactions=0, **{trigger: 1})
+    assert not await service.handle("1", "2", "alice", trigger, 10)
+    bot.services.first_chat_shoutouts.get_live_stream_id.assert_not_awaited()
+    shoutouts.send_chat_message.assert_not_awaited()
+    assert module.blocked_automatic_shoutout("1", "alice", f"auto:{trigger}")
+    assert await service.handle("1", "2", "alice", "raid", 10)
+    assert getattr(config, trigger) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('trigger', ['chat', 'redeem', 'subscription', 'gift', 'bits', 'streak'])
+async def test_whitelist_triggers_are_enabled_by_default_without_amount_thresholds(env, trigger):
+    _, service, _, configure = env
+    config = configure()
+    assert getattr(config, trigger) == 1
+    assert await service.handle('1', '2', 'alice', trigger, 1)
+    assert 'automatic_shoutouts.minimum_bits' not in PROFILE_SETTINGS_BY_KEY
+    assert 'automatic_shoutouts.minimum_gifts' not in PROFILE_SETTINGS_BY_KEY

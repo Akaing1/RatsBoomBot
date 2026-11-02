@@ -1,7 +1,6 @@
 import logging
 
 from bot.profiles import FirstChatShoutout, get_active_profile
-from bot.services.stream.automatic_shoutouts import blacklisted
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -32,8 +31,6 @@ class FirstChatShoutoutService:
     async def handle_message(self, *, broadcaster_id: str, user_id: str, username: str) -> bool:
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
-        if blacklisted(broadcaster_id, user_id, username):
-            return False
         configured = self.get_configured_user(broadcaster_id, user_id)
 
         if configured is None:
@@ -98,3 +95,8 @@ class FirstChatShoutoutService:
             row = await connection.fetchone("SELECT changes() AS inserted")
 
         return bool(row and row["inserted"])
+
+    async def forget_seen(self, *, broadcaster_id: str, stream_id: str, user_id: str) -> None:
+        async with self.db.acquire() as connection:
+            await connection.execute("DELETE FROM first_chat_shoutouts WHERE broadcaster_id = ? AND stream_id = ? AND user_id = ?",
+                                     (str(broadcaster_id), str(stream_id), str(user_id)))

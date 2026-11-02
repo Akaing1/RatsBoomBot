@@ -5,7 +5,7 @@
 <div class="settings-navbar-controls"><span class="settings-navbar-title">Settings</span><button type="button" class="settings-menu-toggle" data-settings-menu-toggle aria-label="Settings menu" aria-controls="settings-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button></div>
 {% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}-settings-heading-links">
+<link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}-shared-whitelist-state">
 <header class="page-header"><div><p class="eyebrow">Your channel, your way</p><h2>Settings</h2></div></header>
 {% for result, message in [(toggle_result, toggle_message), (setting_result, setting_message)] %}
 {% if message %}<div class="toggle-feedback {{ 'success' if result == 'success' else 'error' }}" role="status">{{ message }}</div>{% endif %}
@@ -42,7 +42,6 @@
             {% if not moderator_mode %}<section class="settings-group"><header class="settings-group-heading"><h4>YouTube chat connection</h4></header><div class="panel" id="youtube-integration">{% with settings_notebook=true %}{% include "shared/youtube_settings.html" %}{% endwith %}</div></section>{% endif %}
             <section class="settings-group"><header class="settings-group-heading"><h4>Protected users</h4></header><div class="panel">{% with protected_search_url=channel_root ~ '/protected-users/search', protected_add_url=channel_root ~ '/protected-users/add', protected_remove_url=channel_root ~ '/protected-users/remove' %}{% include 'shared/protected_settings.html' %}{% endwith %}</div></section>
             {% endif %}
-            {% if section.key == 'events' %}{% include "channel/settings_redeems.html" %}{% endif %}
             {% if section.key == 'connections' %}{% include "channel/settings_identity.html" %}{% endif %}
             {% if section.key == 'general' and not moderator_mode %}{% include "shared/widget_settings.html" %}{% endif %}
             {% if section.key == 'queue' %}
@@ -87,13 +86,13 @@
 {% block page_scripts %}
 {{ super() }}
 <script src="/static/js/social-integrations.js" defer></script>
-<script src="/static/js/protected-users.js?v={{ deployment_stamp() }}-ranked-search-optimized" defer></script>
+<script src="/static/js/protected-users.js?v={{ deployment_stamp() }}-retry-user-popup" defer></script>
 <script src="/static/js/settings-timers.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
 <script src="/static/js/settings-inputs.js?v={{ deployment_stamp() }}-batch-field-sizing" defer></script>
 <script src="/static/js/settings-command-references.js?v={{ deployment_stamp() }}-menu-command-selection" defer></script>
 <script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}-optimized-context-tracking" defer></script>
 <script src="/static/js/settings-save.js?v={{ deployment_stamp() }}-targeted-list-refresh" defer></script>
-<script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}-ranked-settings-search" defer></script>
-<script src="/static/js/settings-menu-highlight.js?v={{ deployment_stamp() }}-settings-cleanup" defer></script>
-<script src="/static/js/automatic-shoutout-settings.js?v={{ deployment_stamp() }}" defer></script>
+<script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}-single-outgoing-menu" defer></script>
+<script src="/static/js/settings-menu-highlight.js?v={{ deployment_stamp() }}-single-outgoing-menu" defer></script>
+<script src="/static/js/automatic-shoutout-settings.js?v={{ deployment_stamp() }}-shared-whitelist-state" defer></script>
 {% endblock %}

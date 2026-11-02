@@ -817,7 +817,7 @@
             container.replaceChildren();
             if (!list.size) { container.textContent = "No channels saved."; continue; }
             container.textContent = "";
-            for (const id of list) {
+            for (const id of [...list].sort((a, b) => (identities.get(a)?.login || channelLabel(a)).localeCompare(identities.get(b)?.login || channelLabel(b), undefined, {sensitivity: "base"}))) {
                 const row = document.createElement("div");
                 row.className = "raid-lists-row user-list-row";
                 const channel = identities.get(id);
@@ -846,8 +846,8 @@
                 const button = document.createElement("button");
                 button.type = "button"; button.className = "button secondary"; button.textContent = label;
                 button.setAttribute("aria-label", `${label}: ${channelLabel(id)}`);
+                button.dataset.userRowRemove = "";
                 button.addEventListener("click", () => {
-                    if (list === favorites && !confirmUnfavorite(id)) return;
                     list.delete(id); saveLists(); renderManager();
                     if (dialog.open && list !== favorites) load();
                 });

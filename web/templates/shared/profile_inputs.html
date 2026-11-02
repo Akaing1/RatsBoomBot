@@ -65,8 +65,12 @@
         {% with timer_setting=settings[0] %}{% include "channel/settings_timers.html" %}{% endwith %}
     {% else %}
     {% set flat = flat_settings | default(false) %}
+    {% if settings_notebook | default(false) and group_name == "Outgoing raid messages" %}
+    <section class="settings-group" id="settings-group-outgoing-raids" data-settings-single-menu>
+        <header class="settings-group-heading"><h4>Outgoing raids</h4></header>
+    {% endif %}
     {% set controls = (group_toggles | default({})).get(group_name, []) %}
-    {% if settings_notebook | default(false) and not flat %}<section id="settings-group-{{ group_name | lower | replace(' ', '-') }}" class="settings-group{% if controls | length == 1 and not controls[0].state.effective_enabled and group_name != 'Redeems' %} is-disabled{% endif %}"><header class="settings-group-heading"><h4 class="settings-group-title">{{ group_name }}</h4><span class="settings-header-switches">{% if controls | length == 1 and group_name != "Redeems" %}{{ status_switch(controls[0]) }}{% endif %}</span></header>{% endif %}
+    {% if settings_notebook | default(false) and not flat %}<section id="settings-group-{{ group_name | lower | replace(' ', '-') }}" class="settings-group{% if controls | length == 1 and not controls[0].state.effective_enabled and group_name != 'Redeems' %} is-disabled{% endif %}"><header class="settings-group-heading"><h4 class="settings-group-title">{{ 'Shoutout messages' if group_name == 'Shoutouts' else group_name }}</h4><span class="settings-header-switches">{% if controls | length == 1 and group_name != "Redeems" %}{{ status_switch(controls[0]) }}{% endif %}</span></header>{% endif %}
     <section class="panel toggle-management-panel profile-settings-panel">
         {% set controls = (group_toggles | default({})).get(group_name, []) %}
         {% if controls | length > 1 or flat or group_name == "Redeems" %}<div class="settings-switch-list">{% for toggle in controls %}<div class="settings-switch-row"><div class="settings-toggle-copy"><span>{{ toggle.label }}</span>{{ toggle_details(toggle) }}</div>{{ status_switch(toggle) }}</div>{% endfor %}</div>{% endif %}
@@ -77,7 +81,7 @@
                 <h3>{{ group_name }}</h3>
             </div>
         </div>
-        {% if group_name == "Automatic shoutouts" %}<p>Anyone who meets all enabled requirements is eligible. With no requirements enabled, anyone qualifies. The minimum viewer count applies only to raids. The blacklist overrides every automatic trigger.</p>{% endif %}
+        {% if group_name == "Automatic shoutouts" %}<p>Requirements and the blacklist apply to incoming raids. Other triggers require whitelist membership. Each person receives one automatic shoutout per live stream.</p>{% endif %}
 
         {% if group_name == "Commands" and not settings_notebook | default(false) %}
             <div class="dashboard-tabs command-customization-tabs" role="tablist" aria-label="Command customization">
@@ -87,7 +91,7 @@
         {% endif %}
 
         <div{% if group_name == "Commands" and not settings_notebook | default(false) %} data-command-panel="responses"{% if command_tab | default('responses') == 'protected' %} hidden{% endif %}{% endif %}>
-        <div class="profile-settings-grid">
+        <div class="profile-settings-grid{% if group_name == 'Outgoing raid messages' %} raid-message-fields toggle-card{% endif %}">
             {% for setting in settings %}
                 {% set control = (setting_toggles | default({})).get(setting.definition.key) %}
                 <article id="setting-{{ setting.definition.key | replace('.', '-') }}" data-setting-key="{{ setting.definition.key }}" class="toggle-card profile-setting-card{% if control and not control.state.effective_enabled %} is-disabled{% endif %}{% if setting.definition.key == 'timer_messages' %} full-width{% endif %}">
@@ -166,20 +170,23 @@
         </div>
         </div>
 
+        {% if group_name == "Redeems" %}
+            <p class="settings-hint">Daily, First, and VIP are the recurring redeem types available for self-service customization. Please contact the developer to add or change other custom redeems for your channel.</p>
+        {% endif %}
         {% if group_name == "Commands" and not settings_notebook | default(false) %}
             <div data-command-panel="protected"{% if command_tab | default('responses') != 'protected' %} hidden{% endif %}>
                 {% include "shared/protected_settings.html" %}
             </div>
         {% endif %}
+    </section>
+    {% if settings_notebook | default(false) and not flat %}</section>{% endif %}
         {% if settings_notebook | default(false) and group_name == "Shoutouts" %}
             {% with settings=setting_groups.get('Automatic shoutouts', []) %}{% if settings %}{% include "channel/settings_automatic_shoutouts.html" %}{% endif %}{% endwith %}
         {% endif %}
+    {% if settings_notebook | default(false) and group_name == "Outgoing raid messages" %}
+    <section class="settings-group" id="settings-group-follow-outgoing-raids">
+        {% include "channel/settings_dashboard.html" %}
     </section>
-    {% if settings_notebook | default(false) and not flat %}</section>{% endif %}
-    {% if settings_notebook | default(false) and group_name == "Raid messages" %}
-    <section class="settings-group" id="settings-group-raid-preferences">
-        <header class="settings-group-heading"><h4>Raid preferences</h4></header>
-        <div class="profile-settings-grid">{% include "channel/settings_dashboard.html" %}</div>
     </section>
     {% endif %}
 {% endif %}

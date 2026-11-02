@@ -11,7 +11,7 @@
 
     <div data-queue-blacklist-members>
     {% if blacklist %}
-        <ul class="queue-blacklist-list">
+        <ul class="queue-blacklist-list" data-user-list>
             {% for member in blacklist %}
                 <li class="user-list-row">
                     {{ user_identity(member.user_id, member.username, member.display_name, member.profile_image_url) }}
@@ -19,7 +19,7 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="action" value="remove">
                         <input type="hidden" name="username" value="{{ member.username }}">
-                        <button class="button danger" type="submit">Remove</button>
+                        <button class="button danger" type="submit" data-user-row-remove>Remove</button>
                     </form>
                 </li>
             {% endfor %}

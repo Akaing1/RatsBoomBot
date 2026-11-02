@@ -19,7 +19,7 @@ from web.shared.protected_users import (
     remove_protected_user
 )
 from web.state import get_bot, get_db
-from web.channel.routers.dashboard import raid_browser_profiles
+from web.channel.routers.dashboard import raid_browser_profiles, get_shoutout_user_rows, ensure_user_search_names, user_search_names_loading
 from web.channel.settings_book import build_settings_sections
 
 router = APIRouter(prefix="/channels")
@@ -50,7 +50,14 @@ async def save_admin_channel_customization(request: Request, broadcaster_id: str
     try:
         if action not in {"save", "reset"}:
             raise ValueError("Unknown customization action.")
-        if setting_name in {"social.discord_url", "social.youtube_url"}:
+        if setting_name == "automatic_shoutouts":
+            if action != "save":
+                raise ValueError("Choose Save Changes to update automatic shoutouts.")
+            submitted = await request.form()
+            values = {key: str(submitted[key]) for key in submitted if key.startswith("automatic_shoutouts.")}
+            await services.profile_settings.set_automatic_shoutouts(broadcaster_id, values, f"admin:{request.state.administrator.id}")
+            message = "Automatic shoutout settings saved."
+        elif setting_name in {"social.discord_url", "social.youtube_url"}:
             if action != "save":
                 raise ValueError("Use Save Changes to update or clear a social link.")
             setter = services.broadcaster_settings.set_discord_url if setting_name == "social.discord_url" else services.broadcaster_settings.set_youtube_url
@@ -103,14 +110,13 @@ async def search_admin_protected_user(request: Request, broadcaster_id: str, que
     if get_broadcaster(runtime_bot, broadcaster_id) is None:
         return JSONResponse({"detail": "That Twitch channel is not connected."}, status_code=404)
 
+    ensure_user_search_names(runtime_bot, broadcaster_id)
     try:
         users = await search_protected_users(runtime_bot, broadcaster_id, query, cached_only=cached_only)
     except ProtectedUserError as error:
         return JSONResponse({"detail": str(error)}, status_code=error.status_code)
 
-    name_cache = getattr(runtime_bot, "_follower_names_cache", {}).get(str(broadcaster_id), {})
-    task = name_cache.get("task")
-    return JSONResponse({"users": users, "followers_loading": bool(task and not task.done())}, headers={"Cache-Control": "no-store"})
+    return JSONResponse({"users": users, "followers_loading": user_search_names_loading(runtime_bot, broadcaster_id)}, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/{broadcaster_id}/protected-users/profiles")
@@ -356,6 +362,7 @@ async def channel_features_page(request: Request, broadcaster_id: str):
             setting_message=request.query_params.get("setting_message"),
             command_tab=request.query_params.get("command_tab", "responses"),
             protected_users=await get_protected_user_rows(runtime_bot, str(broadcaster_id)),
+            shoutout_user_rows=await get_shoutout_user_rows(runtime_bot, broadcaster_id),
             protected_result=request.query_params.get("protected_result"),
             protected_message=request.query_params.get("protected_message"),
             protected_search_url=f"/admin/channels/{broadcaster_id}/protected-users/search",

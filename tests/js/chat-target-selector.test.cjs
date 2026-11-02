@@ -129,7 +129,11 @@ test('dashboard composer has one row with destination first and square Send last
     assert.match(styles, /\.channel-dashboard-layout \.live-chat-panel:has\(\[data-chat-composer\]\) \{ padding-bottom: 8px;/);
     assert.match(styles, /\.dashboard-chat-compose-row \.chat-send-button \{[^}]*align-self: center;[^}]*width: 40px; height: 40px;/);
     assert.match(template, /aria-describedby="dashboard-chat-send-hint" aria-keyshortcuts="Shift\+Enter"/);
-    assert.match(template, /id="dashboard-chat-send-hint"[^>]*><kbd>Shift<\/kbd> \+ <kbd>Enter<\/kbd> sends to all connected platforms/);
+    const hint = template.match(/id="dashboard-chat-send-hint"[^>]*>([\s\S]*?)<\/p>/)?.[1];
+    assert.ok(hint, 'The composer keeps its send hint');
+    assert.match(hint, /<kbd>Shift<\/kbd> \+ <kbd>Enter<\/kbd> sends to all connected platforms/);
+    assert.match(hint, /if moderator_mode/);
+    assert.match(hint, /Messages are sent as {{ moderator_name }} on Twitch/);
     assert.match(styles, /\.dashboard-chat-compose-row \.chat-message-entry \{ display: flex;[^}]*border: 1px solid var\(--border\);/);
     assert.match(styles, /\.chat-target-cycle \{[^}]*border: 0;[^}]*background: transparent; color: var\(--text\); font: inherit; font-weight: 700; line-height: 1.4;/);
     assert.match(styles, /\.dashboard-chat-compose-row textarea \{[^}]*padding-left: 12px; text-indent: var\(--chat-target-indent, 9ch\); border: 0;/);

@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from twitchio import HTTPException
 
 from bot.profiles import ShoutoutMessages, get_active_profile, render_profile_message
-from bot.services.stream.automatic_shoutouts import blacklisted
+from bot.services.stream.automatic_shoutouts import blocked_automatic_shoutout
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -63,8 +63,8 @@ class ShoutoutService:
     def enqueue(self, broadcaster_id: str, user_id: str, username: str, requested_by: str) -> tuple[bool, str, int | None]:
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
-        if (requested_by.startswith("auto:") or requested_by in {"raid", "first-chat"}) and blacklisted(broadcaster_id, user_id, username):
-            return False, "This user is excluded from automatic shoutouts.", None
+        if blocked_automatic_shoutout(broadcaster_id, username, requested_by):
+            return False, "This user is excluded from this automatic shoutout.", None
         queued_user_ids = self.queued_user_ids[broadcaster_id]
 
         if user_id in queued_user_ids:
@@ -167,7 +167,7 @@ class ShoutoutService:
             return
 
         queued_shoutout = queue[0]
-        if (queued_shoutout.requested_by.startswith("auto:") or queued_shoutout.requested_by in {"raid", "first-chat"}) and blacklisted(broadcaster_id, queued_shoutout.user_id, queued_shoutout.username):
+        if blocked_automatic_shoutout(broadcaster_id, queued_shoutout.username, queued_shoutout.requested_by):
             queue.popleft()
             self.queued_user_ids[broadcaster_id].discard(queued_shoutout.user_id)
             return

@@ -119,6 +119,7 @@ def protected_search_rank(user, needle):
 
 def cached_protected_user_candidates(runtime_bot, broadcaster_id, needle):
     """Read available relationship data only; never start or refresh a lookup."""
+    broadcaster_id = str(broadcaster_id)
     now = time.monotonic()
     candidates = {}
     profiles = getattr(runtime_bot, "_raid_browser_profile_cache", {})
@@ -144,6 +145,9 @@ def cached_protected_user_candidates(runtime_bot, broadcaster_id, needle):
     name_cache = getattr(runtime_bot, "_follower_names_cache", {}).get(broadcaster_id)
     if name_cache:
         include(name_cache["users"].values())
+    following_cache = getattr(runtime_bot, "_following_names_cache", {}).get(broadcaster_id)
+    if following_cache:
+        include(following_cache["users"].values(), following=True)
     snapshot = getattr(runtime_bot, "_followers_directory_cache", {}).get(broadcaster_id)
     if snapshot:
         include(snapshot.get("followers", []))
@@ -189,7 +193,7 @@ async def search_protected_users(runtime_bot, broadcaster_id: str, query: str, *
         if len(needle) >= 4:
             queries.append(needle[:max(2, min(5, len(needle) // 2))])
         for term in queries:
-            if term != needle and len(candidates) >= 5:
+            if term != needle and sum(not user.get("related") for user in candidates.values()) >= 5:
                 break
             try:
                 async for channel in search(term, first=20, max_results=20):
@@ -209,7 +213,11 @@ async def search_protected_users(runtime_bot, broadcaster_id: str, query: str, *
     if not candidates and exact_error:
         raise exact_error
 
-    return nsmallest(5, candidates.values(), key=lambda user: protected_search_rank(user, needle))
+    related = nsmallest(5, (user for user in candidates.values() if user.get('related')),
+        key=lambda user: protected_search_rank(user, needle))
+    remote = nsmallest(5, (user for user in candidates.values() if not user.get('related')),
+        key=lambda user: protected_search_rank(user, needle))
+    return [*related, *remote]
 
 
 async def add_protected_user(runtime_bot, broadcaster_id: str, user_id: str) -> str:

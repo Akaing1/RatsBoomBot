@@ -204,7 +204,7 @@ RAID_COMMANDS = CommandGroupDefinition(
             "!startraid <channel>",
             "Start a Twitch raid to another channel.",
             CommandPermission.BROADCASTER,
-            feature=FeatureName.RAID_RESPONSES,
+            feature=FeatureName.CHANNEL,
             availability=CommandAvailability.LIVE_ONLY
         ),
     )

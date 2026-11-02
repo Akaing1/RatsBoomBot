@@ -61,3 +61,32 @@ async def test_preload_failure_does_not_break_dashboard_or_retry_immediately():
     ensure_follower_names(bot, '10')
     assert follower_names_state(bot, '10')['task'] is task
     assert not follower_names_state(bot, '10')['loaded']
+
+
+@pytest.mark.asyncio
+async def test_following_preload_is_shared_paginated_and_available_to_cache_only_search():
+    from bot.shared.follower_names import ensure_following_names
+    from web.channel.routers.dashboard import raid_browser_cached_request, ensure_user_search_names, user_search_names_loading
+    release = asyncio.Event()
+    async def twitch(route):
+        if route.path == 'channels/followers':
+            return {'data': [{'user_id': '1', 'user_login': 'follower', 'user_name': 'Follower'}]}
+        await release.wait()
+        if 'after' not in route.params:
+            return {'data': [{'broadcaster_id': '2', 'broadcaster_login': 'following', 'broadcaster_name': 'Following'}], 'pagination': {'cursor': 'next'}}
+        return {'data': [{'broadcaster_id': '3', 'broadcaster_login': 'other', 'broadcaster_name': 'Other'}]}
+    bot = SimpleNamespace(bot_id='99', _http=SimpleNamespace(request_json=AsyncMock(side_effect=twitch)))
+    ensure_user_search_names(bot, '10')
+    task = bot._following_names_cache['10']['task']
+    ensure_user_search_names(bot, '10')
+    assert task is bot._following_names_cache['10']['task']
+    assert user_search_names_loading(bot, '10')
+    release.set()
+    await asyncio.gather(task, follower_names_state(bot, '10')['task'])
+    assert not user_search_names_loading(bot, '10')
+    users = await search_protected_users(bot, '10', '', cached_only=True)
+    assert {user['id'] for user in users} == {'1', '2', '3'}
+    assert all(user['related'] for user in users)
+    await raid_browser_cached_request(bot, '10', 'channels/followed', {'user_id': '10', 'first': 100})
+    ensure_user_search_names(bot, '10')
+    assert bot._http.request_json.await_count == 3

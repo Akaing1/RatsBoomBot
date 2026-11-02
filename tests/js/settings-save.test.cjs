@@ -14,6 +14,7 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
         await page.clock.install();
         let enabled = true;
         let followRaid = true;
+        let interactions = true;
         let fail = false;
         let blacklisted = false;
         let protectedUser = false;
@@ -29,6 +30,7 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
                 <form id="add-blacklist" data-settings-immediate-action data-settings-inline-save method="post" action="/channel/viewer-queue/blacklist"><input name="action" type="hidden" value="add"><input name="username" required><button>Add</button></form>
                 <div data-queue-blacklist-members>${blacklisted ? '<form id="remove-blacklist" data-settings-immediate-action data-settings-inline-save method="post" action="/channel/viewer-queue/blacklist"><input name="action" type="hidden" value="remove"><input name="username" type="hidden" value="viewer"><button>Remove viewer</button></form>' : 'No blacklisted players'}</div>
                 <form id="save-raid" method="post" action="/channel/customization"><input type="hidden" name="setting_name" value="dashboard.follow_raid"><input type="hidden" name="action" value="save"><button role="switch" name="value" value="${followRaid ? '0' : '1'}" aria-checked="${followRaid}">Follow raid</button></form>
+                <form id="save-interactions" method="post" action="/channel/customization"><input type="hidden" name="setting_name" value="automatic_shoutouts.interactions"><input type="hidden" name="action" value="save"><button role="switch" name="value" value="${interactions ? '0' : '1'}" aria-checked="${interactions}">Interactions</button></form>
             </section><section data-settings-page="chat" hidden><header class="settings-page-heading"><h3>Chat</h3></header><article id="lurk-card" class="profile-setting-card${enabled ? '' : ' is-disabled'}">
                 <span class="settings-inline-switch"><button id="child" role="switch" type="submit" form="toggle-child" name="action" value="disable" ${enabled ? '' : 'disabled'} aria-checked="${enabled}">${enabled ? 'Enabled' : 'Disabled'}</button></span>
                 <form id="save-lurk" method="post" action="/channel/customization"><input type="hidden" name="setting_name" value="lurk"><textarea name="value">Lurk message</textarea><button name="action" value="save">Save</button></form>
@@ -44,6 +46,7 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
                 if (request.url.endsWith('/blacklist')) blacklisted = !posts.at(-1).includes('\r\n\r\nremove\r\n');
                 if (request.url.endsWith('/toggles')) enabled = false;
                 if (posts.at(-1).includes('dashboard.follow_raid')) followRaid = false;
+                if (posts.at(-1).includes('automatic_shoutouts.interactions')) interactions = false;
                 await new Promise(resolve => setTimeout(resolve, 100));
                 const resultKey = request.url.includes('/protected-users/') ? 'protected' : 'setting';
                 response.writeHead(303, {location: `/channel/settings?${resultKey}_result=${fail ? 'error' : 'success'}&${resultKey}_message=${fail ? 'Invalid+setting.' : 'Saved.'}`});
@@ -101,6 +104,10 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
         await page.locator('#save-raid button').click();
         await page.waitForFunction(() => document.querySelector('#save-raid button').getAttribute('aria-checked') === 'false');
         assert.equal(await page.locator('#save-raid button').getAttribute('value'), '1');
+        await page.locator('#save-interactions button').click();
+        await page.waitForFunction(() => document.querySelector('#save-interactions button').getAttribute('aria-checked') === 'false');
+        assert.equal(await page.locator('#save-interactions button').getAttribute('value'), '1');
+        assert.equal(await page.locator('#save-interactions [data-settings-save], #save-interactions [data-settings-cancel]').count(), 0);
         assert.match(posts.at(-1), /name="value"\r\n\r\n0/);
         const savesBeforeCancel = posts.length;
         await page.locator('#save-follow textarea').fill('An edit to cancel');

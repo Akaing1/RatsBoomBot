@@ -1,4 +1,4 @@
-<form class="protected-user-result" data-settings-inline-save data-settings-immediate-action="{{ user_search_kind }}" method="post" action="{{ user_search_add_url }}" data-protected-user-result{% if user_search_blacklist %} data-user-search-blacklist{% endif %} hidden>
+<form class="protected-user-result" data-settings-inline-save data-settings-immediate-action="{{ user_search_kind }}" method="post" action="{{ user_search_add_url }}" data-protected-user-result{% if user_search_local | default(false) %} data-user-search-local{% endif %}{% if user_search_blacklist %} data-user-search-blacklist{% endif %} hidden>
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden"{% if not user_search_blacklist %} name="user_id"{% endif %} data-protected-result-id>
                         {% if user_search_blacklist %}<input type="hidden" name="action" value="add"><input type="hidden" name="username" data-protected-result-login>{% endif %}

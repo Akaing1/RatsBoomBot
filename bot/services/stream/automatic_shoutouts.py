@@ -1,4 +1,4 @@
-"""Eligibility and deduplication shared by automatic shoutout triggers."""
+"""Incoming-raid eligibility and whitelist-based automatic shoutouts."""
 import asyncio
 import logging
 import time
@@ -14,9 +14,14 @@ def listed(names, username):
     return str(username).casefold() in names.casefold().split()
 
 
-def blacklisted(broadcaster_id, user_id, username):
+def blocked_automatic_shoutout(broadcaster_id, username, source):
     profile = get_active_profile(str(broadcaster_id))
-    return bool(profile and listed(profile.automatic_shoutouts.blacklist, username))
+    if not profile:
+        return False
+    config = profile.automatic_shoutouts
+    if source in {"raid", "auto:raid"}:
+        return listed(config.blacklist, username)
+    return source.startswith("auto:") and (not config.interactions or not listed(config.users, username))
 
 
 class AutomaticShoutoutService:
@@ -56,6 +61,7 @@ class AutomaticShoutoutService:
         return await asyncio.shield(self.inflight[key])
 
     async def eligible(self, broadcaster_id, user_id, username, config):
+        """All selected requirements apply to incoming raids only."""
         if config.require_list and not listed(config.users, username):
             return False
         if config.require_following:
@@ -88,40 +94,52 @@ class AutomaticShoutoutService:
             return False
         if not user_id.isdigit() or not username or user_id in {broadcaster_id, str(self.bot.bot_id), services.chat_identity.sender_id(broadcaster_id)}:
             return False
-        if blacklisted(broadcaster_id, user_id, username):
+        source = f"auto:{trigger}"
+        if blocked_automatic_shoutout(broadcaster_id, username, source):
             return False
-        threshold = {"raid": config.minimum_viewers, "bits": config.minimum_bits, "gift": config.minimum_gifts}.get(trigger, 0)
-        if amount < threshold:
+        if trigger == "raid" and amount < config.minimum_viewers:
             return False
-        now = time.monotonic()
+        markers = services.first_chat_shoutouts
+        stream_id = await markers.get_live_stream_id(broadcaster_id)
+        if stream_id is None:
+            return False
         key = (broadcaster_id, user_id)
-        if now - self.last_sent.get(key, -100000) < config.cooldown_minutes * 60:
+        if self.last_sent.get(key) == stream_id:
             return False
-        if not await self.eligible(broadcaster_id, user_id, username, config):
-            return False
-        # Other event handlers may finish eligibility while a message is sending.
-        now = time.monotonic()
-        if now - self.last_sent.get(key, -100000) < config.cooldown_minutes * 60:
+        if trigger == "raid" and not await self.eligible(broadcaster_id, user_id, username, config):
             return False
         latest = get_active_profile(broadcaster_id)
-        if not latest or latest.automatic_shoutouts != config or blacklisted(broadcaster_id, user_id, username):
+        if not latest or latest.automatic_shoutouts != config or blocked_automatic_shoutout(broadcaster_id, username, source):
             return False
         if not services.features.is_enabled(broadcaster_id, FeatureName.CHANNEL):
             return False
-        if len(self.last_sent) >= self.CACHE_LIMIT:
-            self.last_sent = {key_: at for key_, at in self.last_sent.items() if now - at < 86400}
-            if len(self.last_sent) >= self.CACHE_LIMIT:
+        # Reuse the persistent first-chat marker so all automatic paths share
+        # one atomic reservation, including simultaneous events and restarts.
+        if not await markers.mark_seen(broadcaster_id=broadcaster_id, stream_id=stream_id, user_id=user_id, username=username):
+            return False
+        sent = False
+        try:
+            if get_active_profile(broadcaster_id) != latest or not services.features.is_enabled(broadcaster_id, FeatureName.CHANNEL):
                 return False
-        self.last_sent[key] = now
-        if config.native:
-            queued, _, _ = self.shoutouts.enqueue(broadcaster_id=broadcaster_id, user_id=user_id, username=username, requested_by=f"auto:{trigger}")
-            if not queued:
-                return False
-        if config.chat_message:
-            template = config.raid_message if trigger == "raid" else config.event_message
-            return await self.shoutouts.send_chat_message(broadcaster_id, username, template or None,
-                viewer_count=amount if trigger == "raid" else 0, amount=amount, trigger=trigger)
-        return True
+            if config.native:
+                queued, _, _ = self.shoutouts.enqueue(broadcaster_id=broadcaster_id, user_id=user_id, username=username, requested_by=source)
+                if not queued:
+                    return False
+                sent = True
+            if config.chat_message:
+                template = config.raid_message if trigger == "raid" else config.event_message
+                chat_sent = await self.shoutouts.send_chat_message(broadcaster_id, username, template or None,
+                    viewer_count=amount if trigger == "raid" else 0, amount=amount, trigger=trigger,
+                    viewer_word="viewer" if amount == 1 else "viewers")
+                sent = sent or chat_sent
+            return sent
+        finally:
+            if sent:
+                if len(self.last_sent) >= self.CACHE_LIMIT and key not in self.last_sent:
+                    self.last_sent.pop(next(iter(self.last_sent)))
+                self.last_sent[key] = stream_id
+            else:
+                await markers.forget_seen(broadcaster_id=broadcaster_id, stream_id=stream_id, user_id=user_id)
 
 
 async def automatic_shoutout(bot, broadcaster_id, user_id, username, trigger, amount=0):

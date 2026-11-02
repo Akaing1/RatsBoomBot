@@ -123,7 +123,8 @@
             const name = normalize(title);
             entries.push({target, section, tabLabel, title, name, nameWords: [...new Set(name.split(/[^\p{L}\p{N}]+/u).filter(Boolean))],
                 category: normalize(`${tabLabel} ${category}`),
-                shortcut: target.matches('.settings-group-heading, h4, h3, .panel-header')});
+                shortcut: target.matches('.settings-group-heading, h4, h3, .panel-header')
+                    && (!target.closest('[data-settings-single-menu]') || target.parentElement.matches('[data-settings-single-menu]'))});
         });
     });
     function navigate(entry, historyMode = 'push') {
@@ -142,6 +143,9 @@
         const button = document.createElement('button'); button.type = 'button';
         if (!showTab) {
             button.dataset.settingsLocation = entry.target.id;
+            if (entry.target.closest('.settings-group')?.parentElement.closest('.settings-group')) {
+                button.classList.add('settings-subcategory-link');
+            }
         }
         const title = document.createElement('span'); title.textContent = entry.title; button.append(title);
         if (showTab) { const label = document.createElement('small'); label.textContent = entry.tabLabel; button.append(label); }

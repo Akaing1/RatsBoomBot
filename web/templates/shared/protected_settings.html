@@ -27,17 +27,17 @@
                     {% with user_search_add_url=protected_add_url | default('/channel/protected-users/add'), user_search_kind='protected-users', user_search_blacklist=false %}{% include 'shared/user_search_result.html' %}{% endwith %}
                 </article>
 
-                <div class="protected-user-list" data-protected-user-members>
+                <div class="protected-user-list" data-protected-user-members data-user-list>
                     {% for user in protected_users | default([]) %}
                         <article class="protected-user-row user-list-row">
                             {{ user_identity(user.user_id, user.login, user.display_name, user.profile_image_url) }}
                             {% if user.is_default %}
                                 <span class="toggle-status">Channel default</span>
                             {% elif user.removable %}
-                                <form data-settings-inline-save data-settings-immediate-action="protected-users" method="post" action="{{ protected_remove_url | default('/channel/protected-users/remove') }}" onsubmit="return confirm('Remove {{ user.display_name }} from protected users?');">
+                                <form data-settings-inline-save data-settings-immediate-action="protected-users" method="post" action="{{ protected_remove_url | default('/channel/protected-users/remove') }}">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <input type="hidden" name="user_id" value="{{ user.user_id }}">
-                                    <button class="button danger" type="submit">Remove</button>
+                                    <button class="button danger" type="submit" data-user-row-remove>Remove</button>
                                 </form>
                             {% endif %}
                         </article>

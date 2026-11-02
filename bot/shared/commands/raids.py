@@ -37,7 +37,7 @@ class RaidCommands(commands.Component):
     async def start_raid(self, ctx: commands.Context, target_name: str | None = None) -> None:
         broadcaster_id = get_context_broadcaster_id(ctx)
 
-        if broadcaster_id is None or not is_feature_enabled(self.bot, ctx, FeatureName.RAID_RESPONSES):
+        if broadcaster_id is None or not is_feature_enabled(self.bot, ctx, FeatureName.CHANNEL):
             return
 
         if not self.is_broadcaster(ctx, broadcaster_id):
@@ -72,7 +72,8 @@ class RaidCommands(commands.Component):
             return
 
         try:
-            outgoing, outgoing_subscriber = outgoing_raid_messages(profile, target)
+            messages = (outgoing_raid_messages(profile, target)
+                        if is_feature_enabled(self.bot, ctx, FeatureName.RAID_RESPONSES) else ())
         except ValueError as error:
             await ctx.reply(str(error))
             return
@@ -93,7 +94,7 @@ class RaidCommands(commands.Component):
 
             return
 
-        await ctx.send(outgoing)
-        await ctx.send(outgoing_subscriber)
+        for message in messages:
+            await ctx.send(message)
 
         LOGGER.info("[Raids] Broadcaster %s started a raid to %s (%s).", broadcaster_id, target.name, target.id)

@@ -5,7 +5,7 @@ let chromium;
 try { ({chromium} = require('playwright')); } catch (_) {}
 const executablePath = process.env.CHAT_TEST_BROWSER_PATH || chromium?.executablePath();
 
-test('cached suggestions rank exact names before relationships and other partial matches', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+test('cached follower/following matches stay first and Twitch results append after them', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
     const browser = await chromium.launch({executablePath, headless: true});
     try {
         const page = await browser.newPage();
@@ -25,17 +25,17 @@ test('cached suggestions rank exact names before relationships and other partial
         await page.addScriptTag({path: 'web/static/js/protected-users.js'});
         await page.locator('input[name=query]').fill('viewername');
         assert.deepEqual(await page.locator('.protected-user-results [data-protected-result-id]').evaluateAll(inputs => inputs.map(input => input.value)),
-            ['display', 'exact', 'related', 'partial', 'near']);
+            ['display', 'exact', 'partial', 'related', 'near']);
         await page.locator('[data-protected-user-search]').dispatchEvent('submit');
         await page.evaluate(() => respond([
             {id: 'remote', login: 'viewername_new', display_name: 'viewername_new'},
         ]));
         assert.deepEqual(await page.locator('.protected-user-results [data-protected-result-id]').evaluateAll(inputs => inputs.map(input => input.value)),
-            ['related', 'remote'], 'Twitch results add to cached relationships even when the response omits those people');
+            ['display', 'exact', 'partial', 'related', 'near', 'remote'], 'Twitch results append without replacing or reordering cached matches');
         await page.locator('[data-protected-user-search]').dispatchEvent('submit');
         await page.evaluate(() => respond([]));
         assert.deepEqual(await page.locator('.protected-user-results [data-protected-result-id]').evaluateAll(inputs => inputs.map(input => input.value)),
-            ['related'], 'An empty Twitch response must not clear matching followers');
+            ['display', 'exact', 'partial', 'related', 'near'], 'An empty Twitch response must not clear matching followers');
     } finally { await browser.close(); }
 });
 
@@ -153,11 +153,12 @@ test('protected user search waits for idle typing, limits results, and ignores s
         assert.equal(await page.evaluate(() => requests[1].signal.aborted), true);
         await page.clock.fastForward(1000);
         await page.evaluate(() => requests[2].respond(Array.from({length: 6}, (_, index) => ({id: String(index), display_name: 'New Viewer', login: 'newviewer' + index, already_protected: index === 1}))));
-        assert.equal(await results.count(), 5);
-        assert.equal(await results.first().locator('[data-protected-result-label]').textContent(), 'New Viewer (newviewer0)');
-        assert.equal(await results.nth(1).locator('[data-protected-add]').isDisabled(), true);
+        assert.equal(await results.count(), 6, 'Five Twitch matches append below the matching cached user');
+        assert.equal(await results.first().locator('[data-protected-result-id]').inputValue(), 'cached');
+        assert.equal(await results.nth(1).locator('[data-protected-result-label]').textContent(), 'New Viewer (newviewer0)');
+        assert.equal(await results.nth(2).locator('[data-protected-add]').isDisabled(), true);
         await page.evaluate(() => requests[1].respond([{id: 'old', display_name: 'Old Viewer', login: 'oldviewer'}]));
-        assert.equal(await results.first().locator('[data-protected-result-id]').inputValue(), '0');
+        assert.equal(await results.first().locator('[data-protected-result-id]').inputValue(), 'cached');
         await input.fill('manualviewer');
         await page.locator('[data-protected-user-search] button').click();
         assert.equal(await page.evaluate(() => requests.length), 4, 'Search starts Twitch lookup without waiting');
@@ -284,5 +285,61 @@ test('missing pictures load in the background and both searches share one cached
         assert.equal(await page.locator('#second [data-protected-result-avatar]').getAttribute('src'), 'https://example.test/avatar.png');
         assert.equal(await page.evaluate(() => pictureLoads.length), 1, 'Subsequent input reuses the picture');
         assert.equal(await page.evaluate(() => cacheWrites), 2, 'One shared write for names and one for the completed picture batch');
+    } finally { await browser.close(); }
+});
+
+
+test('shared user results float without shifting content and stay anchored inside the viewport', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage({viewport: {width: 700, height: 600}});
+        await page.setContent(`<body style="min-height:1400px"><div style="height:380px"></div>
+            <form data-protected-user-search data-search-url="/search"><div class="protected-user-search-controls" style="width:300px"><input name="query" style="height:40px"><button>Search</button></div><p data-protected-search-message></p></form>
+            <form class="protected-user-result" data-protected-user-result hidden><input type="hidden" data-protected-result-id><div class="protected-user-result-identity"><strong data-protected-result-label></strong><small data-protected-result-user-id></small></div><button data-protected-add>Add User</button></form>
+            <div id="following-content">Content after the search</div></body>`);
+        await page.addStyleTag({path: 'web/static/css/style.css'});
+        await page.evaluate(() => {
+            window.fetch = async () => ({ok: true, json: async () => ({users: Array.from({length: 5}, (_, index) => ({id: String(index), login: `alice${index}`, display_name: `Alice ${index}`}))})});
+        });
+        await page.addScriptTag({path: 'web/static/js/protected-users.js'});
+        const before = await page.locator('#following-content').boundingBox();
+        await page.locator('input[name=query]').fill('alice');
+        await page.waitForSelector('.protected-user-results:popover-open');
+        const after = await page.locator('#following-content').boundingBox();
+        assert.equal(after.y, before.y, 'Opening results does not shift the page');
+        let input = await page.locator('input[name=query]').boundingBox();
+        let popup = await page.locator('.protected-user-results').boundingBox();
+        assert.ok(popup.y + popup.height <= input.y, 'Dropdown opens above when there is more room');
+        await page.evaluate(() => scrollBy(0, 100));
+        await page.waitForTimeout(50);
+        input = await page.locator('input[name=query]').boundingBox();
+        popup = await page.locator('.protected-user-results').boundingBox();
+        assert.ok(popup.x >= 0 && popup.x + popup.width <= 700);
+        assert.ok(popup.y >= 0 && popup.y + popup.height <= 600);
+        await page.locator('input[name=query]').press('Escape');
+        assert.equal(await page.locator('.protected-user-results:popover-open').count(), 0);
+        assert.equal(await page.locator('input[name=query]').getAttribute('aria-expanded'), 'false');
+    } finally { await browser.close(); }
+});
+
+
+test('late relationship preloads populate suggestions even after Twitch results arrive', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage();
+        await page.setContent(`<form data-protected-user-search data-search-url="/search"><input name="query"><button>Search</button><p data-protected-search-message></p></form>
+            <form data-protected-user-result hidden><input type="hidden" data-protected-result-id><strong data-protected-result-label></strong><button data-protected-add>Add</button></form>`);
+        await page.evaluate(() => {
+            window.fetch = async url => url.includes('cached_only')
+                ? new Promise(resolve => { window.releaseCache = () => resolve({ok: true, json: async () => ({users: [{id: '1', login: 'viewername_friend', display_name: 'Friend', related: true}]})}); })
+                : ({ok: true, json: async () => ({users: [{id: '2', login: 'viewername_other', display_name: 'Other'}]})});
+        });
+        await page.addScriptTag({path: 'web/static/js/protected-users.js'});
+        await page.locator('input[name=query]').fill('viewername');
+        await page.locator('[data-protected-user-search]').dispatchEvent('submit');
+        await page.waitForFunction(() => [...document.querySelectorAll('.protected-user-results [data-protected-result-id]')].some(input => input.value === '2'));
+        await page.evaluate(() => releaseCache());
+        await page.waitForFunction(() => [...document.querySelectorAll('.protected-user-results [data-protected-result-id]')].some(input => input.value === '1'));
+        assert.deepEqual(await page.locator('.protected-user-results [data-protected-result-id]').evaluateAll(inputs => inputs.map(input => input.value)), ['1', '2']);
     } finally { await browser.close(); }
 });
