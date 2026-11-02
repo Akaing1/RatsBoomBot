@@ -92,6 +92,22 @@
                 </article>
                 {% else %}<div class="panel collection-empty"><h3>{{ 'Your collection starts here' if account_mode else 'No pets collected yet' }}</h3>{% if account_mode %}<p>Summon your first pet using the commands above.</p>{% endif %}</div>{% endfor %}
             </div>
+            {% if account_mode %}
+            <section class="unobtained-pets" aria-label="Unobtained pets">
+                <div class="collection-heading"><h2>Unobtained pets</h2><span class="collection-count">{{ profile.unobtained_pets | default([]) | length }} remaining</span></div>
+                <div class="pet-collection-grid">
+                {% for pet in profile.unobtained_pets | default([]) %}
+                    <article class="pet-collection-card pet-unobtained">
+                        <div class="pet-card-labels"><span>{{ 'UR' if pet.rarity == 'ultra_rare' else pet.rarity | title }}</span><span>Not obtained</span></div>
+                        <div class="pet-collection-sprite-slot">
+                    <div class="chatter-pet-sprite{% if pet.pet_id == 'honey_hen' %} chatter-pet-sprite--hen{% elif pet.pet_id == 'dog_of_the_sun' %} chatter-pet-sprite--sun-dog{% elif pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif pet.pet_id == 'witch_cat' %} chatter-pet-sprite--cat{% elif pet.pet_id == 'royal_raven' %} chatter-pet-sprite--raven{% elif pet.pet_id == 'horned_wolf' %} chatter-pet-sprite--wolf{% elif pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ pet.sprite_path | replace("'", '%27') }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ pet.frame_count }}" role="img" aria-label="{{ pet.display_name }}"></div>
+                        </div>
+                        <h3>{{ pet.display_name }}</h3>
+                    </article>
+                {% else %}<p class="panel collection-empty">You have collected every pet!</p>{% endfor %}
+                </div>
+            </section>
+            {% endif %}
         </section>
 
         <section data-chatter-panel="overview">

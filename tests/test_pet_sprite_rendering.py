@@ -13,14 +13,15 @@ class SpriteParser(HTMLParser):
 
 
 @pytest.mark.parametrize('path', ["/assets/Witch's%20Cat.png", '/assets/Witch%27s%20Cat.png'])
-def test_cat_sprite_renders_in_hero_and_collection(path):
+def test_cat_sprite_renders_in_hero_owned_and_unobtained_collections(path):
     root = Path(__file__).resolve().parents[1]
     source = (root / 'web/templates/public/chatter_profile.html').read_text()
     env = Environment(autoescape=True)
     env.parse(source)
     pet = dict(pet_id='witch_cat', sprite_path=path, frame_count=4, display_name="Witch's Cat")
     sprites = [line.strip() for line in source.splitlines() if '<div class="chatter-pet-sprite' in line]
-    assert len(sprites) == 2
+    # Hero, owned collection, and unobtained silhouettes all need safe asset URLs.
+    assert len(sprites) == 3
     for sprite in sprites:
         rendered = env.from_string(sprite).render(profile={'pet': pet}, pet=pet, deployment_stamp=lambda: 'test')
         parser = SpriteParser()
