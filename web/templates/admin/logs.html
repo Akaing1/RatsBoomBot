@@ -2,11 +2,13 @@
 
 {% block title %}Stream Logs | RatsBoomBot{% endblock %}
 
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/admin-logs.css') }}?v={{ deployment_stamp() }}">{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', path='/js/admin-stream-logs.js') }}?v={{ deployment_stamp() }}" defer></script>{% endblock %}
 {% block content %}
 <header class="page-header">
     <div>
         <p class="eyebrow">Stream history</p>
-        <h2>Logs</h2>
+        <h2>Stream Logs</h2>
 
         <p class="page-description">
             Review channel activity recorded during live Twitch sessions.
@@ -70,9 +72,16 @@
     {% endif %}
 
     {% if log_sessions %}
+        <div class="log-controls" data-log-filters hidden>
+            <label>Find a session<input type="search" data-log-search placeholder="Channel, date or stream ID"></label>
+            <label>Session status<select data-log-status><option value="all">All sessions</option><option value="active">Active</option><option value="saved">Saved</option></select></label>
+            <button class="button secondary" type="button" data-log-reset>Clear filters</button>
+        </div>
+        <p class="card-detail" data-log-count role="status" aria-live="polite"></p>
+        <p class="card-detail" data-log-empty hidden>No matching sessions. Try another search or status.</p>
         <div class="log-session-list">
             {% for session in log_sessions %}
-                <article class="log-session-row">
+                <article class="log-session-row" data-log-row data-search="{{ session.channel_name }} {{ session.started_at }} {{ session.stream_id }}" data-status="{{ 'active' if session.is_active else 'saved' }}">
                     <div class="log-session-icon">
                         {{ session.channel_name[0] | upper }}
                     </div>

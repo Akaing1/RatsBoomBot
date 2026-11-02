@@ -2,7 +2,9 @@ import logging
 import re
 
 from twitchio.ext import commands
+from bot.services.stream.automatic_shoutouts import automatic_shoutout
 
+from bot.shared.follower_names import remember_follower
 from bot.profiles import FeatureName, get_active_profile, render_profile_message
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -208,6 +210,8 @@ class CommunityEvents(commands.Component):
         username = payload.user.name
         services = self.bot.services
 
+        remember_follower(self.bot, broadcaster_id, payload.user, getattr(payload, "followed_at", None))
+
         LOGGER.info(
             "[Events] %s followed %s (%s).",
             username,
@@ -268,6 +272,9 @@ class CommunityEvents(commands.Component):
                     broadcaster_id
                 )
 
+        if not is_gift:
+            await automatic_shoutout(self.bot, broadcaster_id, getattr(payload.user, "id", None), username, "subscription")
+
         if is_gift:
             LOGGER.debug(
                 "[Events] Suppressed gifted subscription response for %s in broadcaster %s.",
@@ -318,6 +325,9 @@ class CommunityEvents(commands.Component):
                 f"{username} gifted {count} subscriptions."
             )
 
+        if payload.user is not None:
+            await automatic_shoutout(self.bot, broadcaster_id, getattr(payload.user, "id", None), username, "gift", count)
+
         if not self.community_response_enabled(broadcaster_id, FeatureName.GIFTED_SUBSCRIPTION_RESPONSES):
             return
 
@@ -361,6 +371,10 @@ class CommunityEvents(commands.Component):
             )
         else:
             services.stream_logs.write(broadcaster_id, "RESUB", f"{username} resubscribed for {months} months.")
+
+        await automatic_shoutout(self.bot, broadcaster_id, getattr(payload.user, "id", None), username, "subscription")
+        if getattr(payload, "streak_months", 0):
+            await automatic_shoutout(self.bot, broadcaster_id, getattr(payload.user, "id", None), username, "streak")
 
         if not self.community_response_enabled(broadcaster_id, FeatureName.RESUBSCRIPTION_RESPONSES):
             return

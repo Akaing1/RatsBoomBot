@@ -1,12 +1,25 @@
+{% from "shared/state_toggle.html" import state_toggle_contents as switch_contents %}
 <article class="settings-timer-row">
-    <div class="settings-timer-heading"><span data-timer-preview>{{ entry.message if entry else 'New timer' }}</span>
-        <input type="checkbox" data-timer-enabled hidden{% if not entry or (entry.enabled and timers_active | default(true)) %} checked{% endif %}>
-        <button type="button" class="settings-status-switch" role="switch" data-toggle-timer aria-label="Enable timer" aria-checked="{{ 'true' if not entry or (entry.enabled and timers_active | default(true)) else 'false' }}">{{ 'Enabled' if not entry or (entry.enabled and timers_active | default(true)) else 'Disabled' }}</button>
+    <div class="settings-timer-content">
+    <input type="checkbox" data-timer-enabled hidden{% if not entry or (entry.enabled and timers_active | default(true)) %} checked{% endif %}>
+    <div class="settings-timer-message-row">
+    <textarea data-timer-message data-settings-grow class="profile-setting-input settings-timer-message" aria-label="Timer message" rows="1" maxlength="500" placeholder="Enter a timer message…">{{ entry.message if entry else '' }}</textarea>
+        <button type="button" class="settings-status-switch state-toggle queue-state-toggle{% if not entry or (entry.enabled and timers_active | default(true)) %} live{% endif %}" role="switch" data-toggle-timer aria-label="Enable timer" aria-checked="{{ 'true' if not entry or (entry.enabled and timers_active | default(true)) else 'false' }}">{{ switch_contents(not entry or (entry.enabled and timers_active | default(true))) }}</button>
+        <button type="button" class="button danger settings-timer-remove" data-remove-timer aria-label="Remove timer" title="Remove timer" aria-expanded="false">×</button>
     </div>
-    <details><summary>Configure</summary><div class="settings-field-body">
-        <label>Type<select data-timer-kind class="profile-setting-input">{% for kind in ['message', 'announcement'] %}<option value="{{ kind }}"{% if entry and entry.kind == kind %} selected{% endif %}>{{ kind | title }}</option>{% endfor %}</select></label>
-        <label data-timer-color-label{% if not entry or entry.kind != 'announcement' %} hidden{% endif %}>Color<select data-timer-color class="profile-setting-input">{% for color in ['primary', 'blue', 'green', 'orange', 'purple'] %}<option value="{{ color }}"{% if entry and entry.color == color %} selected{% endif %}>{{ color | title }}</option>{% endfor %}</select></label>
-        <label>Message<textarea data-timer-message class="profile-setting-input" rows="3" maxlength="500">{{ entry.message if entry else '' }}</textarea></label>
-        <button type="button" class="button danger" data-remove-timer>Remove timer</button>
-    </div></details>
+    <div class="settings-timer-controls">
+        <label class="settings-timer-type">Type<select data-timer-kind class="profile-setting-input">{% for kind in ['message', 'announcement'] %}<option value="{{ kind }}"{% if entry and entry.kind == kind %} selected{% endif %}>{{ kind | title }}</option>{% endfor %}</select></label>
+        <label class="settings-timer-color" data-timer-color-label{% if not entry or entry.kind != 'announcement' %} hidden{% endif %}>Color<select data-timer-color class="profile-setting-input">{% for color in ['primary', 'blue', 'green', 'orange', 'purple'] %}<option value="{{ color }}"{% if entry and entry.color == color %} selected{% endif %}>{{ color | title }}</option>{% endfor %}</select></label>
+        <label class="settings-timer-interval">Every (min)<input type="number" class="profile-setting-input" data-timer-interval aria-label="Run every (minutes)" min="1" max="1440" step="1" value="{{ entry.interval_minutes if entry else 30 }}" required></label>
+        <label class="settings-timer-chat-toggle">Active chat<input type="checkbox" data-timer-require-chat hidden{% if not entry or entry.require_active_chat %} checked{% endif %}><button type="button" class="settings-status-switch state-toggle queue-state-toggle{% if not entry or entry.require_active_chat %} live{% endif %}" data-toggle-timer-chat role="switch" aria-label="Require active chat" aria-checked="{{ 'true' if not entry or entry.require_active_chat else 'false' }}">{{ switch_contents(not entry or entry.require_active_chat, 'On', 'Off', 'On', 'Off') }}</button></label>
+        <label class="settings-timer-minimum">Min. messages<input type="number" class="profile-setting-input" data-timer-minimum-messages aria-label="Minimum chat messages" min="1" max="100000" step="1" value="{{ entry.minimum_messages if entry else 20 }}" required></label>
+    </div>
+        <div class="settings-timer-edit-actions profile-setting-actions settings-save-reveal" data-timer-edit-actions inert aria-hidden="true">
+            <div class="settings-save-inner">
+            <button type="button" class="button primary" data-save-timer>Save</button>
+            <button type="button" class="button secondary" data-cancel-timer>Cancel</button>
+            </div>
+        </div>
+    </div>
+    <button type="button" class="settings-timer-delete-confirm" data-confirm-remove-timer disabled tabindex="-1" aria-hidden="true" aria-label="Confirm delete timer" title="Are you sure you want to delete it?">×</button>
 </article>

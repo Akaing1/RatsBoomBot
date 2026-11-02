@@ -424,7 +424,7 @@
                     </label>
                 </div>
                 <button type="button" data-queue-action="clear" class="danger">Clear queue</button>
-                {% if can_customize %}<a href="{{ channel_root }}/viewer-queue/blacklist">Blacklist</a>{% endif %}
+                {% if can_customize %}<a href="{{ channel_root }}/settings?section=queue#queue-blacklist">Blacklist</a>{% endif %}
             </div>
             {% endif %}<p class="queue-action-status" data-queue-action-status role="status" aria-live="polite"></p>
 
@@ -1127,8 +1127,8 @@
             <button type="button" id="raid-favorites-tab" role="tab" data-raid-list-tab="favorites" aria-controls="raid-favorites-panel" aria-selected="true" tabindex="0">Favorites</button>
             <button type="button" id="raid-blacklist-tab" role="tab" data-raid-list-tab="blacklist" aria-controls="raid-blacklist-panel" aria-selected="false" tabindex="-1">Blacklist</button>
         </div>
-        <section id="raid-favorites-panel" role="tabpanel" aria-labelledby="raid-favorites-tab" data-raid-list-panel="favorites"><div data-raid-favorite-list></div></section>
-        <section id="raid-blacklist-panel" role="tabpanel" aria-labelledby="raid-blacklist-tab" data-raid-list-panel="blacklist" hidden><div data-raid-blocked-list></div></section>
+        <section id="raid-favorites-panel" role="tabpanel" aria-labelledby="raid-favorites-tab" data-raid-list-panel="favorites"><div data-raid-favorite-list data-user-list></div></section>
+        <section id="raid-blacklist-panel" role="tabpanel" aria-labelledby="raid-blacklist-tab" data-raid-list-panel="blacklist" hidden><div data-raid-blocked-list data-user-list></div></section>
         <p class="raid-lists-note">Saved for this connected channel in this browser. The blacklist only affects this raid browser, not Twitch follows or chat bans.</p>
     </dialog>
     <dialog id="dashboard-engagement" class="engagement-dialog" data-engagement data-channel-id="{{ broadcaster.id }}" data-csrf-token="{{ csrf_token }}" aria-labelledby="engagement-title">
@@ -1206,7 +1206,7 @@
     <script src="{{ url_for('static', path='/js/raid-preview-player.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/raid-browser-search-fields.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/raid-browser-selects.js') }}?v={{ deployment_stamp() }}" defer></script>
-    <script src="{{ url_for('static', path='/js/dashboard-raid-browser.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/dashboard-raid-browser.js') }}?v={{ deployment_stamp() }}-alphabetical-saved-users" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-raid-status.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-carousel.js') }}?v={{ deployment_stamp() }}" defer></script>

@@ -1401,9 +1401,10 @@ async def test_blacklisted_channels_are_excluded_from_all_results(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_saved_list_manager_resolves_offline_channels_without_stream_lookup(monkeypatch):
-    api = runtime(monkeypatch, [], profiles=[{"id": "2", "login": "viewer2", "display_name": "Viewer2"}])
+    api = runtime(monkeypatch, [], profiles=[{"id": "2", "login": "viewer2", "display_name": "Viewer2", "profile_image_url": "avatar.png"}])
     response = await dashboard.channel_raid_browser_lists(request(), ids="2")
     assert json.loads(response.body)["channels"][0]["login"] == "viewer2"
+    assert json.loads(response.body)["channels"][0]["profile_image_url"] == "avatar.png"
     assert api.await_args.args[0].path == "users"
     assert api.await_args.args[0].token_for == "1"
 

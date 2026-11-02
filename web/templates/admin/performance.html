@@ -2,19 +2,30 @@
 
 {% block title %}Performance | RatsBoomBot Admin{% endblock %}
 
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/admin-performance.css') }}?v={{ deployment_stamp() }}">{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', path='/js/admin-performance.js') }}?v={{ deployment_stamp() }}" defer></script>{% endblock %}
 {% block content %}
     <section class="page-header">
         <div>
             <p class="eyebrow">Server health</p>
             <h2>Performance</h2>
             <p class="page-description">
-                Live Raspberry Pi and RatsBoomBot resource usage. Metrics refresh every two seconds.
+                Monitor this bot process and the shared Raspberry Pi host.
             </p>
         </div>
 
-        <span id="metrics-status" class="live-status">Connecting</span>
+        <div class="header-actions"><span id="metrics-status" class="live-status" role="status">Connecting</span><button id="metrics-toggle" class="button secondary" type="button" aria-pressed="false">Pause updates</button><a id="metrics-sign-in" class="button primary" href="/admin/login" hidden>Sign in</a></div>
     </section>
 
+    <section class="panel performance-instance" aria-label="Bot instance">
+        <article class="metric-card">
+            <p class="card-label">This instance · process memory</p>
+            <strong id="process-memory" class="metric">—</strong>
+            <p class="card-detail">Resident memory used by the bot instance serving this dashboard.</p>
+        </article>
+        <div><p class="eyebrow">Investigate</p><h3>Understand resource growth</h3><p class="card-detail">Compare process memory with host memory to distinguish this instance’s usage from other services.</p><a class="text-link" href="/admin/runtime-logs">Open runtime logs →</a></div>
+    </section>
+    <div class="panel-header"><div><p class="eyebrow">Shared host</p><h3>Raspberry Pi resources</h3><p class="card-detail">Host totals include production, UAT and other services running on the Pi.</p></div></div>
     <section class="performance-grid">
         <article class="metric-card">
             <p class="card-label">CPU usage</p>
@@ -37,11 +48,7 @@
             <p id="disk-detail" class="card-detail">Loading disk information.</p>
         </article>
 
-        <article class="metric-card">
-            <p class="card-label">Bot process memory</p>
-            <strong id="process-memory" class="metric">—</strong>
-            <p class="card-detail">Resident memory currently used by RatsBoomBot.</p>
-        </article>
+
 
         <article class="metric-card">
             <p class="card-label">Server uptime</p>
@@ -56,67 +63,7 @@
         </article>
     </section>
 
-    <script>
-        const formatBytes = (value) => {
-            if (value === null || value === undefined) return "Unavailable";
-            const units = ["B", "KB", "MB", "GB", "TB"];
-            let amount = Number(value);
-            let unit = 0;
-            while (amount >= 1024 && unit < units.length - 1) {
-                amount /= 1024;
-                unit += 1;
-            }
-            return `${amount.toFixed(unit < 2 ? 0 : 1)} ${units[unit]}`;
-        };
-
-        const formatUptime = (value) => {
-            if (value === null || value === undefined) return "Unavailable";
-            const seconds = Math.floor(value);
-            const days = Math.floor(seconds / 86400);
-            const hours = Math.floor((seconds % 86400) / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            return `${days}d ${hours}h ${minutes}m`;
-        };
-
-        const setProgress = (id, value) => {
-            document.getElementById(id).style.width = `${Math.max(0, Math.min(value || 0, 100))}%`;
-        };
-
-        const updateMetrics = (metrics) => {
-            const cpu = metrics.cpu_percent;
-            document.getElementById("cpu-percent").textContent = cpu === null ? "Sampling" : `${cpu}%`;
-            document.getElementById("cpu-detail").textContent = metrics.cpu_temperature_celsius === null ? "Temperature unavailable" : `${metrics.cpu_temperature_celsius}°C`;
-            setProgress("cpu-progress", cpu);
-
-            document.getElementById("memory-percent").textContent = metrics.memory_percent === null ? "Unavailable" : `${metrics.memory_percent}%`;
-            document.getElementById("memory-detail").textContent = `${formatBytes(metrics.memory_used_bytes)} used · ${formatBytes(metrics.memory_available_bytes)} available`;
-            setProgress("memory-progress", metrics.memory_percent);
-
-            document.getElementById("disk-percent").textContent = `${metrics.disk_percent}%`;
-            document.getElementById("disk-detail").textContent = `${formatBytes(metrics.disk_free_bytes)} free of ${formatBytes(metrics.disk_total_bytes)}`;
-            setProgress("disk-progress", metrics.disk_percent);
-
-            document.getElementById("process-memory").textContent = formatBytes(metrics.process_memory_bytes);
-            document.getElementById("system-uptime").textContent = formatUptime(metrics.system_uptime_seconds);
-            document.getElementById("load-average").textContent = metrics.load_average ? metrics.load_average.join(" / ") : "Unavailable";
-        };
-
-        const refreshMetrics = async () => {
-            const status = document.getElementById("metrics-status");
-
-            try {
-                const response = await fetch("/admin/performance/data", {cache: "no-store"});
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                updateMetrics(await response.json());
-                status.textContent = "Live";
-                status.classList.add("connected");
-            } catch (error) {
-                status.textContent = "Disconnected";
-                status.classList.remove("connected");
-            }
-        };
-
-        refreshMetrics();
-        window.setInterval(refreshMetrics, 2000);
-    </script>
+    <p class="card-detail" id="metrics-updated">Waiting for the first sample.</p>
+    <p class="card-detail">Updates every five seconds while visible. Failed requests retry more slowly; values remain at the last successful sample.</p>
+    <noscript><p class="card-detail">Enable JavaScript to load resource metrics.</p></noscript>
 {% endblock %}

@@ -1,23 +1,28 @@
-<form method="post" action="{{ customization_action | default('/channel/customization') }}" class="settings-timer-manager" data-timer-editor data-timer-manager>
+{% from "shared/state_toggle.html" import state_toggle_contents as switch_contents %}
+<form method="post" action="{{ customization_action | default('/channel/customization') }}" class="settings-timer-manager" data-timer-editor data-timer-manager novalidate>
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="setting_name" value="timer_messages">
     <input type="hidden" name="action" value="save">
     <input type="hidden" name="value" data-timer-value>
     <section class="panel" data-timer-create>
         <h3>Create timer</h3>
-        <label>Type<select data-new-kind class="profile-setting-input"><option value="message">Message</option><option value="announcement">Announcement</option></select></label>
-        <label data-new-color-label hidden>Color<select data-new-color class="profile-setting-input">{% for color in ['primary', 'blue', 'green', 'orange', 'purple'] %}<option value="{{ color }}">{{ color | title }}</option>{% endfor %}</select></label>
-        <label>Message<textarea data-new-message class="profile-setting-input" rows="3" maxlength="500"></textarea></label>
+        <textarea data-new-message data-settings-grow class="profile-setting-input settings-timer-message" aria-label="New timer message" placeholder="Enter a timer message…" rows="1" maxlength="500"></textarea>
+        <div class="settings-timer-controls">
+        <label class="settings-timer-type">Type<select data-new-kind class="profile-setting-input"><option value="message">Message</option><option value="announcement">Announcement</option></select></label>
+        <label class="settings-timer-color" data-new-color-label hidden>Color<select data-new-color class="profile-setting-input">{% for color in ['primary', 'blue', 'green', 'orange', 'purple'] %}<option value="{{ color }}">{{ color | title }}</option>{% endfor %}</select></label>
+        <label class="settings-timer-interval">Every (min)<input type="number" class="profile-setting-input" data-new-interval aria-label="Run every (minutes)" min="1" max="1440" step="1" value="30"></label>
+        <label class="settings-timer-chat-toggle">Active chat<input type="checkbox" data-new-require-chat checked hidden><button type="button" class="settings-status-switch state-toggle queue-state-toggle live" data-toggle-new-chat role="switch" aria-label="Require active chat for new timer" aria-checked="true">{{ switch_contents(true, 'On', 'Off', 'On', 'Off') }}</button></label>
+        <label class="settings-timer-minimum">Min. messages<input type="number" class="profile-setting-input" data-new-minimum-messages aria-label="Minimum chat messages" min="1" max="100000" step="1" value="20"></label>
         <button type="button" class="button primary" data-create-timer>Create timer</button>
+        </div>
     </section>
-    <section class="panel"><h3>Your timers</h3>
+    <section class="panel"><h3>Your timers</h3><p class="settings-toggle-description">Each timer runs independently while your stream is live. Chat requirements count messages since that timer last ran.</p>
         <div data-timer-list>
         {% for entry in timer_setting.timer_entries %}
             {% include 'channel/settings_timer_row.html' %}
         {% endfor %}
         </div>
         <p data-timer-empty{% if timer_setting.timer_entries %} hidden{% endif %}>No timers yet.</p>
-        <button class="button primary" type="submit">Save timer changes</button>
     </section>
 </form>
 <template id="settings-timer-row-template">{% with entry=none %}{% include 'channel/settings_timer_row.html' %}{% endwith %}</template>

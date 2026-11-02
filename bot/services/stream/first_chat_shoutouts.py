@@ -95,3 +95,8 @@ class FirstChatShoutoutService:
             row = await connection.fetchone("SELECT changes() AS inserted")
 
         return bool(row and row["inserted"])
+
+    async def forget_seen(self, *, broadcaster_id: str, stream_id: str, user_id: str) -> None:
+        async with self.db.acquire() as connection:
+            await connection.execute("DELETE FROM first_chat_shoutouts WHERE broadcaster_id = ? AND stream_id = ? AND user_id = ?",
+                                     (str(broadcaster_id), str(stream_id), str(user_id)))

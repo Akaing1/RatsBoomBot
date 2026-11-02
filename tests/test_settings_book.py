@@ -51,7 +51,9 @@ def test_notebook_renders_existing_forms_once_and_honors_deep_link():
     try:
         context, groups, states = settings_context('connections')
         html = templates.env.get_template('channel/settings.html').render(**context)
-        assert html.count('role="tabpanel"') == 8
+        assert html.count('class="settings-menu-section"') == 9
+        assert 'role="tablist"' not in html
+        assert 'role="tabpanel"' not in html
         assert html.count('id="protected-users"') == 1
         assert html.count('id="youtube-integration"') == 1
         assert 'data-settings-page="connections" hidden' not in html
@@ -64,7 +66,33 @@ def test_notebook_renders_existing_forms_once_and_honors_deep_link():
             if name in ('League of Legends', 'Overwatch'):
                 continue
             for entry in entries:
-                assert html.count(f'name="setting_name" value="{entry.definition.key}"') == 1
+                if entry.definition.key.startswith('automatic_shoutouts.'):
+                    hidden = entry.definition.key.split('.')[-1] in {'native', 'chat_message', 'cooldown_minutes'}
+                    assert html.count(f'data-setting-key="{entry.definition.key}"') == (0 if hidden else 1)
+                    assert html.count(f'name="setting_name" value="{entry.definition.key}"') == (0 if hidden else 1)
+                else:
+                    assert html.count(f'name="setting_name" value="{entry.definition.key}"') == 1
+    finally:
+        clear_profiles()
+
+
+def test_blocked_commands_share_prerequisite_links_at_category_top():
+    try:
+        context, _, _ = settings_context('chat')
+        chat = next(section for section in context['settings_sections'] if section['key'] == 'chat')
+        chat['blocked'] = True
+        chat['blocked_by_profile'] = True
+        chat['blocked_by_globals'] = True
+        for toggle in chat['toggles']:
+            toggle['state'] = SimpleNamespace(effective_enabled=False, blocked_by_profile=True, blocked_by_globals=True)
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        chat_html = html.split('id="settings-chat"', 1)[1].split('id="settings-events"', 1)[0]
+        assert chat_html.count('>Enable channel profile</a>') == 1
+        assert chat_html.count('>Enable global commands</a>') == 1
+        assert chat_html.index('>Enable channel profile</a>') < chat_html.index('class="settings-command-cluster"')
+        assert 'Enable channel profile' not in templates.env.get_template('channel/settings_switch.html').module.status_switch(chat['toggles'][0])
+        chat['blocked'] = False
+        assert templates.env.get_template('channel/settings_switch.html').module.blocked_notice(chat).strip() == ''
     finally:
         clear_profiles()
 
@@ -89,7 +117,7 @@ def test_header_controls_are_not_duplicated_in_standalone_rows():
         assert timers['group_toggles'] == {}
         assert timers['toggles'] == []
         html = templates.env.get_template('channel/settings.html').render(**context)
-        assert html.index('<div class="settings-pages"') < html.index('<nav class="settings-tabs"')
+        assert html.index('<div class="settings-pages"') < html.index('<nav class="settings-menu"')
         assert 'form="settings-toggle-feature-timers"' not in html
         assert 'data-timer-manager' in html
         assert '>Enable\n' not in html
@@ -100,14 +128,33 @@ def test_header_controls_are_not_duplicated_in_standalone_rows():
 def test_reorganized_sections_and_forms():
     try:
         context, _, _ = settings_context()
-        assert [s['label'] for s in context['settings_sections']] == ['General', 'Chat', 'Stream Events', 'Timers', 'Connections', 'Loyalty Points', 'Viewer Queue', 'Pets and Boss Hunt']
+        assert [s['label'] for s in context['settings_sections']] == ['General', 'Chat', 'Stream Events', 'Shoutouts', 'Timers', 'Connections', 'Loyalty Points', 'Viewer Queue', 'Pets and Boss Hunt']
         html = templates.env.get_template('channel/settings.html').render(**context)
         general = html.split('id="settings-general"')[1].split('id="settings-chat"')[0]
-        events = html.split('id="settings-events"')[1].split('id="settings-timers"')[0]
+        events = html.split('id="settings-events"')[1].split('id="settings-shoutouts"')[0]
+        shoutouts = html.split('id="settings-shoutouts"')[1].split('id="settings-timers"')[0]
+        assert 'automatic_shoutouts.raid' not in events
+        assert 'automatic_shoutouts.raid' in shoutouts
+        assert 'shoutout_messages.with_game' in shoutouts
+        assert '>Shoutout messages</h4>' in shoutouts
+        assert 'id="settings-group-incoming-raid-shoutouts"' in shoutouts
+        assert 'id="settings-group-whitelist-shoutouts"' in shoutouts
+        assert shoutouts.count('automatic-shoutout-section-heading settings-group-heading') == 2
+        assert 'id="settings-group-automatic-shoutouts"' in shoutouts
+        assert 'automatic-shoutout-heading settings-group-heading' in shoutouts
+        assert '<h4>Interactive shoutouts</h4>' in shoutouts
+        assert 'automatic-shoutout-subsection settings-group' not in shoutouts
         assert 'id="protected-users"' in general
         assert 'id="youtube-integration"' in general
         assert 'dashboard.follow_raid' not in general
         assert 'dashboard.follow_raid' in events
+        assert 'id="settings-group-outgoing-raids"' in events
+        assert '<h4>Outgoing raids</h4>' in events
+        assert '<h4>Raid preferences</h4>' not in events
+        raid_messages, raid_preferences = events.split('id="settings-group-follow-outgoing-raids"', 1)
+        assert 'dashboard.follow_raid' not in raid_messages
+        assert 'dashboard.follow_raid' in raid_preferences
+        assert 'Follow outgoing raids' in raid_preferences
         for key, next_key in [('timers', 'connections'), ('loyalty', 'queue')]:
             page = html.split(f'id="settings-{key}"')[1].split(f'id="settings-{next_key}"')[0]
             assert '<details class="settings-group"' not in page
@@ -149,7 +196,8 @@ def test_related_response_switches_render_inside_their_message_cards():
         assert 'value="reset"' not in html
         assert 'Leave empty to send nothing.' not in html
         assert 'data-settings-finder' in html
-        assert '<details class="settings-field-editor">' in card
+        assert '<details class="settings-field-editor">' not in card
+        assert '<div class="settings-field-body">' in card
         assert 'settings-finder-note' not in html
         for name in ('daily', 'first', 'second', 'vip'):
             assert f'form="settings-toggle-feature-redeem_{name}"' in html
@@ -164,14 +212,101 @@ def test_sidebar_navigation_and_group_descriptions_use_command_registry():
     try:
         context, _, _ = settings_context()
         html = templates.env.get_template('channel/settings.html').render(**context)
-        assert html.index('class="settings-tools"') < html.index('class="settings-tabs"') < html.index('data-settings-finder hidden')
-        assert 'aria-orientation="vertical"' in html
+        assert html.index('class="settings-tools"') < html.index('data-settings-finder hidden') < html.index('class="settings-menu"')
+        assert '<summary>Settings menu</summary>' not in html
+        assert 'aria-current="page"' in html
         assert 'Included commands (' in html
+        assert 'href="?section=events#settings-group-shoutouts"' not in html
+        assert 'href="?section=loyalty#setting-points-display_name"' not in html
+        assert 'Customize social links' not in html
+        assert 'Manage timers' not in html
+        assert 'href="?section=connections#settings-control-global_group-socials"' not in html
         toggles = [toggle for section in context['settings_sections'] for toggle in section['toggles']]
         assert all(toggle['description'] for toggle in toggles)
+        assert all(link[0] != toggle['section'] for toggle in toggles for link in toggle['related_settings'])
+        socials = next(toggle for toggle in toggles if toggle['kind'] == 'global_group' and toggle['name'] == 'socials')
+        assert socials['related_settings'] == []
         queue = next(toggle for toggle in toggles if toggle['kind'] == 'global_group' and toggle['name'] == 'viewer_queue')
         expected = [command.syntax for command in get_registered_definitions(ChannelProfile(channel_name='example')) if command.global_group is GlobalCommandGroup.VIEWER_QUEUE and command.visibility is CommandVisibility.PUBLIC]
         assert [command.syntax for command in queue['commands']] == expected
         assert '!join' in expected
+    finally:
+        clear_profiles()
+
+
+def test_raid_messages_have_separate_groups_and_outgoing_fields_share_a_card():
+    try:
+        context, _, _ = settings_context('events')
+        events = next(section for section in context['settings_sections'] if section['key'] == 'events')
+        assert [entry.definition.key for entry in events['groups']['Outgoing raid messages']] == [
+            'raid_messages.outgoing', 'raid_messages.outgoing_subscriber']
+        assert 'Incoming raid messages' not in events['groups']
+        assert events['group_toggles']['Outgoing raid messages'][0]['name'] == 'raid_responses'
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        assert 'raid-message-fields toggle-card' in html
+        assert 'id="settings-control-feature-incoming_raid_responses"' not in html
+        assert 'name="setting_name" value="raid_messages.incoming"' not in html
+        assert html.count('name="setting_name" value="automatic_shoutouts.raid_message"') == 1
+        assert 'id="settings-control-feature-raid_responses"' in html
+    finally:
+        clear_profiles()
+
+
+@pytest.mark.parametrize("name, section_id", [("raid", "incoming-raid-shoutouts"), ("interactions", "whitelist-shoutouts")])
+def test_disabled_shoutout_master_greys_its_whole_section(name, section_id):
+    from dataclasses import replace
+    try:
+        context, _, _ = settings_context('shoutouts')
+        section = next(item for item in context['settings_sections'] if item['key'] == 'shoutouts')
+        settings = section['groups']['Automatic shoutouts']
+        for index, setting in enumerate(settings):
+            if setting.definition.key == f'automatic_shoutouts.{name}':
+                settings[index] = replace(setting, effective_value=0)
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        assert f'class="automatic-shoutout-section settings-group is-disabled" id="settings-group-{section_id}"' in html
+    finally:
+        clear_profiles()
+
+
+def test_shoutout_list_reuses_user_rows_and_shared_picker_without_a_username_textarea():
+    from dataclasses import replace
+    try:
+        context, _, _ = settings_context('shoutouts')
+        section = next(item for item in context['settings_sections'] if item['key'] == 'shoutouts')
+        entries = section['groups']['Automatic shoutouts']
+        for index, entry in enumerate(entries):
+            if entry.definition.key == 'automatic_shoutouts.users':
+                entries[index] = replace(entry, effective_value='alice')
+        context['shoutout_user_rows'] = {'automatic_shoutouts.users': [
+            {'username': 'alice', 'display_name': 'Alice Display', 'user_id': '123', 'profile_image_url': 'https://example.com/alice.png'}]}
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        assert 'data-user-login="alice"' in html
+        assert 'Alice Display' in html and '(alice)' in html
+        assert 'https://example.com/alice.png' in html
+        assert html.count('data-user-search-local') == 2
+        assert html.count('data-shoutout-list-value') == 2
+        assert html.count('data-shoutout-autosave') == 1
+        assert 'data-shoutout-user-query' not in html
+        assert '<datalist' not in html
+        assert html.count('<h4>Whitelisted users</h4>') == 1
+        assert 'Require <a data-settings-link href="?section=shoutouts#whitelisted-users">whitelist</a>' in html
+    finally:
+        clear_profiles()
+
+
+@pytest.mark.parametrize('raid, interactions', [(0, 0), (0, 1), (1, 0), (1, 1)])
+def test_shoutout_whitelist_is_grey_only_when_both_masters_are_off(raid, interactions):
+    from dataclasses import replace
+    try:
+        context, _, _ = settings_context('shoutouts')
+        section = next(item for item in context['settings_sections'] if item['key'] == 'shoutouts')
+        entries = section['groups']['Automatic shoutouts']
+        values = {'automatic_shoutouts.raid': raid, 'automatic_shoutouts.interactions': interactions}
+        for index, entry in enumerate(entries):
+            if entry.definition.key in values:
+                entries[index] = replace(entry, effective_value=values[entry.definition.key])
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        disabled = ' is-disabled' if not raid and not interactions else ''
+        assert f'class="automatic-shoutout-subsection{disabled}" id="settings-group-shoutout-whitelist"' in html
     finally:
         clear_profiles()

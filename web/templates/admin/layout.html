@@ -16,12 +16,12 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}"
+        href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}-arrow-user-pagination"
     >
     {% block page_styles %}{% endblock %}
 </head>
 
-<body class="dashboard-page admin-page admin-page-{{ active_page }}{% if channel_section == 'overview' %} admin-channel-overview{% endif %}">
+<body{% if channel_root %} data-channel-root="{{ channel_root }}"{% endif %} class="dashboard-page admin-page admin-page-{{ active_page }}">
     <div class="app-shell" data-dashboard-shell data-sidebar-storage-key="ratsboombot-admin-sidebar-collapsed">
         <aside class="sidebar">
             <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-expanded="true" aria-label="Collapse navigation" title="Collapse navigation"><span aria-hidden="true">‹</span></button>
@@ -109,7 +109,9 @@
     </div>
     <script src="{{ url_for('static', path='/js/channel-sidebar.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/hover-labels.js') }}?v={{ deployment_stamp() }}" defer></script>
-    <script src="{{ url_for('static', path='/js/overlay-scrollbars.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/overlay-scrollbars.js') }}?v={{ deployment_stamp() }}-command-panel-scrollbar-fixes" defer></script>
+    <script src="/static/js/user-row-confirmation.js?v={{ deployment_stamp() }}-centered-slide" defer></script>
+    <script src="/static/js/user-list-pagination.js?v={{ deployment_stamp() }}" defer></script>
     {% block page_scripts %}{% endblock %}
 </body>
 </html>

@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from twitchio import HTTPException
 
 from bot.profiles import ShoutoutMessages, get_active_profile, render_profile_message
+from bot.services.stream.automatic_shoutouts import blocked_automatic_shoutout
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -62,6 +63,8 @@ class ShoutoutService:
     def enqueue(self, broadcaster_id: str, user_id: str, username: str, requested_by: str) -> tuple[bool, str, int | None]:
         broadcaster_id = str(broadcaster_id)
         user_id = str(user_id)
+        if blocked_automatic_shoutout(broadcaster_id, username, requested_by):
+            return False, "This user is excluded from this automatic shoutout.", None
         queued_user_ids = self.queued_user_ids[broadcaster_id]
 
         if user_id in queued_user_ids:
@@ -100,7 +103,7 @@ class ShoutoutService:
 
         return True, f"@{username} was added to the shoutout queue at position {position}.", position
 
-    async def send_chat_message(self, broadcaster_id: str, username: str, template: str | None = None) -> bool:
+    async def send_chat_message(self, broadcaster_id: str, username: str, template: str | None = None, **values) -> bool:
         broadcaster_id = str(broadcaster_id)
 
         try:
@@ -116,6 +119,7 @@ class ShoutoutService:
         selected_template = template or (messages.with_game if game_name else messages.without_game)
         message = render_profile_message(
             selected_template,
+            **values,
             username=username,
             game_name=game_name,
             channel_url=f"https://twitch.tv/{username}"
@@ -163,6 +167,10 @@ class ShoutoutService:
             return
 
         queued_shoutout = queue[0]
+        if blocked_automatic_shoutout(broadcaster_id, queued_shoutout.username, queued_shoutout.requested_by):
+            queue.popleft()
+            self.queued_user_ids[broadcaster_id].discard(queued_shoutout.user_id)
+            return
         cooldown_until = self.get_target_cooldown_until(broadcaster_id, queued_shoutout.user_id)
 
         if cooldown_until is not None:

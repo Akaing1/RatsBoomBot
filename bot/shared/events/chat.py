@@ -3,6 +3,7 @@ import logging
 from twitchio.ext import commands
 
 from bot.shared.events.community import award_cheer_points, award_sound_alert_points
+from bot.services.stream.automatic_shoutouts import automatic_shoutout
 from config.settings import settings
 
 LOGGER = logging.getLogger("RatBoomBot")
@@ -21,6 +22,10 @@ class ChatEvents(commands.Component):
             self.bot.services.live_chat.publish_twitch_notification(payload)
         except Exception:
             LOGGER.exception("[Live Chat] Failed to publish Twitch chat notification.")
+        kind = str(getattr(payload, "notice_type", ""))
+        chatter = getattr(payload, "chatter", None)
+        if kind == "watch_streak" or (kind == "resub" and getattr(getattr(payload, "resub", None), "streak_months", 0)):
+            await automatic_shoutout(self.bot, str(payload.broadcaster.id), getattr(chatter, "id", None), getattr(chatter, "name", ""), "streak")
 
     @commands.Component.listener()
     async def event_message(self, payload) -> None:
@@ -177,14 +182,23 @@ class ChatEvents(commands.Component):
         services.timers.track_message(payload)
         await services.raid_bosses.track_message(payload)
 
+        first_chat_handled = False
         try:
-            await services.first_chat_shoutouts.handle_message(
+            first_chat_handled = await services.first_chat_shoutouts.handle_message(
                 broadcaster_id=broadcaster_id,
                 user_id=chatter_id,
                 username=chatter_name
             )
         except Exception:
             LOGGER.exception("[First Chat Shoutouts] Failed to process %s in %s.", chatter_name, broadcaster_name)
+
+        if not first_chat_handled:
+            source = getattr(payload, "source_broadcaster", None)
+            if source is None or str(source.id) == broadcaster_id:
+                bits = getattr(getattr(payload, "cheer", None), "bits", 0)
+                if bits:
+                    await automatic_shoutout(self.bot, broadcaster_id, chatter_id, chatter_name, "bits", int(bits))
+                await automatic_shoutout(self.bot, broadcaster_id, chatter_id, chatter_name, "chat")
 
         try:
             await services.points.track_message(payload)

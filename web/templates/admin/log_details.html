@@ -2,6 +2,7 @@
 
 {% block title %}{{ channel_name }} Log | RatsBoomBot{% endblock %}
 
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/admin-logs.css') }}?v={{ deployment_stamp() }}">{% endblock %}
 {% block content %}
 <header class="page-header">
     <div>
@@ -65,6 +66,6 @@
         </div>
     </div>
 
-    <pre class="log-viewer">{{ log_content }}</pre>
+    <pre class="log-viewer" tabindex="0" aria-label="Recorded stream log">{{ log_content }}</pre>
 </section>
 {% endblock %}

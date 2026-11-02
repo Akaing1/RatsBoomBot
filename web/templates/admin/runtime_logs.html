@@ -2,6 +2,8 @@
 
 {% block title %}Runtime Logs | RatsBoomBot Admin{% endblock %}
 
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/admin-logs.css') }}?v={{ deployment_stamp() }}">{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', path='/js/admin-runtime-logs.js') }}?v={{ deployment_stamp() }}" defer></script>{% endblock %}
 {% block content %}
     <section class="page-header">
         <div>
@@ -13,74 +15,22 @@
         </div>
 
         <div class="header-actions">
-            <span id="logs-status" class="live-status">Connecting</span>
+            <span id="logs-status" class="live-status" role="status">Connecting</span>
+            <button id="logs-toggle" class="button secondary" type="button" aria-pressed="false">Pause updates</button>
+            <a id="logs-sign-in" class="button primary" href="/admin/login" hidden>Sign in</a>
             <button id="clear-logs" class="button secondary" type="button">Clear View</button>
         </div>
     </section>
 
-    <section class="panel runtime-log-panel">
-        <div id="runtime-log-viewer" class="runtime-log-viewer" aria-live="polite"></div>
+    <section class="panel log-controls" aria-label="Runtime log filters">
+        <label>Search messages<input id="runtime-search" type="search" placeholder="Message text"></label>
+        <label>Severity<select id="runtime-level"><option value="all">All levels</option><option value="warnings">Warnings and errors</option><option value="errors">Errors only</option></select></label>
+        <label class="log-follow"><input id="runtime-follow" type="checkbox" checked> Follow new entries</label>
+        <p id="runtime-count" class="card-detail" role="status"></p>
     </section>
-
-    <script>
-        const viewer = document.getElementById("runtime-log-viewer");
-        const status = document.getElementById("logs-status");
-        let lastEntryId = 0;
-        let polling = false;
-
-        const appendEntry = (entry) => {
-            const shouldFollow = viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight < 80;
-            const row = document.createElement("div");
-            row.className = `runtime-log-entry level-${entry.level.toLowerCase()}`;
-
-            const timestamp = document.createElement("span");
-            timestamp.className = "runtime-log-time";
-            timestamp.textContent = new Date(entry.timestamp).toLocaleTimeString();
-
-            const level = document.createElement("span");
-            level.className = "runtime-log-level";
-            level.textContent = entry.level;
-
-            const message = document.createElement("span");
-            message.className = "runtime-log-message";
-            message.textContent = entry.message;
-
-            row.append(timestamp, level, message);
-            viewer.appendChild(row);
-
-            while (viewer.children.length > 1000) viewer.firstElementChild.remove();
-            if (shouldFollow) viewer.scrollTop = viewer.scrollHeight;
-        };
-
-        const pollLogs = async () => {
-            if (polling) return;
-            polling = true;
-
-            try {
-                const response = await fetch(`/admin/runtime-logs/data?after=${lastEntryId}`, {cache: "no-store"});
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const payload = await response.json();
-
-                for (const entry of payload.entries) {
-                    appendEntry(entry);
-                    lastEntryId = Math.max(lastEntryId, entry.id);
-                }
-
-                status.textContent = "Live";
-                status.classList.add("connected");
-            } catch (error) {
-                status.textContent = "Disconnected";
-                status.classList.remove("connected");
-            } finally {
-                polling = false;
-            }
-        };
-
-        document.getElementById("clear-logs").addEventListener("click", () => {
-            viewer.replaceChildren();
-        });
-
-        pollLogs();
-        window.setInterval(pollLogs, 1000);
-    </script>
+    <section class="panel runtime-log-panel">
+        <div id="runtime-log-viewer" class="runtime-log-viewer" aria-label="Runtime log entries" tabindex="0"></div>
+    </section>
+    <p id="runtime-empty" class="card-detail">Waiting for log entries.</p>
+    <p class="card-detail">Keeps up to 1,000 entries in this view. Clear View only clears the displayed entries. Updates pause while this tab is hidden.</p>
 {% endblock %}

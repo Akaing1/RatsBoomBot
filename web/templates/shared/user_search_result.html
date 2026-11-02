@@ -1,0 +1,13 @@
+<form class="protected-user-result" data-settings-inline-save data-settings-immediate-action="{{ user_search_kind }}" method="post" action="{{ user_search_add_url }}" data-protected-user-result{% if user_search_local | default(false) %} data-user-search-local{% endif %}{% if user_search_blacklist %} data-user-search-blacklist{% endif %} hidden>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden"{% if not user_search_blacklist %} name="user_id"{% endif %} data-protected-result-id>
+                        {% if user_search_blacklist %}<input type="hidden" name="action" value="add"><input type="hidden" name="username" data-protected-result-login>{% endif %}
+                        <div class="protected-user-result-identity">
+                            <span class="protected-user-avatar" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg>
+                                <img data-protected-result-avatar alt="" width="32" height="32" decoding="async" hidden onerror="this.hidden=true">
+                            </span>
+                            <div><strong data-protected-result-label></strong><small data-protected-result-user-id></small></div>
+                        </div>
+                        <button class="button primary" type="submit" data-protected-add>Add User</button>
+                    </form>

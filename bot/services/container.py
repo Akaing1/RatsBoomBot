@@ -13,6 +13,7 @@ from config.settings import settings
 from bot.services.channels.achievements import AchievementService
 from bot.services.channels.command_slowmode import CommandSlowmodeService
 from bot.services.channels.quotes import QuoteService
+from bot.services.stream.automatic_shoutouts import AutomaticShoutoutService
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -58,6 +59,7 @@ class ServiceContainer:
         self.league = LeagueService(bot, league_db or db)
         self.moderation = ModerationService(bot, db)
         self.shoutouts = ShoutoutService(bot)
+        self.automatic_shoutouts = AutomaticShoutoutService(bot, self.shoutouts)
         self.first_chat_shoutouts = FirstChatShoutoutService(bot, db, self.shoutouts, self.stream_logs)
         self.clips = ClipService(bot)
 
@@ -140,6 +142,7 @@ class ServiceContainer:
         LOGGER.info("[Shutdown] Stopping services.")
 
         services = (
+            ("AutomaticShoutoutService", self.automatic_shoutouts),
             ("TimerService", self.timers),
             ("AdAnnouncementService", self.ads),
             ("ShoutoutService", self.shoutouts),
