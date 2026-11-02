@@ -135,6 +135,10 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
                 section['standalone_toggles'].append(toggle)
                 panels.setdefault(toggle['panel'], []).append(toggle)
         section['blocked'] = section['blocked_by_profile'] or section['blocked_by_globals']
-        section['standalone_panels'] = sorted(panels.items(), reverse=section['key'] == 'pets')
+        section['standalone_panels'] = sorted(
+            panels.items(),
+            key=lambda item: (section['key'] == 'general' and item[0] != 'Feature controls', item[0]),
+            reverse=section['key'] == 'pets',
+        )
     order = ('general', 'chat', 'events', 'shoutouts', 'timers', 'connections', 'loyalty', 'queue', 'pets', 'games')
     return [sections[key] for key in order if key != 'games' or enabled_games]
