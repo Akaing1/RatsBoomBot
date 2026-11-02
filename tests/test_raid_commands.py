@@ -106,3 +106,19 @@ async def test_start_raid_requires_both_messages() -> None:
 
     assert bot.raid_broadcaster.targets == []
     assert context.replies == ["Both outgoing raid messages must be configured before starting a raid."]
+
+
+@pytest.mark.asyncio
+async def test_outgoing_messages_disabled_does_not_prevent_raid() -> None:
+    from bot.profiles import FeatureName
+    bot = FakeBot()
+    bot.services.features.is_enabled = lambda broadcaster_id, feature: feature is not FeatureName.RAID_RESPONSES
+    component = RaidCommands(bot)
+    context = FakeContext("channel-1", "channel-1")
+    activate_profile("channel-1", ChannelProfile(channel_name="broadcaster"))
+
+    await component.start_raid.callback(component, context, "targetchannel")
+
+    assert bot.raid_broadcaster.targets == [bot.target]
+    assert context.messages == []
+    assert context.replies == []

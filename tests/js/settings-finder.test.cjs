@@ -305,3 +305,27 @@ test('expandable settings menu and search preserve drafts and open matching grou
         assert.equal(await page.locator('[data-settings-page="chat"] textarea').evaluate(node => node === document.activeElement), true);
     } finally { await browser.close(); }
 });
+
+
+test('single-menu categories retain searchable child settings without nested menu entries', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage();
+        await page.setContent(`<div data-settings-book>
+            <nav class="settings-menu"><details class="settings-menu-section" open><summary><a data-settings-tab="events" aria-current="page">Events</a></summary><div data-settings-links="events"></div></details></nav>
+            <section data-settings-page="events"><header class="settings-page-heading"><h3>Events</h3></header>
+                <section class="settings-group" id="outgoing" data-settings-single-menu><header class="settings-group-heading"><h4>Outgoing raids</h4></header>
+                    <section class="settings-group"><header class="settings-group-heading"><h4>Outgoing raid messages</h4></header><article class="profile-setting-card"><h4>Non-subscriber raid message</h4><textarea></textarea></article></section>
+                    <section class="settings-group" id="follow"><header class="settings-group-heading"><h4>Follow outgoing raids</h4></header><p>Description</p></section>
+                </section>
+            </section>
+            <div data-settings-finder><input><p data-settings-result-count></p><div data-settings-results></div></div>
+        </div>`);
+        for (const script of ['settings-finder.js', 'settings-menu-highlight.js']) await page.addScriptTag({path: `web/static/js/${script}`});
+        assert.deepEqual(await page.locator('[data-settings-links] button').allTextContents(), ['Outgoing raids']);
+        await page.evaluate(() => document.querySelector('[data-settings-book]').dispatchEvent(new CustomEvent('settings-hover', {detail: document.querySelector('#follow p')})));
+        assert.equal(await page.locator('[data-settings-links] button[aria-current=location]').textContent(), 'Outgoing raids');
+        await page.locator('[data-settings-finder] input').fill('follow outgoing');
+        assert.ok((await page.locator('[data-settings-results] button>span').allTextContents()).includes('Follow outgoing raids'));
+    } finally { await browser.close(); }
+});

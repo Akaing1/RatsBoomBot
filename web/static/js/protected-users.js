@@ -65,6 +65,7 @@
     }
     function initializeSearch(searchForm, resultForm) {
         const blacklist = resultForm.hasAttribute('data-user-search-blacklist');
+        const local = resultForm.hasAttribute('data-user-search-local');
         const readBlacklist = () => new Set([...document.querySelectorAll('[data-queue-blacklist-members] input[name="username"]')].map(input => input.value.toLocaleLowerCase()));
         let blacklistedNames = blacklist ? readBlacklist() : null;
 
@@ -75,11 +76,36 @@
         results.className = 'protected-user-results';
         results.id = `user-search-results-${++nextSearchId}`;
         results.setAttribute('role', 'listbox');
+        results.setAttribute('popover', 'auto');
+        results.setAttribute('data-overlay-scrollbars', 'off');
         queryInput.setAttribute('role', 'combobox');
         queryInput.setAttribute('aria-autocomplete', 'list');
         queryInput.setAttribute('aria-controls', results.id);
         queryInput.setAttribute('aria-expanded', 'false');
         let selectedId = null;
+        let internalClose = false;
+        let positionFrame;
+        function positionResults() {
+            positionFrame = null;
+            const rect = queryInput.getBoundingClientRect();
+            const width = Math.min(Math.max(searchForm.querySelector('.protected-user-search-controls')?.getBoundingClientRect().width || rect.width, 300), innerWidth - 24);
+            const below = innerHeight - rect.bottom - 16;
+            const above = rect.top - 16;
+            const upwards = below < 180 && above > below;
+            Object.assign(results.style, {
+                width: `${Math.max(0, width)}px`,
+                left: `${Math.max(12, Math.min(rect.left, innerWidth - width - 12))}px`,
+                top: upwards ? 'auto' : `${rect.bottom + 6}px`,
+                bottom: upwards ? `${innerHeight - rect.top + 6}px` : 'auto',
+                maxHeight: `${Math.max(0, Math.min(420, upwards ? above : below))}px`,
+            });
+        }
+        function schedulePosition() {
+            if (results.matches(':popover-open') && !positionFrame) positionFrame = requestAnimationFrame(positionResults);
+        }
+        window.addEventListener('resize', schedulePosition);
+        document.addEventListener('scroll', schedulePosition, true);
+        new ResizeObserver(schedulePosition).observe(queryInput);
         function selectResult(id) {
             selectedId = null;
             results.querySelectorAll('[data-protected-user-result]').forEach(row => {
@@ -94,11 +120,32 @@
         function showResults(users) {
             results.replaceChildren(...users.map(render));
             selectResult(selectedId);
+            if (users.length) {
+                positionResults();
+                if (!results.matches(':popover-open')) results.showPopover();
+            } else hideResults();
+        }
+        function hideResults() {
+            internalClose = true;
+            if (results.matches(':popover-open')) results.hidePopover();
+            internalClose = false;
+            queryInput.setAttribute('aria-expanded', 'false');
         }
         function clearResults() {
             results.replaceChildren();
             selectResult(null);
+            hideResults();
         }
+        results.addEventListener('beforetoggle', event => {
+            if (event.newState === 'closed' && !internalClose) {
+                interrupt(); stopCached(); results.replaceChildren(); selectResult(null);
+            }
+        });
+        results.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                event.preventDefault(); event.stopPropagation(); interrupt(); stopCached(); clearResults(); queryInput.focus();
+            }
+        });
         resultForm.replaceWith(results);
         let timer;
         let controller;
@@ -164,34 +211,33 @@
         }
         function rankedUsers(retainedIds = null) {
             const query = normalizedQuery();
-            const ranked = [];
+            const related = [], remote = [];
             const now = Date.now();
-            const compare = (a, b) => a.priority - b.priority || a.type - b.type || b.score - a.score || a.user.login.localeCompare(b.user.login);
+            const compare = (a, b) => a.type - b.type || b.score - a.score || a.user.login.localeCompare(b.user.login);
             for (const user of candidates.values()) {
-                if (user.expires <= now || (retainedIds && !user.related && !retainedIds.has(user.id))) continue;
+                if (user.expires <= now || (!user.related && !retainedIds?.has(user.id))) continue;
+                const ranked = user.related ? related : remote;
                 let type = 3;
                 for (const name of user.names) {
                     type = Math.min(type, name === query ? 0 : name.startsWith(query) ? 1 : name.includes(query) ? 2 : 3);
                     if (type === 0) break;
                 }
-                const priority = type === 0 ? 0 : user.related ? 1 : 2;
                 const last = ranked[4];
-                // Only calculate edit distance when this candidate can enter the top five.
-                if (last && (priority > last.priority || (priority === last.priority && type > last.type))) continue;
+                if (last && type > last.type) continue;
                 let score = type === 0 ? 1 : 0;
                 if (type !== 0) for (const name of user.names) score = Math.max(score, similarity(query, name));
-                const item = {user, type, priority, score};
+                const item = {user, type, score};
                 if (type === 3 && score < 0.6 && !retainedIds?.has(user.id)) continue;
                 let index = 0;
                 while (index < ranked.length && compare(item, ranked[index]) >= 0) index++;
                 if (index < 5) { ranked.splice(index, 0, item); if (ranked.length > 5) ranked.pop(); }
             }
-            return ranked.map(item => item.user);
+            return [...related, ...remote].map(item => item.user);
         }
         function showCached() {
             const query = normalizedQuery();
-            if (!showing || remoteStarted || !/^[a-z0-9_]{1,25}$/.test(query)) return;
-            showResults(rankedUsers());
+            if (!showing || selectedId !== null || !/^[a-z0-9_]{1,25}$/.test(query)) return;
+            showResults(rankedUsers(remoteStarted ? remoteMatches : null));
         }
         async function loadCached(force = false) {
             if (cachedLoading || (cachedLoaded && !force)) return;
@@ -201,7 +247,7 @@
             try {
                 const {ok, payload} = await fetchCached(`${searchForm.dataset.searchUrl}?query=&cached_only=true`);
                 if (current !== cacheRevision || !ok) return;
-                remember(payload.users);
+                remember(payload.users.map(user => ({...user, related: true})));
                 cachedLoaded = true;
                 cachedAt = Date.now();
                 showCached();
@@ -218,6 +264,7 @@
             cachedLoading = false;
         }
         let remoteStarted = false;
+        let remoteMatches = null;
         let revision = 0;
         let pendingQuery;
         let lastQuery;
@@ -257,12 +304,27 @@
             const id = form.querySelector('[data-protected-result-user-id]');
             if (id) id.textContent = user.id;
             const button = form.querySelector('[data-protected-add]');
-            const existing = blacklist ? blacklistedNames.has(login.toLocaleLowerCase()) : user.already_protected;
+            const existing = local ? (searchForm.closest('[data-shoutout-user-list]').querySelector('[data-shoutout-list-value]').value.split(/\s+/).includes(login.toLowerCase()))
+                : blacklist ? blacklistedNames.has(login.toLocaleLowerCase()) : user.already_protected;
             button.disabled = existing;
             form.setAttribute('aria-disabled', String(Boolean(existing)));
-            button.textContent = blacklist ? existing ? 'Already blacklisted' : 'Blacklist' : existing ? 'Already Protected' : 'Add User';
+            button.textContent = local ? existing ? 'Already added' : 'Add User'
+                : blacklist ? existing ? 'Already blacklisted' : 'Blacklist' : existing ? 'Already Protected' : 'Add User';
+            if (local) form.addEventListener('submit', event => {
+                event.preventDefault(); event.stopPropagation();
+                interrupt(); stopCached(); clearResults(); queryInput.value = ''; message.textContent = '';
+                searchForm.dispatchEvent(new CustomEvent('user-search-selected', {bubbles: true, detail: {...user, profile_image_url: candidates.get(user.id)?.profile_image_url || user.profile_image_url}}));
+            });
             return form;
         }
+
+        searchForm.closest('[data-settings-book]')?.addEventListener('settings-save-failed', event => {
+            if (!results.contains(event.detail.form)) return;
+            showing = true;
+            positionResults();
+            if (!results.matches(':popover-open')) results.showPopover();
+            queryInput.setAttribute('aria-expanded', 'true');
+        });
 
         searchForm.closest('[data-settings-book]')?.addEventListener('settings-saved', event => {
             const kind = event.detail.form.dataset.settingsImmediateAction;
@@ -281,6 +343,7 @@
                 if (matches) form.remove();
             });
             selectResult(selectedId);
+            if (!results.childElementCount) hideResults();
             message.textContent = '';
         });
 
@@ -307,10 +370,10 @@
                 const payload = await response.json();
                 if (current !== revision) return;
                 if (!response.ok) throw new Error(payload.detail || 'Twitch user lookup failed.');
-                const users = payload.users.slice(0, 5);
+                const users = payload.users.slice(0, 10);
                 remember(users);
-                const remoteIds = new Set(users.map(user => user.id));
-                const merged = rankedUsers(remoteIds);
+                remoteMatches = new Set(users.map(user => user.id));
+                const merged = rankedUsers(remoteMatches);
                 showResults(merged);
                 message.textContent = merged.length ? '' : 'No matching users.';
             } catch (error) {
@@ -330,6 +393,7 @@
             cancelLookup();
             showing = false;
             remoteStarted = false;
+            remoteMatches = null;
             selectResult(null);
             if (clearMessage) message.textContent = '';
         }
@@ -370,7 +434,7 @@
         });
         // Keyboard submissions must cancel the lookup too, without removing the
         // chosen form before the save handler reads it.
-        results.addEventListener('submit', event => { if (!event.defaultPrevented) { interrupt(); stopCached(); } });
+        results.addEventListener('submit', event => { if (!event.defaultPrevented) { interrupt(); stopCached(); hideResults(); } });
         queryInput.addEventListener('keydown', event => {
             if (event.isComposing) return;
             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {

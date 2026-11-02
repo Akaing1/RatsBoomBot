@@ -9,21 +9,23 @@ SECTIONS = (
     ("loyalty", "Loyalty Points", "Your currency, command controls, and response wording.", "M20 6c0 2-4 3-8 3S4 8 4 6s4-3 8-3 8 1 8 3ZM4 6v12c0 2 4 3 8 3s8-1 8-3V6M4 12c0 2 4 3 8 3s8-1 8-3"),
     ("queue", "Viewer Queue", "Queue availability and who can join.", "M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1"),
     ("pets", "Pets and Boss Hunt", "Pets and Boss Hunt settings.", "M6 8h12a3 3 0 0 1 3 3v7a2 2 0 0 1-3 1l-3-3H9l-3 3a2 2 0 0 1-3-1v-7a3 3 0 0 1 3-3ZM6 12h4M8 10v4M16 11h1M18 14h1"),
-    ("events", "Stream Events", "Community messages, Twitch raids, shoutouts, and redeems.", "M4 10v5h4l10 5V4L8 10H4ZM8 15l2 6M21 9v6"),
+    ("events", "Stream Events", "Community messages, Twitch raids, and redeems.", "M4 10v5h4l10 5V4L8 10H4ZM8 15l2 6M21 9v6"),
+    ("shoutouts", "Shoutouts", "Shoutout messages, incoming raid shoutouts, and automatic whitelist triggers.", "M3 11v4h4l11 5V4L7 11H3ZM7 15l2 6M21 9v6"),
     ("timers", "Timers", "Automated chat messages and their availability.", "M9 2h6M12 5v2M19 5l-2 2M20 14a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM12 10v5l3 2"),
     ("connections", "Connections", "Social links and bot identity.", "M9 15l6-6M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 10a4 4 0 0 0 6 0l4-4a4 4 0 0 0-6-6l-1 1"),
 )
 
 GROUP_SECTION = {
+    "Automatic shoutouts": "shoutouts",
     "Commands": "chat", "Loyalty points": "loyalty", "Timers": "timers",
-    "Community messages": "events", "Raid messages": "events", "Shoutouts": "events", "Redeems": "events",
+    "Community messages": "events", "Outgoing raid messages": "events", "Shoutouts": "shoutouts", "Redeems": "events",
     "League of Legends": "games", "Overwatch": "games", "Raid boss names": "pets", "Raid item names": "pets",
 }
 TOGGLE_SECTION = {
     "feature": {"points": "loyalty", "timers": "timers", "raid_bosses": "pets", "redeems": "events", "follow_responses": "events", "subscription_responses": "events", "resubscription_responses": "events", "gifted_subscription_responses": "events", "raid_responses": "events", "ad_announcements": "events"},
-    "global_group": {"points": "loyalty", "viewer_queue": "queue", "shoutouts": "events", "socials": "connections", "clips": "chat", "settings": "chat"},
+    "global_group": {"points": "loyalty", "viewer_queue": "queue", "shoutouts": "shoutouts", "socials": "connections", "clips": "chat", "settings": "chat"},
 }
-LABELS = {"raid_bosses": "Boss Hunt", "globals": "All global commands", "channel": "Channel profile", "points": "Loyalty Points", "league": "League of Legends"}
+LABELS = {"raid_responses": "Outgoing raid messages", "raid_bosses": "Boss Hunt", "globals": "All global commands", "channel": "Channel profile", "points": "Loyalty Points", "league": "League of Legends"}
 
 RELATED_SETTINGS = {
     ("profile_feature", "league"): [("games", "league-of-legends", "Customize League of Legends")],
@@ -32,6 +34,7 @@ RELATED_SETTINGS = {
 
 
 TOGGLE_DESCRIPTIONS = {
+    ("feature", "raid_responses"): "Send your messages when you start a raid.",
     ("feature", "channel"): "Enable your channel's bot profile and its features.",
     ("feature", "timers"): "Send your scheduled chat messages and announcements.",
     ("feature", "ad_announcements"): "Notify chat before a scheduled ad break starts.",
@@ -79,6 +82,7 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
             commands = [command for command in definitions if (
                 (kind == "global_group" and value == "globals" and (command.global_group is not None or command.global_command is not None))
                 or getattr(command, kind, None) == name
+                or (kind == "feature" and value == "raid_responses" and command.syntax == "!startraid <channel>")
             )]
             description = TOGGLE_DESCRIPTIONS.get((kind, value)) or (commands[0].description if commands else f"Enable {label.lower()} for your channel.")
             if section == "pets":
@@ -96,7 +100,7 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
                 related_settings=[link for link in RELATED_SETTINGS.get((kind, value), []) if link[0] != section and (link[0] != 'games' or value in enabled_games)]))
     group_controls = {
         ('feature', 'points'): 'Loyalty points', ('global_group', 'points'): 'Loyalty points',
-        ('feature', 'raid_responses'): 'Raid messages',
+        ('feature', 'raid_responses'): 'Outgoing raid messages',
         ('global_group', 'shoutouts'): 'Shoutouts', ('global_command', 'lurk'): 'Commands',
         **{('feature', name): 'Community messages' for name in (
             'follow_responses', 'subscription_responses', 'resubscription_responses', 'gifted_subscription_responses')},
@@ -131,6 +135,10 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
                 section['standalone_toggles'].append(toggle)
                 panels.setdefault(toggle['panel'], []).append(toggle)
         section['blocked'] = section['blocked_by_profile'] or section['blocked_by_globals']
-        section['standalone_panels'] = sorted(panels.items(), reverse=section['key'] == 'pets')
-    order = ('general', 'chat', 'events', 'timers', 'connections', 'loyalty', 'queue', 'pets', 'games')
+        section['standalone_panels'] = sorted(
+            panels.items(),
+            key=lambda item: (section['key'] == 'general' and item[0] != 'Feature controls', item[0]),
+            reverse=section['key'] == 'pets',
+        )
+    order = ('general', 'chat', 'events', 'shoutouts', 'timers', 'connections', 'loyalty', 'queue', 'pets', 'games')
     return [sections[key] for key in order if key != 'games' or enabled_games]

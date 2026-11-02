@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from twitchio.ext import commands
+from bot.services.stream.automatic_shoutouts import automatic_shoutout
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -95,6 +96,8 @@ class RedeemEvents(commands.Component):
             "REDEEM",
             f"{username} redeemed: {reward_title}"
         )
+
+        await automatic_shoutout(self.bot, broadcaster_id, user_id, username, "redeem")
 
         active_session = services.stream_logs.get_active_session(broadcaster_id)
         stream_id = active_session.stream_id if active_session is not None else None

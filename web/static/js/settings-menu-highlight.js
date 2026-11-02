@@ -59,7 +59,8 @@
     function schedule() { if (!frame) frame = requestAnimationFrame(update); }
     function locationFor(target) {
         const group = target.closest('.settings-group') || target.closest('.settings-command-cluster, .profile-settings-panel, .settings-timer-manager>.panel');
-        return locations.find(item => item.target === target) || locations.find(item => group?.contains(item.target));
+        return locations.find(item => item.target === target) || locations.find(item => group?.contains(item.target))
+            || locations.find(item => item.section.hasAttribute('data-settings-single-menu') && item.section.contains(target));
     }
     function releaseIntent() {
         clearTimeout(releaseTimer);

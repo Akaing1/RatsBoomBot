@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 from twitchio import HTTPException
 from twitchio.http import Route
 
-from bot.shared.follower_names import ensure_follower_names
+from bot.shared.follower_names import ensure_follower_names, ensure_following_names
 from bot.command_registry import build_command_help_groups
 from bot.shared.pending_raids import raid_lock, raid_state, raid_viewer_count, remember_raid
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
@@ -46,6 +46,28 @@ from web.state import get_bot
 from storage.incoming_raids import recent_incoming_raids
 
 router = APIRouter()
+
+
+@router.get("/channel/api/automatic-shoutouts/users")
+async def automatic_shoutout_users(request: Request, query: str = ""):
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    query = query.strip().lstrip("@").casefold()
+    if not re.fullmatch(r"[a-z0-9_]{3,25}", query):
+        return JSONResponse({"users": []}, headers={"Cache-Control": "no-store"})
+    async with context.services.db.acquire() as connection:
+        rows = await connection.fetchall(
+            "SELECT i.user_id, i.login, i.display_name FROM chatter_identities i "
+            "JOIN chatter_channel_observations o ON o.user_id = i.user_id "
+            "WHERE o.broadcaster_id = ? AND i.login LIKE ? ESCAPE '\\' ORDER BY i.login LIMIT 10",
+            (context.broadcaster_id, query.replace("_", "\\_") + "%"))
+    users = [{"id": row["user_id"], "login": row["login"], "display_name": row["display_name"]} for row in rows]
+    if not any(user["login"].casefold() == query for user in users):
+        found = await context.services.automatic_shoutouts.lookup(context.broadcaster_id, "users", login=query)
+        if found:
+            users = [{"id": found[0]["id"], "login": found[0]["login"], "display_name": found[0].get("display_name", found[0]["login"])}, *users][:10]
+    return JSONResponse({"users": users}, headers={"Cache-Control": "no-store"})
 LOGGER = logging.getLogger("RatBoomBot")
 CHAT_SEND_TARGETS = {"twitch", "youtube", "both"}
 CHAT_MESSAGE_MAX_LENGTH = 500
@@ -368,6 +390,24 @@ async def category_picker_results(runtime_bot, broadcaster_id: str, games: list[
     }
 
 
+def ensure_user_search_names(runtime_bot, broadcaster_id):
+    if not callable(getattr(getattr(runtime_bot, '_http', None), 'request_json', None)):
+        return
+    broadcaster_id = str(broadcaster_id)
+    ensure_follower_names(runtime_bot, broadcaster_id)
+    ensure_following_names(runtime_bot, broadcaster_id,
+        lambda params: raid_browser_cached_request(runtime_bot, broadcaster_id, 'channels/followed', params))
+
+
+def user_search_names_loading(runtime_bot, broadcaster_id):
+    for attribute in ('_follower_names_cache', '_following_names_cache'):
+        state = getattr(runtime_bot, attribute, {}).get(str(broadcaster_id), {})
+        task = state.get('task')
+        if task and not task.done():
+            return True
+    return False
+
+
 def format_dashboard_username(services, broadcaster_id: str, username: str) -> str:
     formatter = getattr(getattr(services, "chatters", None), "format_name", None)
     return formatter(str(broadcaster_id), str(username)) if callable(formatter) else str(username)
@@ -376,6 +416,11 @@ def format_dashboard_username(services, broadcaster_id: str, username: str) -> s
 async def get_queue_blacklist_rows(runtime_bot, broadcaster_id):
     broadcaster_id = str(broadcaster_id)
     logins = runtime_bot.services.viewer_queue.list_blacklist(broadcaster_id)
+    return await get_named_user_rows(runtime_bot, broadcaster_id, logins)
+
+
+async def get_named_user_rows(runtime_bot, broadcaster_id, logins):
+    broadcaster_id = str(broadcaster_id)
     cached = {user["login"].casefold(): user for user in cached_protected_user_candidates(runtime_bot, broadcaster_id, "").values()}
     missing = [login for login in logins if login.casefold() not in cached or not cached[login.casefold()].get("profile_image_url")]
     try:
@@ -384,10 +429,21 @@ async def get_queue_blacklist_rows(runtime_bot, broadcaster_id):
             for user in payload.get("data", []):
                 cached[str(user["login"]).casefold()] = user
     except Exception:
-        LOGGER.warning("[Settings] Queue blacklist profiles could not be loaded for %s.", broadcaster_id)
+        LOGGER.warning("[Settings] User list profiles could not be loaded for %s.", broadcaster_id)
     return [{"username": login, "display_name": cached.get(login.casefold(), {}).get("display_name") or login,
         "user_id": cached.get(login.casefold(), {}).get("id") or "",
-        "profile_image_url": cached.get(login.casefold(), {}).get("profile_image_url") or ""} for login in logins]
+        "profile_image_url": cached.get(login.casefold(), {}).get("profile_image_url") or ""} for login in sorted(logins, key=str.casefold)]
+
+
+async def get_shoutout_user_rows(runtime_bot, broadcaster_id):
+    profile = get_active_profile(str(broadcaster_id))
+    if profile is None:
+        return {}
+    config = profile.automatic_shoutouts
+    lists = {"automatic_shoutouts.users": config.users.split(), "automatic_shoutouts.blacklist": config.blacklist.split()}
+    rows = await get_named_user_rows(runtime_bot, broadcaster_id, list(dict.fromkeys(name for names in lists.values() for name in names)))
+    by_login = {row["username"]: row for row in rows}
+    return {key: [by_login[name] for name in names] for key, names in lists.items()}
 
 
 def get_queue_members(services, broadcaster_id: str) -> list[dict[str, str]]:
@@ -658,10 +714,9 @@ async def channel_raid_action(request: Request, action: str = Form(...),
             if target is None:
                 return JSONResponse({"detail": "Twitch could not find that channel."}, status_code=404)
             from bot.shared.commands.raids import outgoing_raid_messages
-            if not runtime_bot.services.features.is_enabled(broadcaster_id, FeatureName.RAID_RESPONSES):
-                return JSONResponse({"detail": "Enable raid responses before using !startraid from the raid browser."}, status_code=400)
             try:
-                outgoing_messages = outgoing_raid_messages(get_active_profile(broadcaster_id), target)
+                outgoing_messages = (outgoing_raid_messages(get_active_profile(broadcaster_id), target)
+                    if runtime_bot.services.features.is_enabled(broadcaster_id, FeatureName.RAID_RESPONSES) else ())
             except ValueError as error:
                 return JSONResponse({"detail": str(error)}, status_code=400)
             result = await broadcaster.start_raid(target_id)
@@ -2122,7 +2177,7 @@ async def channel_dashboard(request: Request):
         logout_channel_user(request)
         return RedirectResponse(url="/connect", status_code=303)
 
-    ensure_follower_names(runtime_bot, broadcaster_id)
+    ensure_user_search_names(runtime_bot, broadcaster_id)
 
     await broadcaster_service.refresh_live_statuses()
     clear_stale_chat_on_refresh(services.live_chat, broadcaster)
@@ -2373,6 +2428,7 @@ async def channel_customization_page(request: Request):
         logout_channel_user(request)
         return RedirectResponse(url="/connect", status_code=303)
 
+    ensure_user_search_names(runtime_bot, broadcaster_id)
     groups = services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)})
     widget_token = "" if getattr(getattr(request, "state", None), "channel_access", None) else await services.live_chat.get_or_create_widget_token(broadcaster_id)
     widget_base_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/widgets/chat/{widget_token}"
@@ -2408,6 +2464,7 @@ async def channel_customization_page(request: Request):
             "social_tab": request.query_params.get("social_tab", "links"),
             "command_tab": request.query_params.get("command_tab", "responses"),
             "blacklist": await get_queue_blacklist_rows(runtime_bot, broadcaster_id),
+            "shoutout_user_rows": await get_shoutout_user_rows(runtime_bot, broadcaster_id),
             "protected_users": await get_protected_user_rows(runtime_bot, str(broadcaster_id), profile_loader=raid_browser_profiles),
             "protected_result": request.query_params.get("protected_result"),
             "protected_message": request.query_params.get("protected_message"),
@@ -2437,7 +2494,14 @@ async def update_channel_customization(request: Request, setting_name: str = For
     try:
         if legacy_loyalty and services.profile_settings.get_definition(setting_name).group != LOYALTY_GROUP:
             raise ValueError("Only loyalty point names and responses can be edited here.")
-        if setting_name == "dashboard.follow_raid":
+        if setting_name == "automatic_shoutouts":
+            if action != "save":
+                raise ValueError("Choose Save Changes to update automatic shoutouts.")
+            submitted = await request.form()
+            values = {key: str(submitted[key]) for key in submitted if key.startswith("automatic_shoutouts.")}
+            await services.profile_settings.set_automatic_shoutouts(broadcaster_id, values, settings_actor(request))
+            message = "Automatic shoutout settings saved."
+        elif setting_name == "dashboard.follow_raid":
             if action != "save" or value not in {"0", "1"}:
                 raise ValueError("Choose On or Off.")
             await services.broadcaster_settings.set_follow_raid(broadcaster_id, value == "1")
@@ -2488,14 +2552,13 @@ async def search_channel_protected_user(request: Request, query: str = "", cache
     if runtime_bot is None or runtime_bot.services is None:
         return JSONResponse({"detail": "The bot runtime is unavailable."}, status_code=503)
 
+    ensure_user_search_names(runtime_bot, broadcaster_id)
     try:
         users = await search_protected_users(runtime_bot, str(broadcaster_id), query, cached_only=cached_only)
     except ProtectedUserError as error:
         return JSONResponse({"detail": str(error)}, status_code=error.status_code)
 
-    name_cache = getattr(runtime_bot, "_follower_names_cache", {}).get(str(broadcaster_id), {})
-    task = name_cache.get("task")
-    return JSONResponse({"users": users, "followers_loading": bool(task and not task.done())}, headers={"Cache-Control": "no-store"})
+    return JSONResponse({"users": users, "followers_loading": user_search_names_loading(runtime_bot, broadcaster_id)}, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/channel/protected-users/profiles")

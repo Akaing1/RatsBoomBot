@@ -204,17 +204,15 @@ async def test_user_search_prioritizes_exact_matches_then_relationships(known_co
     }}}, fetch_user=AsyncMock(return_value=SimpleNamespace(id='exact', name='viewername', display_name='Viewername') if strong else None),
         search_channels=lambda *args, **kwargs: search_results())
     users = await search_protected_users(bot, '10', 'viewername')
-    assert len(users) == 5
+    assert len(users) == known_count + (4 if strong else 2)
+    assert all(user['related'] for user in users[:known_count])
+    assert all(not user['related'] for user in users[known_count:])
     ids = [user['id'] for user in users]
     if strong:
-        assert ids[0] == 'exact'
-        assert all(user['related'] for user in users[1:])
-        assert 'near' not in ids, 'Near matches must not displace followers or following'
-    elif known_count == 5:
-        assert all(user['related'] for user in users)
+        assert ids[known_count] == 'exact'
+        assert set(ids[known_count:]) == {'exact', 'near', 'remote1', 'remote2'}
     else:
-        assert all(user['related'] for user in users[:3])
-        assert set(ids[3:]) == {'remote1', 'remote2'}
+        assert set(ids[known_count:]) == {'remote1', 'remote2'}
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from dataclasses import dataclass, fields, replace
 from string import Formatter
 
@@ -49,9 +50,8 @@ PROFILE_SETTING_DEFINITIONS = (
     ProfileSettingDefinition("community_messages.subscription", "Community messages", "Subscription message", "Sent for a new subscription. Use {username} for the subscriber. Leave empty to send nothing."),
     ProfileSettingDefinition("community_messages.resubscription", "Community messages", "Resubscription message", "Sent for a returning subscription. Use {username} and {months}. Leave empty to send nothing."),
     ProfileSettingDefinition("community_messages.gifted_subscription", "Community messages", "Gifted subscription message", "Sent once per gift batch, without recipient names. Use {username}, {count}, and {subscription_word}. Leave empty to send nothing."),
-    ProfileSettingDefinition("raid_messages.incoming", "Raid messages", "Incoming raid message", "Sent when another channel raids your channel."),
-    ProfileSettingDefinition("raid_messages.outgoing", "Raid messages", "Outgoing raid message", "Sent when you start a raid."),
-    ProfileSettingDefinition("raid_messages.outgoing_subscriber", "Raid messages", "Subscriber raid message", "Optional subscriber variation for outgoing raids."),
+    ProfileSettingDefinition("raid_messages.outgoing", "Outgoing raid messages", "Non-subscriber raid message", "Sent when you start a raid."),
+    ProfileSettingDefinition("raid_messages.outgoing_subscriber", "Outgoing raid messages", "Subscriber raid message", "Optional subscriber variation for outgoing raids."),
     ProfileSettingDefinition("shoutout_messages.with_game", "Shoutouts", "Shoutout with game", "Shoutout used when Twitch provides the target's last game."),
     ProfileSettingDefinition("shoutout_messages.without_game", "Shoutouts", "Shoutout without game", "Shoutout used when no game is available."),
     ProfileSettingDefinition("redeems.daily_title", "Redeems", "Daily redeem", "Exact Twitch reward title used for the daily claim.", maximum_length=100, rows=1),
@@ -92,6 +92,42 @@ PROFILE_SETTING_DEFINITIONS += (
 ) + tuple(
     ProfileSettingDefinition(f"points.messages.{field.name}", LOYALTY_GROUP, LOYALTY_RESPONSE_LABELS[field.name], "Available placeholders: " + ", ".join("{" + name + "}" for name in sorted(LOYALTY_PLACEHOLDERS[f"points.messages.{field.name}"])) + ". Leave empty to send nothing.")
     for field in fields(PointsMessages) if field.name in LOYALTY_RESPONSE_LABELS
+)
+
+AUTOMATIC_SHOUTOUT_GROUP = "Automatic shoutouts"
+PROFILE_SETTING_DEFINITIONS += tuple(
+    ProfileSettingDefinition(f"automatic_shoutouts.{name}", AUTOMATIC_SHOUTOUT_GROUP, label, description, value_type="toggle")
+    for name, label, description in (
+        ("raid", "Incoming raid shoutouts", "Automatically shout out eligible incoming raiders."),
+        ("interactions", "Interaction shoutouts", "Enable all configured whitelist interaction triggers."),
+        ("chat", "Chat shoutouts", "Trigger when a whitelisted user chats."),
+        ("redeem", "Redemption shoutouts", "Trigger when a whitelisted user redeems Channel Points."),
+        ("subscription", "Subscription shoutouts", "Trigger when a whitelisted user subscribes or resubscribes, including Prime."),
+        ("gift", "Gift subscription shoutouts", "Shout out the whitelisted person gifting subscriptions, not each recipient."),
+        ("bits", "Bits shoutouts", "Trigger when a whitelisted user cheers Bits."),
+        ("streak", "Shared streak shoutouts", "Trigger when a whitelisted user shares a watch or subscription streak."),
+        ("require_following", "Require following", "You must follow the incoming raider. All enabled raid requirements must match."),
+        ("require_team", "Require stream team", "The incoming raider must share a Twitch stream team with your channel."),
+        ("require_partner", "Require partner", "The incoming raider must be a Twitch Partner."),
+        ("require_list", "Require whitelist", "The incoming raider must be in your automatic-shoutout whitelist."),
+        ("native", "Native Twitch shoutouts", "Queue Twitch shoutouts using the existing Twitch cooldowns."),
+        ("chat_message", "Shoutout chat messages", "Send a shoutout message in chat."),
+    )
+) + tuple(
+    ProfileSettingDefinition(f"automatic_shoutouts.{name}", AUTOMATIC_SHOUTOUT_GROUP, label, description,
+        value_type="integer", minimum=minimum, maximum=maximum, rows=1)
+    for name, label, description, minimum, maximum in (
+        ("minimum_viewers", "Minimum raid viewers", "Additional requirement for raids only. Default: 0.", 0, 10000000),
+        ("cooldown_minutes", "Automatic shoutout cooldown", "Legacy saved value. Automatic shoutouts are limited to once per live stream.", 1, 1440),
+    )
+) + tuple(
+    ProfileSettingDefinition(f"automatic_shoutouts.{name}", AUTOMATIC_SHOUTOUT_GROUP, label,
+        "One Twitch username per line. Type a name to see suggestions.", value_type="usernames", maximum_length=4000, rows=4)
+    for name, label in (("users", "Whitelisted users"), ("blacklist", "Incoming raid blacklist"))
+) + tuple(
+    ProfileSettingDefinition(f"automatic_shoutouts.{name}", AUTOMATIC_SHOUTOUT_GROUP, label,
+        "Optional custom message. Use {username}, {game_name}, {channel_url}, {viewer_count}, {amount}, or {trigger}. Leave empty to use the standard shoutout message.")
+    for name, label in (("raid_message", "Incoming raid shoutout message"), ("event_message", "Whitelist shoutout message"))
 )
 
 PROFILE_SETTINGS_BY_KEY = {definition.key: definition for definition in PROFILE_SETTING_DEFINITIONS}
@@ -141,9 +177,26 @@ class ProfileSettingsService:
             await connection.execute(migration_query)
             await connection.execute(protected_users_query)
 
+        await self.migrate_automatic_shoutout_settings()
         await self.load_overrides()
         await self.load_protected_users()
         LOGGER.info("[Profiles] Loaded database profile overrides for %d broadcaster(s).", len(self.overrides))
+
+    async def migrate_automatic_shoutout_settings(self) -> None:
+        # Preserve the old text, while an explicitly saved shoutout template wins.
+        from storage.transactions import immediate_transaction
+        async with self.db.acquire() as connection:
+            async with immediate_transaction(connection):
+                await connection.execute("""
+                    INSERT INTO channel_profile_overrides
+                        (broadcaster_id, setting_name, setting_value, updated_by, updated_at)
+                    SELECT broadcaster_id, 'automatic_shoutouts.raid_message',
+                        REPLACE(setting_value, '{raider_name}', '{username}'), updated_by, updated_at
+                    FROM channel_profile_overrides WHERE setting_name = 'raid_messages.incoming'
+                    ON CONFLICT(broadcaster_id, setting_name) DO NOTHING
+                """)
+                await connection.execute("DELETE FROM channel_profile_overrides WHERE setting_name = 'raid_messages.incoming'")
+                await connection.execute("DELETE FROM channel_profile_overrides WHERE setting_name IN ('automatic_shoutouts.minimum_bits', 'automatic_shoutouts.minimum_gifts')")
 
     async def load_overrides(self) -> None:
         query = """
@@ -293,6 +346,28 @@ class ProfileSettingsService:
         async with self._settings_lock:
             return await self._set_override(broadcaster_id, setting_name, raw_value, updated_by)
 
+    async def set_automatic_shoutouts(self, broadcaster_id: str, values: dict[str, str], updated_by: str) -> None:
+        definitions = [definition for definition in PROFILE_SETTING_DEFINITIONS if definition.key.startswith("automatic_shoutouts.")]
+        if set(values) != {definition.key for definition in definitions}:
+            raise ValueError("Submit all automatic shoutout settings together.")
+        parsed = {definition.key: self.validate_value(definition, values[definition.key]) for definition in definitions}
+        broadcaster_id = str(broadcaster_id)
+        async with self._settings_lock:
+            async with self.db.acquire() as connection:
+                await connection.execute("BEGIN")
+                try:
+                    await connection.executemany(
+                        "INSERT INTO channel_profile_overrides (broadcaster_id, setting_name, setting_value, updated_by, updated_at) "
+                        "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(broadcaster_id, setting_name) DO UPDATE SET "
+                        "setting_value=excluded.setting_value, updated_by=excluded.updated_by, updated_at=CURRENT_TIMESTAMP",
+                        [(broadcaster_id, key, self.serialize_value(value), updated_by) for key, value in parsed.items()])
+                    await connection.execute("COMMIT")
+                except BaseException:
+                    await connection.execute("ROLLBACK")
+                    raise
+            self.overrides.setdefault(broadcaster_id, {}).update(parsed)
+            self.refresh_active_profile(broadcaster_id)
+
     async def _set_override(self, broadcaster_id: str, setting_name: str, raw_value: str, updated_by: str) -> ProfileSettingState:
         broadcaster_id = str(broadcaster_id)
         definition = self.get_definition(setting_name)
@@ -366,7 +441,10 @@ class ProfileSettingsService:
         default_messages = PointsMessages()
         fixed_messages = {field.name: getattr(default_messages, field.name) for field in fields(PointsMessages) if field.name not in LOYALTY_RESPONSE_LABELS}
         messages = replace(profile.points.messages, **fixed_messages)
-        effective_profile = replace(profile, points=replace(profile.points, messages=messages))
+        automatic = profile.automatic_shoutouts
+        if not automatic.raid_message and profile.raid_messages.incoming:
+            automatic = replace(automatic, raid_message=profile.raid_messages.incoming.replace('{raider_name}', '{username}'))
+        effective_profile = replace(profile, points=replace(profile.points, messages=messages), automatic_shoutouts=automatic)
 
         for setting_name, value in self.overrides.get(broadcaster_id, {}).items():
             if setting_name in PROFILE_SETTINGS_BY_KEY:
@@ -467,6 +545,15 @@ class ProfileSettingsService:
 
     @staticmethod
     def validate_value(definition: ProfileSettingDefinition, raw_value: str) -> str | int:
+        if definition.value_type == "toggle":
+            if raw_value not in {"0", "1"}:
+                raise ValueError("Choose On or Off.")
+            return int(raw_value)
+        if definition.value_type == "usernames":
+            names = list(dict.fromkeys(name.strip().lstrip("@").casefold() for name in raw_value.replace(",", "\n").splitlines() if name.strip()))
+            if len(names) > 100 or any(not re.fullmatch(r"[a-z0-9_]{1,25}", name) for name in names):
+                raise ValueError("Use up to 100 Twitch usernames, one per line.")
+            return "\n".join(names)
         if definition.value_type == "integer":
             value = int(raw_value)
 
@@ -502,6 +589,11 @@ class ProfileSettingsService:
             return value
 
         value = raw_value.strip()
+        if definition.key in {"automatic_shoutouts.raid_message", "automatic_shoutouts.event_message"}:
+            allowed = {"username", "game_name", "channel_url", "viewer_count", "amount", "trigger", "viewer_word"}
+            for _, name, spec, conversion in Formatter().parse(value):
+                if name is not None and (name not in allowed or spec or conversion):
+                    raise ValueError("Use only the listed shoutout placeholders.")
         if definition.key == "points.display_name" and not value:
             value = "Points"
 
@@ -532,6 +624,10 @@ class ProfileSettingsService:
     @staticmethod
     def deserialize_value(definition: ProfileSettingDefinition, stored_value: str) -> str | int:
         value = json.loads(stored_value)
+        if definition.key.startswith("automatic_shoutouts."):
+            if not isinstance(value, (str, int)) or isinstance(value, bool):
+                raise TypeError("Invalid automatic shoutout setting.")
+            return ProfileSettingsService.validate_value(definition, str(value))
 
         if definition.value_type == "integer" and not isinstance(value, int):
             raise TypeError("Expected an integer setting.")

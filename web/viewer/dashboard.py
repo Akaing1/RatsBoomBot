@@ -83,6 +83,7 @@ READS = {'/channel', '/channel/api/dashboard-stats', '/channel/api/redemptions',
     '/channel/api/chat/users', '/channel/api/chat/pinned', '/channel/api/raid-contributors'}
 MODERATE = {'/channel/api/viewer-queue/action', '/channel/viewer-queue/remove'}
 SETTINGS = {'/channel/api/ad-status', '/channel/api/ads/action', '/channel/settings', '/channel/customization', '/channel/features/toggles',
+    '/channel/api/automatic-shoutouts/users',
     '/channel/protected-users/search', '/channel/protected-users/profiles', '/channel/protected-users/add', '/channel/protected-users/remove',
     '/channel/viewer-queue/blacklist', '/channel/api/channel-metadata', '/channel/api/games'}
 for route in owner.router.routes:

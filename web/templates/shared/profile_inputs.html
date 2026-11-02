@@ -59,12 +59,18 @@
 {% endif %}
 
 {% for group_name, settings in setting_groups.items() %}
-    {% if settings_notebook | default(false) and group_name == "Timers" %}
+    {% if group_name == "Automatic shoutouts" and settings_notebook | default(false) %}
+        {# Rendered inside the shared Shoutouts panel below. #}
+    {% elif settings_notebook | default(false) and group_name == "Timers" %}
         {% with timer_setting=settings[0] %}{% include "channel/settings_timers.html" %}{% endwith %}
     {% else %}
     {% set flat = flat_settings | default(false) %}
+    {% if settings_notebook | default(false) and group_name == "Outgoing raid messages" %}
+    <section class="settings-group" id="settings-group-outgoing-raids" data-settings-single-menu>
+        <header class="settings-group-heading"><h4>Outgoing raids</h4></header>
+    {% endif %}
     {% set controls = (group_toggles | default({})).get(group_name, []) %}
-    {% if settings_notebook | default(false) and not flat %}<section id="settings-group-{{ group_name | lower | replace(' ', '-') }}" class="settings-group{% if controls | length == 1 and not controls[0].state.effective_enabled and group_name != 'Redeems' %} is-disabled{% endif %}"><header class="settings-group-heading"><h4 class="settings-group-title">{{ group_name }}</h4><span class="settings-header-switches">{% if controls | length == 1 and group_name != "Redeems" %}{{ status_switch(controls[0]) }}{% endif %}</span></header>{% endif %}
+    {% if settings_notebook | default(false) and not flat %}<section id="settings-group-{{ group_name | lower | replace(' ', '-') }}" class="settings-group{% if controls | length == 1 and not controls[0].state.effective_enabled and group_name != 'Redeems' %} is-disabled{% endif %}"><header class="settings-group-heading"><h4 class="settings-group-title">{{ 'Shoutout messages' if group_name == 'Shoutouts' else group_name }}</h4><span class="settings-header-switches">{% if controls | length == 1 and group_name != "Redeems" %}{{ status_switch(controls[0]) }}{% endif %}</span></header>{% endif %}
     <section class="panel toggle-management-panel profile-settings-panel">
         {% set controls = (group_toggles | default({})).get(group_name, []) %}
         {% if controls | length > 1 or flat or group_name == "Redeems" %}<div class="settings-switch-list">{% for toggle in controls %}<div class="settings-switch-row"><div class="settings-toggle-copy"><span>{{ toggle.label }}</span>{{ toggle_details(toggle) }}</div>{{ status_switch(toggle) }}</div>{% endfor %}</div>{% endif %}
@@ -75,6 +81,7 @@
                 <h3>{{ group_name }}</h3>
             </div>
         </div>
+        {% if group_name == "Automatic shoutouts" %}<p>Requirements and the blacklist apply to incoming raids. Other triggers require whitelist membership. Each person receives one automatic shoutout per live stream.</p>{% endif %}
 
         {% if group_name == "Commands" and not settings_notebook | default(false) %}
             <div class="dashboard-tabs command-customization-tabs" role="tablist" aria-label="Command customization">
@@ -84,7 +91,7 @@
         {% endif %}
 
         <div{% if group_name == "Commands" and not settings_notebook | default(false) %} data-command-panel="responses"{% if command_tab | default('responses') == 'protected' %} hidden{% endif %}{% endif %}>
-        <div class="profile-settings-grid">
+        <div class="profile-settings-grid{% if group_name == 'Outgoing raid messages' %} raid-message-fields toggle-card{% endif %}">
             {% for setting in settings %}
                 {% set control = (setting_toggles | default({})).get(setting.definition.key) %}
                 <article id="setting-{{ setting.definition.key | replace('.', '-') }}" data-setting-key="{{ setting.definition.key }}" class="toggle-card profile-setting-card{% if control and not control.state.effective_enabled %} is-disabled{% endif %}{% if setting.definition.key == 'timer_messages' %} full-width{% endif %}">
@@ -122,6 +129,19 @@
                                 </div>
                                 <button class="button secondary timer-add-button" type="button" data-add-timer>+ Add Timer</button>
                             </div>
+                        {% elif setting.definition.value_type == "toggle" %}
+                            <select class="profile-setting-input" name="value" aria-label="{{ setting.definition.label }}"><option value="1"{% if setting.effective_value %} selected{% endif %}>On</option><option value="0"{% if not setting.effective_value %} selected{% endif %}>Off</option></select>
+                        {% elif setting.definition.value_type == "usernames" %}
+                            {% if settings_notebook | default(false) %}
+                            <div data-shoutout-user-list data-search-url="{{ channel_root | default('/channel') }}/api/automatic-shoutouts/users">
+                            {% endif %}
+                                <textarea class="profile-setting-input" name="value" rows="4" maxlength="4000" aria-label="{{ setting.definition.label }}">{{ setting.effective_value }}</textarea>
+                            {% if settings_notebook | default(false) %}
+                                <label>Add a Twitch user<input class="profile-setting-input" type="search" data-shoutout-user-query list="users-{{ setting.definition.key | replace('.', '-') }}" autocomplete="off" maxlength="25" placeholder="Search username…"></label>
+                                <datalist id="users-{{ setting.definition.key | replace('.', '-') }}" data-shoutout-user-options></datalist>
+                                <button class="button secondary" type="button" data-shoutout-user-add>Add user</button><p data-shoutout-user-status role="status"></p>
+                            </div>
+                            {% endif %}
                         {% elif settings_notebook | default(false) and setting.definition.value_type == "names" %}
                             <div class="settings-entry-editor" data-settings-list data-entry-label="{{ setting.definition.label }}" data-entry-placeholder="{{ (setting.default_value | string).splitlines()[0] if setting.default_value else 'Enter a name' }}" data-entry-limit="{{ setting.definition.maximum_length }}">
                                 <textarea class="profile-setting-input" name="value" rows="1" maxlength="{{ setting.definition.maximum_length }}" aria-label="{{ setting.definition.label }}" data-settings-list-value>{{ setting.override_value if setting.override_value is not none else '' }}</textarea>
@@ -150,6 +170,9 @@
         </div>
         </div>
 
+        {% if group_name == "Redeems" %}
+            <p class="settings-hint">Daily, First, and VIP are the recurring redeem types available for self-service customization. Please contact the developer to add or change other custom redeems for your channel.</p>
+        {% endif %}
         {% if group_name == "Commands" and not settings_notebook | default(false) %}
             <div data-command-panel="protected"{% if command_tab | default('responses') != 'protected' %} hidden{% endif %}>
                 {% include "shared/protected_settings.html" %}
@@ -157,10 +180,13 @@
         {% endif %}
     </section>
     {% if settings_notebook | default(false) and not flat %}</section>{% endif %}
-    {% if settings_notebook | default(false) and group_name == "Raid messages" %}
-    <section class="settings-group" id="settings-group-raid-preferences">
-        <header class="settings-group-heading"><h4>Raid preferences</h4></header>
-        <div class="profile-settings-grid">{% include "channel/settings_dashboard.html" %}</div>
+        {% if settings_notebook | default(false) and group_name == "Shoutouts" %}
+            {% with settings=setting_groups.get('Automatic shoutouts', []) %}{% if settings %}{% include "channel/settings_automatic_shoutouts.html" %}{% endif %}{% endwith %}
+        {% endif %}
+    {% if settings_notebook | default(false) and group_name == "Outgoing raid messages" %}
+    <section class="settings-group" id="settings-group-follow-outgoing-raids">
+        {% include "channel/settings_dashboard.html" %}
+    </section>
     </section>
     {% endif %}
 {% endif %}

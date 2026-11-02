@@ -58,6 +58,22 @@ def make_request():
 
 
 @pytest.mark.asyncio
+async def test_admin_automatic_shoutouts_save_selected_channel_and_actor(monkeypatch):
+    from starlette.datastructures import FormData
+    save = AsyncMock()
+    services = SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {'123': object()}),
+        profile_settings=SimpleNamespace(set_automatic_shoutouts=save))
+    monkeypatch.setattr(channels, 'require_admin', AsyncMock(return_value=None))
+    monkeypatch.setattr(channels, 'get_bot', lambda: SimpleNamespace(services=services))
+    request = make_request()
+    request._form = FormData([('automatic_shoutouts.chat', '1'), ('automatic_shoutouts.users', 'alice'), ('broadcaster_id', 'other')])
+    response = await channels.save_admin_channel_customization(request, '123', 'automatic_shoutouts', '', 'save', 'csrf')
+    save.assert_awaited_once_with('123', {'automatic_shoutouts.chat': '1', 'automatic_shoutouts.users': 'alice'}, 'admin:7')
+    assert response.status_code == 303
+    assert 'setting_result=success' in response.headers['location']
+
+
+@pytest.mark.asyncio
 async def test_admin_customization_requires_auth(monkeypatch):
     monkeypatch.setattr(channels, "require_admin", AsyncMock(return_value=RedirectResponse("/admin/login")))
     response = await channels.save_admin_channel_customization(make_request(), "123", "lurk_message", "hello", "save", "csrf")

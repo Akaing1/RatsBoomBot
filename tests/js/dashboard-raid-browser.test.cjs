@@ -1748,8 +1748,10 @@ test('list manager resolves offline names and restores blacklisted recommendatio
     app.blockedList.children[0].querySelector('button').handlers.click();
     assert.deepEqual(JSON.parse(app.storage.get('ratsboombot:raid-blacklist:1')), []);
     assert.equal(app.blockedList.children.length, 0);
-    app.confirm(false); app.favoriteList.children[0].querySelector('button').handlers.click();
-    assert.equal(app.favoriteList.children.length, 1);
+    assert.equal(app.favoriteList.children[0].querySelector('button').dataset.userRowRemove, '');
+    app.favoriteList.children[0].querySelector('button').handlers.click();
+    assert.equal(app.favoriteList.children.length, 0);
+    assert.deepEqual(JSON.parse(app.storage.get('ratsboombot:raid-favorites:1')), []);
     app.managerClose.handlers.click();
     assert.equal(app.manager.open, false);
     assert.equal(app.manageButton.focused, true);

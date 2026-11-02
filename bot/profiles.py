@@ -161,6 +161,30 @@ class ShoutoutMessages:
 
 
 @dataclass(frozen=True)
+class AutomaticShoutouts:
+    raid: int = 1
+    interactions: int = 1
+    chat: int = 1
+    redeem: int = 1
+    subscription: int = 1
+    gift: int = 1
+    bits: int = 1
+    streak: int = 1
+    require_following: int = 0
+    require_team: int = 0
+    require_partner: int = 0
+    require_list: int = 0
+    minimum_viewers: int = 0
+    cooldown_minutes: int = 60  # Legacy saved value; automatic sends now use per-stream markers.
+    native: int = 1
+    chat_message: int = 1
+    users: str = ""
+    blacklist: str = ""
+    raid_message: str = ""
+    event_message: str = ""
+
+
+@dataclass(frozen=True)
 class SocialMessages:
     overview: str = "Discord: {discord_url} | YouTube: {youtube_url}"
     discord: str = "Join the community on Discord: {discord_url}"
@@ -415,6 +439,7 @@ class ChannelProfile:
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()
     shoutout_messages: ShoutoutMessages = ShoutoutMessages()
+    automatic_shoutouts: AutomaticShoutouts = AutomaticShoutouts()
     social_messages: SocialMessages = SocialMessages()
     first_chat_shoutouts: tuple[FirstChatShoutout, ...] = ()
     clips: ClipConfig = ClipConfig()

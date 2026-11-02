@@ -1,0 +1,69 @@
+{% from "shared/state_toggle.html" import state_toggle_contents %}
+{% macro shoutout_switch(setting, labeled=false) %}
+<form class="automatic-shoutout-switch-form" method="post" action="{{ customization_action | default('/channel/customization') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="setting_name" value="{{ setting.definition.key }}">
+    <input type="hidden" name="action" value="save">
+    {% if labeled %}<div class="toggle-card-heading"><h4>{% if setting.definition.key == 'automatic_shoutouts.require_list' %}Require <a data-settings-link href="?section=shoutouts#whitelisted-users">whitelist</a>{% else %}{{ setting.definition.label }}{% endif %}</h4></div>{% endif %}
+    <button id="auto-{{ setting.definition.key.split('.')[-1] }}" type="submit" name="value" value="{{ 0 if setting.effective_value else 1 }}" class="settings-status-switch state-toggle queue-state-toggle{% if setting.effective_value %} live{% endif %}" role="switch" aria-checked="{{ 'true' if setting.effective_value else 'false' }}" aria-label="{{ setting.definition.label }}">{{ state_toggle_contents(setting.effective_value) }}</button>
+</form>
+{% endmacro %}
+{% macro control(setting) %}
+{% set name = setting.definition.key %}
+{% set id = 'auto-' ~ name.split('.')[-1] %}
+<div class="profile-setting-card automatic-shoutout-control{% if setting.definition.value_type == 'toggle' or name == 'automatic_shoutouts.minimum_viewers' %} is-switch{% endif %}" data-setting-key="{{ name }}">
+    {% if setting.definition.value_type == 'toggle' %}
+        {{ shoutout_switch(setting, true) }}
+    {% elif setting.definition.value_type == 'usernames' %}
+        <div class="toggle-card-heading"><h4>{{ setting.definition.label }}</h4></div>
+        {% include 'shared/shoutout_user_list.html' %}
+    {% else %}
+    <form method="post" action="{{ customization_action | default('/channel/customization') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="setting_name" value="{{ name }}">
+    <div class="automatic-shoutout-field-row">
+    <div class="toggle-card-heading"><div><h4><label for="{{ id }}">{{ setting.definition.label }}</label></h4>
+    {% if setting.definition.value_type != 'toggle' and name != 'automatic_shoutouts.minimum_viewers' %}<p>{% if name in ['automatic_shoutouts.raid_message', 'automatic_shoutouts.event_message'] %}{% set before, phrase, after = setting.definition.description.partition('standard shoutout message') %}{{ before }}<a data-settings-link href="?section=shoutouts#shoutout-messages">{{ phrase }}</a>{{ after }}{% else %}{{ setting.definition.description }}{% endif %}</p>{% endif %}</div></div>
+    {% if setting.definition.value_type == 'integer' %}
+        <input id="{{ id }}" class="profile-setting-input" type="number" name="value" value="{{ setting.effective_value }}" min="{{ setting.definition.minimum }}" max="{{ setting.definition.maximum }}" required>
+    {% else %}
+        <textarea id="{{ id }}" class="profile-setting-input" name="value" rows="1" data-settings-grow maxlength="{{ setting.definition.maximum_length }}" placeholder="Use the standard shoutout message">{{ setting.effective_value }}</textarea>
+    {% endif %}
+    </div>
+    <div class="toggle-actions profile-setting-actions"><button class="button primary" type="submit" name="action" value="save">Save Changes</button></div>
+    </form>
+    {% endif %}
+</div>
+{% endmacro %}
+{% set raid_enabled = (settings | selectattr('definition.key', 'equalto', 'automatic_shoutouts.raid') | first).effective_value %}
+{% set interactions_enabled = (settings | selectattr('definition.key', 'equalto', 'automatic_shoutouts.interactions') | first).effective_value %}
+<section class="automatic-shoutout-settings settings-group" id="settings-group-automatic-shoutouts" aria-label="Automatic shoutouts">
+        <header class="automatic-shoutout-heading settings-group-heading"><div><h3>Automatic shoutouts</h3><p>Configure raid and whitelist triggers separately. Each person gets one automatic shoutout per stream, shared across both.</p></div></header>
+        <div class="automatic-shoutout-grid">
+        {% for title, section_id, description, subgroups in [
+            ('Incoming raid messages', 'incoming-raid-shoutouts', 'All enabled requirements and the minimum viewer count must match. Each person gets one shoutout per stream.', [
+                ('Message', 'raid-message', ['raid_message']),
+                ('Requirements', 'raid-requirements', ['minimum_viewers','require_following','require_team','require_partner','require_list']),
+                ('Blacklist', 'raid-blacklist', ['blacklist'])]),
+            ('Interactive shoutouts', 'whitelist-shoutouts', 'Shout out whitelisted users when they interact with your live stream. Raid requirements and the raid blacklist do not apply.', [
+                ('', 'automated-message', ['event_message']),
+                ('', 'shoutout-whitelist', ['users']),
+                ('Triggers', 'shoutout-triggers', ['chat','redeem','subscription','gift','bits','streak'])])
+        ] %}
+            {% set toggle_key = 'automatic_shoutouts.raid' if section_id == 'incoming-raid-shoutouts' else 'automatic_shoutouts.interactions' %}
+            {% set master = settings | selectattr('definition.key', 'equalto', toggle_key) | first %}
+            <section class="automatic-shoutout-section settings-group{% if not master.effective_value %} is-disabled{% endif %}" id="settings-group-{{ section_id }}"><header class="automatic-shoutout-section-heading settings-group-heading"><h4>{{ title }}</h4>
+                {% for setting in settings if setting.definition.key == toggle_key %}<div data-setting-key="{{ setting.definition.key }}">{{ shoutout_switch(setting) }}</div>{% endfor %}
+            </header><p>{{ description }}</p>
+            {% for subgroup_title, subgroup_id, names in subgroups %}
+                <section class="automatic-shoutout-subsection{% if subgroup_id == 'shoutout-whitelist' and not raid_enabled and not interactions_enabled %} is-disabled{% endif %}" id="settings-group-{{ subgroup_id }}">
+                    {% if subgroup_title %}<header class="automatic-shoutout-subsection-heading"><h4>{{ subgroup_title }}</h4></header>{% endif %}
+                    {% if subgroup_id == 'shoutout-triggers' %}<p class="settings-hint">These triggers only affect automatic shoutouts.</p>{% endif %}
+                    <div class="automatic-shoutout-fields">
+                    {% for name in names %}{% for setting in settings if setting.definition.key == 'automatic_shoutouts.' ~ name %}{{ control(setting) }}{% endfor %}{% endfor %}
+                    </div>
+                </section>
+            {% endfor %}
+            </section>
+        {% endfor %}
+        </div>
+</section>

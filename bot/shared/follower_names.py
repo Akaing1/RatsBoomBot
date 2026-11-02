@@ -83,3 +83,41 @@ def ensure_follower_names(bot, channel_id):
             state["retry_at"] = time.monotonic() + 60
             LOGGER.warning("[Followers] Could not preload follower names for %s.", channel_id, exc_info=True)
     state["task"] = asyncio.create_task(load(), name=f"follower-names-{channel_id}")
+
+
+def ensure_following_names(bot, channel_id, request):
+    """Preload followed-channel names once, using the caller's shared request cache."""
+    channel_id = str(channel_id)
+    cache = getattr(bot, '_following_names_cache', None)
+    if cache is None:
+        cache = bot._following_names_cache = {}
+    state = cache.setdefault(channel_id, {'users': {}, 'loaded': False, 'task': None, 'retry_at': 0})
+    if state['loaded'] or (state['task'] and not state['task'].done()) or time.monotonic() < state['retry_at']:
+        return
+
+    async def load():
+        try:
+            cursor = None
+            cursors = set()
+            while True:
+                params = {'user_id': channel_id, 'first': 100}
+                if cursor:
+                    params['after'] = cursor
+                payload = await asyncio.wait_for(request(params), 20)
+                if payload.get('total') and not payload.get('data') and not cursor:
+                    raise ValueError('Twitch did not return followed channels; reconnect with following access.')
+                for row in payload.get('data', []):
+                    state['users'][str(row['broadcaster_id'])] = row
+                cursor = payload.get('pagination', {}).get('cursor')
+                if not cursor:
+                    state['loaded'] = True
+                    break
+                if cursor in cursors:
+                    raise ValueError('Twitch returned a repeated following page.')
+                cursors.add(cursor)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            state['retry_at'] = time.monotonic() + 60
+            LOGGER.warning('[Followers] Could not preload followed-channel names for %s.', channel_id, exc_info=True)
+    state['task'] = asyncio.create_task(load(), name=f'following-names-{channel_id}')

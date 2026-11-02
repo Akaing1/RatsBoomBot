@@ -1,0 +1,32 @@
+{% from "shared/user_identity.html" import user_identity %}
+{% set root = channel_root | default('/channel') %}
+<div data-shoutout-user-list>
+    <form class="protected-user-search" data-protected-user-search data-search-url="{{ root }}/protected-users/search">
+        <label for="{{ id }}-query">Twitch username</label>
+        <div class="protected-user-search-controls"><input id="{{ id }}-query" class="profile-setting-input" name="query" maxlength="25" autocomplete="off" placeholder="Enter username" required><button class="button secondary" type="submit">Search</button></div>
+        <p class="protected-user-search-message" data-protected-search-message aria-live="polite"></p>
+    </form>
+    {% with user_search_add_url=customization_action | default('/channel/customization'), user_search_kind='shoutout-list', user_search_blacklist=false, user_search_local=true %}{% include 'shared/user_search_result.html' %}{% endwith %}
+    <div class="protected-user-list" data-shoutout-list-members data-user-list>
+        {% set resolved = (shoutout_user_rows | default({})).get(name, []) %}
+        {% for login in setting.effective_value.split() | sort %}
+            {% set user = resolved | selectattr('username', 'equalto', login) | first %}
+            <article class="protected-user-row user-list-row" data-user-login="{{ login }}">
+                {{ user_identity(user.user_id if user else '', login, user.display_name if user else login, user.profile_image_url if user else '') }}
+                <button class="button danger" type="button" data-shoutout-list-remove data-user-row-remove>Remove</button>
+            </article>
+        {% else %}<div class="protected-user-empty">No users added.</div>{% endfor %}
+    </div>
+    <template data-shoutout-row-template><article class="protected-user-row user-list-row">
+        {{ user_identity('', '', '') }}<button class="button danger" type="button" data-shoutout-list-remove data-user-row-remove>Remove</button>
+    </article></template>
+    <form method="post" action="{{ customization_action | default('/channel/customization') }}" data-shoutout-list-form{% if name == 'automatic_shoutouts.users' %} data-shoutout-autosave{% endif %}>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="setting_name" value="{{ name }}">
+        <input type="hidden" name="value" value="{{ setting.effective_value }}" data-shoutout-list-value>
+        {% if name == 'automatic_shoutouts.users' %}
+        <input type="hidden" name="action" value="save">
+        {% else %}
+        <div class="toggle-actions profile-setting-actions"><button class="button primary" type="submit" name="action" value="save">Save Changes</button></div>
+        {% endif %}
+    </form>
+</div>

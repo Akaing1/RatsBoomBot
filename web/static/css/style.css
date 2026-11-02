@@ -3083,3 +3083,25 @@ img.chatter-profile-avatar { display: block; }
 .unobtained-pets { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
 .pet-unobtained .chatter-pet-sprite { filter: brightness(0); opacity: .7; animation: none; background-position: 0 0; }
 .pet-unobtained .pet-collection-sprite-slot { background: #333a49; border-radius: 12px; }
+
+/* Reusable user-row removal: slide out a confirmation X; click elsewhere to cancel. */
+.user-row-remove-action { position: relative; display: inline-flex; align-items: stretch; flex-shrink: 0; width: var(--remove-action-width); overflow: hidden; }
+.user-row-remove-action.is-confirming > [data-user-row-remove] { transform: translateX(-100%); opacity: 0; pointer-events: none; }
+.user-list-row .user-row-remove-action > [data-user-row-remove] { flex: 0 0 var(--remove-action-width); width: var(--remove-action-width); transition: transform .2s ease, opacity .2s ease; }
+.user-row-remove-confirm { position: absolute; right: 0; top: 0; bottom: 0; display: grid; place-items: center; flex: 0 0 32px; width: 32px; min-height: 30px; border: 0; border-radius: 6px; padding: 0; background: #ef444426; color: var(--danger, #f87171); line-height: 1; box-sizing: border-box; cursor: pointer; visibility: hidden; transform: translateX(100%); transition: transform .2s ease, visibility 0s .2s; }
+.user-row-remove-action.is-confirming .user-row-remove-confirm { visibility: visible; transform: translateX(0); transition-delay: 0s; }
+.user-row-remove-confirm svg { display: block; width: 16px; height: 16px; }
+.user-row-remove-confirm:is(:hover, :focus-visible) { background: #ef44444d; }
+@media (prefers-reduced-motion: reduce) { .user-row-remove-action, .user-row-remove-confirm, .user-row-remove-action > [data-user-row-remove] { transition: none; } }
+
+/* Shared user lookup results float beneath their search field. */
+.protected-user-results[popover] { position: fixed; inset: auto; margin: 0; box-sizing: border-box; padding: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); overflow: auto; overscroll-behavior: contain; box-shadow: 0 10px 28px #0006; }
+.protected-user-results[popover]:popover-open { display: grid; gap: 6px; }
+.protected-user-results[popover] .protected-user-result { margin: 0; }
+.protected-user-results[popover]::backdrop { background: transparent; }
+
+.user-list-row[hidden], .user-list-pagination[hidden] { display: none !important; }
+.user-list-pagination { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.user-list-pagination span { color: var(--muted); font-size: 12px; }
+.user-list-pagination .button { display: grid; place-items: center; width: 30px; height: 30px; min-height: 30px; padding: 0; border-radius: 50%; }
+.user-list-pagination svg { display: block; }
