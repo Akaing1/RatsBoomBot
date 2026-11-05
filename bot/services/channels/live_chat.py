@@ -124,6 +124,8 @@ class LiveChatService:
         self.db = db
         self.bot = bot
         self.chat_preferences: dict[str, dict] = {}
+        self.shared_chat_rosters: dict[str, tuple[float, list[dict]]] = {}
+        self._shared_chat_roster_locks: dict[str, asyncio.Lock] = {}
         self._preferences_lock = asyncio.Lock()
         self.connections: dict[str, YouTubeConnection] = {}
         self.youtube_statuses: dict[str, tuple[str, str]] = {}
@@ -594,6 +596,34 @@ class LiveChatService:
             })
 
         return emotes
+
+    async def shared_chat_participants(self, broadcaster_id: str):
+        """Cache Twitch's session roster across dashboard and dock connections."""
+        async with self._shared_chat_roster_locks.setdefault(broadcaster_id, asyncio.Lock()):
+            now = time.monotonic()
+            cached_at, previous = self.shared_chat_rosters.get(broadcaster_id, (0, []))
+            if now - cached_at < 30:
+                return previous
+            token = (getattr(self.bot, "tokens", {}).get(broadcaster_id) or {}).get("token")
+            if not token or self.client is None:
+                return previous
+            try:
+                async with asyncio.timeout(3):
+                    payload = await self._fetch_twitch_emote_page(
+                        str(token), "/shared_chat/session", {"broadcaster_id": broadcaster_id})
+                    sessions = payload.get("data", [])
+                    ids = {str(entry["broadcaster_id"]) for entry in sessions[0].get("participants", [])} if sessions else set()
+                    ids.discard(broadcaster_id)
+                    names = {entry["id"]: entry["name"] for entry in previous}
+                    missing = ids - names.keys()
+                    if missing:
+                        names.update(await self._fetch_twitch_owner_names(str(token), missing))
+                    roster = [{"id": key, "name": names.get(key, key)} for key in sorted(ids)]
+            except (httpx.HTTPError, TimeoutError, RuntimeError):
+                # A transient failure must not remove the user's channel toggles.
+                roster = previous
+            self.shared_chat_rosters[broadcaster_id] = (time.monotonic(), roster)
+            return roster
 
     async def _fetch_twitch_emote_page(self, access_token: str, path: str, params: dict[str, object]) -> dict:
         if self.client is None:

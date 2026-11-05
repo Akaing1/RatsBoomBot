@@ -93,3 +93,54 @@ def test_preview_preserves_shared_source_and_uses_source_roles():
     assert rendered['source_channel_name'] == 'Other Streamer'
     assert rendered['source_message_id'] == 'original'
     assert rendered['accent'] == 'vip'
+
+@pytest.mark.parametrize('channels', [[], {'local': 1}, {'bad': True}, {'123': 'yes'}, {'١٢٣': True}])
+def test_invalid_channel_preferences_are_rejected(channels):
+    with pytest.raises(ValueError):
+        normalize_chat_preferences({'connectedPlatforms': ['twitch'], 'users': [], 'types': [], 'channels': channels})
+
+
+@pytest.mark.asyncio
+async def test_roster_includes_quiet_participants_caches_names_and_clears_on_session_end(monkeypatch):
+    import asyncio
+    import httpx
+    import bot.services.channels.live_chat as module
+    clock = [100]
+    monkeypatch.setattr(module.time, 'monotonic', lambda: clock[0])
+    live = LiveChatService(None, bot=SimpleNamespace(tokens={'1': {'token': 'test'}}))
+    live.client = Mock()
+    live._fetch_twitch_emote_page = AsyncMock(return_value={'data': [{'participants': [
+        {'broadcaster_id': '1'}, {'broadcaster_id': '2'}, {'broadcaster_id': '3'}]}]})
+    live._fetch_twitch_owner_names = AsyncMock(return_value={'2': 'Rat', '3': 'Friend'})
+    expected = [{'id': '2', 'name': 'Rat'}, {'id': '3', 'name': 'Friend'}]
+    results = await asyncio.gather(live.shared_chat_participants('1'), live.shared_chat_participants('1'))
+    assert results == [expected, expected]
+    assert live._fetch_twitch_emote_page.await_count == 1
+    clock[0] += 31
+    assert await live.shared_chat_participants('1') == expected
+    assert live._fetch_twitch_owner_names.await_count == 1
+    clock[0] += 31
+    live._fetch_twitch_emote_page.side_effect = httpx.ConnectError('offline')
+    assert await live.shared_chat_participants('1') == expected
+    clock[0] += 31
+    live._fetch_twitch_emote_page.side_effect = None
+    live._fetch_twitch_emote_page.return_value = {'data': []}
+    assert await live.shared_chat_participants('1') == []
+
+
+@pytest.mark.asyncio
+async def test_roster_is_sent_before_chat_history_and_changes_on_open_stream(monkeypatch):
+    import web.shared.live_chat as module
+    clock = [100]
+    monkeypatch.setattr(module.time, 'monotonic', lambda: clock[0])
+    live = LiveChatService(None)
+    live.shared_chat_participants = AsyncMock(side_effect=[[{'id': '2', 'name': 'Rat'}], []])
+    request = SimpleNamespace(is_disconnected=AsyncMock(return_value=False))
+    events = module.stream_chat_events(request, live, '1', 'both')
+    assert 'retry:' in await anext(events)
+    assert '"name": "Rat"' in await anext(events)
+    assert 'history-complete' in await anext(events)
+    clock[0] += 31
+    assert 'chat-participants\ndata: []' in await anext(events)
+    await events.aclose()
+    assert '1' not in live.subscribers

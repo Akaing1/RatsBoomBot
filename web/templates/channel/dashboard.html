@@ -191,9 +191,13 @@
                             {% endif %}
                         </div>
                         {% endfor %}
-                        <label class="chat-filter-row">Chat source
-                            <select data-chat-filter-origin aria-label="Chat source"><option value="all">All channels</option><option value="local">This channel</option><option value="shared">Shared Chat</option></select>
-                        </label>
+                        <div class="chat-filter-group" role="group" aria-label="Shared Chat">
+                            <div class="chat-filter-options-header chat-filter-section-header">
+                                <span class="chat-filter-group-title">Shared Chat</span>
+                                <button type="button" class="chat-filter-clear" data-chat-filter-clear="channels" aria-label="Reset shared chat filters to show everything">Clear</button>
+                            </div>
+                            <div data-chat-filter-channels></div>
+                        </div>
                         <p class="chat-filter-hint">Left-click to toggle. Right-click to solo.</p><p data-chat-filter-sync-status hidden role="status" aria-live="polite"></p>
                     </div>
                 </div>

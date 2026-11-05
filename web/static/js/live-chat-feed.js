@@ -234,6 +234,7 @@
         row.dataset.chatUser = category.user;
         row.dataset.chatType = category.type;
         row.dataset.chatOrigin = message.is_shared ? 'shared' : 'local';
+        row.dataset.chatChannel = category.channel || 'local';
         row.hidden = feed.filters ? !feed.filters.allows(category) : false;
         if (message.deleted) row.classList.add("is-deleted");
         if (message.mentioned) row.classList.add("is-mentioned");
@@ -500,7 +501,7 @@
             const anchor = followNewest ? null : rows.find(row => !row.hidden && row.getBoundingClientRect().bottom > viewportTop);
             const anchorTop = anchor?.getBoundingClientRect().top;
             rows.forEach(row => {
-                row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local'});
+                row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'});
             });
             feed.merger?.refresh();
             if (followNewest) scrollToNewest(feed);
@@ -511,7 +512,7 @@
             ? window.dashboardChatFilters?.attachMirror(refreshFilters)
             : window.dashboardChatFilters?.attach(element, refreshFilters);
         feed.merger = element.classList.contains("dashboard-chat-feed") ? window.createChatMessageMerger?.({
-            allows: row => !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local'}),
+            allows: row => !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'}),
             onChange: () => { if (feed.followNewest) scrollToNewest(feed); }
         }) : null;
         if (feed.merger) {
@@ -566,6 +567,9 @@
             document.addEventListener("dashboard-chat-send-error", onSendError);
             window.addEventListener("beforeunload", () => document.removeEventListener("dashboard-chat-send-error", onSendError), {once: true});
         }
+        source.addEventListener("chat-participants", event => {
+            try { feed.filters?.participants?.(JSON.parse(event.data)); } catch (_) {}
+        });
         source.addEventListener("chat-preferences", event => {
             if (element.dataset.mirrorChatPreferences !== undefined) {
                 feed.filters?.update(JSON.parse(event.data));
