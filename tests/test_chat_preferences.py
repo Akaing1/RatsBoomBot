@@ -15,7 +15,7 @@ from web.channel.routers import dashboard
 from web.public import routers as public
 from web.shared.live_chat import stream_chat_events
 
-PREFERENCES = {'version': 4, 'connectedPlatforms': ['twitch', 'youtube'],
+PREFERENCES = {'version': 5, 'origin': 'all', 'connectedPlatforms': ['twitch', 'youtube'],
                'users': ['mods', 'youtube_members'], 'types': ['messages']}
 
 

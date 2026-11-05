@@ -233,6 +233,7 @@
         const category = window.dashboardChatFilters?.category(message) || {user: "non_subs", type: "messages"};
         row.dataset.chatUser = category.user;
         row.dataset.chatType = category.type;
+        row.dataset.chatOrigin = message.is_shared ? 'shared' : 'local';
         row.hidden = feed.filters ? !feed.filters.allows(category) : false;
         if (message.deleted) row.classList.add("is-deleted");
         if (message.mentioned) row.classList.add("is-mentioned");
@@ -309,6 +310,11 @@
             body.textContent = message.message || "";
         }
 
+        if (message.is_shared) {
+            const source = makeElement("span", "live-chat-source", `From ${message.source_channel_name || message.source_channel_login || message.source_channel_id || 'another channel'}`);
+            source.title = "Shared Chat source channel";
+            heading.appendChild(source);
+        }
         content.appendChild(heading);
         if (message.notice) {
             if (message.notice_type) row.dataset.noticeType = message.notice_type;
@@ -494,7 +500,7 @@
             const anchor = followNewest ? null : rows.find(row => !row.hidden && row.getBoundingClientRect().bottom > viewportTop);
             const anchorTop = anchor?.getBoundingClientRect().top;
             rows.forEach(row => {
-                row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType});
+                row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local'});
             });
             feed.merger?.refresh();
             if (followNewest) scrollToNewest(feed);
@@ -505,7 +511,7 @@
             ? window.dashboardChatFilters?.attachMirror(refreshFilters)
             : window.dashboardChatFilters?.attach(element, refreshFilters);
         feed.merger = element.classList.contains("dashboard-chat-feed") ? window.createChatMessageMerger?.({
-            allows: row => !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType}),
+            allows: row => !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local'}),
             onChange: () => { if (feed.followNewest) scrollToNewest(feed); }
         }) : null;
         if (feed.merger) {

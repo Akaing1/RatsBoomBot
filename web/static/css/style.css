@@ -3105,3 +3105,5 @@ img.chatter-profile-avatar { display: block; }
 .user-list-pagination span { color: var(--muted); font-size: 12px; }
 .user-list-pagination .button { display: grid; place-items: center; width: 30px; height: 30px; min-height: 30px; padding: 0; border-radius: 50%; }
 .user-list-pagination svg { display: block; }
+
+.live-chat-source { padding: 1px 5px; border-radius: 4px; background: rgba(139,92,246,.18); color: #c4b5fd; font-size: 10px; overflow-wrap: anywhere; }

@@ -26,9 +26,10 @@ function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], 
     const documentState = {};
     const button = {getBoundingClientRect: () => ({right: 400, bottom: 400}), classList: {toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); }, contains: name => classes.has(name)}, setAttribute() {}, focus() { this.focused = true; documentState.activeElement = this; }, blur() { this.focused = false; documentState.activeElement = null; },
         addEventListener: (event, handler) => { buttonHandlers[event] = handler; }};
+    const originInput = input({}); originInput.value = 'all';
     const syncStatus = {textContent: ''};
     const control = {dataset: {channelId: 'test', ...remote.dataset},
-        querySelector: selector => selector.includes('sync-status') ? syncStatus : selector.includes('toggle') ? button : selector.includes('count') ? countLabel : options,
+        querySelector: selector => selector.includes('filter-origin') ? originInput : selector.includes('sync-status') ? syncStatus : selector.includes('toggle') ? button : selector.includes('count') ? countLabel : options,
         querySelectorAll: selector => selector.includes('connection') ? connectionBadges : selector.includes('group-toggle') ? groups : selector.includes('platform') ? platformInputs : selector.includes('clear') ? clears : inputs,
         addEventListener: (event, handler) => { handlers[event] = handler; },
         contains: target => [button, ...inputs, ...groups, ...platformInputs, ...clears].includes(target)};
@@ -46,7 +47,7 @@ function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], 
         const item = platformInputs.find(item => item.dataset.chatFilterPlatform === key);
         item.checked = checked; item.handlers.change();
     };
-    return {api, filter, syncStatus, inputs, groups, platformInputs, platform, connectionBadges, timers, clears, countLabel, option, change, clear, solo, handlers, documentHandlers, buttonHandlers, options, button, changes};
+    return {api, filter, originInput, syncStatus, inputs, groups, platformInputs, platform, connectionBadges, timers, clears, countLabel, option, change, clear, solo, handlers, documentHandlers, buttonHandlers, options, button, changes};
 }
 
 test('connected badges fade after 1.5 seconds on first open only; disconnected badges remain visible', () => {
@@ -344,7 +345,7 @@ test('switching carousel cards dismisses the dropdown', () => {
 });
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
-const prefs = (users = ['mods'], types = ['messages']) => ({version: 4, connectedPlatforms: ['twitch', 'youtube'], users, types});
+const prefs = (users = ['mods'], types = ['messages']) => ({version: 5, origin: 'all', connectedPlatforms: ['twitch', 'youtube'], users, types});
 const response = preferences => ({ok: true, json: async () => ({preferences})});
 const dataset = {preferencesUrl: '/channel/api/chat/preferences', csrfToken: 'valid'};
 
@@ -438,4 +439,26 @@ test('OBS mirror updates both filter axes and restores all filters', () => {
     mirror.update(null);
     assert.ok(mirror.allows(api.category({kind: 'command'})));
     assert.equal(updates, 3);
+});
+
+test('source filter persists independently, resets with Clear all, and mirrors to OBS', () => {
+    const storage = new Map(), ui = setup(storage);
+    ui.originInput.value = 'shared'; ui.originInput.handlers.change();
+    const local = ui.api.category({platform: 'twitch'});
+    const shared = ui.api.category({platform: 'twitch', is_shared: true});
+    assert.equal(ui.filter.allows(local), false);
+    assert.equal(ui.filter.allows(shared), true);
+    const restored = setup(storage);
+    assert.equal(restored.originInput.value, 'shared');
+    assert.equal(restored.filter.allows(shared), true);
+    const mirror = ui.api.attachMirror(() => {});
+    mirror.update(JSON.parse(storage.get('ratsboombot:chat-filters:test')));
+    assert.equal(mirror.allows(local), false);
+    assert.equal(mirror.allows(shared), true);
+    ui.clear('all');
+    assert.equal(ui.originInput.value, 'all');
+    assert.equal(ui.filter.allows(local), true);
+    ui.originInput.value = 'local'; ui.originInput.handlers.change();
+    assert.equal(ui.filter.allows(ui.api.category({platform: 'youtube'})), true);
+    assert.equal(ui.filter.allows(shared), false);
 });

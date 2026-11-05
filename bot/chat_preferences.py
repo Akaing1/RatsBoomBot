@@ -8,9 +8,12 @@ MESSAGE_TYPES = ("commands", "redeems", "messages")
 
 
 def normalize_chat_preferences(value):
-    if not isinstance(value, dict) or set(value) - {"version", "connectedPlatforms", "users", "types"}:
+    if not isinstance(value, dict) or set(value) - {"version", "connectedPlatforms", "users", "types", "origin"}:
         raise ValueError("Invalid chat preferences.")
-    result = {"version": 4}
+    origin = value.get("origin", "all")
+    if origin not in ("all", "local", "shared"):
+        raise ValueError("Invalid chat origin.")
+    result = {"version": 5, "origin": origin}
     for axis, allowed in (("connectedPlatforms", tuple(PLATFORM_USERS)),
                           ("users", sum(PLATFORM_USERS.values(), ())), ("types", MESSAGE_TYPES)):
         keys = value.get(axis)

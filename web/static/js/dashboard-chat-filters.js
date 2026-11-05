@@ -28,7 +28,7 @@
             : badges.has('vip') || message.accent === 'vip' ? 'vips'
             : badges.has('subscriber') || badges.has('founder') || message.accent === 'subscriber' ? 'subs'
             : 'non_subs';
-        return {user, type};
+        return {user, type, origin: message.is_shared ? "shared" : "local"};
     }
 
     function attach(element, onChange) {
@@ -43,11 +43,14 @@
         const connectedPlatforms = platformToggles.filter(input => !input.disabled)
             .map(input => input.dataset.chatFilterPlatform);
         const axes = {users: connectedPlatforms.flatMap(platform => platforms[platform]), types: messageTypes};
+        const originInput = control.querySelector('[data-chat-filter-origin]');
+        let origin = 'all';
         let connectionBadgesShown = false;
         const clearButtons = [...control.querySelectorAll('[data-chat-filter-clear]')];
         const storageKey = `ratsboombot:chat-filters:${control.dataset.channelId}${window.dashboardChatDebug?.active ? ':test' : ''}`;
         const enabled = {users: new Set(axes.users), types: new Set(axes.types)};
         function restore(saved) {
+            origin = ['all', 'local', 'shared'].includes(saved?.origin) ? saved.origin : 'all';
             // Migrate the earlier flat selection without losing saved preferences.
             if (Array.isArray(saved)) {
                 const renamed = saved.map(key => key === 'normal' ? 'non_subs' : key === 'other' ? 'messages' : key);
@@ -110,6 +113,7 @@
         }
 
         function sync() {
+            if (originInput) originInput.value = origin;
             const count = enabled.users.size + enabled.types.size;
             if (countLabel) countLabel.textContent = `| ${count}`;
             button.classList.toggle('has-filter-count', count < axes.users.length + axes.types.length);
@@ -130,12 +134,12 @@
             clearButtons.forEach(clear => {
                 const axis = clear.dataset.chatFilterClear;
                 clear.hidden = axis === 'all'
-                    ? enabled.users.size === axes.users.length && enabled.types.size === axes.types.length
+                    ? enabled.users.size === axes.users.length && enabled.types.size === axes.types.length && origin === 'all'
                     : enabled[axis].size === axes[axis].length;
             });
-            const filtered = Object.keys(axes).some(axis => enabled[axis].size < axes[axis].length);
+            const filtered = origin !== 'all' || Object.keys(axes).some(axis => enabled[axis].size < axes[axis].length);
             button.classList.toggle('is-filtered', filtered);
-            button.title = filtered ? 'Filter chat (user and message-type filters active)' : 'Filter chat (all messages shown)';
+            button.title = filtered ? 'Filter chat (filters active)' : 'Filter chat (all messages shown)';
         }
         function close(returnFocus = false) {
             options.hidePopover?.();
@@ -167,7 +171,7 @@
         });
         document.addEventListener('click', event => { if (!control.contains(event.target)) close(); });
         document.addEventListener('dashboard-carousel-card-changed', () => close());
-        const snapshot = () => ({version: 4, connectedPlatforms, users: [...enabled.users], types: [...enabled.types]});
+        const snapshot = () => ({version: 5, origin, connectedPlatforms, users: [...enabled.users], types: [...enabled.types]});
         const syncUrl = !window.dashboardChatDebug?.active && control.dataset.preferencesUrl;
         const syncStatus = control.querySelector('[data-chat-filter-sync-status]');
         let remoteReady = false, loading = false, dirty = false, saving = false, pending = null;
@@ -225,6 +229,7 @@
         }
         clearButtons.forEach(clear => clear.addEventListener('click', () => {
             const target = clear.dataset.chatFilterClear;
+            if (target === 'all') origin = 'all';
             const targets = target === 'all' ? Object.keys(axes) : [target];
             targets.forEach(axis => { enabled[axis] = new Set(axes[axis]); });
             applySelection();
@@ -254,6 +259,7 @@
             });
             applySelection();
         }));
+        originInput?.addEventListener('change', () => { origin = originInput.value; applySelection(); });
         inputs.forEach(input => input.addEventListener('change', () => {
             if (input.disabled) return;
             const selection = enabled[input.dataset.chatFilterAxis];
@@ -264,15 +270,16 @@
         sync();
         persistSelection();
         if (syncUrl) Promise.resolve().then(loadRemote);
-        return {allows: ({user, type}) =>
-            enabled.users.has(user) && enabled.types.has(type)};
+        return {allows: ({user, type, origin: messageOrigin = 'local'}) =>
+            (origin === 'all' || origin === messageOrigin) && enabled.users.has(user) && enabled.types.has(type)};
     }
     function attachMirror(onChange) {
         let enabled = null;
         return {
-            allows: ({user, type}) => !enabled || enabled.users.includes(user) && enabled.types.includes(type),
+            allows: ({user, type, origin = 'local'}) => !enabled || (enabled.origin === 'all' || enabled.origin === origin) && enabled.users.includes(user) && enabled.types.includes(type),
             update(saved) {
                 enabled = saved ? {
+                    origin: saved.origin || 'all',
                     users: saved.users?.length ? saved.users : (saved.connectedPlatforms || Object.keys(platforms)).flatMap(key => platforms[key] || []),
                     types: saved.types?.length ? saved.types : messageTypes
                 } : null;

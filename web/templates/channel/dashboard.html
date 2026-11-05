@@ -191,6 +191,9 @@
                             {% endif %}
                         </div>
                         {% endfor %}
+                        <label class="chat-filter-row">Chat source
+                            <select data-chat-filter-origin aria-label="Chat source"><option value="all">All channels</option><option value="local">This channel</option><option value="shared">Shared Chat</option></select>
+                        </label>
                         <p class="chat-filter-hint">Left-click to toggle. Right-click to solo.</p><p data-chat-filter-sync-status hidden role="status" aria-live="polite"></p>
                     </div>
                 </div>
