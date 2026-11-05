@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project is privately operated for Ninjakaing and a growing group of stream communities. Core broadcaster onboarding is self-service on the hosted website; specialized integrations and premium features may require maintainer assistance.
 
-Current application version: **17.0.6** (see [`config/version.py`](config/version.py)). Active development targets `release/17.0.0`; the branch name denotes the next release milestone.
+Current application version: **17.1.0** (see [`config/version.py`](config/version.py)). Active development targets `release/17.0.0`; the branch name denotes the next release milestone.
 
 [Website](https://ratsboombot.com) · [My account](https://ratsboombot.com/me) · [Patch notes](https://ratsboombot.com/patch-notes) · [Local development](docs/development.md)
 
@@ -215,8 +215,8 @@ The right sidebar contains the Mod Bar and Communities, with the five most recen
 
 Settings combines feature controls and customization in General, Chat, Stream Events, Timers, Connections, Loyalty Points, Viewer Queue, and Pets and Boss Hunt. Games appears for enabled game integrations. Categories and the search finder sit on the right; expandable inputs keep related switches and messages together. Command groups include usage descriptions.
 
-- General contains command controls, YouTube chat above Protected Users, game switches, and OBS browser sources at the bottom.
-- Stream Events groups community and raid messages, Follow Raids By Default, shoutouts, and individual redeem controls.
+- General contains command controls, YouTube chat above Protected Users, game switches, and one OBS custom dock URL at the bottom. Add it in OBS under Docks → Custom Browser Docks. It uses the dashboard's chat appearance and saved user/platform/message-type filters; changes update an open dock automatically. Existing URLs, including their old view parameters, follow these same preferences. Regenerating the URL revokes previous URLs and open connections.
+- Stream Events groups community and raid messages, Follow Raids By Default, ad announcements, and individual redeem controls. Ad announcements supports custom message text with `{time}` (minutes:seconds), a warning lead time of 5–1,800 seconds, normal message or announcement delivery, and announcement color. Existing defaults stay at 120 seconds and purple announcements; blank text resets to the channel's default. Countdown checks run every five seconds while Twitch schedules are fetched at most every 30 seconds per live channel.
 - Timers provides a creation form and an expandable Configure menu per saved timer. Each entry has an enabled state; colors appear only for announcements.
 - Connections stores supported social URLs, including TikTok, X, Ko-Fi, and VGen. These saved URLs do not add new social chat subcommands.
 - Pets and Boss Hunt have separate control panels.

@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 
 from bot.command_registry import build_enabled_command_help_groups
 from bot.profiles import FeatureName, get_active_profile
-from bot.services.channels.live_chat import normalize_chat_view
 from rpg_minigame import CRAFTING_RECIPES, OVERCLOCKED_WEAPON_TYPES, SELLABLE_WEAPON_TYPES
 from config.settings import settings
 from storage.patch_notes_repository import get_note, list_notes
@@ -39,7 +38,7 @@ async def chat_widget(request: Request, token: str, view: str = "both"):
         name="public/chat_widget.html",
         context={
             "token": token,
-            "view": normalize_chat_view(view),
+            "view": "chat",
             "broadcaster": broadcaster
         },
         headers={"Cache-Control": "no-store"}
@@ -58,8 +57,13 @@ async def chat_widget_events(request: Request, token: str, view: str = "both"):
     if broadcaster_id is None:
         return JSONResponse({"detail": "Widget not found."}, status_code=404)
 
+    async def check_widget_access():
+        if runtime_bot.services.live_chat.resolve_widget_token(token) != broadcaster_id:
+            raise PermissionError("Dock URL revoked.")
+    request.state.check_channel_access = check_widget_access
+
     return StreamingResponse(
-        stream_chat_events(request, runtime_bot.services.live_chat, broadcaster_id, view),
+        stream_chat_events(request, runtime_bot.services.live_chat, broadcaster_id, "both", mirror_preferences=True),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Access-Control-Allow-Origin": "*"}
     )

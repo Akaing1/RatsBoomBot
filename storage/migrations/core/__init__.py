@@ -46,6 +46,7 @@ from .v073_moderator_authorization import migrate as migrate_073
 from .v072_moderator_dashboard import migrate as migrate_072
 
 from .v076_release_16_draft import migrate as migrate_076
+from .v077_chat_preferences import migrate as migrate_077
 
 MIGRATIONS = (
     Migration(1, "initial_schema", migrate_001),
@@ -85,4 +86,5 @@ MIGRATIONS = (
     Migration(73, "moderator_authorization", migrate_073),
     Migration(74, "retire_view_role", migrate_074),
     Migration(76, "release_16_draft", migrate_076),
+    Migration(77, "chat_preferences", migrate_077),
 )

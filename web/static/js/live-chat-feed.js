@@ -487,7 +487,7 @@
                 connectionStatus._connectionFadeTimer = connectionFadeTimer;
             }
         }
-        feed.filters = window.dashboardChatFilters?.attach(element, () => {
+        const refreshFilters = () => {
             const followNewest = feed.followNewest;
             const rows = [...element.querySelectorAll(".live-chat-message")];
             const viewportTop = followNewest ? null : element.getBoundingClientRect().top;
@@ -500,7 +500,10 @@
             if (followNewest) scrollToNewest(feed);
             else if (anchor && !anchor.hidden) element.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
             updateJumpButton(feed);
-        });
+        };
+        feed.filters = element.dataset.mirrorChatPreferences !== undefined
+            ? window.dashboardChatFilters?.attachMirror(refreshFilters)
+            : window.dashboardChatFilters?.attach(element, refreshFilters);
         feed.merger = element.classList.contains("dashboard-chat-feed") ? window.createChatMessageMerger?.({
             allows: row => !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType}),
             onChange: () => { if (feed.followNewest) scrollToNewest(feed); }
@@ -543,7 +546,7 @@
         const source = new EventSource(element.dataset.streamUrl);
         source.addEventListener('access-revoked', () => {
             source.close();
-            element.replaceChildren(makeElement('p', 'live-chat-status', 'Channel access ended. Return to My account.'));
+            element.replaceChildren(makeElement('p', 'live-chat-status', element.dataset.mirrorChatPreferences !== undefined ? 'This OBS dock URL has expired. Copy the current URL from Settings.' : 'Channel access ended. Return to My account.'));
         });
         if (element.classList.contains("dashboard-chat-feed")) {
             const removeTestNotices = attachTestNotices(feed);
@@ -557,6 +560,11 @@
             document.addEventListener("dashboard-chat-send-error", onSendError);
             window.addEventListener("beforeunload", () => document.removeEventListener("dashboard-chat-send-error", onSendError), {once: true});
         }
+        source.addEventListener("chat-preferences", event => {
+            if (element.dataset.mirrorChatPreferences !== undefined) {
+                feed.filters?.update(JSON.parse(event.data));
+            }
+        });
         source.onopen = () => showConnectionStatus(true);
         source.onerror = () => showConnectionStatus(false);
         source.addEventListener("history-complete", () => { feed.historyComplete = true; });

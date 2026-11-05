@@ -131,3 +131,53 @@ async def test_ad_warning_falls_back_to_chat_message_when_announcement_fails() -
 
     assert len(broadcaster.messages) == 1
     assert "Ads starting in ~" in broadcaster.messages[0]
+
+
+@pytest.mark.asyncio
+async def test_custom_warning_time_normal_message_and_duplicate_suppression():
+    broadcaster = FakeBroadcaster(datetime.now(UTC) + timedelta(seconds=300))
+    from unittest.mock import AsyncMock
+    broadcasters = SimpleNamespace(get_live_broadcasters=AsyncMock(return_value={"channel-1": "channel"}))
+    service = AdAnnouncementService(FakeBot(broadcaster), broadcasters)
+    activate_profile('channel-1', ChannelProfile(channel_name='channel', ad_warning_seconds=360,
+        ad_message_type='message', ad_announcement_message='Break in {time}.'))
+    await service.check_ad_schedules()
+    await service.check_ad_schedules()
+    assert len(broadcaster.messages) == 1
+    assert broadcaster.messages[0].startswith('Break in 4:')
+    assert broadcaster.announcements == []
+    # Frequent local countdown checks do not increase Helix schedule requests.
+    assert broadcaster.schedule_fetches == 1
+    broadcasters.get_live_broadcasters.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_short_warning_and_custom_color():
+    broadcaster = FakeBroadcaster(datetime.now(UTC) + timedelta(seconds=110))
+    service = AdAnnouncementService(FakeBot(broadcaster), FakeBroadcasterService())
+    activate_profile('channel-1', ChannelProfile(channel_name='channel', ad_warning_seconds=30,
+        ad_announcement_color='orange'))
+    await service.check_ad_schedules()
+    assert broadcaster.announcements == []
+    broadcaster.next_ad_at = datetime.now(UTC) + timedelta(seconds=20)
+    service._schedule_cache.clear()
+    await service.check_ad_schedules()
+    assert broadcaster.announcements[0]['color'] == 'orange'
+
+
+@pytest.mark.asyncio
+async def test_failed_chat_delivery_can_retry_and_invalid_profile_template_does_not_crash():
+    broadcaster = FakeBroadcaster(datetime.now(UTC) + timedelta(seconds=110))
+    service = AdAnnouncementService(FakeBot(broadcaster), FakeBroadcasterService())
+    activate_profile('channel-1', ChannelProfile(channel_name='channel', ad_message_type='message',
+        ad_announcement_message='{time.no_such_attribute}'))
+    original = broadcaster.send_message
+    async def fail(**kwargs):
+        raise RuntimeError('temporary failure')
+    broadcaster.send_message = fail
+    await service.check_ad_schedules()
+    assert not service.warned_ads
+    broadcaster.send_message = original
+    await service.check_ad_schedules()
+    assert len(broadcaster.messages) == 1
+    assert service.warned_ads
