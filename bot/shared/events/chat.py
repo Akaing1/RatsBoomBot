@@ -5,6 +5,7 @@ from twitchio.ext import commands
 from bot.shared.events.community import award_cheer_points, award_sound_alert_points
 from bot.services.stream.automatic_shoutouts import automatic_shoutout
 from config.settings import settings
+from bot.shared_chat import is_shared_message
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -22,6 +23,8 @@ class ChatEvents(commands.Component):
             self.bot.services.live_chat.publish_twitch_notification(payload)
         except Exception:
             LOGGER.exception("[Live Chat] Failed to publish Twitch chat notification.")
+        if is_shared_message(payload):
+            return
         kind = str(getattr(payload, "notice_type", ""))
         chatter = getattr(payload, "chatter", None)
         if kind == "watch_streak" or (kind == "resub" and getattr(getattr(payload, "resub", None), "streak_months", 0)):
@@ -47,6 +50,15 @@ class ChatEvents(commands.Component):
             LOGGER.warning(
                 "[Chat] Received chat message before services were initialized."
             )
+            return
+
+        # Relayed messages belong in the feed, but must not participate in this
+        # channel's rewards, activity counters, timers, moderation or shoutouts.
+        if is_shared_message(payload):
+            try:
+                services.live_chat.publish_twitch(payload)
+            except Exception:
+                LOGGER.exception("[Live Chat] Failed to publish shared message in %s.", broadcaster_id)
             return
 
         try:

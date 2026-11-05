@@ -14,6 +14,7 @@ import httpx
 import grpc
 
 from bot.profiles import get_active_profile
+from bot.shared_chat import is_shared_message
 from bot.services.channels.chat_notices import notification_details
 from bot.services.channels import youtube_live_chat_pb2
 from config.settings import settings
@@ -71,6 +72,11 @@ class UnifiedChatMessage:
     notice: str = ""
     notice_type: str = ""
     notice_label: str = ""
+    is_shared: bool = False
+    source_channel_id: str = ""
+    source_channel_login: str = ""
+    source_channel_name: str = ""
+    source_message_id: str = ""
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
@@ -245,7 +251,11 @@ class LiveChatService:
         if getattr(payload, "anonymous", False):
             username = display_name = "Anonymous"
         self._ensure_twitch_badge_loader(broadcaster_id)
-        badges = self._twitch_message_badges(broadcaster_id, payload)
+        source = getattr(payload, "source_broadcaster", None)
+        shared = is_shared_message(payload)
+        source_id = str(source.id) if source else broadcaster_id
+        self._ensure_twitch_badge_loader(source_id)
+        badges = self._twitch_message_badges(source_id, payload)
 
         timestamp = getattr(payload, "timestamp", None)
         timestamp_value = timestamp.isoformat() if hasattr(timestamp, "isoformat") else datetime.now(UTC).isoformat()
@@ -253,6 +263,11 @@ class LiveChatService:
         color = getattr(payload, "color", None)
         message = UnifiedChatMessage(
             id=f"twitch:{message_id}",
+            is_shared=shared,
+            source_channel_id=source_id,
+            source_channel_login=str(getattr(source or payload.broadcaster, "name", "") or ""),
+            source_channel_name=str(getattr(source or payload.broadcaster, "display_name", "") or getattr(source or payload.broadcaster, "name", "") or source_id),
+            source_message_id=str(getattr(payload, "source_id", "") or message_id),
             platform="twitch",
             kind="chat" if notice else "command" if self._consume_command_response(broadcaster_id, message_id) else self._classify(broadcaster_id, message_text),
             username=username,
@@ -350,7 +365,7 @@ class LiveChatService:
         catalog = self.twitch_badge_cache.get(broadcaster_id, (0.0, {}))[1]
         badges = []
 
-        for badge in getattr(payload, "badges", ()) or ():
+        for badge in (getattr(payload, "source_badges", ()) if is_shared_message(payload) else getattr(payload, "badges", ())) or ():
             set_id = str(getattr(badge, "set_id", "") or "")
             version = str(getattr(badge, "id", "") or "")
 
@@ -362,7 +377,7 @@ class LiveChatService:
                 ChatBadge(set_id, self._badge_label(set_id))
             ))
 
-        if badges:
+        if badges or is_shared_message(payload):
             return tuple(badges)
 
         chatter = payload.chatter
@@ -385,6 +400,12 @@ class LiveChatService:
     @staticmethod
     def _twitch_message_accent(payload) -> str | None:
         chatter = payload.chatter
+        if is_shared_message(payload):
+            badges = {str(getattr(badge, "set_id", "")) for badge in (getattr(payload, "source_badges", ()) or ())}
+            for badge, accent in (("broadcaster", "broadcaster"), ("staff", "staff"), ("moderator", "moderator"), ("vip", "vip"), ("artist-badge", "artist"), ("subscriber", "subscriber"), ("founder", "subscriber")):
+                if badge in badges:
+                    return accent
+            return None
         message_type = str(getattr(payload, "type", "") or "")
         badge_names = {
             str(getattr(badge, "set_id", "") or "")

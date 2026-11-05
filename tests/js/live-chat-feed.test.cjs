@@ -259,3 +259,15 @@ test('private send failures are bot messages for the affected platform and obey 
     vm.runInContext(`(() => {${callback}})()`, context);
     assert.deepEqual(rows.map(row => row.hidden), [true, false]);
 });
+
+test('shared messages display a text-safe source label and retain the destination message ID', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'destination', platform: 'twitch', kind: 'chat',
+        username: 'viewer', message: 'Hello', is_shared: true, source_channel_name: '<img src=x onerror=bad()>',
+        source_channel_id: 'other', source_message_id: 'original'}});
+    const row = app.element.children[0];
+    assert.equal(row.dataset.messageId, 'destination');
+    assert.equal(row.dataset.chatOrigin, 'shared');
+    assert.equal(row.querySelector('.live-chat-source').textContent, 'From <img src=x onerror=bad()>');
+    assert.equal(row.querySelectorAll('img').length, 0);
+});
