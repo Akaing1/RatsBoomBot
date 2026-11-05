@@ -2216,9 +2216,9 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '{% include "shared/youtube_settings.html" %}' in customization
     assert '{% include "shared/widget_settings.html" %}' in youtube_settings
     assert "Connect YouTube Channel" in youtube_settings
-    assert "('chat', 'Chat'" in widget_settings
-    assert "('commands', 'Commands'" in widget_settings
-    assert "('both', 'Both'" in widget_settings
+    assert 'data-widget-url="dock"' in widget_settings
+    assert "Custom Browser Docks" in widget_settings
+    assert "follows your Combined Chat filters" in widget_settings
     assert ".live-chat-feed::-webkit-scrollbar" in dashboard_styles
     assert "#viewer-queue-content::-webkit-scrollbar" in dashboard_styles
     assert "padding-right: 8px; overflow-y: auto; scrollbar-gutter: stable;" in dashboard_styles
@@ -2248,10 +2248,10 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "display: flex; flex: 0 0 auto;" in dashboard_styles
     assert "display: flex; min-width: 0; flex: 1; flex-wrap: wrap;" in dashboard_styles
     assert ".live-chat-time { position: absolute; top: 1px; right: 0;" in dashboard_styles
-    assert ".live-chat-time { position: absolute; top: 1px; right: 0;" in widget_styles
+    assert "Message appearance comes from the same stylesheet as the dashboard" in widget_styles
     assert "if (timestamp) content.appendChild(timestamp);" in chat_script
     assert ".live-chat-text { max-width: 100%; flex: 0 0 auto; margin: 0;" in dashboard_styles
-    assert ".live-chat-text { max-width: 100%; flex: 0 0 auto; margin: 0;" in widget_styles
+    assert "[hidden] { display: none !important; }" in widget_styles
     assert ".live-chat-jump[hidden] { display: none; }" in dashboard_styles
     assert ".live-chat-jump.has-unseen {" in dashboard_styles
     assert "animation: live-chat-jump-alert 3s ease-in-out infinite" in dashboard_styles

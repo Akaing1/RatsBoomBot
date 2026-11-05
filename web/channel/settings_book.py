@@ -16,6 +16,7 @@ SECTIONS = (
 )
 
 GROUP_SECTION = {
+    "Ad announcements": "events",
     "Automatic shoutouts": "shoutouts",
     "Commands": "chat", "Loyalty points": "loyalty", "Timers": "timers",
     "Community messages": "events", "Outgoing raid messages": "events", "Shoutouts": "shoutouts", "Redeems": "events",
@@ -99,6 +100,7 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
                 reference_commands=commands if value not in {'globals', 'channel'} else [], panel=panel,
                 related_settings=[link for link in RELATED_SETTINGS.get((kind, value), []) if link[0] != section and (link[0] != 'games' or value in enabled_games)]))
     group_controls = {
+        ('feature', 'ad_announcements'): 'Ad announcements',
         ('feature', 'points'): 'Loyalty points', ('global_group', 'points'): 'Loyalty points',
         ('feature', 'raid_responses'): 'Outgoing raid messages',
         ('global_group', 'shoutouts'): 'Shoutouts', ('global_command', 'lurk'): 'Commands',

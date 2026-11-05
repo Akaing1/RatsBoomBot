@@ -117,6 +117,8 @@ class LiveChatService:
     def __init__(self, db, *, bot=None):
         self.db = db
         self.bot = bot
+        self.chat_preferences: dict[str, dict] = {}
+        self._preferences_lock = asyncio.Lock()
         self.connections: dict[str, YouTubeConnection] = {}
         self.youtube_statuses: dict[str, tuple[str, str]] = {}
         self.active_youtube_chat_ids: dict[str, str] = {}
@@ -157,6 +159,7 @@ class LiveChatService:
                 "SELECT broadcaster_id, youtube_channel_id, youtube_channel_title, access_token, refresh_token, expires_at FROM youtube_chat_connections"
             )
             widget_rows = await connection.fetchall("SELECT broadcaster_id, token FROM chat_widget_tokens")
+            preference_rows = await connection.fetchall("SELECT broadcaster_id, preferences_json FROM channel_chat_preferences")
             pinned_rows = await connection.fetchall("SELECT broadcaster_id, message_json FROM pinned_chat_messages")
 
         self.connections = {
@@ -171,6 +174,13 @@ class LiveChatService:
             for row in connection_rows
         }
         self.widget_tokens = {str(row["broadcaster_id"]): str(row["token"]) for row in widget_rows}
+        from bot.chat_preferences import normalize_chat_preferences
+        self.chat_preferences = {}
+        for row in preference_rows:
+            try:
+                self.chat_preferences[str(row["broadcaster_id"])] = normalize_chat_preferences(json.loads(row["preferences_json"]))
+            except (ValueError, TypeError):
+                LOGGER.warning("[Live Chat] Ignoring invalid chat preferences for %s.", row["broadcaster_id"])
         self.token_broadcasters = {token: broadcaster_id for broadcaster_id, token in self.widget_tokens.items()}
         self.pinned_messages = {
             str(row["broadcaster_id"]): json.loads(str(row["message_json"]))
@@ -1178,6 +1188,28 @@ class LiveChatService:
 
     def resolve_widget_token(self, token: str) -> str | None:
         return self.token_broadcasters.get(token)
+
+    def get_chat_preferences(self, broadcaster_id: str) -> dict | None:
+        preferences = self.chat_preferences.get(str(broadcaster_id))
+        return {key: list(value) if isinstance(value, list) else value for key, value in preferences.items()} if preferences else None
+
+    async def set_chat_preferences(self, broadcaster_id: str, preferences) -> dict:
+        from bot.chat_preferences import normalize_chat_preferences
+        preferences = normalize_chat_preferences(preferences)
+        broadcaster_id = str(broadcaster_id)
+        async with self._preferences_lock:
+            async with self.db.acquire() as connection:
+                await connection.execute("""
+                    INSERT INTO channel_chat_preferences (broadcaster_id, preferences_json) VALUES (?, ?)
+                    ON CONFLICT(broadcaster_id) DO UPDATE SET preferences_json = excluded.preferences_json
+                """, (broadcaster_id, json.dumps(preferences)))
+            self.chat_preferences[broadcaster_id] = preferences
+            # Wake existing SSE connections, without adding another polling loop.
+            for queue in tuple(self.subscribers.get(broadcaster_id, ())):
+                if queue.full():
+                    queue.get_nowait()
+                queue.put_nowait({"event": "chat-preferences"})
+        return self.get_chat_preferences(broadcaster_id)
 
     def get_youtube_state(self, broadcaster_id: str) -> YouTubeChatState:
         broadcaster_id = str(broadcaster_id)

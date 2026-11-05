@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages']};
 
-function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube']) {
+function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], remote = {}) {
     const handlers = {}, documentHandlers = {}, buttonHandlers = {}, changes = [];
     const timers = [];
     const connectionBadges = ['twitch', 'youtube'].map(platform => {
@@ -26,12 +26,13 @@ function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube']) 
     const documentState = {};
     const button = {getBoundingClientRect: () => ({right: 400, bottom: 400}), classList: {toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); }, contains: name => classes.has(name)}, setAttribute() {}, focus() { this.focused = true; documentState.activeElement = this; }, blur() { this.focused = false; documentState.activeElement = null; },
         addEventListener: (event, handler) => { buttonHandlers[event] = handler; }};
-    const control = {dataset: {channelId: 'test'},
-        querySelector: selector => selector.includes('toggle') ? button : selector.includes('count') ? countLabel : options,
+    const syncStatus = {textContent: ''};
+    const control = {dataset: {channelId: 'test', ...remote.dataset},
+        querySelector: selector => selector.includes('sync-status') ? syncStatus : selector.includes('toggle') ? button : selector.includes('count') ? countLabel : options,
         querySelectorAll: selector => selector.includes('connection') ? connectionBadges : selector.includes('group-toggle') ? groups : selector.includes('platform') ? platformInputs : selector.includes('clear') ? clears : inputs,
         addEventListener: (event, handler) => { handlers[event] = handler; },
         contains: target => [button, ...inputs, ...groups, ...platformInputs, ...clears].includes(target)};
-    const context = {window: {innerWidth: 500, innerHeight: 600, addEventListener() {}, setTimeout(fn, delay) { timers.push({fn, delay}); }, localStorage: {getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value)}},
+    const context = {AbortController, FormData, fetch: remote.fetch, window: {clearTimeout() {}, dashboardChatDebug: remote.debug, innerWidth: 500, innerHeight: 600, addEventListener() {}, setTimeout(fn, delay) { timers.push({fn, delay}); }, localStorage: {getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value)}},
         document: Object.assign(documentState, {addEventListener: (event, handler) => { documentHandlers[event] = handler; }})};
     vm.runInNewContext(fs.readFileSync('web/static/js/dashboard-chat-filters.js', 'utf8'), context);
     const api = context.window.dashboardChatFilters;
@@ -45,7 +46,7 @@ function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube']) 
         const item = platformInputs.find(item => item.dataset.chatFilterPlatform === key);
         item.checked = checked; item.handlers.change();
     };
-    return {api, filter, inputs, groups, platformInputs, platform, connectionBadges, timers, clears, countLabel, option, change, clear, solo, handlers, documentHandlers, buttonHandlers, options, button, changes};
+    return {api, filter, syncStatus, inputs, groups, platformInputs, platform, connectionBadges, timers, clears, countLabel, option, change, clear, solo, handlers, documentHandlers, buttonHandlers, options, button, changes};
 }
 
 test('connected badges fade after 1.5 seconds on first open only; disconnected badges remain visible', () => {
@@ -340,4 +341,101 @@ test('switching carousel cards dismisses the dropdown', () => {
     ui.documentHandlers['dashboard-carousel-card-changed']();
     assert.equal(ui.options.hidden, true);
     assert.equal(ui.button.focused, false);
+});
+
+const settle = () => new Promise(resolve => setImmediate(resolve));
+const prefs = (users = ['mods'], types = ['messages']) => ({version: 4, connectedPlatforms: ['twitch', 'youtube'], users, types});
+const response = preferences => ({ok: true, json: async () => ({preferences})});
+const dataset = {preferencesUrl: '/channel/api/chat/preferences', csrfToken: 'valid'};
+
+test('server preferences win over local storage without an initial stale write', async () => {
+    const calls = [];
+    const ui = setup(new Map(), undefined, {dataset, fetch: async (_url, options) => {
+        calls.push(options); return response(prefs());
+    }});
+    await settle();
+    assert.equal(ui.option('mods').checked, true);
+    assert.equal(ui.option('subs').checked, false);
+    assert.equal(calls.length, 1);
+    assert.ok(ui.filter.allows({user: 'mods', type: 'messages'}));
+    assert.equal(ui.filter.allows({user: 'mods', type: 'commands'}), false);
+});
+
+test('initial load cannot overwrite edits and migrates the latest selection to OBS', async () => {
+    let resolveLoad;
+    const writes = [];
+    const ui = setup(new Map(), undefined, {dataset, fetch: (_url, options) => {
+        if (!options.method) return new Promise(resolve => { resolveLoad = resolve; });
+        assert.equal(options.body.get('csrf_token'), 'valid');
+        writes.push(JSON.parse(options.body.get('preferences')));
+        return Promise.resolve(response(prefs()));
+    }});
+    await settle();
+    ui.solo(ui.option('subs'));
+    resolveLoad(response(prefs()));
+    await settle();
+    assert.deepEqual(writes[0].users, ['subs']);
+    assert.equal(ui.option('mods').checked, false);
+    assert.equal(ui.option('subs').checked, true);
+});
+
+test('rapid edits serialize saves and coalesce pending selections', async () => {
+    let finishFirst;
+    const writes = [];
+    const ui = setup(new Map(), undefined, {dataset, fetch: (_url, options) => {
+        if (!options.method) return Promise.resolve(response(prefs()));
+        writes.push(JSON.parse(options.body.get('preferences')));
+        if (writes.length === 1) return new Promise(resolve => { finishFirst = resolve; });
+        return Promise.resolve(response(prefs()));
+    }});
+    await settle();
+    ui.change('subs', true);
+    ui.change('bots', true);
+    ui.change('vips', true);
+    assert.equal(writes.length, 1);
+    finishFirst(response(prefs()));
+    await settle();
+    assert.equal(writes.length, 2);
+    assert.deepEqual(new Set(writes[1].users), new Set(['mods', 'subs', 'bots', 'vips']));
+});
+
+test('failed saves keep the UI selection and retry it on the next edit', async () => {
+    let fail = true;
+    const writes = [];
+    const ui = setup(new Map(), undefined, {dataset, fetch: async (_url, options) => {
+        if (!options.method) return response(prefs());
+        if (fail) throw new Error('offline');
+        writes.push(JSON.parse(options.body.get('preferences')));
+        return response(prefs());
+    }});
+    await settle();
+    ui.change('subs', true);
+    await settle();
+    assert.match(ui.syncStatus.textContent, /could not be saved/);
+    assert.equal(ui.option('subs').checked, true);
+    fail = false;
+    ui.change('bots', true);
+    await settle();
+    assert.deepEqual(new Set(writes[0].users), new Set(['mods', 'subs', 'bots']));
+    assert.equal(ui.syncStatus.textContent, '');
+});
+
+test('test mode never reads or changes the streamer OBS preferences', async () => {
+    setup(new Map(), undefined, {dataset, debug: {active: true}, fetch() { throw new Error('Must stay local'); }});
+    await settle();
+});
+
+test('OBS mirror updates both filter axes and restores all filters', () => {
+    const {api} = setup();
+    let updates = 0;
+    const mirror = api.attachMirror(() => updates++);
+    mirror.update(prefs());
+    assert.ok(mirror.allows(api.category({badges: ['moderator']})));
+    assert.equal(mirror.allows(api.category({badges: ['subscriber']})), false);
+    assert.equal(mirror.allows(api.category({badges: ['moderator'], kind: 'command'})), false);
+    mirror.update(prefs(['youtube_members'], ['commands']));
+    assert.ok(mirror.allows(api.category({platform: 'youtube', badges: ['member'], kind: 'command'})));
+    mirror.update(null);
+    assert.ok(mirror.allows(api.category({kind: 'command'})));
+    assert.equal(updates, 3);
 });

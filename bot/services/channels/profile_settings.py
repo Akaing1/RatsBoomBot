@@ -22,6 +22,7 @@ class ProfileSettingDefinition:
     minimum: int | None = None
     maximum: int | None = None
     rows: int = 3
+    choices: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,10 @@ class ProtectedUser:
 
 
 PROFILE_SETTING_DEFINITIONS = (
+    ProfileSettingDefinition("ad_announcement_message", "Ad announcements", "Ad message", "Sent before a scheduled ad break. Use {time} for the remaining time in minutes:seconds.", maximum_length=450),
+    ProfileSettingDefinition("ad_warning_seconds", "Ad announcements", "Seconds before the ad", "Send the warning this many seconds before a scheduled ad. Timing is checked every 5 seconds.", value_type="integer", minimum=5, maximum=1800, rows=1),
+    ProfileSettingDefinition("ad_message_type", "Ad announcements", "Send as", "Choose a normal chat message or a Twitch announcement.", value_type="choice", choices=("message", "announcement")),
+    ProfileSettingDefinition("ad_announcement_color", "Ad announcements", "Announcement color", "Used only when Send as is Announcement.", value_type="choice", choices=("primary", "blue", "green", "orange", "purple")),
     ProfileSettingDefinition("timer_messages", "Timers", "Timer messages", "Add, edit, or remove automated messages and their individual schedules.", value_type="lines", maximum_length=10000, rows=6),
     ProfileSettingDefinition("lurk_message", "Commands", "Lurk message", "Sent when a viewer uses !lurk. Use {username} for the viewer name."),
     ProfileSettingDefinition("community_messages.follow", "Community messages", "Follow message", "Sent when a viewer follows. Leave empty to send nothing."),
@@ -545,6 +550,16 @@ class ProfileSettingsService:
 
     @staticmethod
     def validate_value(definition: ProfileSettingDefinition, raw_value: str) -> str | int:
+        if definition.value_type == "choice":
+            if raw_value not in definition.choices:
+                raise ValueError(f"Choose a valid {definition.label.lower()}.")
+            return raw_value
+        if definition.key == "ad_announcement_message":
+            if "\n" in raw_value or "\r" in raw_value:
+                raise ValueError("Use a single line for the ad message.")
+            for _, name, spec, conversion in Formatter().parse(raw_value):
+                if name is not None and (name != "time" or spec or conversion):
+                    raise ValueError("Use only {time} without formatting modifiers in the ad message.")
         if definition.value_type == "toggle":
             if raw_value not in {"0", "1"}:
                 raise ValueError("Choose On or Off.")
@@ -624,6 +639,10 @@ class ProfileSettingsService:
     @staticmethod
     def deserialize_value(definition: ProfileSettingDefinition, stored_value: str) -> str | int:
         value = json.loads(stored_value)
+        if definition.key.startswith("ad_"):
+            if isinstance(value, bool) or not isinstance(value, (str, int)):
+                raise TypeError("Invalid ad setting.")
+            return ProfileSettingsService.validate_value(definition, str(value))
         if definition.key.startswith("automatic_shoutouts."):
             if not isinstance(value, (str, int)) or isinstance(value, bool):
                 raise TypeError("Invalid automatic shoutout setting.")

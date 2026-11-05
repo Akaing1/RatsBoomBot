@@ -9,7 +9,8 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 
 class AdAnnouncementService:
-    CHECK_EVERY_SECONDS = 30
+    CHECK_EVERY_SECONDS = 5
+    SCHEDULE_REFRESH_SECONDS = 30
     WARNING_SECONDS = 120
 
     def __init__(self, bot, broadcasters):
@@ -18,6 +19,9 @@ class AdAnnouncementService:
         self._task: asyncio.Task | None = None
         self.warned_ads: set[str] = set()
         self._announcement_retry_at: dict[str, float] = {}
+        self._schedule_cache: dict[str, tuple[float, object]] = {}
+        self._live_channels: dict[str, str] = {}
+        self._live_checked_at = float("-inf")
 
     async def start(self) -> None:
         if self._task is not None:
@@ -52,6 +56,9 @@ class AdAnnouncementService:
 
         self.warned_ads.clear()
         self._announcement_retry_at.clear()
+        self._schedule_cache.clear()
+        self._live_channels.clear()
+        self._live_checked_at = float("-inf")
 
         LOGGER.info("[Ads] Ad announcement service stopped.")
 
@@ -88,7 +95,11 @@ class AdAnnouncementService:
             )
             return
 
-        active_channels = await self.broadcasters.get_live_broadcasters()
+        if time.monotonic() - self._live_checked_at >= self.SCHEDULE_REFRESH_SECONDS:
+            self._live_channels = await self.broadcasters.get_live_broadcasters()
+            self._live_checked_at = time.monotonic()
+        active_channels = self._live_channels
+        self._schedule_cache = {key: value for key, value in self._schedule_cache.items() if key in active_channels}
 
         if not active_channels:
             LOGGER.debug(
@@ -110,7 +121,12 @@ class AdAnnouncementService:
 
             try:
                 broadcaster = self.bot.create_partialuser(broadcaster_id)
-                schedule = await broadcaster.fetch_ad_schedule()
+                cached = self._schedule_cache.get(broadcaster_id)
+                if cached and time.monotonic() - cached[0] < self.SCHEDULE_REFRESH_SECONDS:
+                    schedule = cached[1]
+                else:
+                    schedule = await broadcaster.fetch_ad_schedule()
+                    self._schedule_cache[broadcaster_id] = (time.monotonic(), schedule)
             except Exception:
                 LOGGER.exception(
                     "[Ads] Failed to fetch ad schedule for %s (%s).",
@@ -137,7 +153,9 @@ class AdAnnouncementService:
             if seconds_until_ad <= 0:
                 continue
 
-            if seconds_until_ad > self.WARNING_SECONDS:
+            profile = get_active_profile(broadcaster_id)
+            warning_seconds = profile.ad_warning_seconds if profile else self.WARNING_SECONDS
+            if seconds_until_ad > warning_seconds:
                 LOGGER.debug(
                     "[Ads] Next ad for %s begins in %d seconds.",
                     broadcaster_name,
@@ -148,20 +166,20 @@ class AdAnnouncementService:
             if ad_key in self.warned_ads:
                 continue
 
-            profile = get_active_profile(broadcaster_id)
             template = profile.ad_announcement_message if profile is not None else DEFAULT_AD_ANNOUNCEMENT_MESSAGE
             minutes, seconds = divmod(seconds_until_ad, 60)
 
             try:
                 message = template.format(time=f"{minutes}:{seconds:02d}")
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, IndexError, AttributeError):
                 LOGGER.warning("[Ads] Invalid ad announcement template for %s (%s). Using the default message.", broadcaster_name, broadcaster_id)
                 message = DEFAULT_AD_ANNOUNCEMENT_MESSAGE.format(time=f"{minutes}:{seconds:02d}")
 
-            fallback = time.monotonic() < self._announcement_retry_at.get(broadcaster_id, 0)
+            normal_message = profile is not None and profile.ad_message_type == "message"
+            fallback = normal_message or time.monotonic() < self._announcement_retry_at.get(broadcaster_id, 0)
             if not fallback:
                 try:
-                    await self.bot.services.chat_identity.send_announcement(broadcaster, message, "purple")
+                    await self.bot.services.chat_identity.send_announcement(broadcaster, message, profile.ad_announcement_color if profile else "purple")
                     self._announcement_retry_at.pop(broadcaster_id, None)
                 except Exception as error:
                     fallback = True
@@ -191,7 +209,7 @@ class AdAnnouncementService:
 
             LOGGER.info(
                 "[Ads] Sent ad warning via %s to %s (%s) for an ad starting in %d seconds.",
-                "chat fallback" if fallback else "announcement",
+                "message" if normal_message else "chat fallback" if fallback else "announcement",
                 broadcaster_name,
                 broadcaster_id,
                 seconds_until_ad

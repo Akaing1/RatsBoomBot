@@ -435,6 +435,9 @@ class ChannelProfile:
     features: FeatureDefaults = FeatureDefaults()
     globals: GlobalCommandDefaults = GlobalCommandDefaults()
     ad_announcement_message: str = DEFAULT_AD_ANNOUNCEMENT_MESSAGE
+    ad_warning_seconds: int = 120
+    ad_message_type: str = "announcement"
+    ad_announcement_color: str = "purple"
     timer_messages: tuple[str | TimerMessage | tuple[str, str] | tuple[str, str, str], ...] = ()
     community_messages: CommunityMessages = CommunityMessages()
     raid_messages: RaidMessages = RaidMessages()

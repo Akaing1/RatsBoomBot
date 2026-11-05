@@ -314,3 +314,36 @@ async def test_league_identity_invalidation_persists_and_preserves_newer_edits(t
         assert restarted.apply_overrides("1", base).league.game_name == "Replacement"
         await service.clear_override("1", "league.game_name", "test")
         assert get_active_profile("1").league.game_name == ""
+
+
+@pytest.mark.asyncio
+async def test_ad_settings_persist_refresh_profile_and_reset_without_affecting_other_channels(tmp_path):
+    profile = ChannelProfile(channel_name='ads', ad_announcement_message='Original {time}')
+    async with asqlite.create_pool(str(tmp_path / 'ad-settings.db')) as db:
+        service = ProfileSettingsService(db)
+        await service.setup()
+        activate_profile('ads', service.apply_overrides('ads', profile))
+        values = {'ad_announcement_message': 'Back soon! Ads in {time}', 'ad_warning_seconds': '45',
+                  'ad_message_type': 'message', 'ad_announcement_color': 'green'}
+        for key, value in values.items():
+            await service.set_override('ads', key, value, 'owner')
+        assert get_active_profile('ads').ad_warning_seconds == 45
+        assert get_active_profile('ads').ad_message_type == 'message'
+        restarted = ProfileSettingsService(db)
+        await restarted.setup()
+        updated = restarted.apply_overrides('ads', profile)
+        assert updated.ad_announcement_color == 'green'
+        assert updated.ad_announcement_message == values['ad_announcement_message']
+        assert restarted.apply_overrides('other', profile).ad_warning_seconds == 120
+        await service.clear_override('ads', 'ad_announcement_message', 'owner')
+        assert get_active_profile('ads').ad_announcement_message == 'Original {time}'
+
+
+@pytest.mark.parametrize('key,value', [('ad_warning_seconds', '0'), ('ad_warning_seconds', '1801'),
+    ('ad_message_type', 'invalid'), ('ad_announcement_color', 'red'),
+    ('ad_announcement_message', '{username}'), ('ad_announcement_message', '{time:99999}'),
+    ('ad_announcement_message', '{time.__class__}'), ('ad_announcement_message', 'broken {'),
+    ('ad_announcement_message', 'line one\nline two')])
+def test_ad_settings_reject_invalid_inputs(key, value):
+    with pytest.raises(ValueError):
+        ProfileSettingsService.validate_value(PROFILE_SETTINGS_BY_KEY[key], value)

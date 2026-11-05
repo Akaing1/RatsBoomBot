@@ -47,8 +47,7 @@
         const clearButtons = [...control.querySelectorAll('[data-chat-filter-clear]')];
         const storageKey = `ratsboombot:chat-filters:${control.dataset.channelId}${window.dashboardChatDebug?.active ? ':test' : ''}`;
         const enabled = {users: new Set(axes.users), types: new Set(axes.types)};
-        try {
-            let saved = JSON.parse(window.localStorage.getItem(storageKey) || 'null');
+        function restore(saved) {
             // Migrate the earlier flat selection without losing saved preferences.
             if (Array.isArray(saved)) {
                 const renamed = saved.map(key => key === 'normal' ? 'non_subs' : key === 'other' ? 'messages' : key);
@@ -70,7 +69,9 @@
                     enabled[axis] = new Set(keys.length ? keys : axes[axis]);
                 }
             }
-        } catch (_) { /* Default to showing everything when storage is unavailable. */ }
+        }
+        try { restore(JSON.parse(window.localStorage.getItem(storageKey) || 'null')); }
+        catch (_) { /* Default to showing everything when storage is unavailable. */ }
 
         function positionDropdown() {
             if (options.hidden) return;
@@ -166,10 +167,52 @@
         });
         document.addEventListener('click', event => { if (!control.contains(event.target)) close(); });
         document.addEventListener('dashboard-carousel-card-changed', () => close());
+        const snapshot = () => ({version: 4, connectedPlatforms, users: [...enabled.users], types: [...enabled.types]});
+        const syncUrl = !window.dashboardChatDebug?.active && control.dataset.preferencesUrl;
+        const syncStatus = control.querySelector('[data-chat-filter-sync-status]');
+        let remoteReady = false, loading = false, dirty = false, saving = false, pending = null;
+        const status = message => { if (syncStatus && syncUrl) { syncStatus.textContent = message; syncStatus.hidden = !message; } };
+        async function requestPreferences(options = {}) {
+            const controller = new AbortController();
+            const timeout = window.setTimeout(() => controller.abort(), 10000);
+            try {
+                const response = await fetch(syncUrl, {...options, signal: controller.signal, cache: 'no-store', headers: {Accept: 'application/json'}});
+                if (!response.ok) throw new Error('Chat preferences unavailable');
+                return await response.json();
+            } finally { window.clearTimeout(timeout); }
+        }
+        async function saveRemote() {
+            pending = snapshot();
+            if (saving || !remoteReady) return;
+            saving = true;
+            try {
+                while (pending) {
+                    const selection = pending; pending = null;
+                    const body = new FormData();
+                    body.set('csrf_token', control.dataset.csrfToken);
+                    body.set('preferences', JSON.stringify(selection));
+                    await requestPreferences({method: 'POST', body});
+                }
+                dirty = false; status('');
+            } catch (_) {
+                remoteReady = false;
+                status('OBS filters could not be saved. Change a filter to retry.');
+            } finally { saving = false; }
+        }
+        async function loadRemote() {
+            if (!syncUrl || loading) return;
+            loading = true;
+            try {
+                const result = await requestPreferences();
+                if (result.preferences && !dirty) { restore(result.preferences); sync(); onChange(); persistSelection(); }
+                remoteReady = true;
+                if (!result.preferences || dirty || JSON.stringify(result.preferences) !== JSON.stringify(snapshot())) await saveRemote();
+            } catch (_) { status('OBS filters could not be loaded. Change a filter to retry.'); }
+            finally { loading = false; }
+        }
         function persistSelection() {
             try {
-                window.localStorage.setItem(storageKey, JSON.stringify({version: 4, connectedPlatforms,
-                    users: [...enabled.users], types: [...enabled.types]}));
+                window.localStorage.setItem(storageKey, JSON.stringify(snapshot()));
             } catch (_) {}
         }
         function applySelection() {
@@ -178,6 +221,7 @@
             }
             persistSelection();
             sync(); onChange();
+            if (syncUrl) { dirty = true; if (remoteReady) saveRemote(); else loadRemote(); }
         }
         clearButtons.forEach(clear => clear.addEventListener('click', () => {
             const target = clear.dataset.chatFilterClear;
@@ -219,8 +263,22 @@
         }));
         sync();
         persistSelection();
+        if (syncUrl) Promise.resolve().then(loadRemote);
         return {allows: ({user, type}) =>
             enabled.users.has(user) && enabled.types.has(type)};
     }
-    window.dashboardChatFilters = {category, attach, dropdownPosition};
+    function attachMirror(onChange) {
+        let enabled = null;
+        return {
+            allows: ({user, type}) => !enabled || enabled.users.includes(user) && enabled.types.includes(type),
+            update(saved) {
+                enabled = saved ? {
+                    users: saved.users?.length ? saved.users : (saved.connectedPlatforms || Object.keys(platforms)).flatMap(key => platforms[key] || []),
+                    types: saved.types?.length ? saved.types : messageTypes
+                } : null;
+                onChange();
+            }
+        };
+    }
+    window.dashboardChatFilters = {category, attach, attachMirror, dropdownPosition};
 })();
