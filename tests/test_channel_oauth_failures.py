@@ -89,3 +89,40 @@ async def test_invalid_state_never_exchanges_code(auth_client):
     response = await client.get("/oauth/channel/connect?state=wrong&code=code")
     assert response.status_code == 400
     exchange.assert_not_awaited()
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('cancel', [False, True])
+async def test_dock_login_returns_to_originating_dock(auth_client, monkeypatch, cancel):
+    client, session, exchange = auth_client
+    live = SimpleNamespace(resolve_widget_token=lambda token: 'new' if token == 'valid' else None)
+    monkeypatch.setattr(oauth, 'get_bot', lambda: SimpleNamespace(
+        onboard_broadcaster=AsyncMock(), services=SimpleNamespace(live_chat=live)))
+    response = await client.get('/connect/twitch?dock=valid')
+    assert response.status_code == 307
+    state = session[CHANNEL_OAUTH_STATE_KEY]
+    query = 'error=access_denied' if cancel else 'code=code'
+    response = await client.get(f'/oauth/channel/connect?state={state}&{query}')
+    assert response.headers['location'] == '/widgets/chat/valid'
+    assert oauth.DOCK_RETURN_TOKEN_KEY not in session
+    if cancel:
+        exchange.assert_not_awaited()
+    else:
+        assert session['channel_user_id'] == 'new'
+
+
+@pytest.mark.asyncio
+async def test_dock_return_cannot_be_external_stale_or_revoked(auth_client, monkeypatch):
+    client, session, _ = auth_client
+    valid = [True]
+    live = SimpleNamespace(resolve_widget_token=lambda token: 'new' if token == 'valid' and valid[0] else None)
+    monkeypatch.setattr(oauth, 'get_bot', lambda: SimpleNamespace(
+        onboard_broadcaster=AsyncMock(), services=SimpleNamespace(live_chat=live)))
+    session[oauth.DOCK_RETURN_TOKEN_KEY] = 'valid'
+    await client.get('/connect/twitch?dock=https://evil.example')
+    assert oauth.DOCK_RETURN_TOKEN_KEY not in session
+    await client.get('/connect/twitch?dock=valid')
+    state = session[CHANNEL_OAUTH_STATE_KEY]
+    valid[0] = False
+    response = await client.get(f'/oauth/channel/connect?state={state}&code=code')
+    assert response.headers['location'] == '/channel'
+    assert oauth.DOCK_RETURN_TOKEN_KEY not in session
