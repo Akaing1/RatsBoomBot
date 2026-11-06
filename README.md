@@ -114,7 +114,7 @@ Points can remain disabled without disabling unrelated redeem tracking. Meinya s
 
 ### Chatter Profiles
 
-`!stats` links to the invoking chatter's profile for the current channel; `!me` links to their global profile. Chatter sign-in provides account actions, including channel-specific shopping, crafting, selling, and gambling. Global profiles summarize exact tracked messages, channels visited, raid damage, boss participation, final hits, and bot-earned loyalty rewards. Each connected channel links to a detail page with the chatter's current balance, lifetime earnings, redeems, raid record, and inventory.
+`!stats [@username]` links to a chatter's profile for the current channel; `!me [@username]` links to their global profile. Both default to the invoking chatter when no username is supplied. Names work with or without `@`; unknown chatters receive a profile-not-found reply. Chatter sign-in provides account actions, including channel-specific shopping, crafting, selling, and gambling. Global profiles summarize exact tracked messages, channels visited, raid damage, boss participation, final hits, and bot-earned loyalty rewards. Each connected channel links to a detail page with the chatter's current balance, lifetime earnings, redeems, raid record, and inventory.
 
 Historical message totals are seeded from the previous point-eligible message count. After migration 13, every non-bot message is counted independently of the loyalty cooldown. Historical lifetime earnings begin with the balance present at migration; future totals include chat, redeem, raid, gamble, and other bot rewards while excluding moderator grants and viewer transfers.
 
@@ -302,7 +302,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 | Group | Commands |
 | --- | --- |
-| Utility | `!kamikaze [username]`, `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats`, `!me` |
+| Utility | `!kamikaze [username]`, `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats [@username]`, `!me [@username]` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube` |
 | Settings | `!set discord <url>`, `!set youtube <url>`, `!set game <game name>`, `!set title <stream title>`, `!timers`, `!timers on`, `!timers off` |

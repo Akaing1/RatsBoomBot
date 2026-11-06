@@ -16,7 +16,7 @@ class StatsCommands(commands.Component):
         self.bot = bot
 
     @commands.command()
-    async def stats(self, ctx: commands.Context) -> None:
+    async def stats(self, ctx: commands.Context, *, target: str | None = None) -> None:
         if not is_global_command_enabled(self.bot, ctx, GlobalCommandName.STATS):
             return
 
@@ -34,23 +34,33 @@ class StatsCommands(commands.Component):
             await ctx.reply("I can't find this channel's chatter profile right now.")
             return
 
-        profile_name = await self._profile_login(ctx)
+        profile_name = await self._profile_login(ctx, target)
+        if profile_name is None:
+            return
+        owner = "Your" if target is None else f"{profile_name}'s"
         profile_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/chatters/{quote(profile_name, safe='')}/channels/{quote(str(channel_login), safe='')}"
-        await ctx.reply(f"Your stats in {getattr(current_channel, 'display_name', None) or channel_login}: {profile_url}")
+        await ctx.reply(f"{owner} stats in {getattr(current_channel, 'display_name', None) or channel_login}: {profile_url}")
 
-        LOGGER.debug("[Chatter Stats] User %s requested their channel profile in %s.", ctx.chatter.name, channel_login)
+        LOGGER.debug("[Chatter Stats] User %s requested %s's channel profile in %s.", ctx.chatter.name, profile_name, channel_login)
 
     @commands.command()
-    async def me(self, ctx: commands.Context) -> None:
+    async def me(self, ctx: commands.Context, *, target: str | None = None) -> None:
         if not is_global_command_enabled(self.bot, ctx, GlobalCommandName.ME):
             return
 
-        profile_name = await self._profile_login(ctx)
+        profile_name = await self._profile_login(ctx, target)
+        if profile_name is None:
+            return
+        owner = "Your" if target is None else f"{profile_name}'s"
         profile_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/chatters/{quote(profile_name, safe='')}"
-        await ctx.reply(f"Your RatsBoomBot profile: {profile_url}")
+        await ctx.reply(f"{owner} RatsBoomBot profile: {profile_url}")
 
-        LOGGER.debug("[Chatter Stats] User %s requested their global profile.", ctx.chatter.name)
+        LOGGER.debug("[Chatter Stats] User %s requested %s's global profile.", ctx.chatter.name, profile_name)
 
-    async def _profile_login(self, ctx: commands.Context) -> str:
-        identity = await self.bot.services.chatter_stats.resolve_identity(str(ctx.chatter.id))
+    async def _profile_login(self, ctx: commands.Context, target: str | None = None) -> str | None:
+        value = str(ctx.chatter.id) if target is None else target.strip().removeprefix("@").strip()
+        identity = await self.bot.services.chatter_stats.resolve_identity(value)
+        if target is not None and identity is None:
+            await ctx.reply("I can't find a RatsBoomBot profile for that chatter yet.")
+            return None
         return str(identity["login"]) if identity is not None else str(ctx.chatter.name)

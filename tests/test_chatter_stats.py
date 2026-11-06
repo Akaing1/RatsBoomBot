@@ -289,3 +289,68 @@ async def test_disconnected_channel_hidden_without_losing_history(tmp_path) -> N
         broadcasters.items["channel-1"] = saved
         reconnected = await service.get_global_profile("alice")
         assert reconnected["channels"] == connected["channels"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("command", ["me", "stats"])
+@pytest.mark.parametrize("target", ["bob", "@BoB", "  @bob  "])
+async def test_profile_commands_accept_other_chatters(monkeypatch, command, target) -> None:
+    from unittest.mock import AsyncMock
+
+    resolver = AsyncMock(return_value={"login": "bob", "display_name": "Bob"})
+    bot = SimpleNamespace(services=SimpleNamespace(
+        features=SimpleNamespace(is_global_command_enabled=lambda *args: True),
+        chatter_stats=SimpleNamespace(resolve_identity=resolver),
+        broadcasters=FakeBroadcasters(),
+    ))
+    ctx = SimpleNamespace(chatter=SimpleNamespace(id="user-1", name="alice"),
+                          broadcaster=SimpleNamespace(id="channel-1"), reply=AsyncMock())
+    monkeypatch.setattr("bot.shared.commands.stats.settings.PUBLIC_BASE_URL", "https://ratsboombot.com/")
+    component = StatsCommands(bot)
+
+    await getattr(component, command).callback(component, ctx, target=target)
+
+    resolver.assert_awaited_once_with(target.strip().removeprefix("@").strip())
+    expected = ("bob's RatsBoomBot profile: https://ratsboombot.com/chatters/bob" if command == "me"
+                else "bob's stats in TestChannel: https://ratsboombot.com/chatters/bob/channels/testchannel")
+    ctx.reply.assert_awaited_once_with(expected)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("command", ["me", "stats"])
+@pytest.mark.parametrize("target", ["unknown", "@", " "])
+async def test_profile_commands_do_not_link_to_caller_for_unknown_targets(command, target) -> None:
+    from unittest.mock import AsyncMock
+
+    bot = SimpleNamespace(services=SimpleNamespace(
+        features=SimpleNamespace(is_global_command_enabled=lambda *args: True),
+        chatter_stats=SimpleNamespace(resolve_identity=AsyncMock(return_value=None)),
+        broadcasters=FakeBroadcasters(),
+    ))
+    ctx = SimpleNamespace(chatter=SimpleNamespace(id="user-1", name="alice"),
+                          broadcaster=SimpleNamespace(id="channel-1"), reply=AsyncMock())
+    component = StatsCommands(bot)
+
+    await getattr(component, command).callback(component, ctx, target=target)
+
+    ctx.reply.assert_awaited_once_with("I can't find a RatsBoomBot profile for that chatter yet.")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("command", ["me", "stats"])
+async def test_targeted_profile_commands_respect_feature_toggle(command) -> None:
+    from unittest.mock import AsyncMock
+
+    resolver = AsyncMock()
+    bot = SimpleNamespace(services=SimpleNamespace(
+        features=SimpleNamespace(is_global_command_enabled=lambda *args: False),
+        chatter_stats=SimpleNamespace(resolve_identity=resolver),
+    ))
+    ctx = SimpleNamespace(chatter=SimpleNamespace(id="user-1", name="alice"),
+                          broadcaster=SimpleNamespace(id="channel-1"), reply=AsyncMock())
+    component = StatsCommands(bot)
+
+    await getattr(component, command).callback(component, ctx, target="@bob")
+
+    resolver.assert_not_awaited()
+    ctx.reply.assert_not_awaited()
