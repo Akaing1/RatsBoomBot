@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from datetime import UTC, datetime, timedelta
 
 from bot.services.channels.live_chat import message_matches_view, normalize_chat_view
@@ -27,6 +28,24 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str, *
     try:
         yield "retry: 2000\n\n"
 
+        roster = None
+        roster_checked = 0
+        async def participant_event():
+            nonlocal roster, roster_checked
+            fetch = getattr(service, "shared_chat_participants", None)
+            if mirror_preferences or view == "commands" or not fetch or time.monotonic() - roster_checked < 30:
+                return None
+            roster_checked = time.monotonic()
+            current = await fetch(broadcaster_id)
+            if current == roster:
+                return None
+            roster = current
+            return f"event: chat-participants\ndata: {json.dumps(roster)}\n\n"
+
+        event = await participant_event()
+        if event:
+            yield event
+
         if mirror_preferences:
             preferences = service.get_chat_preferences(broadcaster_id)
             yield f"event: chat-preferences\ndata: {json.dumps(preferences)}\n\n"
@@ -43,6 +62,9 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str, *
                 except Exception:
                     yield "event: access-revoked\ndata: {}\n\n"
                     return
+            event = await participant_event()
+            if event:
+                yield event
             if mirror_preferences:
                 current_preferences = service.get_chat_preferences(broadcaster_id)
                 if preferences != current_preferences:

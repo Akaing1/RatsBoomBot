@@ -19,22 +19,29 @@ function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], 
     const groups = Object.keys(axes).map(axis => input({chatFilterGroupToggle: axis}));
     const platformInputs = ['twitch', 'youtube'].map(platform => input({chatFilterPlatform: platform}));
     platformInputs.forEach(item => { item.disabled = !connectedPlatforms.includes(item.dataset.chatFilterPlatform); });
-    const clears = ['all', 'users', 'types'].map(axis => input({chatFilterClear: axis}));
+    const clears = ['all', 'users', 'types', 'channels'].map(axis => input({chatFilterClear: axis}));
     const options = {hidden: true, scrollTop: 0, contains: () => false, style: {}, getBoundingClientRect: () => ({width: 200, height: 330})};
     const countLabel = {textContent: ''};
     const classes = new Set();
     const documentState = {};
     const button = {getBoundingClientRect: () => ({right: 400, bottom: 400}), classList: {toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); }, contains: name => classes.has(name)}, setAttribute() {}, focus() { this.focused = true; documentState.activeElement = this; }, blur() { this.focused = false; documentState.activeElement = null; },
         addEventListener: (event, handler) => { buttonHandlers[event] = handler; }};
-    const originInput = input({}); originInput.value = 'all';
+    function createElement(tag) {
+        return {...input({}), tag, children: [], append(...children) { children.forEach(child => { child.parentElement = this; this.children.push(child); }); },
+            querySelector(tag) { return this.children.find(child => child.tag === tag); },
+            remove() { this.parentElement.children = this.parentElement.children.filter(child => child !== this); }};
+    }
+    const channelList = createElement('div');
+    const channel = id => channelList.children.map(row => row.children[0]).find(item => item.dataset.chatFilterChannel === id);
+    const toggleChannel = (id, checked) => { const item = channel(id); item.checked = checked; item.handlers.change(); };
     const syncStatus = {textContent: ''};
     const control = {dataset: {channelId: 'test', ...remote.dataset},
-        querySelector: selector => selector.includes('filter-origin') ? originInput : selector.includes('sync-status') ? syncStatus : selector.includes('toggle') ? button : selector.includes('count') ? countLabel : options,
+        querySelector: selector => selector.includes('filter-channels') ? channelList : selector.includes('sync-status') ? syncStatus : selector.includes('toggle') ? button : selector.includes('count') ? countLabel : options,
         querySelectorAll: selector => selector.includes('connection') ? connectionBadges : selector.includes('group-toggle') ? groups : selector.includes('platform') ? platformInputs : selector.includes('clear') ? clears : inputs,
         addEventListener: (event, handler) => { handlers[event] = handler; },
         contains: target => [button, ...inputs, ...groups, ...platformInputs, ...clears].includes(target)};
     const context = {AbortController, FormData, fetch: remote.fetch, window: {clearTimeout() {}, dashboardChatDebug: remote.debug, innerWidth: 500, innerHeight: 600, addEventListener() {}, setTimeout(fn, delay) { timers.push({fn, delay}); }, localStorage: {getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value)}},
-        document: Object.assign(documentState, {addEventListener: (event, handler) => { documentHandlers[event] = handler; }})};
+        document: Object.assign(documentState, {createElement, addEventListener: (event, handler) => { documentHandlers[event] = handler; }})};
     vm.runInNewContext(fs.readFileSync('web/static/js/dashboard-chat-filters.js', 'utf8'), context);
     const api = context.window.dashboardChatFilters;
     const filter = api.attach({closest: () => ({querySelector: () => control})}, () => changes.push(true));
@@ -42,12 +49,12 @@ function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], 
     const change = (key, checked) => { const item = option(key); item.checked = checked; item.handlers.change(); };
     const clear = axis => clears.find(item => item.dataset.chatFilterClear === axis).handlers.click();
     const solo = item => handlers.contextmenu({target: {closest: () => ({querySelector: selector =>
-        selector.includes('platform') ? (platformInputs.includes(item) ? item : null) : (inputs.includes(item) ? item : null)})}, preventDefault() {}});
+        selector.includes('filter-channel') ? null : selector.includes('platform') ? (platformInputs.includes(item) ? item : null) : (inputs.includes(item) ? item : null)})}, preventDefault() {}});
     const platform = (key, checked) => {
         const item = platformInputs.find(item => item.dataset.chatFilterPlatform === key);
         item.checked = checked; item.handlers.change();
     };
-    return {api, filter, originInput, syncStatus, inputs, groups, platformInputs, platform, connectionBadges, timers, clears, countLabel, option, change, clear, solo, handlers, documentHandlers, buttonHandlers, options, button, changes};
+    return {api, filter, channelList, channel, toggleChannel, syncStatus, inputs, groups, platformInputs, platform, connectionBadges, timers, clears, countLabel, option, change, clear, solo, handlers, documentHandlers, buttonHandlers, options, button, changes};
 }
 
 test('connected badges fade after 1.5 seconds on first open only; disconnected badges remain visible', () => {
@@ -264,15 +271,15 @@ test('Clear buttons are visible only for sections with disabled options', () => 
 
 test('button count tracks enabled options across both independent sections', () => {
     const ui = setup();
-    assert.equal(ui.countLabel.textContent, '| 12');
+    assert.equal(ui.countLabel.textContent, '| 13');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
     ui.change('bots', false);
-    assert.equal(ui.countLabel.textContent, '| 11');
+    assert.equal(ui.countLabel.textContent, '| 12');
     assert.equal(ui.button.classList.contains('has-filter-count'), true);
     ui.solo(ui.option('messages'));
-    assert.equal(ui.countLabel.textContent, '| 9');
+    assert.equal(ui.countLabel.textContent, '| 10');
     ui.clear('all');
-    assert.equal(ui.countLabel.textContent, '| 12');
+    assert.equal(ui.countLabel.textContent, '| 13');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
 });
 
@@ -345,7 +352,7 @@ test('switching carousel cards dismisses the dropdown', () => {
 });
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
-const prefs = (users = ['mods'], types = ['messages']) => ({version: 5, origin: 'all', connectedPlatforms: ['twitch', 'youtube'], users, types});
+const prefs = (users = ['mods'], types = ['messages']) => ({version: 6, origin: 'all', channels: {}, connectedPlatforms: ['twitch', 'youtube'], users, types});
 const response = preferences => ({ok: true, json: async () => ({preferences})});
 const dataset = {preferencesUrl: '/channel/api/chat/preferences', csrfToken: 'valid'};
 
@@ -441,24 +448,74 @@ test('OBS mirror updates both filter axes and restores all filters', () => {
     assert.equal(updates, 3);
 });
 
-test('source filter persists independently, resets with Clear all, and mirrors to OBS', () => {
+test('participant toggles match shared rows and mirror selections to OBS', () => {
     const storage = new Map(), ui = setup(storage);
-    ui.originInput.value = 'shared'; ui.originInput.handlers.change();
+    ui.filter.participants([{id: '123', name: 'Rat'}, {id: '456', name: '<img onerror=bad>'}]);
+    assert.equal(ui.channelList.children[1].children[1].textContent, "Rat's Chat");
+    assert.equal(ui.channelList.children[2].children[1].textContent, "<img onerror=bad>'s Chat");
+    ui.toggleChannel('123', false);
     const local = ui.api.category({platform: 'twitch'});
-    const shared = ui.api.category({platform: 'twitch', is_shared: true});
-    assert.equal(ui.filter.allows(local), false);
-    assert.equal(ui.filter.allows(shared), true);
+    const rat = ui.api.category({platform: 'twitch', is_shared: true, source_channel_id: '123'});
+    const other = ui.api.category({platform: 'twitch', is_shared: true, source_channel_id: '456', is_bot: true});
+    assert.equal(ui.filter.allows(local), true);
+    assert.equal(ui.filter.allows(rat), false);
+    assert.equal(ui.filter.allows(other), true);
     const restored = setup(storage);
-    assert.equal(restored.originInput.value, 'shared');
-    assert.equal(restored.filter.allows(shared), true);
+    assert.equal(restored.filter.allows(rat), false);
     const mirror = ui.api.attachMirror(() => {});
     mirror.update(JSON.parse(storage.get('ratsboombot:chat-filters:test')));
-    assert.equal(mirror.allows(local), false);
-    assert.equal(mirror.allows(shared), true);
-    ui.clear('all');
-    assert.equal(ui.originInput.value, 'all');
+    assert.equal(mirror.allows(local), true);
+    assert.equal(mirror.allows(rat), false);
+    assert.equal(mirror.allows(other), true);
+    ui.filter.participants([{id: '456', name: 'Friend'}]);
+    assert.equal(ui.channel('123'), undefined);
+    assert.equal(ui.channelList.children.length, 2);
+    ui.clear('channels');
     assert.equal(ui.filter.allows(local), true);
-    ui.originInput.value = 'local'; ui.originInput.handlers.change();
-    assert.equal(ui.filter.allows(ui.api.category({platform: 'youtube'})), true);
+    assert.equal(ui.filter.allows(rat), true);
+});
+
+test('legacy source selections survive migration and Clear all restores channels', () => {
+    const storage = new Map([['ratsboombot:chat-filters:test', JSON.stringify({...prefs(), users: axes.users, origin: 'shared', version: 5})]]);
+    const ui = setup(storage);
+    assert.equal(ui.channel('shared').checked, true);
+    ui.filter.participants([{id: '123', name: 'Rat'}]);
+    assert.equal(ui.channel('123').checked, true);
+    ui.clear('all');
+    assert.equal(ui.channel('shared').checked, true);
+    assert.equal(ui.channel('123').checked, true);
+});
+
+test('right-click solos shared channels and repeating restores all', () => {
+    const ui = setup();
+    ui.filter.participants([{id: '123', name: 'Rat'}]);
+    const event = {target: {closest: () => ({querySelector: () => ui.channel('123')})}, preventDefault() {}};
+    ui.handlers.contextmenu(event);
+    assert.equal(ui.channel('shared').checked, false);
+    assert.equal(ui.channel('123').checked, true);
+    ui.handlers.contextmenu(event);
+    assert.equal(ui.channel('shared').checked, true);
+    ui.toggleChannel('123', false);
+    assert.equal(ui.channel('123').checked, false);
+});
+
+test('master disables all current and future shared channels and persists to OBS', () => {
+    const storage = new Map(), ui = setup(storage);
+    ui.filter.participants([{id: '123', name: 'Rat'}]);
+    ui.toggleChannel('shared', false);
+    ui.filter.participants([{id: '123', name: 'Rat'}, {id: '456', name: 'Friend'}]);
+    const local = ui.api.category({platform: 'youtube'});
+    const shared = ui.api.category({platform: 'twitch', is_shared: true, source_channel_id: '456'});
+    assert.equal(ui.filter.allows(local), true);
     assert.equal(ui.filter.allows(shared), false);
+    assert.equal(ui.channel('456').checked, false);
+    const mirror = ui.api.attachMirror(() => {});
+    mirror.update(JSON.parse(storage.get('ratsboombot:chat-filters:test')));
+    assert.equal(mirror.allows(local), true);
+    assert.equal(mirror.allows(shared), false);
+    const restored = setup(storage);
+    assert.equal(restored.channel('shared').checked, false);
+    ui.toggleChannel('shared', true);
+    assert.equal(ui.filter.allows(shared), true);
+    assert.equal(ui.channel('123').checked, true);
 });

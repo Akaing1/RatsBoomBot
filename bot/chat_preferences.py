@@ -8,12 +8,17 @@ MESSAGE_TYPES = ("commands", "redeems", "messages")
 
 
 def normalize_chat_preferences(value):
-    if not isinstance(value, dict) or set(value) - {"version", "connectedPlatforms", "users", "types", "origin"}:
+    if not isinstance(value, dict) or set(value) - {"version", "connectedPlatforms", "users", "types", "origin", "channels"}:
         raise ValueError("Invalid chat preferences.")
     origin = value.get("origin", "all")
     if origin not in ("all", "local", "shared"):
         raise ValueError("Invalid chat origin.")
-    result = {"version": 5, "origin": origin}
+    channels = value.get("channels", {})
+    if (not isinstance(channels, dict) or len(channels) > 100
+            or any(not isinstance(key, str) or (key != "local" and (not key.isascii() or not key.isdigit() or len(key) > 25))
+                   or not isinstance(enabled, bool) for key, enabled in channels.items())):
+        raise ValueError("Invalid chat channels.")
+    result = {"version": 6, "origin": origin, "channels": dict(channels)}
     for axis, allowed in (("connectedPlatforms", tuple(PLATFORM_USERS)),
                           ("users", sum(PLATFORM_USERS.values(), ())), ("types", MESSAGE_TYPES)):
         keys = value.get(axis)

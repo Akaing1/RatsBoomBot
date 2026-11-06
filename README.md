@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project is privately operated for Ninjakaing and a growing group of stream communities. Core broadcaster onboarding is self-service on the hosted website; specialized integrations and premium features may require maintainer assistance.
 
-Current application version: **17.1.1** (see [`config/version.py`](config/version.py)). Active development targets `release/17.0.0`; the branch name denotes the next release milestone.
+Current application version: **17.1.2** (see [`config/version.py`](config/version.py)). Active development targets `release/17.0.0`; the branch name denotes the next release milestone.
 
 [Website](https://ratsboombot.com) · [My account](https://ratsboombot.com/me) · [Patch notes](https://ratsboombot.com/patch-notes) · [Local development](docs/development.md)
 
@@ -417,6 +417,6 @@ Connection recovery and monitoring: [operations guide](docs/connection-recovery.
 
 ### Shared Chat handling
 
-Combined Chat and its OBS dock label messages relayed from other Twitch channels with their source channel. The Chat source filter selects All channels (default), This channel, or Shared Chat and syncs to an open OBS dock. Existing saved filters default to All channels. Local YouTube messages remain in This channel.
+Combined Chat and its OBS dock label messages relayed from other Twitch channels with their source channel. The Shared Chat filter section has an Enable shared chat toggle for all shared messages and individual toggles for each participating streamer’s chat, plus Clear and right-click-to-solo controls. Twitch’s session roster refreshes about every 30 seconds while the dashboard is open, including quiet channels; departed participants disappear from the list. Per-channel selections sync to an open OBS dock and existing per-streamer choices are preserved. Your own Twitch and YouTube messages are always included by the Shared Chat section; user and message-type filters still apply.
 
 Relayed messages and notifications are display-only for the receiving channel: they do not earn loyalty points, increment chatter statistics, advance timers/Boss Hunt activity, trigger automatic shoutouts or run bot moderation there. TwitchIO skips commands on relayed messages; commands still run in their original channel. Message IDs remain scoped to the receiving channel for replies and moderation. Shared messages use source-channel badges and role highlights. This does not start or manage Stream Together sessions.
