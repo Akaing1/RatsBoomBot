@@ -33,7 +33,7 @@
         <p data-dock-send-status role="status" aria-live="polite"></p>
     </form>
     {% else %}
-    <p class="widget-chat-login"><a href="/connect/twitch">Sign in to send messages</a> · Reopen your dock URL after signing in.</p>
+    <p class="widget-chat-login"><a href="/connect/twitch?dock={{ token | urlencode }}">Sign in to send messages</a></p>
     {% endif %}
     <script src="{{ url_for('static', path='/js/chat-widget.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/chat-name-colors.js') }}?v={{ deployment_stamp() }}" defer></script>

@@ -20,6 +20,7 @@ from web.shared.oauth import build_public_channel_oauth_url, build_public_custom
 from web.state import get_bot, get_db
 
 router = APIRouter()
+DOCK_RETURN_TOKEN_KEY = "channel_oauth_dock_token"
 
 
 @router.get("/channel/api/authorization")
@@ -63,7 +64,12 @@ async def public_connect_page(request: Request):
 
 
 @router.get("/connect/twitch")
-async def public_connect_twitch(request: Request):
+async def public_connect_twitch(request: Request, dock: str | None = None):
+    request.session.pop(DOCK_RETURN_TOKEN_KEY, None)
+    runtime_bot = get_bot()
+    live_chat = getattr(getattr(runtime_bot, "services", None), "live_chat", None)
+    if dock and live_chat and live_chat.resolve_widget_token(dock):
+        request.session[DOCK_RETURN_TOKEN_KEY] = dock
     state = create_channel_oauth_state(request)
     return RedirectResponse(build_public_channel_oauth_url(state=state))
 
@@ -198,8 +204,15 @@ async def public_channel_callback(request: Request, code: str | None = None, sta
     if not validate_channel_oauth_state(request, state):
         return render_channel_auth_error(request, title="Channel authorization failed", message="This authorization attempt expired, was already used, or could not be verified. Start channel sign-in again from this page.", status_code=400)
 
+    dock_token = request.session.pop(DOCK_RETURN_TOKEN_KEY, None)
+    dock_return = None
+    runtime_bot = get_bot()
+    live_chat = getattr(getattr(runtime_bot, "services", None), "live_chat", None)
+    if dock_token and live_chat and live_chat.resolve_widget_token(dock_token):
+        dock_return = f"/widgets/chat/{quote_plus(dock_token)}"
+
     if error:
-        return RedirectResponse(url="/", status_code=303)
+        return RedirectResponse(url=dock_return or "/", status_code=303)
 
     if not code:
         return render_channel_auth_error(request, title="Channel authorization failed", message="No authorization code was provided.", status_code=400)
@@ -221,7 +234,7 @@ async def public_channel_callback(request: Request, code: str | None = None, sta
     except Exception:
         return render_channel_auth_error(request, title="Channel connection failed", message="The channel could not be connected. Please try again shortly.", status_code=500)
 
-    return RedirectResponse(url="/channel", status_code=303)
+    return RedirectResponse(url=dock_return or "/channel", status_code=303)
 
 
 async def custom_bot_callback(request: Request, code: str | None, state: str | None, error: str | None):
