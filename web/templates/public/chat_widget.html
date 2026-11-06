@@ -9,10 +9,12 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/chat-widget.css') }}?v={{ deployment_stamp() }}">
 </head>
 <body class="chat-widget-body">
+    {% if can_send %}
     <header class="widget-chat-header">
-        <span id="dock-connection" role="status" aria-live="polite">Connecting…</span>
-        <button type="button" data-dock-reload>Reconnect</button>
+        <label class="sr-only" for="dock-target">Send to</label>
+        <select id="dock-target" name="target" form="dock-composer"><option value="twitch">Twitch</option><option value="youtube">YouTube</option><option value="both">Both</option></select>
     </header>
+    {% endif %}
     <main
         class="live-chat-feed widget-chat-feed"
         data-live-chat-feed
@@ -23,18 +25,24 @@
         data-empty-title="Waiting for {{ view }}"
     ><p class="compact-empty-state">Waiting for chat messages…</p></main>
     {% if can_send %}
-    <form class="widget-chat-composer" data-dock-composer action="/widgets/chat/{{ token }}/send">
+    <form id="dock-composer" class="widget-chat-composer" data-dock-composer action="/widgets/chat/{{ token }}/send">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <label class="sr-only" for="dock-target">Send to</label>
-        <select id="dock-target" name="target"><option value="twitch">Twitch</option><option value="youtube">YouTube</option><option value="both">Both</option></select>
         <label class="sr-only" for="dock-message">Message</label>
-        <textarea id="dock-message" name="message" rows="2" maxlength="500" required placeholder="Send a message…"></textarea>
-        <button type="submit" class="button primary">Send</button>
+        <div class="widget-chat-entry">
+        <textarea id="dock-message" name="message" rows="1" maxlength="500" required placeholder="Send a message…"></textarea>
+        <button type="button" class="chat-emote-toggle" data-dock-emotes aria-label="Open emote picker" aria-expanded="false">☺</button>
+        <span id="dock-connection" class="chat-send-status" role="status" aria-live="polite">Connecting…</span>
+        </div>
+        <button type="submit" class="button primary chat-send-button" aria-label="Send message" title="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3 21 12 4 21 8 12Z"/></svg></button>
+        <div class="chat-emote-picker" data-dock-picker hidden></div>
         <p data-dock-send-status role="status" aria-live="polite"></p>
     </form>
     {% else %}
+    <span id="dock-connection" class="chat-send-status" role="status">Connecting…</span>
     <p class="widget-chat-login"><a href="/connect/twitch?dock={{ token | urlencode }}">Sign in to send messages</a></p>
     {% endif %}
+    <script src="{{ url_for('static', path='/js/chat-emote-picker.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/chat-emote-input.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/chat-widget.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/chat-name-colors.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-chat-filters.js') }}?v={{ deployment_stamp() }}" defer></script>
