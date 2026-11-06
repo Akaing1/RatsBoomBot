@@ -453,19 +453,18 @@ test('participant toggles match shared rows and mirror selections to OBS', () =>
     ui.filter.participants([{id: '123', name: 'Rat'}, {id: '456', name: '<img onerror=bad>'}]);
     assert.equal(ui.channelList.children[1].children[1].textContent, "Rat's Chat");
     assert.equal(ui.channelList.children[2].children[1].textContent, "<img onerror=bad>'s Chat");
-    ui.toggleChannel('local', false);
     ui.toggleChannel('123', false);
     const local = ui.api.category({platform: 'twitch'});
     const rat = ui.api.category({platform: 'twitch', is_shared: true, source_channel_id: '123'});
     const other = ui.api.category({platform: 'twitch', is_shared: true, source_channel_id: '456', is_bot: true});
-    assert.equal(ui.filter.allows(local), false);
+    assert.equal(ui.filter.allows(local), true);
     assert.equal(ui.filter.allows(rat), false);
     assert.equal(ui.filter.allows(other), true);
     const restored = setup(storage);
     assert.equal(restored.filter.allows(rat), false);
     const mirror = ui.api.attachMirror(() => {});
     mirror.update(JSON.parse(storage.get('ratsboombot:chat-filters:test')));
-    assert.equal(mirror.allows(local), false);
+    assert.equal(mirror.allows(local), true);
     assert.equal(mirror.allows(rat), false);
     assert.equal(mirror.allows(other), true);
     ui.filter.participants([{id: '456', name: 'Friend'}]);
@@ -479,24 +478,44 @@ test('participant toggles match shared rows and mirror selections to OBS', () =>
 test('legacy source selections survive migration and Clear all restores channels', () => {
     const storage = new Map([['ratsboombot:chat-filters:test', JSON.stringify({...prefs(), users: axes.users, origin: 'shared', version: 5})]]);
     const ui = setup(storage);
-    assert.equal(ui.channel('local').checked, false);
+    assert.equal(ui.channel('shared').checked, true);
     ui.filter.participants([{id: '123', name: 'Rat'}]);
     assert.equal(ui.channel('123').checked, true);
     ui.clear('all');
-    assert.equal(ui.channel('local').checked, true);
+    assert.equal(ui.channel('shared').checked, true);
     assert.equal(ui.channel('123').checked, true);
 });
 
-test('right-click solos a channel and repeating restores all; last toggle resets', () => {
+test('right-click solos shared channels and repeating restores all', () => {
     const ui = setup();
     ui.filter.participants([{id: '123', name: 'Rat'}]);
     const event = {target: {closest: () => ({querySelector: () => ui.channel('123')})}, preventDefault() {}};
     ui.handlers.contextmenu(event);
-    assert.equal(ui.channel('local').checked, false);
+    assert.equal(ui.channel('shared').checked, false);
     assert.equal(ui.channel('123').checked, true);
     ui.handlers.contextmenu(event);
-    assert.equal(ui.channel('local').checked, true);
-    ui.toggleChannel('local', false); ui.toggleChannel('123', false);
-    assert.equal(ui.channel('local').checked, true);
+    assert.equal(ui.channel('shared').checked, true);
+    ui.toggleChannel('123', false);
+    assert.equal(ui.channel('123').checked, false);
+});
+
+test('master disables all current and future shared channels and persists to OBS', () => {
+    const storage = new Map(), ui = setup(storage);
+    ui.filter.participants([{id: '123', name: 'Rat'}]);
+    ui.toggleChannel('shared', false);
+    ui.filter.participants([{id: '123', name: 'Rat'}, {id: '456', name: 'Friend'}]);
+    const local = ui.api.category({platform: 'youtube'});
+    const shared = ui.api.category({platform: 'twitch', is_shared: true, source_channel_id: '456'});
+    assert.equal(ui.filter.allows(local), true);
+    assert.equal(ui.filter.allows(shared), false);
+    assert.equal(ui.channel('456').checked, false);
+    const mirror = ui.api.attachMirror(() => {});
+    mirror.update(JSON.parse(storage.get('ratsboombot:chat-filters:test')));
+    assert.equal(mirror.allows(local), true);
+    assert.equal(mirror.allows(shared), false);
+    const restored = setup(storage);
+    assert.equal(restored.channel('shared').checked, false);
+    ui.toggleChannel('shared', true);
+    assert.equal(ui.filter.allows(shared), true);
     assert.equal(ui.channel('123').checked, true);
 });

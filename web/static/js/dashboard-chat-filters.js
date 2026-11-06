@@ -55,6 +55,8 @@
         function restore(saved) {
             origin = ['all', 'local', 'shared'].includes(saved?.origin) ? saved.origin : 'all';
             channels = {...saved?.channels};
+            delete channels.local;
+            if (origin === 'shared') origin = 'all';
             // Migrate the earlier flat selection without losing saved preferences.
             if (Array.isArray(saved)) {
                 const renamed = saved.map(key => key === 'normal' ? 'non_subs' : key === 'other' ? 'messages' : key);
@@ -117,7 +119,13 @@
         }
 
         function sync() {
-            channelInputs.forEach((input, id) => { input.checked = allowsChannel({origin: id === 'local' ? 'local' : 'shared', channel: id}); });
+            channelInputs.forEach((input, id) => {
+                if (id === 'shared') {
+                    const selections = [origin !== 'local', ...Object.entries(channels).map(([, checked]) => checked)];
+                    input.checked = selections.every(Boolean);
+                    input.indeterminate = selections.some(Boolean) && !input.checked;
+                } else { input.checked = allowsChannel({origin: 'shared', channel: id}); }
+            });
             const count = enabled.users.size + enabled.types.size + [...channelInputs.values()].filter(input => input.checked).length;
             if (countLabel) countLabel.textContent = `| ${count}`;
             button.classList.toggle('has-filter-count', count < axes.users.length + axes.types.length + channelInputs.size);
@@ -247,12 +255,12 @@
         control.addEventListener('contextmenu', event => {
             const row = event.target.closest('.chat-filter-row');
             const channelInput = row?.querySelector('[data-chat-filter-channel]');
-            if (channelInput) {
+            if (channelInput && channelInput.dataset.chatFilterChannel !== 'shared') {
                 event.preventDefault();
                 const id = channelInput.dataset.chatFilterChannel;
-                const soloed = [...channelInputs.keys()].every(key => allowsChannel({origin: key === 'local' ? 'local' : 'shared', channel: key}) === (key === id));
+                const soloed = [...channelInputs.keys()].filter(key => key !== 'shared').every(key => allowsChannel({origin: 'shared', channel: key}) === (key === id)) && origin === 'local';
                 origin = soloed ? 'all' : 'local';
-                channels = soloed ? {} : Object.fromEntries([...channelInputs.keys()].map(key => [key, key === id]));
+                channels = soloed ? {} : Object.fromEntries([...channelInputs.keys()].filter(key => key !== 'shared').map(key => [key, key === id]));
                 applySelection(); return;
             }
             const input = row?.querySelector('[data-chat-filter-option]');
@@ -283,7 +291,7 @@
         function allowsChannel(category) { return channelAllowed({origin, channels}, category); }
         function participants(entries) {
             if (!channelList) return;
-            const roster = [{id: 'local', name: 'Your channel'}, ...entries.filter(entry => String(entry.id) !== control.dataset.channelId)
+            const roster = [{id: 'shared', name: 'Enable shared chat'}, ...entries.filter(entry => String(entry.id) !== control.dataset.channelId)
                 .map(entry => ({id: String(entry.id), name: `${entry.name || entry.id}'s Chat`}))];
             const ids = new Set(roster.map(entry => entry.id));
             channelInputs.forEach((input, id) => {
@@ -300,8 +308,9 @@
                     row.append(input, label); channelList.append(row);
                     channelInputs.set(id, input);
                     input.addEventListener('change', () => {
-                        channels[id] = input.checked;
-                        if (![...channelInputs.values()].some(item => item.checked)) { origin = 'all'; channels = {}; }
+                        if (id === 'shared') {
+                            origin = input.checked ? 'all' : 'local'; channels = {};
+                        } else { channels[id] = input.checked; }
                         applySelection();
                     });
                 }
@@ -317,6 +326,7 @@
         return {participants, allows: category => allowsChannel(category) && enabled.users.has(category.user) && enabled.types.has(category.type)};
     }
     function channelAllowed(saved, {origin = 'local', channel = 'local'}) {
+        if (origin === 'local') return true;
         if (Object.prototype.hasOwnProperty.call(saved.channels || {}, channel)) return saved.channels[channel];
         return !saved.origin || saved.origin === 'all' || saved.origin === origin;
     }
