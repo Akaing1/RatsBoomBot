@@ -155,7 +155,7 @@
                 <h3 class="chat-heading">Combined Chat <span class="chat-platform-dot twitch active" title="Twitch connected" aria-label="Twitch connected"></span><span class="chat-platform-dot youtube {% if youtube_chat.connected %}active{% endif %}" title="YouTube {% if youtube_chat.connected %}connected{% else %}off{% endif %}" aria-label="YouTube {% if youtube_chat.connected %}connected{% else %}off{% endif %}"></span></h3>
             </div>
             <div class="dashboard-chat-header-actions">
-                <div class="chat-filter" data-chat-filter data-channel-id="{{ broadcaster.id }}">
+                <div class="chat-filter" data-chat-filter data-channel-id="{{ broadcaster.id }}"{% if not moderator_mode %} data-preferences-url="/channel/api/chat/preferences" data-csrf-token="{{ csrf_token }}"{% endif %}>
                     <button type="button" class="chat-filter-toggle" data-chat-filter-toggle aria-label="Filter chat" aria-expanded="false" aria-controls="chat-filter-options" title="Filter chat">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="chat-filter-button-label">Filter</span><span data-chat-filter-count aria-hidden="true"></span>
                     </button>
@@ -191,7 +191,14 @@
                             {% endif %}
                         </div>
                         {% endfor %}
-                        <p class="chat-filter-hint">Left-click to toggle. Right-click to solo.</p>
+                        <div class="chat-filter-group" role="group" aria-label="Shared Chat">
+                            <div class="chat-filter-options-header chat-filter-section-header">
+                                <span class="chat-filter-group-title">Shared Chat</span>
+                                <button type="button" class="chat-filter-clear" data-chat-filter-clear="channels" aria-label="Reset shared chat filters to show everything">Clear</button>
+                            </div>
+                            <div data-chat-filter-channels></div>
+                        </div>
+                        <p class="chat-filter-hint">Left-click to toggle. Right-click to solo.</p><p data-chat-filter-sync-status hidden role="status" aria-live="polite"></p>
                     </div>
                 </div>
                 <button type="button" class="dashboard-chat-control dashboard-chat-lock" data-chat-lock aria-pressed="false" aria-label="Lock automatic chat resizing" title="Lock automatic chat resizing">

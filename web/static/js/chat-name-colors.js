@@ -46,10 +46,15 @@
         }
         return [background, ...samples];
     }
+    const applied = new WeakMap();
     function apply(name) {
         const original = name.dataset.chatNameColor;
         if (!/^#[0-9a-f]{6}$/i.test(original || '')) return;
-        name.style.color = readable(original, backgrounds(name));
+        const color = readable(original, backgrounds(name));
+        const previous = applied.get(name);
+        if (previous?.color === color && previous.actual === name.style.color) return;
+        name.style.color = color;
+        applied.set(name, {color, actual: name.style.color});
     }
     function refresh() { document.querySelectorAll('[data-chat-name-color]').forEach(apply); }
     window.dashboardNameColors = {apply, readable, contrast};

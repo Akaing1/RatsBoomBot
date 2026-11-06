@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import re
 import time
@@ -1829,6 +1830,27 @@ async def prioritize_raid_current_category(runtime_bot, broadcaster_id, payload)
         return payload
 
 
+@router.get("/channel/api/chat/preferences")
+async def channel_chat_preferences(request: Request):
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    return JSONResponse({"preferences": context.services.live_chat.get_chat_preferences(context.broadcaster_id)}, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/channel/api/chat/preferences")
+async def update_channel_chat_preferences(request: Request, preferences: str = Form(..., max_length=2000), csrf_token: str = Form(...)):
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    validate_csrf_token(request, csrf_token)
+    try:
+        saved = await context.services.live_chat.set_chat_preferences(context.broadcaster_id, json.loads(preferences))
+    except (TypeError, ValueError) as error:
+        return JSONResponse({"detail": str(error)}, status_code=400)
+    return JSONResponse({"preferences": saved}, headers={"Cache-Control": "no-store"})
+
+
 @router.get("/channel/api/chat/stream")
 async def channel_chat_stream(request: Request, view: str = "both"):
     broadcaster_id = current_channel_id(request)
@@ -2432,7 +2454,7 @@ async def channel_customization_page(request: Request):
     groups = services.profile_settings.get_setting_groups(broadcaster_id, {feature.value for feature in services.features.get_profile_features(broadcaster_id)})
     widget_token = "" if getattr(getattr(request, "state", None), "channel_access", None) else await services.live_chat.get_or_create_widget_token(broadcaster_id)
     widget_base_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/widgets/chat/{widget_token}"
-    widget_urls = {view: f"{widget_base_url}?view={view}" for view in ("chat", "commands", "both")}
+    widget_urls = {"dock": widget_base_url}
 
     return templates.TemplateResponse(
         request=request,

@@ -1,27 +1,17 @@
-            <article class="youtube-integration-card widget-url-card">
-                <div class="toggle-card-heading">
-                    <div>
-                        <h4>OBS browser sources</h4>
-                        <p>Add any of these URLs to an OBS Browser Source. Treat them like private stream keys.</p>
-                    </div>
-                </div>
-
-                {% for key, label, description in [
-                    ('chat', 'Chat', 'Twitch and YouTube messages, excluding commands.'),
-                    ('commands', 'Commands', 'Command messages only.'),
-                    ('both', 'Both', 'All chat messages and commands.')
-                ] %}
-                    <label class="widget-url-field">
-                        <span><strong>{{ label }}</strong> &middot; {{ description }}</span>
-                        <div class="widget-url-controls">
-                            <input class="profile-setting-input" type="text" value="{{ widget_urls[key] }}" readonly data-widget-url="{{ key }}">
-                            <button class="button secondary" type="button" data-copy-widget-url="{{ key }}">Copy URL</button>
-                        </div>
-                    </label>
-                {% endfor %}
-
-                <form class="widget-regenerate-form" method="post" action="/channel/widgets/regenerate" onsubmit="return confirm('Generate new URLs? Existing OBS browser-source URLs will stop working.');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button class="button danger" type="submit">Regenerate URLs</button>
-                </form>
-            </article>
+<article class="youtube-integration-card widget-url-card">
+    <div class="toggle-card-heading"><div>
+        <h4>OBS custom dock</h4>
+        <p>In OBS, open Docks → Custom Browser Docks and add this URL. It follows your Combined Chat filters automatically, including changes made while the dock is open. Keep this URL private.</p>
+    </div></div>
+    <label class="widget-url-field">
+        <span>Combined Chat</span>
+        <div class="widget-url-controls">
+            <input class="profile-setting-input" type="text" value="{{ widget_urls.get('dock', '') }}" readonly data-widget-url="dock" aria-label="OBS custom dock URL">
+            <button class="button secondary" type="button" data-copy-widget-url="dock">Copy URL</button>
+        </div>
+    </label>
+    <form class="widget-regenerate-form" method="post" action="/channel/widgets/regenerate" onsubmit="return confirm('Generate a new URL? Existing OBS dock URLs will stop working.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="button danger" type="submit">Regenerate URL</button>
+    </form>
+</article>

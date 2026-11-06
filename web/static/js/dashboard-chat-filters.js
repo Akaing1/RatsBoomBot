@@ -14,10 +14,11 @@
 
     function category(message) {
         const isNotice = Boolean(message.notice_type);
+        const source = {origin: message.is_shared ? 'shared' : 'local', channel: message.is_shared ? String(message.source_channel_id || '') : 'local'};
         const type = message.is_redeem || isNotice || message.kind === 'redeem' || message.kind === 'redemption'
             ? 'redeems' : message.kind === 'command' ? 'commands' : 'messages';
         if (message.is_bot || isNotice) {
-            return {user: message.platform === 'youtube' ? 'youtube_bots' : 'bots', type};
+            return {user: message.platform === 'youtube' ? 'youtube_bots' : 'bots', type, ...source};
         }
         const badges = new Set((message.badges || []).map(badge =>
             String(typeof badge === 'string' ? badge : badge.name || '').toLowerCase()));
@@ -28,7 +29,7 @@
             : badges.has('vip') || message.accent === 'vip' ? 'vips'
             : badges.has('subscriber') || badges.has('founder') || message.accent === 'subscriber' ? 'subs'
             : 'non_subs';
-        return {user, type};
+        return {user, type, ...source};
     }
 
     function attach(element, onChange) {
@@ -43,12 +44,19 @@
         const connectedPlatforms = platformToggles.filter(input => !input.disabled)
             .map(input => input.dataset.chatFilterPlatform);
         const axes = {users: connectedPlatforms.flatMap(platform => platforms[platform]), types: messageTypes};
+        const channelList = control.querySelector('[data-chat-filter-channels]');
+        const channelInputs = new Map();
+        let channels = {};
+        let origin = 'all';
         let connectionBadgesShown = false;
         const clearButtons = [...control.querySelectorAll('[data-chat-filter-clear]')];
         const storageKey = `ratsboombot:chat-filters:${control.dataset.channelId}${window.dashboardChatDebug?.active ? ':test' : ''}`;
         const enabled = {users: new Set(axes.users), types: new Set(axes.types)};
-        try {
-            let saved = JSON.parse(window.localStorage.getItem(storageKey) || 'null');
+        function restore(saved) {
+            origin = ['all', 'local', 'shared'].includes(saved?.origin) ? saved.origin : 'all';
+            channels = {...saved?.channels};
+            delete channels.local;
+            if (origin === 'shared') origin = 'all';
             // Migrate the earlier flat selection without losing saved preferences.
             if (Array.isArray(saved)) {
                 const renamed = saved.map(key => key === 'normal' ? 'non_subs' : key === 'other' ? 'messages' : key);
@@ -70,7 +78,9 @@
                     enabled[axis] = new Set(keys.length ? keys : axes[axis]);
                 }
             }
-        } catch (_) { /* Default to showing everything when storage is unavailable. */ }
+        }
+        try { restore(JSON.parse(window.localStorage.getItem(storageKey) || 'null')); }
+        catch (_) { /* Default to showing everything when storage is unavailable. */ }
 
         function positionDropdown() {
             if (options.hidden) return;
@@ -109,9 +119,16 @@
         }
 
         function sync() {
-            const count = enabled.users.size + enabled.types.size;
+            channelInputs.forEach((input, id) => {
+                if (id === 'shared') {
+                    const selections = [origin !== 'local', ...Object.entries(channels).map(([, checked]) => checked)];
+                    input.checked = selections.every(Boolean);
+                    input.indeterminate = selections.some(Boolean) && !input.checked;
+                } else { input.checked = allowsChannel({origin: 'shared', channel: id}); }
+            });
+            const count = enabled.users.size + enabled.types.size + [...channelInputs.values()].filter(input => input.checked).length;
             if (countLabel) countLabel.textContent = `| ${count}`;
-            button.classList.toggle('has-filter-count', count < axes.users.length + axes.types.length);
+            button.classList.toggle('has-filter-count', count < axes.users.length + axes.types.length + channelInputs.size);
             button.setAttribute('aria-label', `Filter chat, ${count} options enabled`);
             inputs.forEach(input => {
                 const selection = enabled[input.dataset.chatFilterAxis];
@@ -129,12 +146,12 @@
             clearButtons.forEach(clear => {
                 const axis = clear.dataset.chatFilterClear;
                 clear.hidden = axis === 'all'
-                    ? enabled.users.size === axes.users.length && enabled.types.size === axes.types.length
-                    : enabled[axis].size === axes[axis].length;
+                    ? enabled.users.size === axes.users.length && enabled.types.size === axes.types.length && origin === 'all' && !Object.values(channels).includes(false)
+                    : axis === 'channels' ? origin === 'all' && !Object.values(channels).includes(false) : enabled[axis].size === axes[axis].length;
             });
-            const filtered = Object.keys(axes).some(axis => enabled[axis].size < axes[axis].length);
+            const filtered = origin !== 'all' || Object.values(channels).includes(false) || Object.keys(axes).some(axis => enabled[axis].size < axes[axis].length);
             button.classList.toggle('is-filtered', filtered);
-            button.title = filtered ? 'Filter chat (user and message-type filters active)' : 'Filter chat (all messages shown)';
+            button.title = filtered ? 'Filter chat (filters active)' : 'Filter chat (all messages shown)';
         }
         function close(returnFocus = false) {
             options.hidePopover?.();
@@ -166,10 +183,52 @@
         });
         document.addEventListener('click', event => { if (!control.contains(event.target)) close(); });
         document.addEventListener('dashboard-carousel-card-changed', () => close());
+        const snapshot = () => ({version: 6, origin, channels: {...channels}, connectedPlatforms, users: [...enabled.users], types: [...enabled.types]});
+        const syncUrl = !window.dashboardChatDebug?.active && control.dataset.preferencesUrl;
+        const syncStatus = control.querySelector('[data-chat-filter-sync-status]');
+        let remoteReady = false, loading = false, dirty = false, saving = false, pending = null;
+        const status = message => { if (syncStatus && syncUrl) { syncStatus.textContent = message; syncStatus.hidden = !message; } };
+        async function requestPreferences(options = {}) {
+            const controller = new AbortController();
+            const timeout = window.setTimeout(() => controller.abort(), 10000);
+            try {
+                const response = await fetch(syncUrl, {...options, signal: controller.signal, cache: 'no-store', headers: {Accept: 'application/json'}});
+                if (!response.ok) throw new Error('Chat preferences unavailable');
+                return await response.json();
+            } finally { window.clearTimeout(timeout); }
+        }
+        async function saveRemote() {
+            pending = snapshot();
+            if (saving || !remoteReady) return;
+            saving = true;
+            try {
+                while (pending) {
+                    const selection = pending; pending = null;
+                    const body = new FormData();
+                    body.set('csrf_token', control.dataset.csrfToken);
+                    body.set('preferences', JSON.stringify(selection));
+                    await requestPreferences({method: 'POST', body});
+                }
+                dirty = false; status('');
+            } catch (_) {
+                remoteReady = false;
+                status('OBS filters could not be saved. Change a filter to retry.');
+            } finally { saving = false; }
+        }
+        async function loadRemote() {
+            if (!syncUrl || loading) return;
+            loading = true;
+            try {
+                const result = await requestPreferences();
+                if (result.preferences && !dirty) { restore(result.preferences); sync(); onChange(); persistSelection(); }
+                remoteReady = true;
+                if (!result.preferences || dirty || JSON.stringify(result.preferences) !== JSON.stringify(snapshot())) await saveRemote();
+            } catch (_) { status('OBS filters could not be loaded. Change a filter to retry.'); }
+            finally { loading = false; }
+        }
         function persistSelection() {
             try {
-                window.localStorage.setItem(storageKey, JSON.stringify({version: 4, connectedPlatforms,
-                    users: [...enabled.users], types: [...enabled.types]}));
+                window.localStorage.setItem(storageKey, JSON.stringify(snapshot()));
             } catch (_) {}
         }
         function applySelection() {
@@ -178,10 +237,12 @@
             }
             persistSelection();
             sync(); onChange();
+            if (syncUrl) { dirty = true; if (remoteReady) saveRemote(); else loadRemote(); }
         }
         clearButtons.forEach(clear => clear.addEventListener('click', () => {
             const target = clear.dataset.chatFilterClear;
-            const targets = target === 'all' ? Object.keys(axes) : [target];
+            if (target === 'all' || target === 'channels') { origin = 'all'; channels = {}; }
+            const targets = target === 'all' ? Object.keys(axes) : target === 'channels' ? [] : [target];
             targets.forEach(axis => { enabled[axis] = new Set(axes[axis]); });
             applySelection();
         }));
@@ -193,6 +254,15 @@
         }
         control.addEventListener('contextmenu', event => {
             const row = event.target.closest('.chat-filter-row');
+            const channelInput = row?.querySelector('[data-chat-filter-channel]');
+            if (channelInput && channelInput.dataset.chatFilterChannel !== 'shared') {
+                event.preventDefault();
+                const id = channelInput.dataset.chatFilterChannel;
+                const soloed = [...channelInputs.keys()].filter(key => key !== 'shared').every(key => allowsChannel({origin: 'shared', channel: key}) === (key === id)) && origin === 'local';
+                origin = soloed ? 'all' : 'local';
+                channels = soloed ? {} : Object.fromEntries([...channelInputs.keys()].filter(key => key !== 'shared').map(key => [key, key === id]));
+                applySelection(); return;
+            }
             const input = row?.querySelector('[data-chat-filter-option]');
             if (input && inputs.includes(input) && !input.disabled) {
                 event.preventDefault(); solo(input.dataset.chatFilterAxis, [input.dataset.chatFilterOption]);
@@ -210,6 +280,7 @@
             });
             applySelection();
         }));
+
         inputs.forEach(input => input.addEventListener('change', () => {
             if (input.disabled) return;
             const selection = enabled[input.dataset.chatFilterAxis];
@@ -217,10 +288,62 @@
             if (input.checked) selection.add(key); else selection.delete(key);
             applySelection();
         }));
+        function allowsChannel(category) { return channelAllowed({origin, channels}, category); }
+        function participants(entries) {
+            if (!channelList) return;
+            const roster = [{id: 'shared', name: 'Enable shared chat'}, ...entries.filter(entry => String(entry.id) !== control.dataset.channelId)
+                .map(entry => ({id: String(entry.id), name: `${entry.name || entry.id}'s Chat`}))];
+            const ids = new Set(roster.map(entry => entry.id));
+            channelInputs.forEach((input, id) => {
+                if (!ids.has(id)) { input.parentElement.remove(); channelInputs.delete(id); }
+            });
+            roster.forEach(({id, name}) => {
+                let input = channelInputs.get(id);
+                if (!input) {
+                    const row = document.createElement('label');
+                    row.className = 'chat-filter-row chat-filter-suboption';
+                    input = document.createElement('input'); input.type = 'checkbox';
+                    input.dataset.chatFilterChannel = id;
+                    const label = document.createElement('span');
+                    row.append(input, label); channelList.append(row);
+                    channelInputs.set(id, input);
+                    input.addEventListener('change', () => {
+                        if (id === 'shared') {
+                            origin = input.checked ? 'all' : 'local'; channels = {};
+                        } else { channels[id] = input.checked; }
+                        applySelection();
+                    });
+                }
+                input.parentElement.querySelector('span').textContent = name;
+                input.parentElement.title = name;
+            });
+            sync(); positionDropdown();
+        }
+        participants([]);
         sync();
         persistSelection();
-        return {allows: ({user, type}) =>
-            enabled.users.has(user) && enabled.types.has(type)};
+        if (syncUrl) Promise.resolve().then(loadRemote);
+        return {participants, allows: category => allowsChannel(category) && enabled.users.has(category.user) && enabled.types.has(category.type)};
     }
-    window.dashboardChatFilters = {category, attach, dropdownPosition};
+    function channelAllowed(saved, {origin = 'local', channel = 'local'}) {
+        if (origin === 'local') return true;
+        if (Object.prototype.hasOwnProperty.call(saved.channels || {}, channel)) return saved.channels[channel];
+        return !saved.origin || saved.origin === 'all' || saved.origin === origin;
+    }
+
+    function attachMirror(onChange) {
+        let enabled = null;
+        return {
+            allows: category => !enabled || channelAllowed(enabled, category) && enabled.users.includes(category.user) && enabled.types.includes(category.type),
+            update(saved) {
+                enabled = saved ? {
+                    origin: saved.origin || 'all', channels: saved.channels || {},
+                    users: saved.users?.length ? saved.users : (saved.connectedPlatforms || Object.keys(platforms)).flatMap(key => platforms[key] || []),
+                    types: saved.types?.length ? saved.types : messageTypes
+                } : null;
+                onChange();
+            }
+        };
+    }
+    window.dashboardChatFilters = {category, attach, attachMirror, dropdownPosition};
 })();

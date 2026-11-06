@@ -201,7 +201,7 @@ test('pinned-message polling never overlaps requests and releases its guard afte
 });
 
 test('filtering queries rows and viewport once while retaining filtering and follow behavior', () => {
-    const callback = source.match(/feed.filters = window.dashboardChatFilters\?\.attach\(element, \(\) => \{([\s\S]*?)\n        \}\);/)[1];
+    const callback = source.match(/const refreshFilters = \(\) => \{([\s\S]*?)\n        \};/)[1];
     const rows = ['allowed', 'blocked'].map(user => ({hidden: false,
         dataset: {chatUser: user, chatType: 'messages'}, getBoundingClientRect: () => ({top: 10, bottom: 30})}));
     let queries = 0, measurements = 0, scrolls = 0;
@@ -215,7 +215,7 @@ test('filtering queries rows and viewport once while retaining filtering and fol
 });
 
 test('filtering preserves the visible anchor when not following new messages', () => {
-    const callback = source.match(/feed.filters = window.dashboardChatFilters\?\.attach\(element, \(\) => \{([\s\S]*?)\n        \}\);/)[1];
+    const callback = source.match(/const refreshFilters = \(\) => \{([\s\S]*?)\n        \};/)[1];
     const before = {hidden: false, dataset: {chatUser: 'blocked', chatType: 'messages'},
         getBoundingClientRect: () => ({top: -20, bottom: -1})};
     const anchor = {hidden: false, dataset: {chatUser: 'allowed', chatType: 'messages'},
@@ -248,7 +248,7 @@ test('private send failures are bot messages for the affected platform and obey 
     vm.runInContext(`${handler}\nonSendError({detail:{platform:'twitch',message:'Failed'}}); onSendError({detail:{platform:'youtube',message:'Failed'}});`, context);
     assert.deepEqual(rows.map(row => row.dataset.chatUser), ['bots', 'youtube_bots']);
     assert.ok(rows.every(row => row.dataset.chatType === 'messages'));
-    const callback = source.match(/feed.filters = window.dashboardChatFilters\?\.attach\(element, \(\) => \{([\s\S]*?)\n        \}\);/)[1];
+    const callback = source.match(/const refreshFilters = \(\) => \{([\s\S]*?)\n        \};/)[1];
     const allowed = new Set(['bots']);
     context.feed = {followNewest: true, filters: {allows: category => allowed.has(category.user)}};
     context.element = {querySelectorAll: () => rows, getBoundingClientRect: () => ({top: 0})};
@@ -258,4 +258,16 @@ test('private send failures are bot messages for the affected platform and obey 
     allowed.delete('bots'); allowed.add('youtube_bots');
     vm.runInContext(`(() => {${callback}})()`, context);
     assert.deepEqual(rows.map(row => row.hidden), [true, false]);
+});
+
+test('shared messages display a text-safe source label and retain the destination message ID', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'destination', platform: 'twitch', kind: 'chat',
+        username: 'viewer', message: 'Hello', is_shared: true, source_channel_name: '<img src=x onerror=bad()>',
+        source_channel_id: 'other', source_message_id: 'original'}});
+    const row = app.element.children[0];
+    assert.equal(row.dataset.messageId, 'destination');
+    assert.equal(row.dataset.chatOrigin, 'shared');
+    assert.equal(row.querySelector('.live-chat-source').textContent, 'From <img src=x onerror=bad()>');
+    assert.equal(row.querySelectorAll('img').length, 0);
 });

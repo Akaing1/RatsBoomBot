@@ -129,6 +129,8 @@
                                 </div>
                                 <button class="button secondary timer-add-button" type="button" data-add-timer>+ Add Timer</button>
                             </div>
+                        {% elif setting.definition.value_type == "choice" %}
+                            <select class="profile-setting-input" name="value" aria-label="{{ setting.definition.label }}">{% for choice in setting.definition.choices %}<option value="{{ choice }}"{% if setting.effective_value == choice %} selected{% endif %}>{{ choice | title }}</option>{% endfor %}</select>
                         {% elif setting.definition.value_type == "toggle" %}
                             <select class="profile-setting-input" name="value" aria-label="{{ setting.definition.label }}"><option value="1"{% if setting.effective_value %} selected{% endif %}>On</option><option value="0"{% if not setting.effective_value %} selected{% endif %}>Off</option></select>
                         {% elif setting.definition.value_type == "usernames" %}

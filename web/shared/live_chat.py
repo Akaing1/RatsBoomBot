@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from datetime import UTC, datetime, timedelta
 
 from bot.services.channels.live_chat import message_matches_view, normalize_chat_view
@@ -16,7 +17,7 @@ def clear_stale_chat_on_refresh(service, broadcaster, *, now=None):
     return True
 
 
-async def stream_chat_events(request, service, broadcaster_id: str, view: str):
+async def stream_chat_events(request, service, broadcaster_id: str, view: str, *, mirror_preferences=False):
     broadcaster_id = str(broadcaster_id)
     view = normalize_chat_view(view)
     check_access = getattr(getattr(request, "state", None), "check_channel_access", None)
@@ -26,6 +27,28 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str):
 
     try:
         yield "retry: 2000\n\n"
+
+        roster = None
+        roster_checked = 0
+        async def participant_event():
+            nonlocal roster, roster_checked
+            fetch = getattr(service, "shared_chat_participants", None)
+            if mirror_preferences or view == "commands" or not fetch or time.monotonic() - roster_checked < 30:
+                return None
+            roster_checked = time.monotonic()
+            current = await fetch(broadcaster_id)
+            if current == roster:
+                return None
+            roster = current
+            return f"event: chat-participants\ndata: {json.dumps(roster)}\n\n"
+
+        event = await participant_event()
+        if event:
+            yield event
+
+        if mirror_preferences:
+            preferences = service.get_chat_preferences(broadcaster_id)
+            yield f"event: chat-preferences\ndata: {json.dumps(preferences)}\n\n"
 
         for message in service.history(broadcaster_id, view):
             yield f"data: {json.dumps(message, separators=(',', ':'))}\n\n"
@@ -39,6 +62,14 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str):
                 except Exception:
                     yield "event: access-revoked\ndata: {}\n\n"
                     return
+            event = await participant_event()
+            if event:
+                yield event
+            if mirror_preferences:
+                current_preferences = service.get_chat_preferences(broadcaster_id)
+                if preferences != current_preferences:
+                    preferences = current_preferences
+                    yield f"event: chat-preferences\ndata: {json.dumps(preferences)}\n\n"
             try:
                 message = await asyncio.wait_for(queue.get(), timeout=15)
             except TimeoutError:
@@ -51,6 +82,8 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str):
                 except Exception:
                     yield "event: access-revoked\ndata: {}\n\n"
                     return
+            if isinstance(message, dict) and message.get("event") == "chat-preferences":
+                continue
             if isinstance(message, dict) and message.get("event") == "chat-clear":
                 yield f"event: chat-clear\ndata: {json.dumps(message, separators=(',', ':'))}\n\n"
             elif message_matches_view(message, view):

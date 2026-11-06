@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project is privately operated for Ninjakaing and a growing group of stream communities. Core broadcaster onboarding is self-service on the hosted website; specialized integrations and premium features may require maintainer assistance.
 
-Current application version: **17.0.6** (see [`config/version.py`](config/version.py)). Active development targets `release/17.0.0`; the branch name denotes the next release milestone.
+Current application version: **17.1.5** (see [`config/version.py`](config/version.py)). Active development targets `release/17.0.0`; the branch name denotes the next release milestone.
 
 [Website](https://ratsboombot.com) · [My account](https://ratsboombot.com/me) · [Patch notes](https://ratsboombot.com/patch-notes) · [Local development](docs/development.md)
 
@@ -215,8 +215,8 @@ The right sidebar contains the Mod Bar and Communities, with the five most recen
 
 Settings combines feature controls and customization in General, Chat, Stream Events, Timers, Connections, Loyalty Points, Viewer Queue, and Pets and Boss Hunt. Games appears for enabled game integrations. Categories and the search finder sit on the right; expandable inputs keep related switches and messages together. Command groups include usage descriptions.
 
-- General contains command controls, YouTube chat above Protected Users, game switches, and OBS browser sources at the bottom.
-- Stream Events groups community and raid messages, Follow Raids By Default, shoutouts, and individual redeem controls.
+- General contains command controls, YouTube chat above Protected Users, game switches, and one OBS custom dock URL at the bottom. Add it in OBS under Docks → Custom Browser Docks. It uses the dashboard's chat appearance and saved user/platform/message-type filters; changes update an open dock automatically. Existing URLs, including their old view parameters, follow these same preferences. Regenerating the URL revokes previous URLs and open connections.
+- Stream Events groups community and raid messages, Follow Raids By Default, ad announcements, and individual redeem controls. Ad announcements supports custom message text with `{time}` (minutes:seconds), a warning lead time of 5–1,800 seconds, normal message or announcement delivery, and announcement color. Existing defaults stay at 120 seconds and purple announcements; blank text resets to the channel's default. Countdown checks run every five seconds while Twitch schedules are fetched at most every 30 seconds per live channel.
 - Timers provides a creation form and an expandable Configure menu per saved timer. Each entry has an enabled state; colors appear only for announcements.
 - Connections stores supported social URLs, including TikTok, X, Ko-Fi, and VGen. These saved URLs do not add new social chat subcommands.
 - Pets and Boss Hunt have separate control panels.
@@ -414,3 +414,11 @@ Samples contain a Unix timestamp, PID, application version, process resident mem
 To inspect history, run `tail -n 10 /path/to/database-directory/performance.jsonl`. Copy the current file and rotated backups when investigating an incident. Samples flush after each write; a stalled process may leave a gap, and this logger cannot diagnose an outage before it was deployed. File/firmware reads run off the chat event loop, with a two-second firmware command timeout.
 
 Connection recovery and monitoring: [operations guide](docs/connection-recovery.md).
+
+### Shared Chat handling
+
+Combined Chat and its OBS dock label messages relayed from other Twitch channels with their source channel. The Shared Chat filter section has an Enable shared chat toggle for all shared messages and individual toggles for each participating streamer’s chat, plus Clear and right-click-to-solo controls. Twitch’s session roster refreshes about every 30 seconds while the dashboard is open, including quiet channels; departed participants disappear from the list. Per-channel selections sync to an open OBS dock and existing per-streamer choices are preserved. Your own Twitch and YouTube messages are always included by the Shared Chat section; user and message-type filters still apply.
+
+Relayed messages and notifications are display-only for the receiving channel: they do not earn loyalty points, increment chatter statistics, advance timers/Boss Hunt activity, trigger automatic shoutouts or run bot moderation there. TwitchIO skips commands on relayed messages; commands still run in their original channel. Message IDs remain scoped to the receiving channel for replies and moderation. Shared messages use source-channel badges and role highlights. This does not start or manage Stream Together sessions.
+
+OBS chat docks include a top Twitch/YouTube/Both selector, fading connection status inside the compact message composer, and the dashboard’s searchable Twitch/7TV emote picker with inline emote previews. Sign in as the channel owner inside the OBS browser; you return automatically to the dock to send. Enter sends and Shift+Enter adds a newline. Dock URLs remain read-only without owner authentication; rotating the URL also revokes its send endpoint.

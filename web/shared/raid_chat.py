@@ -119,8 +119,12 @@ def chat_event(kind, event, timestamp="", badge_catalog=None, emotes=None):
         source = tuple(ChatSegment(**segment) for segment in segments) or (ChatSegment("text", message_text),)
         segments = [asdict(segment) for segment in LiveChatService.apply_emote_catalog(source, emotes)]
     catalog = badge_catalog or {}
+    source_id = str(event.get("source_broadcaster_user_id") or "")
+    shared = bool(source_id and source_id != str(event.get("broadcaster_user_id") or ""))
+    if shared:
+        catalog = {}  # Never label a source-channel badge with the target's artwork.
     badges = []
-    for badge in event.get("badges", []):
+    for badge in (event.get("source_badges", []) if shared else event.get("badges", [])) or []:
         set_id, version = str(badge.get("set_id") or ""), str(badge.get("id") or "")
         if set_id:
             badges.append(asdict(catalog.get((set_id, version), ChatBadge(set_id, LiveChatService._badge_label(set_id)))))
@@ -134,6 +138,10 @@ def chat_event(kind, event, timestamp="", badge_catalog=None, emotes=None):
         "platform": "twitch", "kind": "message", "username": "Anonymous" if event.get("chatter_is_anonymous") else event.get("chatter_user_login", ""),
         "display_name": "Anonymous" if event.get("chatter_is_anonymous") else event.get("chatter_user_name", ""), "color": event.get("color", ""),
         "timestamp": timestamp, "message": message_text,
+        "is_shared": shared, "source_channel_id": source_id or str(event.get("broadcaster_user_id") or ""),
+        "source_channel_login": event.get("source_broadcaster_user_login") or "",
+        "source_channel_name": event.get("source_broadcaster_user_name") or event.get("source_broadcaster_user_login") or source_id,
+        "source_message_id": event.get("source_message_id") or event.get("message_id") or "",
         "segments": segments, "badges": badges, "accent": accent, "is_redeem": is_redeem, **notice}}
 
 

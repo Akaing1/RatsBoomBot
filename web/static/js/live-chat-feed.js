@@ -233,6 +233,8 @@
         const category = window.dashboardChatFilters?.category(message) || {user: "non_subs", type: "messages"};
         row.dataset.chatUser = category.user;
         row.dataset.chatType = category.type;
+        row.dataset.chatOrigin = message.is_shared ? 'shared' : 'local';
+        row.dataset.chatChannel = category.channel || 'local';
         row.hidden = feed.filters ? !feed.filters.allows(category) : false;
         if (message.deleted) row.classList.add("is-deleted");
         if (message.mentioned) row.classList.add("is-mentioned");
@@ -309,6 +311,11 @@
             body.textContent = message.message || "";
         }
 
+        if (message.is_shared) {
+            const source = makeElement("span", "live-chat-source", `From ${message.source_channel_name || message.source_channel_login || message.source_channel_id || 'another channel'}`);
+            source.title = "Shared Chat source channel";
+            heading.appendChild(source);
+        }
         content.appendChild(heading);
         if (message.notice) {
             if (message.notice_type) row.dataset.noticeType = message.notice_type;
@@ -487,22 +494,25 @@
                 connectionStatus._connectionFadeTimer = connectionFadeTimer;
             }
         }
-        feed.filters = window.dashboardChatFilters?.attach(element, () => {
+        const refreshFilters = () => {
             const followNewest = feed.followNewest;
             const rows = [...element.querySelectorAll(".live-chat-message")];
             const viewportTop = followNewest ? null : element.getBoundingClientRect().top;
             const anchor = followNewest ? null : rows.find(row => !row.hidden && row.getBoundingClientRect().bottom > viewportTop);
             const anchorTop = anchor?.getBoundingClientRect().top;
             rows.forEach(row => {
-                row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType});
+                row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'});
             });
             feed.merger?.refresh();
             if (followNewest) scrollToNewest(feed);
             else if (anchor && !anchor.hidden) element.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
             updateJumpButton(feed);
-        });
+        };
+        feed.filters = element.dataset.mirrorChatPreferences !== undefined
+            ? window.dashboardChatFilters?.attachMirror(refreshFilters)
+            : window.dashboardChatFilters?.attach(element, refreshFilters);
         feed.merger = element.classList.contains("dashboard-chat-feed") ? window.createChatMessageMerger?.({
-            allows: row => !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType}),
+            allows: row => !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'}),
             onChange: () => { if (feed.followNewest) scrollToNewest(feed); }
         }) : null;
         if (feed.merger) {
@@ -543,7 +553,7 @@
         const source = new EventSource(element.dataset.streamUrl);
         source.addEventListener('access-revoked', () => {
             source.close();
-            element.replaceChildren(makeElement('p', 'live-chat-status', 'Channel access ended. Return to My account.'));
+            element.replaceChildren(makeElement('p', 'live-chat-status', element.dataset.mirrorChatPreferences !== undefined ? 'This OBS dock URL has expired. Copy the current URL from Settings.' : 'Channel access ended. Return to My account.'));
         });
         if (element.classList.contains("dashboard-chat-feed")) {
             const removeTestNotices = attachTestNotices(feed);
@@ -557,6 +567,14 @@
             document.addEventListener("dashboard-chat-send-error", onSendError);
             window.addEventListener("beforeunload", () => document.removeEventListener("dashboard-chat-send-error", onSendError), {once: true});
         }
+        source.addEventListener("chat-participants", event => {
+            try { feed.filters?.participants?.(JSON.parse(event.data)); } catch (_) {}
+        });
+        source.addEventListener("chat-preferences", event => {
+            if (element.dataset.mirrorChatPreferences !== undefined) {
+                feed.filters?.update(JSON.parse(event.data));
+            }
+        });
         source.onopen = () => showConnectionStatus(true);
         source.onerror = () => showConnectionStatus(false);
         source.addEventListener("history-complete", () => { feed.historyComplete = true; });

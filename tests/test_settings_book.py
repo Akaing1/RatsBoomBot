@@ -310,3 +310,21 @@ def test_shoutout_whitelist_is_grey_only_when_both_masters_are_off(raid, interac
         assert f'class="automatic-shoutout-subsection{disabled}" id="settings-group-shoutout-whitelist"' in html
     finally:
         clear_profiles()
+
+
+def test_ad_controls_are_in_stream_events_and_obs_exposes_one_url():
+    try:
+        context, _, _ = settings_context('events')
+        context['widget_urls'] = {'dock': 'https://example.test/widgets/chat/private-token'}
+        html = templates.env.get_template('channel/settings.html').render(**context)
+        events = html.split('id="settings-events"')[1].split('id="settings-shoutouts"')[0]
+        for key in ['ad_announcement_message', 'ad_warning_seconds', 'ad_message_type', 'ad_announcement_color']:
+            assert f'name="setting_name" value="{key}"' in events
+        assert 'value="announcement" selected' in events
+        assert 'value="purple" selected' in events
+        assert html.count('data-widget-url="dock"') == 1
+        assert '?view=chat' not in html
+        assert '?view=commands' not in html
+        assert 'ad-announcement-settings.js' in html
+    finally:
+        clear_profiles()

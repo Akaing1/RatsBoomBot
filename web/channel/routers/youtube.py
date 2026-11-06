@@ -106,4 +106,4 @@ async def regenerate_widget_urls(request: Request, csrf_token: str = Form(...)):
         return youtube_redirect("error", "The bot runtime is unavailable.")
 
     await runtime_bot.services.live_chat.regenerate_widget_token(str(broadcaster_id))
-    return youtube_redirect("success", "New OBS browser-source URLs were generated. The previous URLs no longer work.")
+    return youtube_redirect("success", "A new OBS dock URL was generated. The previous URLs no longer work.")

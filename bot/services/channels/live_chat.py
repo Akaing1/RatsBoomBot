@@ -14,6 +14,7 @@ import httpx
 import grpc
 
 from bot.profiles import get_active_profile
+from bot.shared_chat import is_shared_message
 from bot.services.channels.chat_notices import notification_details
 from bot.services.channels import youtube_live_chat_pb2
 from config.settings import settings
@@ -71,6 +72,11 @@ class UnifiedChatMessage:
     notice: str = ""
     notice_type: str = ""
     notice_label: str = ""
+    is_shared: bool = False
+    source_channel_id: str = ""
+    source_channel_login: str = ""
+    source_channel_name: str = ""
+    source_message_id: str = ""
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
@@ -117,6 +123,10 @@ class LiveChatService:
     def __init__(self, db, *, bot=None):
         self.db = db
         self.bot = bot
+        self.chat_preferences: dict[str, dict] = {}
+        self.shared_chat_rosters: dict[str, tuple[float, list[dict]]] = {}
+        self._shared_chat_roster_locks: dict[str, asyncio.Lock] = {}
+        self._preferences_lock = asyncio.Lock()
         self.connections: dict[str, YouTubeConnection] = {}
         self.youtube_statuses: dict[str, tuple[str, str]] = {}
         self.active_youtube_chat_ids: dict[str, str] = {}
@@ -157,6 +167,7 @@ class LiveChatService:
                 "SELECT broadcaster_id, youtube_channel_id, youtube_channel_title, access_token, refresh_token, expires_at FROM youtube_chat_connections"
             )
             widget_rows = await connection.fetchall("SELECT broadcaster_id, token FROM chat_widget_tokens")
+            preference_rows = await connection.fetchall("SELECT broadcaster_id, preferences_json FROM channel_chat_preferences")
             pinned_rows = await connection.fetchall("SELECT broadcaster_id, message_json FROM pinned_chat_messages")
 
         self.connections = {
@@ -171,6 +182,13 @@ class LiveChatService:
             for row in connection_rows
         }
         self.widget_tokens = {str(row["broadcaster_id"]): str(row["token"]) for row in widget_rows}
+        from bot.chat_preferences import normalize_chat_preferences
+        self.chat_preferences = {}
+        for row in preference_rows:
+            try:
+                self.chat_preferences[str(row["broadcaster_id"])] = normalize_chat_preferences(json.loads(row["preferences_json"]))
+            except (ValueError, TypeError):
+                LOGGER.warning("[Live Chat] Ignoring invalid chat preferences for %s.", row["broadcaster_id"])
         self.token_broadcasters = {token: broadcaster_id for broadcaster_id, token in self.widget_tokens.items()}
         self.pinned_messages = {
             str(row["broadcaster_id"]): json.loads(str(row["message_json"]))
@@ -235,7 +253,11 @@ class LiveChatService:
         if getattr(payload, "anonymous", False):
             username = display_name = "Anonymous"
         self._ensure_twitch_badge_loader(broadcaster_id)
-        badges = self._twitch_message_badges(broadcaster_id, payload)
+        source = getattr(payload, "source_broadcaster", None)
+        shared = is_shared_message(payload)
+        source_id = str(source.id) if source else broadcaster_id
+        self._ensure_twitch_badge_loader(source_id)
+        badges = self._twitch_message_badges(source_id, payload)
 
         timestamp = getattr(payload, "timestamp", None)
         timestamp_value = timestamp.isoformat() if hasattr(timestamp, "isoformat") else datetime.now(UTC).isoformat()
@@ -243,6 +265,11 @@ class LiveChatService:
         color = getattr(payload, "color", None)
         message = UnifiedChatMessage(
             id=f"twitch:{message_id}",
+            is_shared=shared,
+            source_channel_id=source_id,
+            source_channel_login=str(getattr(source or payload.broadcaster, "name", "") or ""),
+            source_channel_name=str(getattr(source or payload.broadcaster, "display_name", "") or getattr(source or payload.broadcaster, "name", "") or source_id),
+            source_message_id=str(getattr(payload, "source_id", "") or message_id),
             platform="twitch",
             kind="chat" if notice else "command" if self._consume_command_response(broadcaster_id, message_id) else self._classify(broadcaster_id, message_text),
             username=username,
@@ -340,7 +367,7 @@ class LiveChatService:
         catalog = self.twitch_badge_cache.get(broadcaster_id, (0.0, {}))[1]
         badges = []
 
-        for badge in getattr(payload, "badges", ()) or ():
+        for badge in (getattr(payload, "source_badges", ()) if is_shared_message(payload) else getattr(payload, "badges", ())) or ():
             set_id = str(getattr(badge, "set_id", "") or "")
             version = str(getattr(badge, "id", "") or "")
 
@@ -352,7 +379,7 @@ class LiveChatService:
                 ChatBadge(set_id, self._badge_label(set_id))
             ))
 
-        if badges:
+        if badges or is_shared_message(payload):
             return tuple(badges)
 
         chatter = payload.chatter
@@ -375,6 +402,12 @@ class LiveChatService:
     @staticmethod
     def _twitch_message_accent(payload) -> str | None:
         chatter = payload.chatter
+        if is_shared_message(payload):
+            badges = {str(getattr(badge, "set_id", "")) for badge in (getattr(payload, "source_badges", ()) or ())}
+            for badge, accent in (("broadcaster", "broadcaster"), ("staff", "staff"), ("moderator", "moderator"), ("vip", "vip"), ("artist-badge", "artist"), ("subscriber", "subscriber"), ("founder", "subscriber")):
+                if badge in badges:
+                    return accent
+            return None
         message_type = str(getattr(payload, "type", "") or "")
         badge_names = {
             str(getattr(badge, "set_id", "") or "")
@@ -563,6 +596,34 @@ class LiveChatService:
             })
 
         return emotes
+
+    async def shared_chat_participants(self, broadcaster_id: str):
+        """Cache Twitch's session roster across dashboard and dock connections."""
+        async with self._shared_chat_roster_locks.setdefault(broadcaster_id, asyncio.Lock()):
+            now = time.monotonic()
+            cached_at, previous = self.shared_chat_rosters.get(broadcaster_id, (0, []))
+            if now - cached_at < 30:
+                return previous
+            token = (getattr(self.bot, "tokens", {}).get(broadcaster_id) or {}).get("token")
+            if not token or self.client is None:
+                return previous
+            try:
+                async with asyncio.timeout(3):
+                    payload = await self._fetch_twitch_emote_page(
+                        str(token), "/shared_chat/session", {"broadcaster_id": broadcaster_id})
+                    sessions = payload.get("data", [])
+                    ids = {str(entry["broadcaster_id"]) for entry in sessions[0].get("participants", [])} if sessions else set()
+                    ids.discard(broadcaster_id)
+                    names = {entry["id"]: entry["name"] for entry in previous}
+                    missing = ids - names.keys()
+                    if missing:
+                        names.update(await self._fetch_twitch_owner_names(str(token), missing))
+                    roster = [{"id": key, "name": names.get(key, key)} for key in sorted(ids)]
+            except (httpx.HTTPError, TimeoutError, RuntimeError):
+                # A transient failure must not remove the user's channel toggles.
+                roster = previous
+            self.shared_chat_rosters[broadcaster_id] = (time.monotonic(), roster)
+            return roster
 
     async def _fetch_twitch_emote_page(self, access_token: str, path: str, params: dict[str, object]) -> dict:
         if self.client is None:
@@ -1178,6 +1239,28 @@ class LiveChatService:
 
     def resolve_widget_token(self, token: str) -> str | None:
         return self.token_broadcasters.get(token)
+
+    def get_chat_preferences(self, broadcaster_id: str) -> dict | None:
+        preferences = self.chat_preferences.get(str(broadcaster_id))
+        return {key: list(value) if isinstance(value, list) else value for key, value in preferences.items()} if preferences else None
+
+    async def set_chat_preferences(self, broadcaster_id: str, preferences) -> dict:
+        from bot.chat_preferences import normalize_chat_preferences
+        preferences = normalize_chat_preferences(preferences)
+        broadcaster_id = str(broadcaster_id)
+        async with self._preferences_lock:
+            async with self.db.acquire() as connection:
+                await connection.execute("""
+                    INSERT INTO channel_chat_preferences (broadcaster_id, preferences_json) VALUES (?, ?)
+                    ON CONFLICT(broadcaster_id) DO UPDATE SET preferences_json = excluded.preferences_json
+                """, (broadcaster_id, json.dumps(preferences)))
+            self.chat_preferences[broadcaster_id] = preferences
+            # Wake existing SSE connections, without adding another polling loop.
+            for queue in tuple(self.subscribers.get(broadcaster_id, ())):
+                if queue.full():
+                    queue.get_nowait()
+                queue.put_nowait({"event": "chat-preferences"})
+        return self.get_chat_preferences(broadcaster_id)
 
     def get_youtube_state(self, broadcaster_id: str) -> YouTubeChatState:
         broadcaster_id = str(broadcaster_id)
