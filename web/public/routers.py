@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from bot.command_registry import build_enabled_command_help_groups
@@ -39,7 +39,9 @@ async def chat_widget(request: Request, token: str, view: str = "both"):
         context={
             "token": token,
             "view": "chat",
-            "broadcaster": broadcaster
+            "broadcaster": broadcaster,
+            "can_send": str(request.session.get(CHANNEL_USER_ID_KEY, "")) == str(broadcaster_id),
+            "csrf_token": get_csrf_token(request),
         },
         headers={"Cache-Control": "no-store"}
     )
@@ -67,6 +69,22 @@ async def chat_widget_events(request: Request, token: str, view: str = "both"):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Access-Control-Allow-Origin": "*"}
     )
+
+
+@router.post("/widgets/chat/{token}/send")
+async def chat_widget_send(request: Request, token: str, message: str = Form(...),
+                           target: str = Form("twitch"), csrf_token: str = Form(...)):
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
+    broadcaster_id = runtime_bot.services.live_chat.resolve_widget_token(token)
+    if broadcaster_id is None:
+        return JSONResponse({"detail": "Dock URL revoked."}, status_code=404)
+    if str(request.session.get(CHANNEL_USER_ID_KEY, "")) != str(broadcaster_id):
+        return JSONResponse({"detail": "Sign in as this channel's streamer to send messages."}, status_code=401)
+    from web.channel.routers.dashboard import channel_send_chat_message
+    return await channel_send_chat_message(request, message, target, csrf_token, "")
+
 
 
 # Keep this intentionally curated. Homepage highlights change for minor and major

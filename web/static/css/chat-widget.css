@@ -1,8 +1,8 @@
 /* Message appearance comes from the same stylesheet as the dashboard. */
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0f1115; }
-.chat-widget-body { color: var(--text); }
+.chat-widget-body { color: var(--text); display: flex; flex-direction: column; }
 .chat-widget-body [hidden] { display: none !important; }
-.chat-widget-body .live-chat-feed-shell { width: 100%; height: 100%; }
+.chat-widget-body .live-chat-feed-shell { width: 100%; flex: 1; min-height: 0; }
 .widget-chat-feed { width: 100%; height: 100%; gap: 4px; padding: 12px; overflow-y: auto; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #8b5cf6 transparent; }
 .widget-chat-feed::before { content: ""; margin-top: auto; }
 .widget-chat-feed::-webkit-scrollbar { width: 8px; }
@@ -10,3 +10,14 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 .widget-chat-feed::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: rgba(139,92,246,.65); background-clip: padding-box; }
 .widget-chat-feed::-webkit-scrollbar-thumb:hover { background: #8b5cf6; background-clip: padding-box; }
 .widget-chat-feed::-webkit-scrollbar-button { display: none; }
+
+.widget-chat-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; flex: 0 0 auto; border-bottom: 1px solid var(--border); font-size: 12px; }
+.widget-chat-header .chat-send-status { position: static; opacity: 1; }
+.widget-chat-header button { background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--text); cursor: pointer; }
+.widget-chat-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 8px; flex: 0 0 auto; border-top: 1px solid var(--border); }
+.widget-chat-composer select { grid-column: 1 / -1; }
+.widget-chat-composer textarea, .widget-chat-composer select { width: 100%; min-width: 0; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 5px; padding: 6px; font: inherit; }
+.widget-chat-composer textarea { resize: none; }
+.widget-chat-composer p, .widget-chat-login { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 12px; }
+.widget-chat-login { padding: 8px; }
+.widget-chat-login a { color: #c7b7ff; text-decoration: underline; }
