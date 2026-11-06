@@ -18,7 +18,7 @@ from bot.shared_chat import is_shared_message
 from bot.services.channels.chat_notices import notification_details
 from bot.services.channels import youtube_live_chat_pb2
 from config.settings import settings
-from web.shared.youtube_oauth import YOUTUBE_API_URL, YOUTUBE_TOKEN_URL, YouTubeChannel, YouTubeTokenResponse
+from web.shared.youtube_oauth import YOUTUBE_API_URL, YOUTUBE_TOKEN_URL, YouTubeChannel, YouTubeTokenResponse, fetch_youtube_channel
 
 LOGGER = logging.getLogger("RatBoomBot")
 CHAT_VIEWS = {"chat", "commands", "both"}
@@ -103,6 +103,7 @@ class YouTubeChatState:
     channel_title: str | None
     status: str
     detail: str
+    reauth_required: bool = False
 
 
 def normalize_chat_view(view: str | None) -> str:
@@ -129,6 +130,7 @@ class LiveChatService:
         self._preferences_lock = asyncio.Lock()
         self.connections: dict[str, YouTubeConnection] = {}
         self.youtube_statuses: dict[str, tuple[str, str]] = {}
+        self.youtube_reauth_required: set[str] = set()
         self.active_youtube_chat_ids: dict[str, str] = {}
         self.widget_tokens: dict[str, str] = {}
         self.token_broadcasters: dict[str, str] = {}
@@ -1279,8 +1281,48 @@ class LiveChatService:
             channel_id=connection.channel_id if connection else None,
             channel_title=connection.channel_title if connection else None,
             status=status,
-            detail=detail
+            detail=detail,
+            reauth_required=connection is not None and broadcaster_id in self.youtube_reauth_required,
         )
+
+    def require_youtube_reauthorization(self, broadcaster_id: str, detail: str) -> None:
+        self.youtube_reauth_required.add(str(broadcaster_id))
+        self.youtube_statuses[str(broadcaster_id)] = ("unavailable", detail)
+
+    async def check_youtube_authorization(self, broadcaster_id: str) -> bool:
+        """Validate a linked account even offline; transient failures remain retryable."""
+        broadcaster_id = str(broadcaster_id)
+        if not settings.YOUTUBE_CONFIGURED:
+            return False
+        lock = self.youtube_refresh_locks.setdefault(broadcaster_id, asyncio.Lock())
+        async with lock:
+            if broadcaster_id not in self.connections:
+                return False
+            if broadcaster_id in self.youtube_reauth_required:
+                return True
+            try:
+                connection = await self._refresh_access_token_if_needed(broadcaster_id)
+                try:
+                    channel = await fetch_youtube_channel(connection.access_token)
+                except httpx.HTTPStatusError as error:
+                    if error.response.status_code != 401:
+                        raise
+                    # An expired access token can still have a valid refresh grant.
+                    connection.expires_at = datetime.now(UTC).isoformat()
+                    connection = await self._refresh_access_token_if_needed(broadcaster_id)
+                    channel = await fetch_youtube_channel(connection.access_token)
+                if channel.channel_id != connection.channel_id:
+                    raise YouTubeReconnectRequired("Reconnect YouTube to verify the linked channel.")
+            except YouTubeReconnectRequired as error:
+                self.require_youtube_reauthorization(broadcaster_id, str(error))
+                return True
+            except httpx.HTTPStatusError as error:
+                reason, _ = self._youtube_error_details(error.response)
+                if error.response.status_code != 401 and reason not in {"insufficientPermissions", "insufficientLivePermissions"}:
+                    raise
+                self.require_youtube_reauthorization(broadcaster_id, "Reconnect YouTube to restore chat permissions.")
+                return True
+            return False
 
     async def connect_youtube(self, broadcaster_id: str, channel: YouTubeChannel, token: YouTubeTokenResponse) -> YouTubeChatState:
         broadcaster_id = str(broadcaster_id)
@@ -1318,6 +1360,7 @@ class LiveChatService:
         self.active_youtube_chat_ids.pop(broadcaster_id, None)
         self.youtube_page_tokens.pop(broadcaster_id, None)
         self.connections[broadcaster_id] = connection
+        self.youtube_reauth_required.discard(broadcaster_id)
         self.youtube_statuses[broadcaster_id] = (
             "waiting", "Waiting for an active YouTube livestream." if self._twitch_stream_is_live(broadcaster_id)
             else "Waiting for the Twitch stream to go live."
@@ -1347,6 +1390,7 @@ class LiveChatService:
             await connection.execute("DELETE FROM youtube_chat_connections WHERE broadcaster_id = ?", (broadcaster_id,))
 
         self.connections.pop(broadcaster_id, None)
+        self.youtube_reauth_required.discard(broadcaster_id)
         self.youtube_page_tokens.pop(broadcaster_id, None)
         self.youtube_statuses.pop(broadcaster_id, None)
         self.active_youtube_chat_ids.pop(broadcaster_id, None)
@@ -1422,20 +1466,20 @@ class LiveChatService:
                 except asyncio.CancelledError:
                     raise
                 except YouTubeReconnectRequired as error:
-                    self.youtube_statuses[broadcaster_id] = ("unavailable", str(error))
+                    self.require_youtube_reauthorization(broadcaster_id, str(error))
                     LOGGER.warning("[Live Chat] YouTube authorization requires reconnect for broadcaster %s.", broadcaster_id)
                     return
                 except httpx.HTTPStatusError as error:
                     status_code = error.response.status_code
                     reason, _ = self._youtube_error_details(error.response)
                     if status_code in {400, 401} and reason in {"invalid_grant", "invalid_client", "unauthorized_client"}:
-                        self.youtube_statuses[broadcaster_id] = ("unavailable", "Reconnect YouTube: Google authorization expired or was revoked.")
+                        self.require_youtube_reauthorization(broadcaster_id, "Reconnect YouTube: Google authorization expired or was revoked.")
                         return
                     if reason in {"quotaExceeded", "dailyLimitExceeded"}:
                         detail = "YouTube API quota is exhausted. Chat discovery will resume after the daily reset."
                         delay = self._seconds_until_youtube_quota_reset()
                     elif status_code == 401 or reason in {"insufficientPermissions", "insufficientLivePermissions"}:
-                        self.youtube_statuses[broadcaster_id] = ("unavailable", "Reconnect YouTube to restore chat permissions.")
+                        self.require_youtube_reauthorization(broadcaster_id, "Reconnect YouTube to restore chat permissions.")
                         return
                     elif reason in {"liveChatEnded", "liveChatDisabled", "liveChatNotFound"} or status_code == 404:
                         known_chat_id = None
@@ -1710,6 +1754,9 @@ class LiveChatService:
                 **request
             )
 
+        reason, _ = self._youtube_error_details(response)
+        if response.status_code == 401 or reason in {"insufficientPermissions", "insufficientLivePermissions"}:
+            self.require_youtube_reauthorization(broadcaster_id, "Reconnect YouTube to restore chat permissions.")
         response.raise_for_status()
         return response.json()
 
@@ -1743,6 +1790,7 @@ class LiveChatService:
             except (ValueError, AttributeError):
                 reason = None
             if reason in {"invalid_grant", "invalid_client", "unauthorized_client"}:
+                self.require_youtube_reauthorization(broadcaster_id, "Reconnect YouTube: Google authorization expired or was revoked.")
                 raise YouTubeReconnectRequired("Reconnect YouTube: Google authorization expired or was revoked.")
         response.raise_for_status()
         payload = response.json()

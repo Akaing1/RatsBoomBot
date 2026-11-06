@@ -2693,6 +2693,7 @@ async def test_youtube_revoked_authorization_requires_reconnect():
     service._find_active_live_chat = AsyncMock(side_effect=YouTubeReconnectRequired("Reconnect YouTube"))
     await service._watch_youtube("channel-1")
     assert service.youtube_statuses["channel-1"] == ("unavailable", "Reconnect YouTube")
+    assert "channel-1" in service.youtube_reauth_required
     assert service._find_active_live_chat.await_count == 1
 
 

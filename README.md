@@ -190,7 +190,7 @@ Third-party game APIs may require public player profiles and do not expose every
 
 ### Streamer Dashboard
 
-The root URL is the public landing page with chatter sign-in. Connected broadcasters use `/channel` for stream status, combined Twitch/YouTube chat, viewer queues, check-ins, redeems, raid discovery, and feature/customization controls.
+The root URL is the public landing page with chatter sign-in. Connected broadcasters use `/channel` for stream status, combined Twitch/YouTube chat, viewer queues, check-ins, redeems, raid discovery, and feature/customization controls. Twitch and YouTube authorization warnings appear above dashboard content with their own reauthorize actions. Linked YouTube accounts are checked on page load even while offline; temporary check failures offer Retry rather than claiming reauthorization is required. Successful YouTube reconnects clear its warning.
 
 Channel sessions are isolated by Twitch user ID and persist for the configured session lifetime. The Overview also provides polls and predictions with live summaries and history, subject to Twitch eligibility and authorization. The Followers page adds sortable statistics and raid favorites.
 
