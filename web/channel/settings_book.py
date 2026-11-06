@@ -76,6 +76,8 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
             else:
                 section = "events" if kind == "feature" and value.startswith("redeem_") else TOGGLE_SECTION.get(kind, {}).get(value, "general")
             label = "!" + value if kind == "global_command" else LABELS.get(value, value.replace("_", " ").title())
+            if kind == "global_command" and value == "eight_ball":
+                label = "!8ball"
             if kind == "feature" and value.startswith("redeem_"):
                 label = value.removeprefix("redeem_").title() + " redeem"
             if kind == "global_group" and value != "globals":

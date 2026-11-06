@@ -61,6 +61,7 @@ class GlobalCommandName(Enum):
     ME = "me"
     PETS = "pets"
     QUOTE = "quote"
+    EIGHT_BALL = "eight_ball"
 
     KAMIKAZE = "kamikaze"
 
@@ -115,6 +116,7 @@ class GlobalCommandDefaults:
     me: bool = True
     pets: bool = True
     quote: bool = True
+    eight_ball: bool = True
 
     kamikaze: bool = True
 

@@ -40,6 +40,9 @@ def test_every_setting_and_toggle_is_assigned_exactly_once():
         assert sum(len(section['toggles']) for section in sections) == sum(map(len, states)) - 2
         chat = next(s for s in sections if s['key'] == 'chat')
         assert any(t['name'] == 'kamikaze' for t in chat['toggles'])
+        eight_ball = next(t for t in chat['toggles'] if t['name'] == 'eight_ball')
+        assert eight_ball['label'] == '!8ball'
+        assert eight_ball['state'].effective_enabled is True
         loyalty = next(s for s in sections if s['key'] == 'loyalty')
         assert 'Loyalty points' in loyalty['groups']
         assert {(t['kind'], t['name']) for t in loyalty['toggles']} == {('feature', 'points'), ('global_group', 'points')}
