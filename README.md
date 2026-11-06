@@ -207,6 +207,8 @@ Access is checked per channel and revoked users receive an Unauthorized page. De
 
 ### My Account and Community Pages
 
+`!8ball <question>` gives a random conversational answer using local JSON response categories and bounded per-channel SQLite history. See [8ball configuration](docs/eight-ball.md).
+
 `!me` opens the chatter's global account, while `!stats` links to their profile in the current community. Updated Overview, Achievements, Pets, and Boss Hunt tabs are shared with public and per-channel profiles. Channel profiles combine Shop, Craft, and Gamble in **Activity**.
 
 The right sidebar contains the Mod Bar and Communities, with the five most recently interacted-with communities visible and the rest expandable. Shared headers connect community profiles, Command Help, Boss Hunt guides, and Patch notes.
@@ -302,7 +304,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 | Group | Commands |
 | --- | --- |
-| Utility | `!kamikaze [username]`, `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats [@username]`, `!me [@username]` |
+| Utility | `!kamikaze [username]`, `!hi`, `!choice`, `!8ball <question>`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats [@username]`, `!me [@username]` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube` |
 | Settings | `!set discord <url>`, `!set youtube <url>`, `!set game <game name>`, `!set title <stream title>`, `!timers`, `!timers on`, `!timers off` |

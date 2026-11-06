@@ -106,6 +106,7 @@ UTILITY_COMMANDS = CommandGroupDefinition(
         ),
         CommandDefinition("!hi [username]", "Say hello to yourself or another chatter.", global_command=GlobalCommandName.HI),
         CommandDefinition("!choice <options>", "Randomly choose from the supplied space-separated options.", global_command=GlobalCommandName.CHOICE),
+        CommandDefinition("!8ball <question>", "Ask a yes/no question for a random, conversational prediction.", global_command=GlobalCommandName.EIGHT_BALL),
         CommandDefinition("!kaboom [username]", "Blow yourself or another chatter up.", global_command=GlobalCommandName.KABOOM),
         CommandDefinition("!stinky [username]", "Generate a random stinky percentage.", global_command=GlobalCommandName.STINKY),
         CommandDefinition("!lucky [username]", "Generate a random luck percentage.", global_command=GlobalCommandName.LUCKY),

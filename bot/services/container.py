@@ -14,6 +14,7 @@ from bot.services.channels.achievements import AchievementService
 from bot.services.channels.command_slowmode import CommandSlowmodeService
 from bot.services.channels.quotes import QuoteService
 from bot.services.stream.automatic_shoutouts import AutomaticShoutoutService
+from bot.services.engagement.eight_ball import EightBallService
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -33,6 +34,7 @@ class ServiceContainer:
         self.achievements = AchievementService(db)
         self.command_slowmode = CommandSlowmodeService(db)
         self.quotes = QuoteService(db)
+        self.eight_ball = EightBallService(db)
         self.chatter_stats = ChatterStatsService(bot, db, self.broadcasters)
         self.profile_settings = ProfileSettingsService(db)
         self.features = FeatureToggleService(db, self.profile_settings)

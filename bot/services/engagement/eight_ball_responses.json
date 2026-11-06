@@ -1,0 +1,290 @@
+[
+  {
+    "id": "general_yes_1",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "Oh, absolutely."
+  },
+  {
+    "id": "general_yes_2",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "Yeah, I reckon so."
+  },
+  {
+    "id": "general_yes_3",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "The signs point to yes."
+  },
+  {
+    "id": "general_yes_4",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "I'd put cheese on it."
+  },
+  {
+    "id": "general_maybe_1",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "Honestly? Could go either way."
+  },
+  {
+    "id": "general_maybe_2",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "Ask me again in a minute."
+  },
+  {
+    "id": "general_maybe_3",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "Even the rats don't know."
+  },
+  {
+    "id": "general_maybe_4",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "I'm just as lost as you are."
+  },
+  {
+    "id": "general_no_1",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "Yeah... probably not."
+  },
+  {
+    "id": "general_no_2",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "I wouldn't bet on it."
+  },
+  {
+    "id": "general_no_3",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "That's a hard no."
+  },
+  {
+    "id": "general_no_4",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "The signs aren't looking good."
+  },
+  {
+    "id": "statement_yes_1",
+    "outcome": "yes",
+    "categories": [
+      "statement"
+    ],
+    "text": "The evidence is overwhelming."
+  },
+  {
+    "id": "statement_yes_2",
+    "outcome": "yes",
+    "categories": [
+      "statement"
+    ],
+    "text": "That checks out."
+  },
+  {
+    "id": "statement_maybe_1",
+    "outcome": "maybe",
+    "categories": [
+      "statement"
+    ],
+    "text": "The rats are still debating that."
+  },
+  {
+    "id": "statement_maybe_2",
+    "outcome": "maybe",
+    "categories": [
+      "statement"
+    ],
+    "text": "I can't quite call that one."
+  },
+  {
+    "id": "statement_no_1",
+    "outcome": "no",
+    "categories": [
+      "statement"
+    ],
+    "text": "The evidence says otherwise."
+  },
+  {
+    "id": "statement_no_2",
+    "outcome": "no",
+    "categories": [
+      "statement"
+    ],
+    "text": "I'm not convinced."
+  },
+  {
+    "id": "prediction_yes_1",
+    "outcome": "yes",
+    "categories": [
+      "prediction"
+    ],
+    "text": "Looking pretty good."
+  },
+  {
+    "id": "prediction_yes_2",
+    "outcome": "yes",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I can see it happening."
+  },
+  {
+    "id": "prediction_maybe_1",
+    "outcome": "maybe",
+    "categories": [
+      "prediction"
+    ],
+    "text": "Too early to call."
+  },
+  {
+    "id": "prediction_maybe_2",
+    "outcome": "maybe",
+    "categories": [
+      "prediction"
+    ],
+    "text": "Let's see how this plays out."
+  },
+  {
+    "id": "prediction_no_1",
+    "outcome": "no",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I wouldn't get my hopes up."
+  },
+  {
+    "id": "prediction_no_2",
+    "outcome": "no",
+    "categories": [
+      "prediction"
+    ],
+    "text": "Not looking likely."
+  },
+  {
+    "id": "advice_yes_1",
+    "outcome": "yes",
+    "categories": [
+      "advice"
+    ],
+    "text": "Go for it."
+  },
+  {
+    "id": "advice_yes_2",
+    "outcome": "yes",
+    "categories": [
+      "advice"
+    ],
+    "text": "The rats approve."
+  },
+  {
+    "id": "advice_maybe_1",
+    "outcome": "maybe",
+    "categories": [
+      "advice"
+    ],
+    "text": "Maybe sleep on it first."
+  },
+  {
+    "id": "advice_maybe_2",
+    "outcome": "maybe",
+    "categories": [
+      "advice"
+    ],
+    "text": "Give that one a little more thought."
+  },
+  {
+    "id": "advice_no_1",
+    "outcome": "no",
+    "categories": [
+      "advice"
+    ],
+    "text": "The rats advise against it."
+  },
+  {
+    "id": "advice_no_2",
+    "outcome": "no",
+    "categories": [
+      "advice"
+    ],
+    "text": "I'd give that a miss."
+  },
+  {
+    "id": "ability_yes_1",
+    "outcome": "yes",
+    "categories": [
+      "ability"
+    ],
+    "text": "You've got this."
+  },
+  {
+    "id": "ability_yes_2",
+    "outcome": "yes",
+    "categories": [
+      "ability"
+    ],
+    "text": "Yeah, you've got a shot."
+  },
+  {
+    "id": "ability_maybe_1",
+    "outcome": "maybe",
+    "categories": [
+      "ability"
+    ],
+    "text": "Only one way to find out."
+  },
+  {
+    "id": "ability_maybe_2",
+    "outcome": "maybe",
+    "categories": [
+      "ability"
+    ],
+    "text": "It's going to be close."
+  },
+  {
+    "id": "ability_no_1",
+    "outcome": "no",
+    "categories": [
+      "ability"
+    ],
+    "text": "You might need backup."
+  },
+  {
+    "id": "ability_no_2",
+    "outcome": "no",
+    "categories": [
+      "ability"
+    ],
+    "text": "Not without a little more practice."
+  }
+]
