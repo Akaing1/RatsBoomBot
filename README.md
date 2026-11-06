@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project is privately operated for Ninjakaing and a growing group of stream communities. Core broadcaster onboarding is self-service on the hosted website; specialized integrations and premium features may require maintainer assistance.
 
-Current application version: **17.1.4** (see [`config/version.py`](config/version.py)). Active development targets `release/17.0.0`; the branch name denotes the next release milestone.
+Current application version: **17.1.5** (see [`config/version.py`](config/version.py)). Active development targets `release/17.0.0`; the branch name denotes the next release milestone.
 
 [Website](https://ratsboombot.com) · [My account](https://ratsboombot.com/me) · [Patch notes](https://ratsboombot.com/patch-notes) · [Local development](docs/development.md)
 
@@ -421,4 +421,4 @@ Combined Chat and its OBS dock label messages relayed from other Twitch channels
 
 Relayed messages and notifications are display-only for the receiving channel: they do not earn loyalty points, increment chatter statistics, advance timers/Boss Hunt activity, trigger automatic shoutouts or run bot moderation there. TwitchIO skips commands on relayed messages; commands still run in their original channel. Message IDs remain scoped to the receiving channel for replies and moderation. Shared messages use source-channel badges and role highlights. This does not start or manage Stream Together sessions.
 
-OBS chat docks include connection status and a message composer (Twitch, YouTube, or Both). Sign in as the channel owner inside the OBS browser; you return automatically to the dock to send. Enter sends and Shift+Enter adds a newline. Dock URLs remain read-only without owner authentication; rotating the URL also revokes its send endpoint.
+OBS chat docks include a top Twitch/YouTube/Both selector, fading connection status inside the compact message composer, and the dashboard’s searchable Twitch/7TV emote picker with inline emote previews. Sign in as the channel owner inside the OBS browser; you return automatically to the dock to send. Enter sends and Shift+Enter adds a newline. Dock URLs remain read-only without owner authentication; rotating the URL also revokes its send endpoint.
