@@ -17,11 +17,11 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 .widget-chat-composer { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 36px; align-items: start; gap: 4px 6px; padding: 7px; flex: 0 0 auto; border-top: 1px solid var(--border); }
 .widget-chat-entry { position: relative; min-width: 0; }
 .widget-chat-entry textarea, .widget-chat-entry .chat-rich-input { display: block; width: 100%; min-height: 36px; max-height: 90px; box-sizing: border-box; margin: 0; padding: 8px 34px 8px 8px; resize: none; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 5px; font: inherit; font-size: 13px; line-height: 18px; overflow-y: auto; }
-.widget-chat-entry .chat-emote-toggle { position: absolute; right: 3px; top: 3px; width: 30px; height: 30px; padding: 0; }
+.widget-chat-entry .chat-emote-toggle { position: absolute; right: 3px; top: 3px; transform: none; width: 30px; height: 30px; padding: 0; }
 .widget-chat-entry .chat-send-status { position: absolute; right: 35px; top: 11px; max-width: 45%; }
 .widget-chat-entry:focus-within .chat-send-status { opacity: 0; }
 .widget-chat-composer .chat-send-button { width: 36px; height: 36px; min-height: 0; padding: 8px; border-radius: 6px; }
-.widget-chat-composer .chat-send-button svg { width: 20px; height: 20px; }
+.widget-chat-composer .chat-send-button svg { display: block; width: 20px; height: 20px; fill: currentColor; }
 .widget-chat-composer > .chat-emote-picker { position: absolute; left: 7px; right: 7px; bottom: 100%; width: auto; max-height: min(65vh, 420px); z-index: 10; }
 .widget-chat-composer > p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 11px; }
 .widget-chat-composer > p:empty { display: none; }
