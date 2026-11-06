@@ -9,14 +9,33 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/chat-widget.css') }}?v={{ deployment_stamp() }}">
 </head>
 <body class="chat-widget-body">
+    <header class="widget-chat-header">
+        <span id="dock-connection" role="status" aria-live="polite">Connecting…</span>
+        <button type="button" data-dock-reload>Reconnect</button>
+    </header>
     <main
         class="live-chat-feed widget-chat-feed"
         data-live-chat-feed
         data-mirror-chat-preferences
         data-stream-url="/widgets/chat/{{ token }}/events"
+        data-connection-status-target="#dock-connection"
         data-max-messages="150"
         data-empty-title="Waiting for {{ view }}"
-    ></main>
+    ><p class="compact-empty-state">Waiting for chat messages…</p></main>
+    {% if can_send %}
+    <form class="widget-chat-composer" data-dock-composer action="/widgets/chat/{{ token }}/send">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label class="sr-only" for="dock-target">Send to</label>
+        <select id="dock-target" name="target"><option value="twitch">Twitch</option><option value="youtube">YouTube</option><option value="both">Both</option></select>
+        <label class="sr-only" for="dock-message">Message</label>
+        <textarea id="dock-message" name="message" rows="2" maxlength="500" required placeholder="Send a message…"></textarea>
+        <button type="submit" class="button primary">Send</button>
+        <p data-dock-send-status role="status" aria-live="polite"></p>
+    </form>
+    {% else %}
+    <p class="widget-chat-login"><a href="/connect/twitch">Sign in to send messages</a> · Reopen your dock URL after signing in.</p>
+    {% endif %}
+    <script src="{{ url_for('static', path='/js/chat-widget.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/chat-name-colors.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-chat-filters.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/live-chat-feed.js') }}?v={{ deployment_stamp() }}" defer></script>

@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import asqlite
 import pytest
 from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from bot.chat_preferences import normalize_chat_preferences
 from bot.services.channels.live_chat import LiveChatService
@@ -96,3 +97,20 @@ async def test_legacy_widget_parameters_use_the_mirrored_feed_and_rotation_revok
     assert 'access-revoked' in await anext(events)
     await events.aclose()
     assert not live.subscribers
+
+@pytest.mark.asyncio
+async def test_dock_send_requires_owner_session_valid_token_and_csrf(monkeypatch):
+    from web.channel.routers import dashboard
+    live = SimpleNamespace(resolve_widget_token=lambda token: 'owner' if token == 'valid' else None)
+    monkeypatch.setattr(public, 'get_bot', lambda: SimpleNamespace(services=SimpleNamespace(live_chat=live)))
+    with pytest.raises(HTTPException):
+        await public.chat_widget_send(request(), 'valid', 'hello', 'twitch', 'bad')
+    send = AsyncMock(return_value=JSONResponse({'sent': ['twitch'], 'errors': {}}))
+    monkeypatch.setattr(dashboard, 'channel_send_chat_message', send)
+    assert (await public.chat_widget_send(request(None), 'valid', 'hello', 'twitch', 'valid')).status_code == 401
+    assert (await public.chat_widget_send(request('other'), 'valid', 'hello', 'twitch', 'valid')).status_code == 401
+    assert (await public.chat_widget_send(request(), 'revoked', 'hello', 'twitch', 'valid')).status_code == 404
+    send.assert_not_awaited()
+    req = request()
+    assert (await public.chat_widget_send(req, 'valid', 'hello', 'twitch', 'valid')).status_code == 200
+    send.assert_awaited_once_with(req, 'hello', 'twitch', 'valid', '')

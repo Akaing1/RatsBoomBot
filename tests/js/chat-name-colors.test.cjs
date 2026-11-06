@@ -52,3 +52,17 @@ test('readability adjustment calculates each background luminance only once', ()
     assert.equal(calculations, 1);
     assert.ok(app.api.contrast(rgb(result), background) >= 4.5);
 });
+
+test('observer refreshes do not keep rewriting their own color style', () => {
+    const app = setup();
+    let color = '', writes = 0;
+    Object.defineProperty(app.name.style, 'color', {
+        get: () => color, set: value => { writes++; color = value; }
+    });
+    app.api.apply(app.name);
+    for (let i = 0; i < 20; i++) app.api.apply(app.name);
+    assert.equal(writes, 1);
+    color = '#ffffff'; // External changes still get corrected.
+    app.api.apply(app.name);
+    assert.equal(writes, 2);
+});
