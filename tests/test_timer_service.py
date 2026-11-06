@@ -38,25 +38,17 @@ async def test_configured_schedule_and_activity_gate(monkeypatch, require_chat, 
 
 
 @pytest.mark.asyncio
-async def test_each_timer_has_independent_interval_and_message_baseline(monkeypatch):
-    timers = (TimerMessage('Quiet chat', interval_minutes=5, require_active_chat=False),
-              TimerMessage('Active chat', interval_minutes=10, minimum_messages=3))
+async def test_due_timers_are_buffered_and_oldest_waiting_timer_wins(monkeypatch):
+    timers = tuple(TimerMessage(name, interval_minutes=1, require_active_chat=False)
+                   for name in ('First', 'Second', 'Third'))
     service, identity, _ = await make_service(monkeypatch, timers)
-    monkeypatch.setattr('bot.services.stream.timers.time.time', lambda: 300)
-    service.message_counts['1'] = 2
-    await service.check_announcements()
-    assert identity.send_message.await_args_list == [call('1', 'Quiet chat')]
-    monkeypatch.setattr('bot.services.stream.timers.time.time', lambda: 600)
-    service.message_counts['1'] = 3
-    await service.check_announcements()
-    assert identity.send_message.await_args_list[-2:] == [call('1', 'Quiet chat'), call('1', 'Active chat')]
-    monkeypatch.setattr('bot.services.stream.timers.time.time', lambda: 1200)
-    service.message_counts['1'] = 5
-    await service.check_announcements()
-    assert identity.send_message.await_args == call('1', 'Quiet chat')
-    service.message_counts['1'] = 6
-    await service.check_announcements()
-    assert identity.send_message.await_args == call('1', 'Active chat')
+    for elapsed, expected in ((60, ['First']), (65, ['First']),
+                              (1859, ['First']), (1860, ['First', 'Second']),
+                              (3660, ['First', 'Second', 'Third']),
+                              (5460, ['First', 'Second', 'Third', 'First'])):
+        monkeypatch.setattr('bot.services.stream.timers.time.time', lambda: elapsed)
+        await service.check_announcements()
+        assert identity.send_message.await_args_list == [call('1', name) for name in expected]
 
 
 @pytest.mark.asyncio
@@ -82,6 +74,9 @@ async def test_failed_delivery_can_retry_without_blocking_other_timers(monkeypat
     assert identity.send_message.await_args_list == [call('1', 'Failing'), call('1', 'Healthy')]
     identity.send_message.side_effect = None
     await service.check_announcements()
+    assert identity.send_message.await_count == 2
+    monkeypatch.setattr('bot.services.stream.timers.time.time', lambda: 1860)
+    await service.check_announcements()
     assert identity.send_message.await_args_list[-1] == call('1', 'Failing')
     assert identity.send_message.await_count == 3
 
@@ -96,7 +91,7 @@ async def test_reordering_preserves_timer_progress_and_removed_timers_are_pruned
     await service.check_announcements()
     identity.send_message.assert_awaited_once_with('1', 'First')
     profile.timer_messages = (timers[1],)
-    monkeypatch.setattr('bot.services.stream.timers.time.time', lambda: 120)
+    monkeypatch.setattr('bot.services.stream.timers.time.time', lambda: 1860)
     await service.check_announcements()
     assert identity.send_message.await_args == call('1', 'Second')
     assert len(service.timer_progress['1']) == 1
@@ -133,3 +128,13 @@ def test_disabled_timers_are_excluded_and_placeholder_rendering_preserves_schedu
     assert (messages[0].interval_minutes, messages[0].minimum_messages) == (7, 6)
     assert TimerService.get_messages((entries[0],), settings) == []
     assert parse_timers(format_timers(entries)) == entries
+
+
+@pytest.mark.asyncio
+async def test_channel_buffer_does_not_block_other_channels(monkeypatch):
+    service, identity, _ = await make_service(monkeypatch, (TimerMessage('Hello', require_active_chat=False),))
+    service.broadcasters.get_live_broadcasters.return_value = {'1': 'Mei', '2': 'Other'}
+    await service.check_announcements()
+    monkeypatch.setattr('bot.services.stream.timers.time.time', lambda: 1800)
+    await service.check_announcements()
+    assert identity.send_message.await_args_list == [call('1', 'Hello'), call('2', 'Hello')]

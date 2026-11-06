@@ -11,6 +11,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 class TimerService:
     CHECK_EVERY_SECONDS = 5
+    CHANNEL_BUFFER_SECONDS = 30 * 60
 
     def __init__(self, bot, broadcasters, broadcaster_settings):
         self.bot = bot
@@ -21,6 +22,7 @@ class TimerService:
         self.message_counts: dict[str, int] = {}
         self.timer_progress: dict[str, dict[tuple[TimerMessage, int], tuple[float, int]]] = {}
         self.last_check = 0
+        self.last_deliveries: dict[str, float] = {}
 
     async def start(self) -> None:
         if self._task is not None:
@@ -141,6 +143,7 @@ class TimerService:
             progress = self.timer_progress.setdefault(broadcaster_id, {})
             occurrences: dict[TimerMessage, int] = {}
             active = set()
+            due = []
             for entry in profile.timer_messages:
                 timer = normalize_timer(entry)
                 messages = self.get_messages((timer,), settings)
@@ -155,10 +158,20 @@ class TimerService:
                     continue
                 if timer.require_active_chat and count - last_count < timer.minimum_messages:
                     continue
-                if await self.send_announcement(broadcaster_id, broadcaster_name, messages[0]):
-                    progress[key] = (now, count)
+                due.append((last_sent, key, messages[0]))
             for key in progress.keys() - active:
                 del progress[key]
+
+            last_delivery = self.last_deliveries.get(broadcaster_id)
+            if last_delivery is not None and now - last_delivery < self.CHANNEL_BUFFER_SECONDS:
+                continue
+            # Oldest waiting entries go first; stable sorting preserves list order
+            # for ties and prevents short-interval timers starving the rotation.
+            for _, key, message in sorted(due, key=lambda candidate: candidate[0]):
+                if await self.send_announcement(broadcaster_id, broadcaster_name, message):
+                    progress[key] = (now, count)
+                    self.last_deliveries[broadcaster_id] = now
+                    break
 
     async def send_announcement(self, broadcaster_id: str, broadcaster_name: str, message: TimerMessage) -> bool:
         if not self.bot.services.features.is_enabled(broadcaster_id, FeatureName.TIMERS):
