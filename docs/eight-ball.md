@@ -10,6 +10,8 @@ know facts about chatters or learn automatically from the history.
 
 ## Responses and matching
 
+The library contains 180 responses across the five question categories.
+
 Edit `bot/services/engagement/eight_ball_responses.json` and restart the bot to
 change the shared response library. Each entry has a unique stable `id`, an
 `outcome` (`yes`, `maybe`, or `no`), a list of compatible `categories`, and `text`.
@@ -40,7 +42,9 @@ least two general responses for each outcome.
 
 Migration 78 adds `eight_ball_history` to the existing SQLite database. It stores
 the normalized question, category, outcome, response ID, channel, and timestamp.
-Only the latest 100 entries per channel are retained; the latest five influence
-repeat avoidance. History survives restarts and stays separate between channels.
+Only the latest 100 entries per channel are retained, and all of them influence
+repeat avoidance. Compatible replies absent from this history are preferred;
+when every compatible reply has been used, the oldest is reused first. History
+survives restarts and stays separate between channels.
 It can be inspected to find matching rules or response wording worth improving.
 This version does not include an automatic training or feedback system.

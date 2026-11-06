@@ -286,5 +286,1157 @@
       "ability"
     ],
     "text": "Not without a little more practice."
+  },
+  {
+    "id": "general_yes_5",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "I'd say yes."
+  },
+  {
+    "id": "general_yes_6",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "That's a yes from me."
+  },
+  {
+    "id": "general_yes_7",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "Pretty sure about that one: yes."
+  },
+  {
+    "id": "general_yes_8",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "All signs say yes."
+  },
+  {
+    "id": "general_yes_9",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "No doubt in my tiny rat brain."
+  },
+  {
+    "id": "general_yes_10",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "The cheese council says yes."
+  },
+  {
+    "id": "general_yes_11",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "I'm leaning heavily toward yes."
+  },
+  {
+    "id": "general_yes_12",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "That gets my vote."
+  },
+  {
+    "id": "general_yes_13",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "My whiskers say yes."
+  },
+  {
+    "id": "general_yes_14",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "Yeah, that sounds about right."
+  },
+  {
+    "id": "general_yes_15",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "A surprisingly confident yes."
+  },
+  {
+    "id": "general_yes_16",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "I asked around. It's a yes."
+  },
+  {
+    "id": "general_yes_17",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "If I had to call it, yes."
+  },
+  {
+    "id": "general_yes_18",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "Yes. The rats have spoken."
+  },
+  {
+    "id": "general_yes_19",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "That's the answer I'm going with: yes."
+  },
+  {
+    "id": "general_yes_20",
+    "outcome": "yes",
+    "categories": [
+      "general"
+    ],
+    "text": "I see no reason to say no."
+  },
+  {
+    "id": "general_maybe_5",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "I'm on the fence with this one."
+  },
+  {
+    "id": "general_maybe_6",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "I need a minute. And some cheese."
+  },
+  {
+    "id": "general_maybe_7",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "The answer is hiding somewhere."
+  },
+  {
+    "id": "general_maybe_8",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "I'm getting mixed signals."
+  },
+  {
+    "id": "general_maybe_9",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "My whiskers are picking up absolutely nothing."
+  },
+  {
+    "id": "general_maybe_10",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "The cheese council couldn't agree."
+  },
+  {
+    "id": "general_maybe_11",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "That's a solid maybe."
+  },
+  {
+    "id": "general_maybe_12",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "I wish I had a better answer for you."
+  },
+  {
+    "id": "general_maybe_13",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "I'm going to need a second opinion."
+  },
+  {
+    "id": "general_maybe_14",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "There's a yes in there somewhere. Possibly."
+  },
+  {
+    "id": "general_maybe_15",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "Let me get back to you on that."
+  },
+  {
+    "id": "general_maybe_16",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "The rats would like to abstain."
+  },
+  {
+    "id": "general_maybe_17",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "My confidence on this one is nonexistent."
+  },
+  {
+    "id": "general_maybe_18",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "I'm torn, honestly."
+  },
+  {
+    "id": "general_maybe_19",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "The answer seems to change every time I look."
+  },
+  {
+    "id": "general_maybe_20",
+    "outcome": "maybe",
+    "categories": [
+      "general"
+    ],
+    "text": "Even my backup rat isn't sure."
+  },
+  {
+    "id": "general_no_5",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "That's a no from me."
+  },
+  {
+    "id": "general_no_6",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "I'm leaning toward no."
+  },
+  {
+    "id": "general_no_7",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "My whiskers say no."
+  },
+  {
+    "id": "general_no_8",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "The cheese council says no."
+  },
+  {
+    "id": "general_no_9",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "I really don't think so."
+  },
+  {
+    "id": "general_no_10",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "Nope. Not feeling that one."
+  },
+  {
+    "id": "general_no_11",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "I'd be very surprised if the answer were yes."
+  },
+  {
+    "id": "general_no_12",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "I checked twice. Still no."
+  },
+  {
+    "id": "general_no_13",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "Not according to the rats."
+  },
+  {
+    "id": "general_no_14",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "A fairly confident no."
+  },
+  {
+    "id": "general_no_15",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "I hate to say it, but no."
+  },
+  {
+    "id": "general_no_16",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "That's getting a no vote."
+  },
+  {
+    "id": "general_no_17",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "The answer appears to be a very small no."
+  },
+  {
+    "id": "general_no_18",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "All signs say no."
+  },
+  {
+    "id": "general_no_19",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "No. I even consulted the fancy cheese."
+  },
+  {
+    "id": "general_no_20",
+    "outcome": "no",
+    "categories": [
+      "general"
+    ],
+    "text": "Can't give you a yes on that one."
+  },
+  {
+    "id": "statement_yes_3",
+    "outcome": "yes",
+    "categories": [
+      "statement"
+    ],
+    "text": "That's pretty much how it is."
+  },
+  {
+    "id": "statement_yes_4",
+    "outcome": "yes",
+    "categories": [
+      "statement"
+    ],
+    "text": "Yeah, that adds up."
+  },
+  {
+    "id": "statement_yes_5",
+    "outcome": "yes",
+    "categories": [
+      "statement"
+    ],
+    "text": "I think you're onto something."
+  },
+  {
+    "id": "statement_yes_6",
+    "outcome": "yes",
+    "categories": [
+      "statement"
+    ],
+    "text": "That sounds accurate to me."
+  },
+  {
+    "id": "statement_yes_7",
+    "outcome": "yes",
+    "categories": [
+      "statement"
+    ],
+    "text": "Can't argue with that assessment."
+  },
+  {
+    "id": "statement_yes_8",
+    "outcome": "yes",
+    "categories": [
+      "statement"
+    ],
+    "text": "The rats have reached the same conclusion."
+  },
+  {
+    "id": "statement_yes_9",
+    "outcome": "yes",
+    "categories": [
+      "statement"
+    ],
+    "text": "I'd call that a fair statement."
+  },
+  {
+    "id": "statement_yes_10",
+    "outcome": "yes",
+    "categories": [
+      "statement"
+    ],
+    "text": "That explanation fits a little too well."
+  },
+  {
+    "id": "statement_maybe_3",
+    "outcome": "maybe",
+    "categories": [
+      "statement"
+    ],
+    "text": "I can see both sides of that."
+  },
+  {
+    "id": "statement_maybe_4",
+    "outcome": "maybe",
+    "categories": [
+      "statement"
+    ],
+    "text": "That claim needs further rat investigation."
+  },
+  {
+    "id": "statement_maybe_5",
+    "outcome": "maybe",
+    "categories": [
+      "statement"
+    ],
+    "text": "I'm withholding judgment for now."
+  },
+  {
+    "id": "statement_maybe_6",
+    "outcome": "maybe",
+    "categories": [
+      "statement"
+    ],
+    "text": "There might be something to that."
+  },
+  {
+    "id": "statement_maybe_7",
+    "outcome": "maybe",
+    "categories": [
+      "statement"
+    ],
+    "text": "The evidence is a little fuzzy."
+  },
+  {
+    "id": "statement_maybe_8",
+    "outcome": "maybe",
+    "categories": [
+      "statement"
+    ],
+    "text": "I don't have enough to call that either way."
+  },
+  {
+    "id": "statement_maybe_9",
+    "outcome": "maybe",
+    "categories": [
+      "statement"
+    ],
+    "text": "That's still up for debate."
+  },
+  {
+    "id": "statement_maybe_10",
+    "outcome": "maybe",
+    "categories": [
+      "statement"
+    ],
+    "text": "I'll leave that one with the rat jury."
+  },
+  {
+    "id": "statement_no_3",
+    "outcome": "no",
+    "categories": [
+      "statement"
+    ],
+    "text": "That doesn't quite add up."
+  },
+  {
+    "id": "statement_no_4",
+    "outcome": "no",
+    "categories": [
+      "statement"
+    ],
+    "text": "I don't buy that claim."
+  },
+  {
+    "id": "statement_no_5",
+    "outcome": "no",
+    "categories": [
+      "statement"
+    ],
+    "text": "I'd question that assessment."
+  },
+  {
+    "id": "statement_no_6",
+    "outcome": "no",
+    "categories": [
+      "statement"
+    ],
+    "text": "The rat jury disagrees."
+  },
+  {
+    "id": "statement_no_7",
+    "outcome": "no",
+    "categories": [
+      "statement"
+    ],
+    "text": "That sounds a little off to me."
+  },
+  {
+    "id": "statement_no_8",
+    "outcome": "no",
+    "categories": [
+      "statement"
+    ],
+    "text": "I think the opposite is more likely."
+  },
+  {
+    "id": "statement_no_9",
+    "outcome": "no",
+    "categories": [
+      "statement"
+    ],
+    "text": "The evidence isn't backing that up."
+  },
+  {
+    "id": "statement_no_10",
+    "outcome": "no",
+    "categories": [
+      "statement"
+    ],
+    "text": "I wouldn't call that accurate."
+  },
+  {
+    "id": "prediction_yes_3",
+    "outcome": "yes",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I've got a good feeling about it."
+  },
+  {
+    "id": "prediction_yes_4",
+    "outcome": "yes",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I think that's how this ends."
+  },
+  {
+    "id": "prediction_yes_5",
+    "outcome": "yes",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I'd expect that to happen."
+  },
+  {
+    "id": "prediction_yes_6",
+    "outcome": "yes",
+    "categories": [
+      "prediction"
+    ],
+    "text": "The future looks promising."
+  },
+  {
+    "id": "prediction_yes_7",
+    "outcome": "yes",
+    "categories": [
+      "prediction"
+    ],
+    "text": "That seems like the likely outcome."
+  },
+  {
+    "id": "prediction_yes_8",
+    "outcome": "yes",
+    "categories": [
+      "prediction"
+    ],
+    "text": "My crystal cheese says it's happening."
+  },
+  {
+    "id": "prediction_yes_9",
+    "outcome": "yes",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I think the odds are in favor."
+  },
+  {
+    "id": "prediction_yes_10",
+    "outcome": "yes",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I'm calling it now: yes."
+  },
+  {
+    "id": "prediction_maybe_3",
+    "outcome": "maybe",
+    "categories": [
+      "prediction"
+    ],
+    "text": "There's still time for a plot twist."
+  },
+  {
+    "id": "prediction_maybe_4",
+    "outcome": "maybe",
+    "categories": [
+      "prediction"
+    ],
+    "text": "Ask me closer to the finale."
+  },
+  {
+    "id": "prediction_maybe_5",
+    "outcome": "maybe",
+    "categories": [
+      "prediction"
+    ],
+    "text": "The future is being annoyingly vague."
+  },
+  {
+    "id": "prediction_maybe_6",
+    "outcome": "maybe",
+    "categories": [
+      "prediction"
+    ],
+    "text": "Depends how the next bit goes."
+  },
+  {
+    "id": "prediction_maybe_7",
+    "outcome": "maybe",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I can see a few different endings."
+  },
+  {
+    "id": "prediction_maybe_8",
+    "outcome": "maybe",
+    "categories": [
+      "prediction"
+    ],
+    "text": "That prediction is still buffering."
+  },
+  {
+    "id": "prediction_maybe_9",
+    "outcome": "maybe",
+    "categories": [
+      "prediction"
+    ],
+    "text": "My crystal cheese is foggy today."
+  },
+  {
+    "id": "prediction_maybe_10",
+    "outcome": "maybe",
+    "categories": [
+      "prediction"
+    ],
+    "text": "This could still go either direction."
+  },
+  {
+    "id": "prediction_no_3",
+    "outcome": "no",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I don't see that happening."
+  },
+  {
+    "id": "prediction_no_4",
+    "outcome": "no",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I think we're headed for a different ending."
+  },
+  {
+    "id": "prediction_no_5",
+    "outcome": "no",
+    "categories": [
+      "prediction"
+    ],
+    "text": "My crystal cheese says not this time."
+  },
+  {
+    "id": "prediction_no_6",
+    "outcome": "no",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I'd expect a plot twist instead."
+  },
+  {
+    "id": "prediction_no_7",
+    "outcome": "no",
+    "categories": [
+      "prediction"
+    ],
+    "text": "That future looks pretty unlikely."
+  },
+  {
+    "id": "prediction_no_8",
+    "outcome": "no",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I'd keep expectations low."
+  },
+  {
+    "id": "prediction_no_9",
+    "outcome": "no",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I'm predicting a no on this one."
+  },
+  {
+    "id": "prediction_no_10",
+    "outcome": "no",
+    "categories": [
+      "prediction"
+    ],
+    "text": "I think the odds are against it."
+  },
+  {
+    "id": "advice_yes_3",
+    "outcome": "yes",
+    "categories": [
+      "advice"
+    ],
+    "text": "I'd give it a try."
+  },
+  {
+    "id": "advice_yes_4",
+    "outcome": "yes",
+    "categories": [
+      "advice"
+    ],
+    "text": "Sounds worth a shot to me."
+  },
+  {
+    "id": "advice_yes_5",
+    "outcome": "yes",
+    "categories": [
+      "advice"
+    ],
+    "text": "You've got the rat seal of approval."
+  },
+  {
+    "id": "advice_yes_6",
+    "outcome": "yes",
+    "categories": [
+      "advice"
+    ],
+    "text": "I say go ahead."
+  },
+  {
+    "id": "advice_yes_7",
+    "outcome": "yes",
+    "categories": [
+      "advice"
+    ],
+    "text": "That sounds like a reasonable move."
+  },
+  {
+    "id": "advice_yes_8",
+    "outcome": "yes",
+    "categories": [
+      "advice"
+    ],
+    "text": "I'd take the opportunity."
+  },
+  {
+    "id": "advice_yes_9",
+    "outcome": "yes",
+    "categories": [
+      "advice"
+    ],
+    "text": "I think you should."
+  },
+  {
+    "id": "advice_yes_10",
+    "outcome": "yes",
+    "categories": [
+      "advice"
+    ],
+    "text": "The council supports your decision."
+  },
+  {
+    "id": "advice_maybe_3",
+    "outcome": "maybe",
+    "categories": [
+      "advice"
+    ],
+    "text": "I'd think it through a little longer."
+  },
+  {
+    "id": "advice_maybe_4",
+    "outcome": "maybe",
+    "categories": [
+      "advice"
+    ],
+    "text": "What does your second-favorite rat think?"
+  },
+  {
+    "id": "advice_maybe_5",
+    "outcome": "maybe",
+    "categories": [
+      "advice"
+    ],
+    "text": "I'd wait until you're more sure."
+  },
+  {
+    "id": "advice_maybe_6",
+    "outcome": "maybe",
+    "categories": [
+      "advice"
+    ],
+    "text": "Maybe run that past someone first."
+  },
+  {
+    "id": "advice_maybe_7",
+    "outcome": "maybe",
+    "categories": [
+      "advice"
+    ],
+    "text": "Could be a good idea. Could be a story."
+  },
+  {
+    "id": "advice_maybe_8",
+    "outcome": "maybe",
+    "categories": [
+      "advice"
+    ],
+    "text": "I'd check the details before deciding."
+  },
+  {
+    "id": "advice_maybe_9",
+    "outcome": "maybe",
+    "categories": [
+      "advice"
+    ],
+    "text": "Take a minute before committing."
+  },
+  {
+    "id": "advice_maybe_10",
+    "outcome": "maybe",
+    "categories": [
+      "advice"
+    ],
+    "text": "I'm not ready to endorse that plan."
+  },
+  {
+    "id": "advice_no_3",
+    "outcome": "no",
+    "categories": [
+      "advice"
+    ],
+    "text": "I'd reconsider that plan."
+  },
+  {
+    "id": "advice_no_4",
+    "outcome": "no",
+    "categories": [
+      "advice"
+    ],
+    "text": "Maybe sit this one out."
+  },
+  {
+    "id": "advice_no_5",
+    "outcome": "no",
+    "categories": [
+      "advice"
+    ],
+    "text": "I think you'd be better off passing."
+  },
+  {
+    "id": "advice_no_6",
+    "outcome": "no",
+    "categories": [
+      "advice"
+    ],
+    "text": "I'd look for another option."
+  },
+  {
+    "id": "advice_no_7",
+    "outcome": "no",
+    "categories": [
+      "advice"
+    ],
+    "text": "That plan gets a tiny rat veto."
+  },
+  {
+    "id": "advice_no_8",
+    "outcome": "no",
+    "categories": [
+      "advice"
+    ],
+    "text": "I'd hold off for now."
+  },
+  {
+    "id": "advice_no_9",
+    "outcome": "no",
+    "categories": [
+      "advice"
+    ],
+    "text": "I don't think that's your best move."
+  },
+  {
+    "id": "advice_no_10",
+    "outcome": "no",
+    "categories": [
+      "advice"
+    ],
+    "text": "The council would like you to reconsider."
+  },
+  {
+    "id": "ability_yes_3",
+    "outcome": "yes",
+    "categories": [
+      "ability"
+    ],
+    "text": "I think you can pull it off."
+  },
+  {
+    "id": "ability_yes_4",
+    "outcome": "yes",
+    "categories": [
+      "ability"
+    ],
+    "text": "You're more capable than you think."
+  },
+  {
+    "id": "ability_yes_5",
+    "outcome": "yes",
+    "categories": [
+      "ability"
+    ],
+    "text": "I'd back you on this one."
+  },
+  {
+    "id": "ability_yes_6",
+    "outcome": "yes",
+    "categories": [
+      "ability"
+    ],
+    "text": "You can handle it."
+  },
+  {
+    "id": "ability_yes_7",
+    "outcome": "yes",
+    "categories": [
+      "ability"
+    ],
+    "text": "I think that's within your reach."
+  },
+  {
+    "id": "ability_yes_8",
+    "outcome": "yes",
+    "categories": [
+      "ability"
+    ],
+    "text": "You've got a decent chance."
+  },
+  {
+    "id": "ability_yes_9",
+    "outcome": "yes",
+    "categories": [
+      "ability"
+    ],
+    "text": "The rats believe in you."
+  },
+  {
+    "id": "ability_yes_10",
+    "outcome": "yes",
+    "categories": [
+      "ability"
+    ],
+    "text": "Yeah, I think you can manage that."
+  },
+  {
+    "id": "ability_maybe_3",
+    "outcome": "maybe",
+    "categories": [
+      "ability"
+    ],
+    "text": "Depends how much practice you've had."
+  },
+  {
+    "id": "ability_maybe_4",
+    "outcome": "maybe",
+    "categories": [
+      "ability"
+    ],
+    "text": "You've got a chance, but it's no guarantee."
+  },
+  {
+    "id": "ability_maybe_5",
+    "outcome": "maybe",
+    "categories": [
+      "ability"
+    ],
+    "text": "I'd like to see a trial run first."
+  },
+  {
+    "id": "ability_maybe_6",
+    "outcome": "maybe",
+    "categories": [
+      "ability"
+    ],
+    "text": "Maybe, with a little help."
+  },
+  {
+    "id": "ability_maybe_7",
+    "outcome": "maybe",
+    "categories": [
+      "ability"
+    ],
+    "text": "That's going to test you."
+  },
+  {
+    "id": "ability_maybe_8",
+    "outcome": "maybe",
+    "categories": [
+      "ability"
+    ],
+    "text": "It might take you a few attempts."
+  },
+  {
+    "id": "ability_maybe_9",
+    "outcome": "maybe",
+    "categories": [
+      "ability"
+    ],
+    "text": "Hard to tell without seeing you try."
+  },
+  {
+    "id": "ability_maybe_10",
+    "outcome": "maybe",
+    "categories": [
+      "ability"
+    ],
+    "text": "I wouldn't rule you out yet."
+  },
+  {
+    "id": "ability_no_3",
+    "outcome": "no",
+    "categories": [
+      "ability"
+    ],
+    "text": "You might be aiming a little high there."
+  },
+  {
+    "id": "ability_no_4",
+    "outcome": "no",
+    "categories": [
+      "ability"
+    ],
+    "text": "I'd build up to that one first."
+  },
+  {
+    "id": "ability_no_5",
+    "outcome": "no",
+    "categories": [
+      "ability"
+    ],
+    "text": "You may need a bit more preparation."
+  },
+  {
+    "id": "ability_no_6",
+    "outcome": "no",
+    "categories": [
+      "ability"
+    ],
+    "text": "I don't think you're quite there yet."
+  },
+  {
+    "id": "ability_no_7",
+    "outcome": "no",
+    "categories": [
+      "ability"
+    ],
+    "text": "I'd bring someone along to help."
+  },
+  {
+    "id": "ability_no_8",
+    "outcome": "no",
+    "categories": [
+      "ability"
+    ],
+    "text": "You might want a backup plan."
+  },
+  {
+    "id": "ability_no_9",
+    "outcome": "no",
+    "categories": [
+      "ability"
+    ],
+    "text": "I'd start with something a little easier."
+  },
+  {
+    "id": "ability_no_10",
+    "outcome": "no",
+    "categories": [
+      "ability"
+    ],
+    "text": "That might be a stretch for you right now."
   }
 ]
