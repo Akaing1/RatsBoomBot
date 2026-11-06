@@ -1,8 +1,12 @@
 # Timer rotation
 
-Messages and promotional announcements share one rotation per channel. One entry
-is sent after at least 30 minutes and 20 tracked chat messages. A successful send
-resets both gates and advances the rotation by one slot.
+Messages and promotional announcements share a 30-minute delivery buffer per
+channel. Each entry keeps its configured interval and optional chat-message
+requirement. When several entries become eligible, only the oldest waiting entry
+is sent. Other entries remain pending until a later slot; list order breaks ties.
+A successful delivery starts the channel buffer and resets that entry's interval
+and message baseline. Failed deliveries do not consume the slot, so another
+eligible entry can still be sent. Different channels have independent buffers.
 
 Profiles accept plain strings (normal messages) or typed entries:
 
@@ -25,6 +29,6 @@ replaces the default list; add the promotion through customization if that chann
 uses an override.
 
 Failed announcements fall back to chat. If both attempts fail, the same entry
-remains pending. Timer counters and rotation position remain in memory and reset
+remains pending. Timer counters, delivery buffers, and progress remain in memory and reset
 on restart. Stream lifecycle announcements (ads and raid events) are independent
 of this promotional timer rotation.
