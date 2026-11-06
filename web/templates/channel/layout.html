@@ -137,6 +137,11 @@
                 <a class="button primary" href="/connect/twitch" data-channel-auth-connect hidden>Reauthorize Twitch</a>
                 <button class="button secondary" type="button" data-channel-auth-retry hidden>Retry permission check</button>
             </div>
+            <div class="channel-auth-banner" data-channel-auth-banner data-auth-platform="YouTube" data-auth-endpoint="/channel/api/youtube/authorization" role="status" hidden>
+                <p data-channel-auth-message></p>
+                <a class="button primary" href="/channel/youtube/connect" data-channel-auth-connect hidden>Reauthorize YouTube</a>
+                <button class="button secondary" type="button" data-channel-auth-retry hidden>Retry permission check</button>
+            </div>
             {% endif %}
             {% block content %}{% endblock %}
         </main>
