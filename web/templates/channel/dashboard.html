@@ -311,6 +311,7 @@
                         {% for entry in redemption_activity.feed %}
                             {% if entry.kind == "checkin" %}
                             <li class="activity-list-item">
+                                {% if entry.reward_icon_url %}<img class="activity-reward-icon" src="{{ entry.reward_icon_url }}" alt="" width="28" height="28" loading="lazy" onerror="this.hidden=true">{% endif %}
                                 <div class="activity-main">
                                     <strong>{{ entry.user_label }}</strong>
                                     <span>{{ entry.redeemed_at }}</span>
@@ -321,6 +322,7 @@
                             </li>
                             {% else %}
                             <li class="activity-list-item redemption-activity-item">
+                                {% if entry.reward_icon_url %}<img class="activity-reward-icon" src="{{ entry.reward_icon_url }}" alt="" width="28" height="28" loading="lazy" onerror="this.hidden=true">{% endif %}
                                 <div class="activity-main">
                                     <strong>{{ entry.reward_title }}</strong>
                                     <span>{{ entry.user_label }} &middot; {{ entry.redeemed_at }}</span>
@@ -799,6 +801,17 @@
                 item.dataset.activityKey = entry.kind === "checkin"
                     ? JSON.stringify(["checkin", entry.username, entry.redeemed_at, entry.type])
                     : JSON.stringify(["redemption", entry.id || entry.username, entry.redeemed_at, entry.reward_title]);
+
+                if (entry.reward_icon_url) {
+                    const icon = document.createElement("img");
+                    icon.className = "activity-reward-icon";
+                    icon.src = entry.reward_icon_url;
+                    icon.alt = "";
+                    icon.width = icon.height = 28;
+                    icon.loading = "lazy";
+                    icon.addEventListener("error", () => { icon.hidden = true; });
+                    item.appendChild(icon);
+                }
 
                 const main = document.createElement("div");
                 main.className = "activity-main";
