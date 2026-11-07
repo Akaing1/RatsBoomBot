@@ -11,7 +11,6 @@ OUTCOMES = ("yes", "maybe", "no")
 CATEGORIES = ("general", "statement", "prediction", "advice", "ability")
 MAX_QUESTION_LENGTH = 400
 HISTORY_LIMIT = 100
-RECENT_LIMIT = 5
 
 
 def question_category(question: str) -> str:
@@ -62,7 +61,7 @@ class EightBallService:
             async with immediate_transaction(connection):
                 recent = await connection.fetchall(
                     "SELECT response_id FROM eight_ball_history WHERE broadcaster_id = ? ORDER BY id DESC LIMIT ?",
-                    (broadcaster_id, RECENT_LIMIT),
+                    (broadcaster_id, HISTORY_LIMIT),
                 )
                 recent_ids = [row["response_id"] for row in recent]
                 # Relax the oldest exclusion first if this outcome's pool is exhausted.

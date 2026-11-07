@@ -33,9 +33,11 @@ async def test_answers_fit_question_type_and_choose_verdict_independently(tmp_pa
     async with asqlite.create_pool(str(tmp_path / "8ball.db")) as db:
         await run_migrations(db)
         service = EightBallService(db)
-        # Force the last positive option: first-person encouragement is only in ability.
+        # Request known replies without depending on catalog order or pool size.
         monkeypatch.setattr("bot.services.engagement.eight_ball.random.choice",
-                            lambda items: "yes" if isinstance(items, tuple) else items[-1])
+                            lambda items: "yes" if isinstance(items, tuple) else next(
+                                r for preferred in ('statement_yes_2', 'ability_yes_2', 'general_yes_4')
+                                for r in items if r['id'] == preferred))
         assert await service.answer("a", "Is Meinya short?") == "That checks out."
         assert await service.answer("a", "Can I win?") == "Yeah, you've got a shot."
         assert await service.answer("a", "Can Meinya win?") == "I'd put cheese on it."
@@ -111,3 +113,35 @@ def test_eight_ball_appears_in_command_help_and_uses_shared_slowmode():
     assert entry.global_command is GlobalCommandName.EIGHT_BALL
     assert entry.slowmode is CommandSlowmode.SHARED
     assert UtilityCommands.eight_ball.name == "8ball"
+
+
+def test_response_library_has_broad_unique_pools():
+    service = EightBallService(None)
+    assert len(service.responses) >= 180
+    assert len({r['text'].casefold() for r in service.responses}) == len(service.responses)
+    for outcome in ('yes', 'maybe', 'no'):
+        for category in ('general', 'statement', 'prediction', 'advice', 'ability'):
+            eligible = [r for r in service.responses if r['outcome'] == outcome
+                        and (category in r['categories'] or 'general' in r['categories'])]
+            assert len(eligible) >= (20 if category == 'general' else 30)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('outcome', ['yes', 'maybe', 'no'])
+@pytest.mark.parametrize('question', ['Is Meinya short?', 'Something unexpected?'])
+async def test_replies_use_full_pool_before_repeating_even_after_restart(tmp_path, monkeypatch, outcome, question):
+    async with asqlite.create_pool(str(tmp_path / 'variety.db')) as db:
+        await run_migrations(db)
+        service = EightBallService(db)
+        category = question_category(question)
+        pool = [r for r in service.responses if r['outcome'] == outcome
+                and (category in r['categories'] or 'general' in r['categories'])]
+        monkeypatch.setattr('bot.services.engagement.eight_ball.random.choice',
+                            lambda items: outcome if isinstance(items, tuple) else items[0])
+        replies = []
+        for index in range(len(pool)):
+            if index == len(pool) // 2:
+                service = EightBallService(db)
+            replies.append(await service.answer('channel', question))
+        assert len(set(replies)) == len(pool)
+        assert await service.answer('channel', question) == replies[0]
