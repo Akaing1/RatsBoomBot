@@ -70,6 +70,47 @@ async def test_unified_settings_keep_master_controls_and_admin_endpoints(monkeyp
     assert '/admin/channels/123/delete' in html
 
 
+def test_real_template_response_preserves_admin_root_and_switch_submission():
+    from html.parser import HTMLParser
+    class Elements(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.tags = []
+        def handle_starttag(self, tag, attrs):
+            self.tags.append((tag, dict(attrs)))
+    from web.channel.settings_book import build_settings_sections
+    from web.shared.common import build_admin_context
+    from bot.profiles import ChannelProfile, activate_profile, clear_profiles
+    from bot.services.channels.feature_toggle import FeatureToggleService
+    try:
+        activate_profile('123', ChannelProfile(channel_name='test'))
+        features = FeatureToggleService(None)
+        sections = build_settings_sections({}, features.get_channel_features('123'),
+            features.get_profile_features('123'), features.get_global_groups('123'), features.get_global_commands('123'))
+        req = request()
+        context = build_admin_context(req, active_page='channels', channel_section='settings',
+            channel_root='/admin/channels/123', settings_sections=sections,
+            broadcaster=SimpleNamespace(id='123', name='Test'), customization_action='/admin/channels/123/customization',
+            channel_settings=SimpleNamespace(), protected_users=[], profile_features={},
+            chat_identity={'connected': False, 'premium_enabled': False},
+            url_for=lambda name, path: '/static'+path)
+        response = templates.TemplateResponse(request=req, name='admin/channel_settings.html', context=context)
+        parser = Elements()
+        parser.feed(response.body.decode())
+        tags = parser.tags
+        body = next(attrs for tag, attrs in tags if tag == 'body')
+        assert body['data-channel-root'] == '/admin/channels/123'
+        button = next(attrs for tag, attrs in tags if attrs.get('id') == 'settings-control-feature-channel')
+        form = next(attrs for tag, attrs in tags if tag == 'form' and attrs.get('id') == button['form'])
+        assert form['action'] == '/admin/channels/123/toggles'
+        assert button['name'] == 'action' and button['value'] == 'disable'
+        assert all(attrs['value'] == req.session['csrf_token'] for tag, attrs in tags if attrs.get('name') == 'csrf_token')
+        assert sum('settings-menu-section' in attrs.get('class', '').split() for tag, attrs in tags) == len(sections)
+        assert not any('settings-tabs' in attrs.get('class', '').split() for tag, attrs in tags)
+    finally:
+        clear_profiles()
+
+
 @pytest.mark.asyncio
 async def test_monitor_is_scoped_and_has_no_queue_dependency(monkeypatch):
     activity = {'feed': [{'user_label': '<viewer>'}], 'mod_actions': [], 'automod': []}

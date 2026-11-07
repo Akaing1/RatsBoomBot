@@ -19,7 +19,7 @@
 
     <div class="settings-pages">
         {% for section in settings_sections %}
-        <section class="settings-page" id="settings-{{ section.key }}" role="tabpanel" aria-labelledby="settings-tab-{{ section.key }}" tabindex="0" data-settings-page="{{ section.key }}"{% if section.key != selected %} hidden{% endif %}>
+        <section class="settings-page" id="settings-{{ section.key }}" aria-labelledby="settings-section-{{ section.key }}" data-settings-page="{{ section.key }}"{% if section.key != selected %} hidden{% endif %}>
             <header class="settings-page-heading"><div><p class="eyebrow">Channel settings</p><h3>{{ section.label }}</h3><p>{{ section.description }}</p></div><span class="settings-page-number" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span></header>
             {{ blocked_notice(section) }}
             {% if section.standalone_toggles %}
@@ -52,12 +52,16 @@
     </div>
     </div>
     <aside class="settings-tools" aria-label="Settings navigation and search">
-    <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+    <nav class="settings-menu" aria-label="Settings sections">
         {% for section in settings_sections %}
-        <a class="settings-tab" id="settings-tab-{{ section.key }}" href="{{ channel_root }}/settings?section={{ section.key }}" role="tab" aria-controls="settings-{{ section.key }}" aria-selected="{{ 'true' if section.key == selected else 'false' }}" tabindex="{{ '0' if section.key == selected else '-1' }}" data-settings-tab="{{ section.key }}" title="{{ section.label }}">
+        <details class="settings-menu-section"{% if section.key == selected %} open{% endif %}>
+        <summary>
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ section.icon }}"/></svg>
-            <span>{{ section.label }}</span><span class="settings-dirty-dot" hidden aria-label="Unsaved changes">●</span>
-        </a>
+            <a class="settings-section-link" id="settings-section-{{ section.key }}" href="{{ channel_root }}/settings?section={{ section.key }}" aria-controls="settings-{{ section.key }}"{% if section.key == selected %} aria-current="page"{% endif %} data-settings-tab="{{ section.key }}">{{ section.label }}</a>
+            <span class="settings-dirty-dot" hidden aria-label="Unsaved changes">●</span>
+        </summary>
+        <div class="settings-menu-links" data-settings-links="{{ section.key }}"></div>
+        </details>
         {% endfor %}
     </nav>
     <div class="settings-finder" data-settings-finder hidden aria-label="Settings finder">
@@ -82,6 +86,8 @@
 <script src="/static/js/ad-announcement-settings.js?v={{ deployment_stamp() }}" defer></script>
 <script src="/static/js/protected-users.js?v={{ deployment_stamp() }}-retry-user-popup" defer></script>
 <script src="/static/js/settings-timers.js?v={{ deployment_stamp() }}" defer></script>
+<script src="/static/js/settings-inputs.js?v={{ deployment_stamp() }}" defer></script>
 <script src="/static/js/channel-settings.js?v={{ deployment_stamp() }}-optimized-context-tracking" defer></script>
+<script src="/static/js/settings-save.js?v={{ deployment_stamp() }}" defer></script>
 <script src="/static/js/settings-finder.js?v={{ deployment_stamp() }}-single-outgoing-menu" defer></script>
 {% endblock %}

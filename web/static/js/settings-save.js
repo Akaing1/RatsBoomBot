@@ -5,7 +5,10 @@
     function isInlineForm(form) {
         if (!(form instanceof HTMLFormElement)) return false;
         const url = new URL(form.getAttribute('action') || location.href, location.href);
-        return form.method === 'post' && url.origin === location.origin && /\/(customization|features\/toggles|viewer-queue\/blacklist|protected-users\/(add|remove))$/.test(url.pathname);
+        return form.method === 'post' && url.origin === location.origin && (
+            /\/(customization|features\/toggles|viewer-queue\/blacklist|protected-users\/(add|remove))$/.test(url.pathname)
+            || (form.classList.contains('admin-settings-reset-form') && /^\/admin\/channels\/[^/]+\/toggles$/.test(url.pathname))
+        );
     }
     book.querySelectorAll('form[method="post"]').forEach(form => {
         if (isInlineForm(form)) form.dataset.settingsInlineSave = '';
