@@ -394,7 +394,7 @@
             warning.textContent = [data.error, ...(data.warnings || [])].filter(Boolean).join(' '); warning.hidden = !warning.textContent;
             root.querySelector('[data-followers-page]').textContent = `Page ${page} of ${data.pages}`;
             prev.disabled = page <= 1; next.disabled = page >= data.pages;
-            if (data.loading) timer = setTimeout(() => load(), 1500);
+            timer = setTimeout(() => { if (!document.hidden) load(); }, data.loading ? 1500 : 30000);
         } catch (error) {
             if (error.name === 'AbortError' || request !== sequence) return;
             status.textContent = 'Unable to update the follower list.'; warning.textContent = error.message; warning.hidden = false;
@@ -416,6 +416,8 @@
     form.elements.search.addEventListener('input', () => { clearTimeout(debounce); clearTimeout(timer); controller?.abort(); sequence++; page = 1; debounce = setTimeout(() => load(), 250); });
     prev.addEventListener('click', () => { page--; load(); }); next.addEventListener('click', () => { page++; load(); });
     refresh.addEventListener('click', () => load(true));
+    function refreshVisibleFollowers() { if (!document.hidden && !stopped) load(); }
+    document.addEventListener('visibilitychange', refreshVisibleFollowers);
     window.addEventListener('scroll', scheduleRender, {passive: true});
     window.addEventListener('resize', scheduleRender);
     const panelObserver = new ResizeObserver(() => { sizeColumns(); scheduleRender(); }); panelObserver.observe(panel);
@@ -488,6 +490,7 @@
         document.removeEventListener('pointerdown', closeFavoriteConfirmation);
         document.removeEventListener('pointerup', endColumnDrag); document.removeEventListener('pointercancel', endColumnDrag);
         window.removeEventListener('storage', syncFavoriteStorage);
+        document.removeEventListener('visibilitychange', refreshVisibleFollowers);
         window.removeEventListener('hashchange', onHashChange);
         window.removeEventListener('scroll', scheduleRender); window.removeEventListener('resize', scheduleRender);
     });

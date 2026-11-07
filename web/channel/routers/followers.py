@@ -79,6 +79,7 @@ async def load_snapshot(bot, channel_id, snapshot, *, refresh_followers=False):
             during_load = {key: row for key, row in names['users'].items() if before.get(key) is not row}
             names['users'] = {**{str(row['user_id']): row for row in followers}, **during_load}
             names['loaded'] = True
+            names['refreshed'] = time.monotonic()
             followers = list(names['users'].values())
             total = max(total, len(followers))
         unique = {str(item['user_id']): item for item in followers}
@@ -211,7 +212,9 @@ async def followers_api(request: Request, page: int = Query(1, ge=1), page_size:
         snapshot.update(loading=True, loaded=len(snapshot['followers']), error='', warnings=[])
         if refresh:
             snapshot['metrics_at'] = 0
-        snapshot['task'] = asyncio.create_task(load_snapshot(bot, channel_id, snapshot, refresh_followers=refresh and age >= 30))
+        names = follower_names_state(bot, channel_id)
+        refresh_names = (refresh and age >= 30) or (names['loaded'] and time.monotonic() - names.get('refreshed', 0) >= 86400)
+        snapshot['task'] = asyncio.create_task(load_snapshot(bot, channel_id, snapshot, refresh_followers=refresh_names))
     followers = snapshot['followers']
     following_task = start_following_load(bot, channel_id, snapshot)
     if following_task and (mutual or sort in {'roles', 'label'}):

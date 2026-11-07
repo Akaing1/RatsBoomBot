@@ -401,6 +401,33 @@ async def test_follower_page_reuses_names_updates_new_follows_and_can_refresh(di
 
 
 @pytest.mark.asyncio
+async def test_expired_snapshot_reconciles_unfollows_and_preserves_new_follow_events(directory):
+    from bot.shared.follower_names import follower_names_state, remember_follower
+    client, _, _, bot, calls = directory
+    await ready(client, bot)
+    original = bot._http.request_json.side_effect
+    async def changed_followers(route):
+        payload = await original(route)
+        if route.path == 'channels/followers':
+            payload['data'] = [row for row in payload['data'] if row['user_id'] != '2']
+            payload['total'] = 127
+            if not route.params.get('after'):
+                remember_follower(bot, '1', SimpleNamespace(id='999', name='newviewer', display_name='New Viewer'))
+        return payload
+    bot._http.request_json.side_effect = changed_followers
+    bot._followers_directory_cache['1']['refreshed'] -= 301
+    follower_names_state(bot, '1')['refreshed'] -= 86401
+    await client.get('/channel/api/followers')
+    await bot._followers_directory_cache['1']['task']
+    data = (await client.get('/channel/api/followers?search=user002')).json()
+    assert data['count'] == 0
+    assert data['total'] == 128
+    assert '2' not in follower_names_state(bot, '1')['users']
+    assert (await client.get('/channel/api/followers?search=newviewer')).json()['count'] == 1
+    assert sum(route.path == 'channels/followers' for route in calls) == 4
+
+
+@pytest.mark.asyncio
 async def test_cached_names_render_without_waiting_for_following_lookup(directory):
     from bot.shared.follower_names import ensure_follower_names, follower_names_state
     client, _, _, bot, calls = directory

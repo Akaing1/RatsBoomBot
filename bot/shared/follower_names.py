@@ -42,6 +42,7 @@ def ensure_follower_names(bot, channel_id):
     if snapshot and snapshot.get("refreshed") and not snapshot.get("loading") and not snapshot.get("error"):
         state["users"] = {**{str(row["user_id"]): row for row in snapshot["followers"]}, **state["users"]}
         state["loaded"] = True
+        state.setdefault("refreshed", snapshot["refreshed"])
         return
 
     directory_task = snapshot.get("task") if snapshot and snapshot.get("loading") else None
@@ -53,6 +54,7 @@ def ensure_follower_names(bot, channel_id):
                 if not snapshot.get("error"):
                     state["users"] = {**{str(row["user_id"]): row for row in snapshot["followers"]}, **state["users"]}
                     state["loaded"] = True
+                    state["refreshed"] = time.monotonic()
                     return
             cursor = None
             cursors = set()
@@ -73,6 +75,7 @@ def ensure_follower_names(bot, channel_id):
                 cursor = payload.get("pagination", {}).get("cursor")
                 if not cursor:
                     state["loaded"] = True
+                    state["refreshed"] = time.monotonic()
                     break
                 if cursor in cursors:
                     raise ValueError("Twitch returned a repeated follower page.")
