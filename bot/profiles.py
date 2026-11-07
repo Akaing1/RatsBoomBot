@@ -214,6 +214,7 @@ class ClipMessages:
     authorization_required: str = "The broadcaster needs to reconnect their Twitch account before clips can be created."
     failed: str = "@{username}, Twitch could not create that clip. Please try again later."
     usage: str = "Use !clip for 60 seconds or !clip short for 30 seconds."
+    unconfirmed: str = "@{username}, Twitch accepted the clip request, but it wasn't ready in time. Check the channel's Clip Manager before trying again."
 
 
 @dataclass(frozen=True)
@@ -221,7 +222,7 @@ class ClipConfig:
     duration: int = 60
     short_duration: int = 30
     cooldown_seconds: int = 120
-    processing_timeout_seconds: int = 15
+    processing_timeout_seconds: int = 60
     title: str = "{channel_name} clipped by {username}"
     messages: ClipMessages = ClipMessages()
 

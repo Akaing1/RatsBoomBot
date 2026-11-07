@@ -168,6 +168,8 @@ Boss Hunt is the separate RPG minigame with scheduled bosses, attacks, weapons, 
 
 `!clip` or `!clips` creates a 60-second clip. Adding `short` requests a 30-second clip. Clip creation includes per-channel cooldowns, in-progress protection, live validation, and profile-specific responses.
 
+The bot checks for the accepted clip for up to 60 seconds, backing off between lookups and retrying temporary failures. It announces success only when Twitch confirms the clip exists. An unconfirmed request produces a Clip Manager check message instead of a guessed link; the bot does not automatically create a duplicate clip.
+
 The **Clips** tab in For You browses channel clips with last-24-hours, 7-day, 1-month, and all-time ranges (all time by default), search, sorting, playback, and downloads. Search and sorting apply to loaded clips; load more to expand the results. Filters apply immediately.
 
 ### Moderation

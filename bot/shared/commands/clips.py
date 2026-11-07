@@ -55,15 +55,19 @@ class ClipCommands(commands.Component):
 
         processing_message = render_profile_message(config.messages.processing, username=username, duration=duration)
         await ctx.reply(processing_message)
-        clip = await services.clips.wait_for_clip(broadcaster_id, created_clip.id, config.processing_timeout_seconds)
+        try:
+            clip = await services.clips.wait_for_clip(broadcaster_id, created_clip.id, config.processing_timeout_seconds)
+        except Exception as error:
+            LOGGER.exception("[Clips] Could not verify accepted clip %s for broadcaster %s.", created_clip.id, broadcaster_id)
+            await ctx.reply(self.error_message(error, config, username))
+            return
 
         if clip is None:
-            clip_url = f"https://clips.twitch.tv/{created_clip.id}"
-            LOGGER.warning("[Clips] Clip %s was accepted but was not available after %d seconds.", created_clip.id, config.processing_timeout_seconds)
-        else:
-            clip_url = clip.url
+            LOGGER.warning("[Clips] Clip %s for broadcaster %s was accepted but was not confirmed after %d seconds.", created_clip.id, broadcaster_id, config.processing_timeout_seconds)
+            await ctx.reply(render_profile_message(config.messages.unconfirmed, username=username, duration=duration))
+            return
 
-        message = render_profile_message(config.messages.success, username=username, clip_url=clip_url, duration=duration)
+        message = render_profile_message(config.messages.success, username=username, clip_url=clip.url, duration=duration)
         await ctx.send(message)
         LOGGER.info("[Clips] User %s created a %d-second clip %s for broadcaster %s.", username, duration, created_clip.id, broadcaster_id)
 
