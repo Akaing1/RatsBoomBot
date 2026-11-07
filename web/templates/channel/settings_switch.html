@@ -1,4 +1,5 @@
 {% from "shared/state_toggle.html" import state_toggle_contents as switch_contents %}
+{% from "shared/social_icon.html" import social_icon %}
 
 {% macro status_switch(toggle, labeled=false) %}
 {% set blocked = toggle.state.blocked_by_profile or toggle.state.blocked_by_globals | default(false) %}
@@ -27,7 +28,7 @@
 {% endmacro %}
 
 {% macro command_list(commands) %}
-<ul>{% for command in commands %}<li><code>{{ command.syntax }}</code><span>{{ command.description | replace("the broadcaster's", "your") | replace("the broadcaster", "you") | replace("mods, broadcaster,", "mods, you,") | replace("this channel", "your channel") | replace("This channel", "Your channel") }}</span></li>{% endfor %}</ul>
+<ul>{% for command in commands %}<li>{% if command.syntax.startswith('!socials ') %}<span class="social-platform-heading">{{ social_icon(command.syntax.split(' ')[1]) }}<code>{{ command.syntax }}</code></span>{% else %}<code>{{ command.syntax }}</code>{% endif %}<span>{{ command.description | replace("the broadcaster's", "your") | replace("the broadcaster", "you") | replace("mods, broadcaster,", "mods, you,") | replace("this channel", "your channel") | replace("This channel", "Your channel") }}</span>{% if command.aliases %}<small class="settings-command-aliases">Aliases: {% for alias in command.aliases %}<code>{{ '!' if command.is_root_command else command.syntax.rsplit(' ', 1)[0] ~ ' ' }}{{ alias }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</small>{% endif %}</li>{% endfor %}</ul>
 {% endmacro %}
 
 {% macro command_reference(toggle) %}

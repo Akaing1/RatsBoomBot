@@ -63,7 +63,7 @@ async def save_admin_channel_customization(request: Request, broadcaster_id: str
             setter = services.broadcaster_settings.set_discord_url if setting_name == "social.discord_url" else services.broadcaster_settings.set_youtube_url
             await setter(broadcaster_id, value.strip())
             message = "Social link updated."
-        elif setting_name in {"social.tiktok_url", "social.x_url", "social.kofi_url", "social.vgen_url"}:
+        elif setting_name in {"social.tiktok_url", "social.x_url", "social.kofi_url", "social.vgen_url", "social.throne_url", "social.website_url"}:
             if action != "save":
                 raise ValueError("Use Save Changes to update or clear a social link.")
             await services.broadcaster_settings.set_social_url(broadcaster_id, setting_name.removeprefix("social.").removesuffix("_url"), value.strip())

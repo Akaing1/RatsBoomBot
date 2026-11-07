@@ -2528,7 +2528,7 @@ async def update_channel_customization(request: Request, setting_name: str = For
                 raise ValueError("Choose On or Off.")
             await services.broadcaster_settings.set_follow_raid(broadcaster_id, value == "1")
             message = "Follow raid preference saved."
-        elif setting_name in {"social.tiktok_url", "social.x_url", "social.kofi_url", "social.vgen_url"}:
+        elif setting_name in {"social.tiktok_url", "social.x_url", "social.kofi_url", "social.vgen_url", "social.throne_url", "social.website_url"}:
             if action != "save":
                 raise ValueError("Unknown social action.")
             await services.broadcaster_settings.set_social_url(broadcaster_id, setting_name.removeprefix("social.").removesuffix("_url"), value)

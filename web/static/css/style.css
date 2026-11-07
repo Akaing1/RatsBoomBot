@@ -2255,6 +2255,10 @@ body.landing-page {
     font-size: 15px;
 }
 
+.social-platform-heading { display: inline-flex; align-items: center; gap: 8px; min-width: 0; vertical-align: middle; }
+.social-platform-heading > :is(span,code) { display: block; line-height: 1.25; }
+.social-platform-icon { display: block; flex: 0 0 16px; width: 16px; height: 16px; object-fit: contain; align-self: center; }
+
 .toggle-card-heading p {
     margin: 6px 0 0;
     color: var(--muted);
