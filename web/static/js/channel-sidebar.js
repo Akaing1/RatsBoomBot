@@ -15,8 +15,7 @@
     const storageKey = shell.dataset.sidebarStorageKey || "ratsboombot-dashboard-sidebar-collapsed";
     const mobileMedia = window.matchMedia("(max-width: 768px)");
     const compactMedia = window.matchMedia("(min-width: 769px) and (max-width: 1100px)");
-    let desktopCollapsed = false;
-    let compactExpanded = false;
+    let desktopCollapsed = compactMedia.matches;
     let mobileExpanded = false;
     let readyFrame = 0;
 
@@ -48,11 +47,12 @@
     }
 
     function applyResponsiveState() {
-        applyState(mobileMedia.matches ? !mobileExpanded : compactMedia.matches ? !compactExpanded : desktopCollapsed);
+        applyState(mobileMedia.matches ? !mobileExpanded : desktopCollapsed);
     }
 
     try {
-        desktopCollapsed = window.localStorage.getItem(storageKey) === "true";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) desktopCollapsed = saved === "true";
     } catch (error) {
         // Storage may be unavailable in privacy-restricted browser contexts.
     }
@@ -62,13 +62,6 @@
     function toggleNavigation() {
         if (mobileMedia.matches) {
             mobileExpanded = shell.classList.contains("sidebar-collapsed");
-            applyResponsiveState();
-            return;
-        }
-        if (compactMedia.matches) {
-            compactExpanded = shell.classList.contains("sidebar-collapsed");
-            shell.classList.toggle("sidebar-hover-locked", !compactExpanded);
-            sidebar?.classList.toggle("sidebar-hover-locked", !compactExpanded);
             applyResponsiveState();
             return;
         }
