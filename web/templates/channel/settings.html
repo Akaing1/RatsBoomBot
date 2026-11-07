@@ -26,11 +26,15 @@
             {% if section.standalone_toggles %}
             <div class="settings-command-clusters">
                 {% for panel, toggles in section.standalone_panels %}
-                <section class="settings-command-cluster">
+                <section class="settings-command-cluster{% if panel == 'Enable bot' %} settings-master-control{% endif %}">
+                    {% if panel == 'Enable bot' %}
+                    {% for toggle in toggles %}<div class="settings-switch-row" data-settings-shortcut><div class="settings-toggle-copy"><h4>{{ panel }}</h4>{{ toggle_details(toggle) }}</div>{{ status_switch(toggle) }}</div>{% endfor %}
+                    {% else %}
                     <h4>{{ panel }}</h4>
                     <div class="settings-switch-list">
                     {% for toggle in toggles %}<div class="settings-switch-row{% if not toggle.state.effective_enabled %} is-disabled{% endif %}"><div class="settings-toggle-copy"><span>{{ toggle.label }}</span>{{ toggle_details(toggle) }}</div>{{ status_switch(toggle) }}</div>{% endfor %}
                     </div>
+                    {% endif %}
                 </section>
                 {% endfor %}
             </div>
