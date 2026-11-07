@@ -1,6 +1,9 @@
 import asyncio
 import math
 
+from aiohttp import ClientError
+from twitchio import HTTPException
+
 from bot.profiles import ClipConfig, render_profile_message
 
 
@@ -48,13 +51,24 @@ class ClipService:
     async def wait_for_clip(self, broadcaster_id: str, clip_id: str, timeout_seconds: int):
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout_seconds
+        retry_delay = 1
 
-        while loop.time() < deadline:
-            clips = self.bot.fetch_clips(clip_ids=[clip_id], token_for=str(broadcaster_id), max_results=1)
-
-            async for clip in clips:
-                return clip
-
-            await asyncio.sleep(1)
+        while (remaining := deadline - loop.time()) > 0:
+            try:
+                async with asyncio.timeout(remaining):
+                    clips = self.bot.fetch_clips(clip_ids=[clip_id], token_for=str(broadcaster_id), max_results=1)
+                    async for clip in clips:
+                        return clip
+            except HTTPException as error:
+                if error.status != 429 and not 500 <= error.status < 600:
+                    raise
+            except (ClientError, TimeoutError):
+                # Retry the lookup, never the already-accepted create request.
+                pass
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                break
+            await asyncio.sleep(min(retry_delay, remaining))
+            retry_delay = min(5, retry_delay * 2)
 
         return None
