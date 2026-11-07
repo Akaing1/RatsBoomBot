@@ -194,7 +194,10 @@
             categoryArtAnimation.onfinish = () => gameSuggestions.classList.remove("is-art-animating");
         }
     }
-    document.addEventListener("dashboard-carousel-card-changed", () => setGameSuggestionsVisible(false));
+    document.addEventListener("dashboard-carousel-card-changed", () => {
+        if (document.activeElement === gameField) gameField.blur();
+        else setGameSuggestionsVisible(false);
+    });
 
     function renderGameOptions(games, query, moreGames = [], expanded = false) {
         const normalizedQuery = query.trim().toLowerCase();
@@ -363,6 +366,12 @@
             }
             const shouldCommit = field.dataset.commitEdit === "true";
             delete field.dataset.commitEdit;
+            if ((field === gameField && !shouldCommit) || (field === titleField && !field.textContent.trim())) {
+                field.textContent = savedValue;
+                delete field.dataset.hasDraft;
+                refreshDraftWarning();
+                return;
+            }
             if (!shouldCommit) {
                 if (field.textContent.trim() !== savedValue) {
                     field.dataset.hasDraft = "true";
