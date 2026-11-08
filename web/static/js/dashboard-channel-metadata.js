@@ -203,8 +203,15 @@
         const normalizedQuery = query.trim().toLowerCase();
         const previousScroll = normalizedQuery === renderedGameQuery ? gameOptionsList.scrollTop : 0;
         renderedGameQuery = normalizedQuery;
-        const mainGames = Array.isArray(games) ? games : [];
-        const extraGames = Array.isArray(moreGames) ? moreGames : [];
+        const isCurrentCategory = game => game.name.trim().toLowerCase() === savedCategoryName.toLowerCase();
+        const results = Array.isArray(games) ? games : [];
+        const additional = Array.isArray(moreGames) ? moreGames : [];
+        const current = [...results, ...additional].find(isCurrentCategory)
+            || {name: savedCategoryName, box_art_url: savedCategoryArt};
+        const pinCurrent = !normalizedQuery && savedCategoryName;
+        const mainGames = pinCurrent
+            ? [current, ...results.filter(game => !isCurrentCategory(game))] : results;
+        const extraGames = pinCurrent ? additional.filter(game => !isCurrentCategory(game)) : additional;
         gameOptions = expanded ? [...mainGames, ...extraGames] : mainGames;
         selectedGame = 0;
         gameOptionsList.replaceChildren();
