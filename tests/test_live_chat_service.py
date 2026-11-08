@@ -2354,7 +2354,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "left: -36px; width: min(1250px,calc(100vw - 144px));" in dashboard_styles
     assert 'window.matchMedia("(max-width: 768px)")' in sidebar_script
     assert 'window.matchMedia("(min-width: 769px) and (max-width: 1100px)")' in sidebar_script
-    assert 'compactMedia.matches ? !compactExpanded : desktopCollapsed' in sidebar_script
+    assert 'applyState(mobileMedia.matches ? !mobileExpanded : desktopCollapsed)' in sidebar_script
     assert 'enableTransitionsAfterLayout()' in sidebar_script
     assert 'sidebar-hover-locked' in sidebar_script
     assert '@media (min-width: 769px) {\n    .dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded .sidebar' in dashboard_styles
@@ -2693,6 +2693,7 @@ async def test_youtube_revoked_authorization_requires_reconnect():
     service._find_active_live_chat = AsyncMock(side_effect=YouTubeReconnectRequired("Reconnect YouTube"))
     await service._watch_youtube("channel-1")
     assert service.youtube_statuses["channel-1"] == ("unavailable", "Reconnect YouTube")
+    assert "channel-1" in service.youtube_reauth_required
     assert service._find_active_live_chat.await_count == 1
 
 

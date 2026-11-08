@@ -61,6 +61,7 @@ class GlobalCommandName(Enum):
     ME = "me"
     PETS = "pets"
     QUOTE = "quote"
+    EIGHT_BALL = "eight_ball"
 
     KAMIKAZE = "kamikaze"
 
@@ -115,6 +116,7 @@ class GlobalCommandDefaults:
     me: bool = True
     pets: bool = True
     quote: bool = True
+    eight_ball: bool = True
 
     kamikaze: bool = True
 
@@ -186,7 +188,7 @@ class AutomaticShoutouts:
 
 @dataclass(frozen=True)
 class SocialMessages:
-    overview: str = "Discord: {discord_url} | YouTube: {youtube_url}"
+    overview: str = "YouTube: {youtube_url} | Discord: {discord_url}"
     discord: str = "Join the community on Discord: {discord_url}"
     youtube: str = "Catch up on YouTube: {youtube_url}"
     discord_unavailable: str = "No Discord link has been set for this channel yet."
@@ -212,6 +214,7 @@ class ClipMessages:
     authorization_required: str = "The broadcaster needs to reconnect their Twitch account before clips can be created."
     failed: str = "@{username}, Twitch could not create that clip. Please try again later."
     usage: str = "Use !clip for 60 seconds or !clip short for 30 seconds."
+    unconfirmed: str = "@{username}, Twitch accepted the clip request, but it wasn't ready in time. Check the channel's Clip Manager before trying again."
 
 
 @dataclass(frozen=True)
@@ -219,7 +222,7 @@ class ClipConfig:
     duration: int = 60
     short_duration: int = 30
     cooldown_seconds: int = 120
-    processing_timeout_seconds: int = 15
+    processing_timeout_seconds: int = 60
     title: str = "{channel_name} clipped by {username}"
     messages: ClipMessages = ClipMessages()
 

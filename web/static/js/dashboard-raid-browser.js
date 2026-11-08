@@ -298,7 +298,10 @@
                 const button = document.createElement("button"); button.type = "button";
                 button.setAttribute("data-hover-pointer-only", "");
                 if (/^https:\/\/static-cdn\.jtvnw\.net\//.test(game.box_art_url || "")) {
-                    const image = document.createElement("img"); image.alt = ""; image.src = game.box_art_url; button.append(image);
+                    const image = document.createElement("img"); image.alt = "";
+                    if (window.categoryArtwork) window.categoryArtwork.set(image, game.box_art_url, 24);
+                    else image.src = game.box_art_url;
+                    button.append(image);
                 }
                 const name = document.createElement("span"); name.textContent = game.name; button.append(name);
                 button.addEventListener("mousedown", event => event.preventDefault());

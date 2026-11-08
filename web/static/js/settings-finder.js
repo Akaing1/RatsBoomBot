@@ -123,7 +123,7 @@
             const name = normalize(title);
             entries.push({target, section, tabLabel, title, name, nameWords: [...new Set(name.split(/[^\p{L}\p{N}]+/u).filter(Boolean))],
                 category: normalize(`${tabLabel} ${category}`),
-                shortcut: target.matches('.settings-group-heading, h4, h3, .panel-header')
+                shortcut: target.matches('.settings-group-heading, h4, h3, .panel-header, [data-settings-shortcut]')
                     && (!target.closest('[data-settings-single-menu]') || target.parentElement.matches('[data-settings-single-menu]'))});
         });
     });

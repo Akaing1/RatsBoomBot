@@ -5,6 +5,60 @@ let chromium;
 try { ({chromium} = require('playwright')); } catch (_) {}
 const executablePath = process.env.CHAT_TEST_BROWSER_PATH || chromium?.executablePath();
 
+test('single-column desktop settings use a fixed menu button without reserving menu space', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage({viewport: {width: 850, height: 900}, reducedMotion: 'reduce'});
+        await page.route('http://settings.test/**', route => route.fulfill({body: '<html></html>', contentType: 'text/html'}));
+        await page.goto('http://settings.test/channel/settings');
+        await page.setContent(`<body class="dashboard-page channel-page channel-page-settings">
+            <div class="app-shell sidebar-collapsed" data-dashboard-shell><aside class="sidebar" data-channel-sidebar>
+                <div class="settings-navbar-controls"><span class="settings-navbar-title">Settings</span><button class="settings-menu-toggle" data-settings-menu-toggle aria-expanded="false">Menu</button></div>
+            </aside><main class="main-content streamer-main-content"><header class="page-header">Settings</header>
+            <div class="settings-book" data-settings-book data-selected="general"><div class="settings-workspace">
+                <div class="settings-main"><div class="settings-pages"><section data-settings-page="general"><header class="settings-page-heading"><h3>General</h3></header><article class="profile-setting-card"><h4>Channel setting</h4><textarea>Draft</textarea></article><div style="height:1600px"></div></section></div></div>
+                <aside class="settings-tools"><div class="settings-finder" data-settings-finder hidden><input placeholder="Search settings"><p data-settings-result-count></p><div data-settings-results></div></div>
+                    <nav class="settings-menu"><details class="settings-menu-section" open><summary><a data-settings-tab="general">General</a></summary><div data-settings-links="general"></div></details></nav>
+                </aside></div></div></main></div></body>`);
+        for (const path of ['web/static/css/style.css', 'web/static/css/channel-settings.css']) await page.addStyleTag({path});
+        for (const path of ['web/static/js/channel-settings.js', 'web/static/js/settings-finder.js']) await page.addScriptTag({path});
+        const toggle = page.locator('[data-settings-menu-toggle]');
+        const menu = page.locator('.settings-tools');
+        const main = page.locator('.settings-main');
+        assert.equal(await menu.isVisible(), false);
+        assert.equal(await menu.evaluate(node => node.inert), true);
+        const before = await main.boundingBox();
+        const buttonBefore = await toggle.boundingBox();
+        assert.ok(Math.abs(buttonBefore.x + buttonBefore.width - 834) < 1);
+        assert.equal(buttonBefore.y, 16);
+        await toggle.click();
+        assert.equal(await menu.isVisible(), true);
+        assert.equal(await menu.evaluate(node => node.inert), false);
+        assert.deepEqual(await main.boundingBox(), before, 'Opening the menu does not move the settings');
+        await page.locator('[data-settings-finder] input').fill('Channel');
+        assert.equal(await page.locator('.settings-search-popup').evaluate(node => node.matches(':popover-open')), true);
+        await page.keyboard.press('Escape');
+        await page.keyboard.press('Escape');
+        assert.equal(await menu.isVisible(), false);
+        await toggle.click();
+        await page.locator('.page-header').click();
+        assert.equal(await menu.isVisible(), false, 'Clicking outside dismisses the desktop menu');
+        await page.evaluate(() => window.scrollTo(0, 500));
+        assert.deepEqual(await toggle.boundingBox(), buttonBefore, 'The button remains fixed while scrolling');
+        await page.setViewportSize({width: 1200, height: 900});
+        await page.waitForFunction(() => !document.querySelector('.settings-tools').inert);
+        assert.equal(await menu.isVisible(), true, 'Wide desktop navigation remains visible');
+        assert.equal(await toggle.isVisible(), false);
+        await page.setViewportSize({width: 600, height: 900});
+        await page.waitForFunction(() => document.querySelector('.settings-tools').inert);
+        assert.equal(await menu.isVisible(), false);
+        await toggle.click();
+        const mobileMenu = await menu.boundingBox();
+        assert.equal(mobileMenu.x, 0);
+        assert.equal(mobileMenu.width, 600, 'Mobile retains its full-width attached menu');
+    } finally { await browser.close(); }
+});
+
 test('settings search ranks close names first and also includes name and category substrings', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
     const browser = await chromium.launch({executablePath, headless: true});
     try {

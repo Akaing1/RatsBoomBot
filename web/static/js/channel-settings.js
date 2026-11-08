@@ -7,6 +7,7 @@
     const scroller = book.querySelector('.settings-pages');
     const main = book.querySelector('.settings-main');
     const mobile = matchMedia('(max-width: 768px)');
+    const floatingMenu = matchMedia('(max-width: 900px)');
     const hoverCapable = matchMedia('(hover: hover)');
     let hoveredSetting;
     let pointer;
@@ -78,7 +79,7 @@
         if (!menuToggle || !menu) return;
         menuAnimation?.cancel();
         menuToggle.setAttribute('aria-expanded', String(open));
-        menu.inert = mobile.matches && !open;
+        menu.inert = floatingMenu.matches && !open;
         if (!animate || matchMedia('(prefers-reduced-motion: reduce)').matches) {
             menu.classList.toggle('is-open', open); return;
         }
@@ -96,9 +97,10 @@
         const group = tabs.find(tab => tab.dataset.settingsTab === activeSection)?.closest('.settings-menu-section');
         if (mobile.matches && group) expand(group, true);
     });
+    floatingMenu.addEventListener('change', () => showMenu(false, false));
     showMenu(false, false);
     document.addEventListener('click', event => {
-        if (mobile.matches && menuToggle?.getAttribute('aria-expanded') === 'true' && !menu.contains(event.target) && !menuToggle.contains(event.target)) showMenu(false);
+        if (floatingMenu.matches && menuToggle?.getAttribute('aria-expanded') === 'true' && !menu.contains(event.target) && !menuToggle.contains(event.target)) showMenu(false);
     });
     document.addEventListener('keydown', event => {
         if (event.key === 'Escape' && menuToggle?.getAttribute('aria-expanded') === 'true') {
@@ -177,7 +179,7 @@
     });
     book.addEventListener('settings-location-changed', event => writeLocation(activeSection, event.detail, 'replace'));
     book.addEventListener('settings-scroll', event => {
-        if (mobile.matches && menuToggle?.getAttribute('aria-expanded') === 'true') showMenu(false);
+        if (floatingMenu.matches && menuToggle?.getAttribute('aria-expanded') === 'true') showMenu(false);
         scrollToSetting(event.detail);
     });
     function select(key, updateURL = true) {
@@ -199,7 +201,7 @@
     tabs.forEach((tab, index) => {
         tab.addEventListener('click', event => {
             if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-            if (mobile.matches && menuToggle?.getAttribute('aria-expanded') === 'true') showMenu(false);
+            if (floatingMenu.matches && menuToggle?.getAttribute('aria-expanded') === 'true') showMenu(false);
             event.preventDefault(); select(tab.dataset.settingsTab);
             scrollToSetting(pages.find(page => page.dataset.settingsPage === tab.dataset.settingsTab));
         });

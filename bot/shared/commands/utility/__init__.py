@@ -6,6 +6,7 @@ from twitchio.ext import commands
 from bot.profiles import GlobalCommandName, get_active_profile, render_profile_message
 from bot.shared.commands.converters import LocalizedUser
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_command_enabled
+from bot.services.engagement.eight_ball import MAX_QUESTION_LENGTH
 
 from .kamikaze import KamikazeCommands
 
@@ -78,6 +79,21 @@ class UtilityCommands(commands.Component):
             return
 
         await ctx.reply(f"{ctx.chatter.name} says hallo {user}!")
+
+    @commands.command(name="8ball")
+    async def eight_ball(self, ctx: commands.Context, *, question: str = "") -> None:
+        self.log_command(ctx, "8ball")
+        if not self.command_enabled(ctx, GlobalCommandName.EIGHT_BALL):
+            return
+        question = " ".join(question.split())
+        if not question:
+            await ctx.reply("Ask me a yes/no question! Example: !8ball Will we win this game?")
+            return
+        if len(question) > MAX_QUESTION_LENGTH:
+            await ctx.reply(f"Keep your question to {MAX_QUESTION_LENGTH} characters or fewer.")
+            return
+        answer = await self.bot.services.eight_ball.answer(get_context_broadcaster_id(ctx), question)
+        await ctx.reply(answer)
 
     @commands.command()
     async def choice(self, ctx: commands.Context, *choices: str) -> None:

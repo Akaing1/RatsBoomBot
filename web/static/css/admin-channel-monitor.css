@@ -7,10 +7,10 @@
 .admin-monitor-panel-header .button { flex-shrink: 0; }
 .admin-monitor-player { aspect-ratio: 16 / 9; }
 .admin-monitor-player > div { width: 100%; height: 100%; }
-.admin-monitor-chat, .admin-monitor-commands { display: flex; flex-direction: column; }
+.admin-monitor-chat, .admin-monitor-commands { display: flex; flex-direction: column; height: clamp(360px, 65dvh, 720px); min-height: 0; overflow: hidden; }
 .admin-monitor :is(.admin-monitor-chat, .admin-monitor-commands) > .admin-monitor-panel-header { flex: 0 0 auto; }
-.admin-monitor .live-chat-feed-shell { flex: 1; min-height: 0; }
-.admin-monitor .live-chat-feed { height: 0; min-height: 180px; flex: 1; overflow: auto; }
+.admin-monitor .live-chat-feed-shell { flex: 1; min-height: 0; overflow: hidden; }
+.admin-monitor .live-chat-feed { height: 0; min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; }
 .admin-monitor .compact-empty-state { margin: 0; padding: 18px 8px; border: 0; color: var(--muted); font-size: 13px; }
 .admin-monitor-feeds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
 .admin-monitor-feeds > section { min-width: 0; padding: 0 14px; }
@@ -26,7 +26,6 @@
 .admin-monitor :focus-visible { outline: 2px solid #b390ff; outline-offset: 3px; }
 @media (max-width: 1100px) {
     .admin-monitor { grid-template-columns: minmax(0, 1fr); }
-    .admin-monitor-chat .live-chat-feed { flex: none; height: 300px; }
 }
 @media (max-width: 700px) {
     .admin-monitor .panel { padding: 14px; }

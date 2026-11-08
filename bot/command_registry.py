@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from bot.profiles import ChannelProfile, FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName
+from bot.services.channels.broadcaster_settings import EXTRA_SOCIAL_LINKS
 
 
 class CommandPermission(str, Enum):
@@ -106,6 +107,7 @@ UTILITY_COMMANDS = CommandGroupDefinition(
         ),
         CommandDefinition("!hi [username]", "Say hello to yourself or another chatter.", global_command=GlobalCommandName.HI),
         CommandDefinition("!choice <options>", "Randomly choose from the supplied space-separated options.", global_command=GlobalCommandName.CHOICE),
+        CommandDefinition("!8ball <question>", "Ask a yes/no question for a random, conversational prediction.", global_command=GlobalCommandName.EIGHT_BALL),
         CommandDefinition("!kaboom [username]", "Blow yourself or another chatter up.", global_command=GlobalCommandName.KABOOM),
         CommandDefinition("!stinky [username]", "Generate a random stinky percentage.", global_command=GlobalCommandName.STINKY),
         CommandDefinition("!lucky [username]", "Generate a random luck percentage.", global_command=GlobalCommandName.LUCKY),
@@ -114,8 +116,8 @@ UTILITY_COMMANDS = CommandGroupDefinition(
         CommandDefinition("!pp [username]", "Generate a measurement from -1in through 20in.", global_command=GlobalCommandName.PP),
         CommandDefinition("!lurk", "Let chat know you are stepping away to lurk.", global_command=GlobalCommandName.LURK),
         CommandDefinition("!help", "Show the compact command list in Twitch chat.", global_command=GlobalCommandName.HELP),
-        CommandDefinition("!stats", "Open your chatter profile in this channel.", global_command=GlobalCommandName.STATS),
-        CommandDefinition("!me", "Open your global chatter profile.", global_command=GlobalCommandName.ME),
+        CommandDefinition("!stats [@username]", "Open your or another chatter's profile in this channel.", global_command=GlobalCommandName.STATS),
+        CommandDefinition("!me [@username]", "Open your or another chatter's global profile.", global_command=GlobalCommandName.ME),
         CommandDefinition("!quote [random|number]", "Show a random quote or one by number.", global_command=GlobalCommandName.QUOTE),
         CommandDefinition("!quote add <message>", "Add a quote to this channel.", global_command=GlobalCommandName.QUOTE),
         CommandDefinition("!quote remove <number>", "Remove a quote by number.", CommandPermission.MODERATOR, global_command=GlobalCommandName.QUOTE)
@@ -144,8 +146,13 @@ SOCIAL_COMMANDS = CommandGroupDefinition(
     description="Share the channel's configured community links.",
     commands=(
         CommandDefinition("!socials", "Show every configured social link.", global_group=GlobalCommandGroup.SOCIALS),
-        CommandDefinition("!socials discord", "Show the configured Discord link.", global_group=GlobalCommandGroup.SOCIALS),
-        CommandDefinition("!socials youtube", "Show the configured YouTube link.", global_group=GlobalCommandGroup.SOCIALS)
+        CommandDefinition("!socials twitch", "Show your channel's Twitch link.", global_group=GlobalCommandGroup.SOCIALS),
+        CommandDefinition("!socials youtube", "Show the configured YouTube link.", global_group=GlobalCommandGroup.SOCIALS),
+        CommandDefinition("!socials discord", "Show the configured Discord link.", global_group=GlobalCommandGroup.SOCIALS)
+    ) + tuple(
+        CommandDefinition(f"!socials {platform}", f"Show the configured {label} link.", global_group=GlobalCommandGroup.SOCIALS,
+                          aliases=("twitter",) if platform == "x" else ())
+        for platform, label in EXTRA_SOCIAL_LINKS.items()
     )
 )
 

@@ -114,7 +114,7 @@ Points can remain disabled without disabling unrelated redeem tracking. Meinya s
 
 ### Chatter Profiles
 
-`!stats` links to the invoking chatter's profile for the current channel; `!me` links to their global profile. Chatter sign-in provides account actions, including channel-specific shopping, crafting, selling, and gambling. Global profiles summarize exact tracked messages, channels visited, raid damage, boss participation, final hits, and bot-earned loyalty rewards. Each connected channel links to a detail page with the chatter's current balance, lifetime earnings, redeems, raid record, and inventory.
+`!stats [@username]` links to a chatter's profile for the current channel; `!me [@username]` links to their global profile. Both default to the invoking chatter when no username is supplied. Names work with or without `@`; unknown chatters receive a profile-not-found reply. Chatter sign-in provides account actions, including channel-specific shopping, crafting, selling, and gambling. Global profiles summarize exact tracked messages, channels visited, raid damage, boss participation, final hits, and bot-earned loyalty rewards. Each connected channel links to a detail page with the chatter's current balance, lifetime earnings, redeems, raid record, and inventory.
 
 Historical message totals are seeded from the previous point-eligible message count. After migration 13, every non-bot message is counted independently of the loyalty cooldown. Historical lifetime earnings begin with the balance present at migration; future totals include chat, redeem, raid, gamble, and other bot rewards while excluding moderator grants and viewer transfers.
 
@@ -168,6 +168,8 @@ Boss Hunt is the separate RPG minigame with scheduled bosses, attacks, weapons, 
 
 `!clip` or `!clips` creates a 60-second clip. Adding `short` requests a 30-second clip. Clip creation includes per-channel cooldowns, in-progress protection, live validation, and profile-specific responses.
 
+The bot checks for the accepted clip for up to 60 seconds, backing off between lookups and retrying temporary failures. It announces success only when Twitch confirms the clip exists. An unconfirmed request produces a Clip Manager check message instead of a guessed link; the bot does not automatically create a duplicate clip.
+
 The **Clips** tab in For You browses channel clips with last-24-hours, 7-day, 1-month, and all-time ranges (all time by default), search, sorting, playback, and downloads. Search and sorting apply to loaded clips; load more to expand the results. Filters apply immediately.
 
 ### Moderation
@@ -190,7 +192,7 @@ Third-party game APIs may require public player profiles and do not expose every
 
 ### Streamer Dashboard
 
-The root URL is the public landing page with chatter sign-in. Connected broadcasters use `/channel` for stream status, combined Twitch/YouTube chat, viewer queues, check-ins, redeems, raid discovery, and feature/customization controls.
+The root URL is the public landing page with chatter sign-in. Connected broadcasters use `/channel` for stream status, combined Twitch/YouTube chat, viewer queues, check-ins, redeems, raid discovery, and feature/customization controls. Twitch and YouTube authorization warnings appear above dashboard content with their own reauthorize actions. Linked YouTube accounts are checked on page load even while offline; temporary check failures offer Retry rather than claiming reauthorization is required. Successful YouTube reconnects clear its warning.
 
 Channel sessions are isolated by Twitch user ID and persist for the configured session lifetime. The Overview also provides polls and predictions with live summaries and history, subject to Twitch eligibility and authorization. The Followers page adds sortable statistics and raid favorites.
 
@@ -206,6 +208,8 @@ Broadcasters grant, change, or revoke roles from **Moderator access**. Delegates
 Access is checked per channel and revoked users receive an Unauthorized page. Delegated dashboard access does not grant administrator access. Twitch replies use the moderator's own authorized identity. Connection prompts request reauthorization when a supported connection needs attention.
 
 ### My Account and Community Pages
+
+`!8ball <question>` gives a random conversational answer using local JSON response categories and bounded per-channel SQLite history. See [8ball configuration](docs/eight-ball.md).
 
 `!me` opens the chatter's global account, while `!stats` links to their profile in the current community. Updated Overview, Achievements, Pets, and Boss Hunt tabs are shared with public and per-channel profiles. Channel profiles combine Shop, Craft, and Gamble in **Activity**.
 
@@ -302,7 +306,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 | Group | Commands |
 | --- | --- |
-| Utility | `!kamikaze [username]`, `!hi`, `!choice`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats`, `!me` |
+| Utility | `!kamikaze [username]`, `!hi`, `!choice`, `!8ball <question>`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats [@username]`, `!me [@username]` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube` |
 | Settings | `!set discord <url>`, `!set youtube <url>`, `!set game <game name>`, `!set title <stream title>`, `!timers`, `!timers on`, `!timers off` |

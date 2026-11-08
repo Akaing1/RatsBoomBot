@@ -311,6 +311,7 @@
                         {% for entry in redemption_activity.feed %}
                             {% if entry.kind == "checkin" %}
                             <li class="activity-list-item">
+                                {% if entry.reward_icon_url %}<img class="activity-reward-icon" src="{{ entry.reward_icon_url }}" alt="" width="24" height="24" loading="lazy" onerror="this.hidden=true">{% endif %}
                                 <div class="activity-main">
                                     <strong>{{ entry.user_label }}</strong>
                                     <span>{{ entry.redeemed_at }}</span>
@@ -321,6 +322,7 @@
                             </li>
                             {% else %}
                             <li class="activity-list-item redemption-activity-item">
+                                {% if entry.reward_icon_url %}<img class="activity-reward-icon" src="{{ entry.reward_icon_url }}" alt="" width="24" height="24" loading="lazy" onerror="this.hidden=true">{% endif %}
                                 <div class="activity-main">
                                     <strong>{{ entry.reward_title }}</strong>
                                     <span>{{ entry.user_label }} &middot; {{ entry.redeemed_at }}</span>
@@ -800,6 +802,17 @@
                     ? JSON.stringify(["checkin", entry.username, entry.redeemed_at, entry.type])
                     : JSON.stringify(["redemption", entry.id || entry.username, entry.redeemed_at, entry.reward_title]);
 
+                if (entry.reward_icon_url) {
+                    const icon = document.createElement("img");
+                    icon.className = "activity-reward-icon";
+                    icon.src = entry.reward_icon_url;
+                    icon.alt = "";
+                    icon.width = icon.height = 24;
+                    icon.loading = "lazy";
+                    icon.addEventListener("error", () => { icon.hidden = true; });
+                    item.appendChild(icon);
+                }
+
                 const main = document.createElement("div");
                 main.className = "activity-main";
 
@@ -831,6 +844,42 @@
             feedContent.appendChild(list);
         }
 
+        const moderationIconPaths = {
+                ban: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM6 6l12 12',
+                check: 'm5 12 4 4L19 6',
+                clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 3v6l4 2',
+                trash: 'M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 10v7m4-7v7',
+                warning: 'm12 3 10 18H2L12 3Zm0 5v6m0 3v1',
+                clear: 'm14 3 7 7-9 11H5l-3-3L14 3ZM7 12l9 9M5 21h16',
+                shield: 'm12 2 9 4v6c0 5-9 10-9 10S3 17 3 12V6l9-4Zm-4 10 3 3 5-6',
+                star: 'm12 2 3 6 7 1-5 5 1 8-6-4-6 4 1-8-5-5 7-1 3-6Z',
+                raid: 'M4 20 20 4M12 4h8v8M3 15l6 6',
+                people: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM2 21v-3a7 7 0 0 1 14 0v3m1-17a4 4 0 0 1 0 7m2 4a6 6 0 0 1 3 6',
+                chat: 'M3 3h18v14H9l-6 4V3Zm4 5h10M7 12h7',
+                smile: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM8 9h1m6 0h1M7 14q5 6 10 0',
+                terms: 'M5 3h14v18H5V3Zm3 5h8m-8 4h8m-8 4h5',
+            };
+        const moderationIconTypes = {unban: 'check', untimeout: 'check', timeout: 'clock', delete: 'trash', warn: 'warning',
+                mod: 'shield', unmod: 'shield', vip: 'star', unvip: 'star', unraid: 'raid', followers: 'people', followersoff: 'people',
+                slow: 'clock', slowoff: 'clock', subscribers: 'star', subscribersoff: 'star', uniquechat: 'chat', uniquechatoff: 'chat',
+                emoteonly: 'smile', emoteonlyoff: 'smile', add_blocked_term: 'terms', remove_blocked_term: 'terms',
+                add_permitted_term: 'terms', remove_permitted_term: 'terms', approve_unban_request: 'check', deny_unban_request: 'ban'};
+        function moderationIcon(action) {
+            const key = (action.action_key || '').replace(/^shared_chat_/, '');
+            const type = moderationIconTypes[key] || key;
+            const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            icon.setAttribute('viewBox', '0 0 24 24');
+            icon.setAttribute('aria-hidden', 'true');
+            icon.setAttribute('class', 'activity-moderation-icon');
+            icon.classList.toggle('is-destructive', ['ban', 'delete', 'clear', 'unmod', 'unvip', 'deny_unban_request'].includes(key));
+            icon.classList.toggle('is-warning', ['timeout', 'warn'].includes(key));
+            icon.classList.toggle('is-positive', ['unban', 'untimeout', 'mod', 'vip', 'approve_unban_request'].includes(key));
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', moderationIconPaths[type] || moderationIconPaths.shield);
+            icon.appendChild(path);
+            return icon;
+        }
+
         function renderModActions(actions) {
             modActionContent.replaceChildren();
             if (!actions.length) {
@@ -843,6 +892,7 @@
                 const item = document.createElement("li");
                 item.className = "activity-list-item";
                 item.dataset.activityKey = String(action.id || JSON.stringify([action.action, action.target, action.timestamp]));
+                item.appendChild(moderationIcon(action));
                 const main = document.createElement("div");
                 main.className = "activity-main";
                 const heading = document.createElement("strong");
@@ -1213,6 +1263,7 @@
     <script src="{{ url_for('static', path='/js/raid-preview-player.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/raid-browser-search-fields.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/raid-browser-selects.js') }}?v={{ deployment_stamp() }}" defer></script>
+    <script src="{{ url_for('static', path='/js/category-artwork.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-raid-browser.js') }}?v={{ deployment_stamp() }}-alphabetical-saved-users" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-raid-status.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/dashboard-header-stats.js') }}?v={{ deployment_stamp() }}" defer></script>

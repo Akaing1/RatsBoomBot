@@ -20,6 +20,7 @@
         }
     });
     let savedCategoryArt = currentCategoryArt?.getAttribute("src") || "";
+    if (currentCategoryArt && savedCategoryArt) window.categoryArtwork?.set(currentCategoryArt, savedCategoryArt);
     let savedCategoryName = gameField.textContent.trim();
     let categoryArtAnimation = null;
     currentCategoryArt?.addEventListener("error", () => { currentCategoryArt.hidden = true; });
@@ -159,7 +160,8 @@
         categoryArtHome?.setAttribute("title", name);
         currentCategoryArt.setAttribute("title", name);
         currentCategoryArt.hidden = !url;
-        if (url) currentCategoryArt.src = url;
+        if (window.categoryArtwork) window.categoryArtwork.set(currentCategoryArt, url);
+        else if (url) currentCategoryArt.src = url;
         else currentCategoryArt.removeAttribute("src");
     }
 
@@ -194,14 +196,24 @@
             categoryArtAnimation.onfinish = () => gameSuggestions.classList.remove("is-art-animating");
         }
     }
-    document.addEventListener("dashboard-carousel-card-changed", () => setGameSuggestionsVisible(false));
+    document.addEventListener("dashboard-carousel-card-changed", () => {
+        if (document.activeElement === gameField) gameField.blur();
+        else setGameSuggestionsVisible(false);
+    });
 
     function renderGameOptions(games, query, moreGames = [], expanded = false) {
         const normalizedQuery = query.trim().toLowerCase();
         const previousScroll = normalizedQuery === renderedGameQuery ? gameOptionsList.scrollTop : 0;
         renderedGameQuery = normalizedQuery;
-        const mainGames = Array.isArray(games) ? games : [];
-        const extraGames = Array.isArray(moreGames) ? moreGames : [];
+        const isCurrentCategory = game => game.name.trim().toLowerCase() === savedCategoryName.toLowerCase();
+        const results = Array.isArray(games) ? games : [];
+        const additional = Array.isArray(moreGames) ? moreGames : [];
+        const current = [...results, ...additional].find(isCurrentCategory)
+            || {name: savedCategoryName, box_art_url: savedCategoryArt};
+        const pinCurrent = !normalizedQuery && savedCategoryName;
+        const mainGames = pinCurrent
+            ? [current, ...results.filter(game => !isCurrentCategory(game))] : results;
+        const extraGames = pinCurrent ? additional.filter(game => !isCurrentCategory(game)) : additional;
         gameOptions = expanded ? [...mainGames, ...extraGames] : mainGames;
         selectedGame = 0;
         gameOptionsList.replaceChildren();
@@ -212,7 +224,8 @@
             if (game.box_art_url) {
                 const image = document.createElement("img");
                 image.className = "twitch-category-art";
-                image.src = game.box_art_url;
+                if (window.categoryArtwork) window.categoryArtwork.set(image, game.box_art_url, 24);
+                else image.src = game.box_art_url;
                 image.alt = "";
                 image.loading = "lazy";
                 image.addEventListener("error", () => { image.hidden = true; });
@@ -363,6 +376,12 @@
             }
             const shouldCommit = field.dataset.commitEdit === "true";
             delete field.dataset.commitEdit;
+            if ((field === gameField && !shouldCommit) || (field === titleField && !field.textContent.trim())) {
+                field.textContent = savedValue;
+                delete field.dataset.hasDraft;
+                refreshDraftWarning();
+                return;
+            }
             if (!shouldCommit) {
                 if (field.textContent.trim() !== savedValue) {
                     field.dataset.hasDraft = "true";

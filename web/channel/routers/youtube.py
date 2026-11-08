@@ -1,9 +1,11 @@
 import logging
 import secrets
+import asyncio
+import httpx
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 
 from config.settings import settings
 from web.admin.auth import validate_csrf_token
@@ -13,6 +15,23 @@ from web.state import get_bot
 
 router = APIRouter()
 LOGGER = logging.getLogger("RatBoomBot")
+
+
+@router.get("/channel/api/youtube/authorization")
+async def youtube_authorization_status(request: Request):
+    broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
+    headers = {"Cache-Control": "no-store"}
+    if not broadcaster_id:
+        return JSONResponse({"detail": "Sign in to your channel."}, status_code=401, headers=headers)
+    runtime_bot = get_bot()
+    if runtime_bot is None or runtime_bot.services is None:
+        return JSONResponse({"detail": "Authorization check unavailable."}, status_code=503, headers=headers)
+    try:
+        async with asyncio.timeout(8):
+            required = await runtime_bot.services.live_chat.check_youtube_authorization(str(broadcaster_id))
+    except (httpx.HTTPError, ValueError, TypeError, RuntimeError, TimeoutError):
+        return JSONResponse({"detail": "Could not check YouTube permissions. Please retry."}, status_code=503, headers=headers)
+    return JSONResponse({"required": required}, headers=headers)
 
 
 def youtube_redirect(result: str, message: str) -> RedirectResponse:

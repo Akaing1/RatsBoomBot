@@ -13,6 +13,10 @@ WEB_DIRECTORY = Path(__file__).resolve().parents[1]
 TEMPLATES_DIRECTORY = WEB_DIRECTORY / "templates"
 
 def channel_presentation(request):
+    # Context processors overwrite explicit TemplateResponse values. Admin pages
+    # supply their own channel root and must never inherit streamer URLs.
+    if request.scope.get('path', '').startswith('/admin/'):
+        return {}
     access = getattr(request.state, 'channel_access', None)
     return {
         'moderator_mode': bool(access),

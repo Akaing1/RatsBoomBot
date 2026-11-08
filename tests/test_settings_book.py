@@ -40,6 +40,9 @@ def test_every_setting_and_toggle_is_assigned_exactly_once():
         assert sum(len(section['toggles']) for section in sections) == sum(map(len, states)) - 2
         chat = next(s for s in sections if s['key'] == 'chat')
         assert any(t['name'] == 'kamikaze' for t in chat['toggles'])
+        eight_ball = next(t for t in chat['toggles'] if t['name'] == 'eight_ball')
+        assert eight_ball['label'] == '!8ball'
+        assert eight_ball['state'].effective_enabled is True
         loyalty = next(s for s in sections if s['key'] == 'loyalty')
         assert 'Loyalty points' in loyalty['groups']
         assert {(t['kind'], t['name']) for t in loyalty['toggles']} == {('feature', 'points'), ('global_group', 'points')}
@@ -87,10 +90,10 @@ def test_blocked_commands_share_prerequisite_links_at_category_top():
             toggle['state'] = SimpleNamespace(effective_enabled=False, blocked_by_profile=True, blocked_by_globals=True)
         html = templates.env.get_template('channel/settings.html').render(**context)
         chat_html = html.split('id="settings-chat"', 1)[1].split('id="settings-events"', 1)[0]
-        assert chat_html.count('>Enable channel profile</a>') == 1
+        assert chat_html.count('>Enable bot</a>') == 1
         assert chat_html.count('>Enable global commands</a>') == 1
-        assert chat_html.index('>Enable channel profile</a>') < chat_html.index('class="settings-command-cluster"')
-        assert 'Enable channel profile' not in templates.env.get_template('channel/settings_switch.html').module.status_switch(chat['toggles'][0])
+        assert chat_html.index('>Enable bot</a>') < chat_html.index('class="settings-command-cluster"')
+        assert 'Enable bot' not in templates.env.get_template('channel/settings_switch.html').module.status_switch(chat['toggles'][0])
         chat['blocked'] = False
         assert templates.env.get_template('channel/settings_switch.html').module.blocked_notice(chat).strip() == ''
     finally:

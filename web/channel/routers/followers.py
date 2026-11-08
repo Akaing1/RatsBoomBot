@@ -5,23 +5,24 @@ import math
 import re
 import time
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from twitchio.http import Route
 
 from bot.shared.follower_names import ensure_follower_names, follower_names_state
 from storage.followers import follower_metrics
-from web.admin.auth import get_csrf_token
+from bot.profiles import get_active_profile
+from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.api_context import resolve_channel_api_context
-from web.channel.auth import CHANNEL_USER_ID_KEY
+from web.channel.auth import CHANNEL_USER_ID_KEY, settings_actor
 from web.channel.routers.dashboard import raid_browser_cached_profiles, raid_browser_profiles, raid_browser_cached_request
 from web.shared.common import templates
 from web.state import get_bot, get_db
 
 router = APIRouter()
 LOGGER = logging.getLogger('RatBoomBot')
-SORTS = {'name', 'roles', 'followed_at', 'points', 'label', 'messages', 'lifetime_points', 'watch_minutes', 'first_seen', 'last_seen', 'last_watched', 'first_redeems', 'check_ins', 'achievement_count', 'points_spent', 'raid_favorite'}
-RANKS = {'mod', 'vip', 'subscriber', 'tier1', 'tier2', 'tier3'}
+SORTS = {'name', 'roles', 'followed_at', 'points', 'label', 'messages', 'lifetime_points', 'watch_minutes', 'first_seen', 'last_seen', 'last_watched', 'first_redeems', 'check_ins', 'achievement_count', 'points_spent', 'raid_favorite', 'automatic_shoutout'}
+RANKS = {'mod', 'vip', 'subscriber', 'tier1', 'tier2', 'tier3', 'partner'}
 ROLE_PATHS = {'mod': 'moderation/moderators', 'vip': 'channels/vips', 'subscriber': 'subscriptions'}
 
 
@@ -79,6 +80,7 @@ async def load_snapshot(bot, channel_id, snapshot, *, refresh_followers=False):
             during_load = {key: row for key, row in names['users'].items() if before.get(key) is not row}
             names['users'] = {**{str(row['user_id']): row for row in followers}, **during_load}
             names['loaded'] = True
+            names['refreshed'] = time.monotonic()
             followers = list(names['users'].values())
             total = max(total, len(followers))
         unique = {str(item['user_id']): item for item in followers}
@@ -165,6 +167,32 @@ async def followers_page(request: Request):
         'active_page': 'followers', 'broadcaster': context.broadcaster, 'channel_id': str(context.broadcaster_id), 'csrf_token': get_csrf_token(request)})
 
 
+def shoutout_config(channel_id):
+    profile = get_active_profile(channel_id)
+    config = profile.automatic_shoutouts if profile else None
+    return config if config and (config.interactions or config.raid) else None
+
+
+@router.post('/channel/api/followers/automatic-shoutout')
+async def update_follower_shoutout(request: Request, user_id: str = Form(...), enabled: bool = Form(...), csrf_token: str = Form(...)):
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    validate_csrf_token(request, csrf_token)
+    channel_id = str(context.broadcaster_id)
+    if not shoutout_config(channel_id):
+        return JSONResponse({'detail': 'Enable automatic shoutouts in settings first.'}, status_code=409)
+    snapshot = getattr(context.runtime_bot, '_followers_directory_cache', {}).get(channel_id)
+    member = next((row for row in snapshot['followers'] if str(row['user_id']) == user_id), None) if snapshot else None
+    if member is None or not member.get('user_login'):
+        return JSONResponse({'detail': 'Load this follower before changing automatic shoutouts.'}, status_code=404)
+    try:
+        await context.services.profile_settings.set_automatic_shoutout_user(channel_id, member['user_login'], enabled, settings_actor(request))
+    except ValueError as error:
+        return JSONResponse({'detail': str(error)}, status_code=400)
+    return JSONResponse({'enabled': enabled}, headers={'Cache-Control': 'no-store'})
+
+
 @router.get('/channel/api/followers/profiles')
 async def follower_profiles(request: Request, ids: str = Query('', max_length=2600)):
     context = resolve_channel_api_context(request, get_bot)
@@ -178,19 +206,47 @@ async def follower_profiles(request: Request, ids: str = Query('', max_length=26
     if snapshot is None or not set(user_ids) <= snapshot['follower_ids']:
         return JSONResponse({'detail': 'Load this channel’s followers before requesting their pictures.'}, status_code=403)
     channels = [{'id': user_id} for user_id in user_ids]
-    profiles = await raid_browser_profiles(bot, channel_id, channels)
-    _, missing = raid_browser_cached_profiles(bot, channel_id, channels)
-    if missing:
+    try:
+        profiles = await raid_browser_profiles(bot, channel_id, channels, strict=True)
+    except Exception:
         return JSONResponse({'detail': 'Profile pictures are temporarily unavailable.'}, status_code=503)
-    return JSONResponse({'profiles': [{'id': user_id, 'profile_image_url': str(profiles.get(user_id, {}).get('profile_image_url') or '')}
+    return JSONResponse({'profiles': [{'id': user_id, 'profile_image_url': str(profiles.get(user_id, {}).get('profile_image_url') or ''),
+        'is_partner': profiles.get(user_id, {}).get('broadcaster_type') == 'partner'}
         for user_id in user_ids]}, headers={'Cache-Control': 'no-store'})
+
+
+def start_partner_load(bot, channel_id, snapshot):
+    task = snapshot.get('partner_task')
+    if task and not task.done():
+        return task
+    if snapshot['loading']:
+        return None
+    if time.monotonic() < snapshot.get('partner_expires', 0) and (snapshot.get('partner_error') or all(
+            str(row['user_id']) in snapshot.get('partner_checked', ()) for row in snapshot['followers'])):
+        return None
+    members = list(snapshot['followers'])
+    async def load():
+        try:
+            partners = {}
+            for offset in range(0, len(members), 100):
+                batch = [{'id': str(row['user_id'])} for row in members[offset:offset + 100]]
+                profiles = await raid_browser_profiles(bot, channel_id, batch, strict=True)
+                partners.update({user_id: profile for user_id, profile in profiles.items() if profile.get('broadcaster_type') == 'partner'})
+            snapshot['roles'] = {**snapshot['roles'], 'partner': partners}
+            snapshot.update(partner_error='', partner_expires=time.monotonic() + 86400,
+                            partner_checked={str(row['user_id']) for row in members})
+        except Exception:
+            LOGGER.warning('[Followers] Partner status unavailable for %s.', channel_id, exc_info=True)
+            snapshot.update(partner_error='Partner status is temporarily unavailable. Please try again shortly.', partner_expires=time.monotonic() + 60)
+    snapshot['partner_task'] = asyncio.create_task(load())
+    return snapshot['partner_task']
 
 
 @router.get('/channel/api/followers')
 async def followers_api(request: Request, page: int = Query(1, ge=1), page_size: int = Query(25),
         sort: str = 'followed_at', direction: str = 'desc', search: str = Query('', max_length=100),
         rank: list[str] | None = Query(None), mutual: bool = False, refresh: bool = False,
-        raid_favorites: bool = False, favorites: str = Query('', max_length=2600)):
+        raid_favorites: bool = False, favorites: str = Query('', max_length=2600), automatic_shoutouts: bool = False):
     context = resolve_channel_api_context(request, get_bot)
     if isinstance(context, JSONResponse):
         return context
@@ -211,7 +267,9 @@ async def followers_api(request: Request, page: int = Query(1, ge=1), page_size:
         snapshot.update(loading=True, loaded=len(snapshot['followers']), error='', warnings=[])
         if refresh:
             snapshot['metrics_at'] = 0
-        snapshot['task'] = asyncio.create_task(load_snapshot(bot, channel_id, snapshot, refresh_followers=refresh and age >= 30))
+        names = follower_names_state(bot, channel_id)
+        refresh_names = (refresh and age >= 30) or (names['loaded'] and time.monotonic() - names.get('refreshed', 0) >= 86400)
+        snapshot['task'] = asyncio.create_task(load_snapshot(bot, channel_id, snapshot, refresh_followers=refresh_names))
     followers = snapshot['followers']
     following_task = start_following_load(bot, channel_id, snapshot)
     if following_task and (mutual or sort in {'roles', 'label'}):
@@ -226,20 +284,33 @@ async def followers_api(request: Request, page: int = Query(1, ge=1), page_size:
             if expired:
                 snapshot['metrics_at'] = time.monotonic()
     roles = snapshot['roles']
-    if not snapshot['loading'] and any(roles.get('subscriber' if role.startswith('tier') else role) is None for role in selected_roles):
+    partner_task = start_partner_load(bot, channel_id, snapshot) if 'partner' in selected_roles else None
+    if 'partner' in selected_roles and snapshot.get('partner_error') and not partner_task:
+        return JSONResponse({'detail': snapshot['partner_error']}, status_code=503)
+    if not snapshot['loading'] and any(roles.get('subscriber' if role.startswith('tier') else role) is None for role in selected_roles - {'partner'}):
         return JSONResponse({'detail': 'This roles filter is unavailable until Twitch role data can be loaded.'}, status_code=503)
     followed_ids = snapshot['following_ids']
     following_warning = snapshot['following_error']
     if mutual and following_warning:
         return JSONResponse({'detail': following_warning}, status_code=503)
-    generation = (id(followers), id(roles), snapshot['metrics_generation'], snapshot['following_expires'])
+    profiles, _ = raid_browser_cached_profiles(bot, channel_id, [{'id': str(row['user_id'])} for row in followers])
+    partner_ids = set(roles.get('partner') or ())
+    for user_id, profile in profiles.items():
+        if profile.get('broadcaster_type') == 'partner':
+            partner_ids.add(user_id)
+        else:
+            partner_ids.discard(user_id)
+    partner_known = set(profiles) | set(snapshot.get('partner_checked', ()))
+    config = shoutout_config(channel_id)
+    shoutout_users = frozenset(config.users.casefold().split()) if config else frozenset()
+    generation = (id(followers), id(roles), snapshot['metrics_generation'], snapshot['following_expires'], frozenset(partner_ids), frozenset(partner_known), shoutout_users)
     if snapshot.get('table_generation') != generation:
         snapshot.update(table_generation=generation, table_results={})
-    options = (sort, direction, search.casefold(), frozenset(selected_roles), mutual, raid_favorites, frozenset(favorite_ids))
+    options = (sort, direction, search.casefold(), frozenset(selected_roles), mutual, raid_favorites, frozenset(favorite_ids), automatic_shoutouts)
     cached_rows = snapshot['table_results'].get(options)
     if cached_rows is None:
         cached_rows = build_table_rows(followers, snapshot['metrics'], roles, followed_ids, selected_roles,
-            favorite_ids, mutual, raid_favorites, search.casefold(), sort, direction)
+            favorite_ids, mutual, raid_favorites, search.casefold(), sort, direction, partner_ids, partner_known, shoutout_users, automatic_shoutouts)
         if len(snapshot['table_results']) >= 4:
             snapshot['table_results'].pop(next(iter(snapshot['table_results'])))
         snapshot['table_results'][options] = cached_rows
@@ -248,16 +319,19 @@ async def followers_api(request: Request, page: int = Query(1, ge=1), page_size:
     if following_warning:
         warnings.append(following_warning)
     return JSONResponse(dict(rows=cached_rows[(page - 1) * page_size:page * page_size], page=page, pages=pages,
-        count=len(cached_rows), total=snapshot['total'], loading=snapshot['loading'] or bool(following_task and not following_task.done()) or followers is not snapshot['followers'], loaded=snapshot['loaded'],
-        error=snapshot['error'], warnings=warnings), headers={'Cache-Control': 'no-store'})
+        count=len(cached_rows), total=snapshot['total'], loading=snapshot['loading'] or bool(partner_task and not partner_task.done()) or bool(following_task and not following_task.done()) or followers is not snapshot['followers'] or roles is not snapshot['roles'], loaded=snapshot['loaded'],
+        error=snapshot['error'], warnings=warnings, automatic_shoutouts_enabled=config is not None), headers={'Cache-Control': 'no-store'})
 
 
 def build_table_rows(followers, metrics, roles, followed_ids, selected_roles, favorite_ids,
-        mutual, raid_favorites, search_text, sort, direction):
+        mutual, raid_favorites, search_text, sort, direction, partner_ids=(), partner_known=(), shoutout_users=(), automatic_shoutouts=False):
     """Filter and sort once per data generation; paging only slices the result."""
     rows = []
     for follower in followers:
         user_id = str(follower['user_id'])
+        whitelisted = follower.get('user_login', '').casefold() in shoutout_users
+        if automatic_shoutouts and not whitelisted:
+            continue
         if (raid_favorites and user_id not in favorite_ids) or (mutual and user_id not in followed_ids):
             continue
         labels, ranks = [], []
@@ -273,9 +347,13 @@ def build_table_rows(followers, metrics, roles, followed_ids, selected_roles, fa
         if user_id in followed_ids:
             ranks.append('mutual')
             labels.append('Mutual')
+        if user_id in partner_ids:
+            ranks.append('partner')
+            labels.append('Partner')
         row = dict(metrics.get(user_id, {}), user_id=user_id, login=follower.get('user_login', ''),
             name=follower.get('user_name') or follower.get('user_login', ''), followed_at=follower.get('followed_at'),
-            ranks=ranks, role_labels=labels, label=' · '.join(labels) or 'Follower', raid_favorite=user_id in favorite_ids)
+            ranks=ranks, role_labels=labels, label=' · '.join(labels) or 'Follower', raid_favorite=user_id in favorite_ids,
+            is_partner=(user_id in partner_ids) if user_id in partner_ids or user_id in partner_known else None, automatic_shoutout=whitelisted)
         if selected_roles and not selected_roles.intersection(ranks):
             continue
         if search_text and search_text not in f"{row['name']} {row['login']} {row['label']}".casefold():
