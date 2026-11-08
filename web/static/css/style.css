@@ -1254,7 +1254,7 @@ html.raid-browser-open { overflow: hidden; }
 .redemption-activity-item { display: flex; }
 .activity-reward-icon { display: block; flex: 0 0 28px; width: 28px; height: 28px; object-fit: contain; align-self: center; }
 .activity-reward-icon[hidden] { display: none; }
-.activity-moderation-icon { flex: 0 0 22px; width: 22px; height: 22px; margin-top: 2px; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.activity-moderation-icon { flex: 0 0 22px; width: 22px; height: 22px; align-self: center; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .activity-moderation-icon.is-destructive { stroke: #f87171; }
 .activity-moderation-icon.is-warning { stroke: #fbbf24; }
 .activity-moderation-icon.is-positive { stroke: #4ade80; }
