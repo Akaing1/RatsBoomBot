@@ -54,6 +54,7 @@ class GlobalCommandName(Enum):
     LUCKY = "lucky"
     SMART = "smart"
     HEIGHT = "height"
+    DAILIES = "dailies"
     PP = "pp"
     LURK = "lurk"
     HELP = "help"
@@ -109,6 +110,7 @@ class GlobalCommandDefaults:
     lucky: bool = True
     smart: bool = True
     height: bool = True
+    dailies: bool = True
     pp: bool = True
     lurk: bool = True
     help: bool = True
