@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from storage.migration_runner import run_migrations
 from storage.followers import follower_metrics
 from web.channel.routers import followers
+from web.channel.routers import user_lists
 
 
 @pytest.fixture
@@ -35,6 +36,7 @@ async def directory(tmp_path, monkeypatch):
             services=SimpleNamespace(broadcasters=SimpleNamespace(get_broadcasters=lambda: {'1': SimpleNamespace(name='Alice'), 'other': SimpleNamespace(name='Other')}),
                 live_chat=SimpleNamespace(history=lambda channel: history if channel == '1' else [])))
         monkeypatch.setattr(followers, 'get_bot', lambda: bot)
+        monkeypatch.setattr(user_lists, 'get_bot', lambda: bot)
         monkeypatch.setattr(followers, 'get_db', lambda: db)
         async with db.acquire() as connection:
             await connection.execute("INSERT INTO viewers VALUES ('1','2','user002',500,0)")
@@ -49,6 +51,7 @@ async def directory(tmp_path, monkeypatch):
             request.scope['session'] = session.copy()
             return await call_next(request)
         app.include_router(followers.router)
+        app.include_router(user_lists.router)
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
             yield client, session, db, bot, calls
         for snapshot in getattr(bot, '_followers_directory_cache', {}).values():
@@ -60,6 +63,33 @@ async def ready(client, bot):
     initial = await client.get('/channel/api/followers')
     assert initial.status_code == 200
     await bot._followers_directory_cache['1']['task']
+
+
+@pytest.mark.asyncio
+async def test_console_user_list_exports_and_imports_are_channel_scoped_and_validated(directory, monkeypatch):
+    from bot.profiles import AutomaticShoutouts
+    client, _, _, bot, _ = directory
+    profile = SimpleNamespace(automatic_shoutouts=AutomaticShoutouts(users='alice', blacklist='blocked'))
+    monkeypatch.setattr(user_lists, 'get_active_profile', lambda channel: profile)
+    bot.services.viewer_queue = SimpleNamespace(list_blacklist=lambda channel: ['queued'],
+        add_to_blacklist=AsyncMock(), remove_from_blacklist=AsyncMock())
+    bot.services.profile_settings = SimpleNamespace(import_automatic_shoutout_lists=AsyncMock())
+    exported = await client.get('/channel/api/user-lists')
+    assert exported.headers['cache-control'] == 'no-store'
+    assert exported.json() == {'version': 1, 'channelId': '1', 'lists': {
+        'automaticShoutouts': ['alice'], 'incomingRaidBlacklist': ['blocked'], 'queueBlacklist': ['queued']}}
+    payload = {'version': 1, 'channelId': '1', 'lists': {'automaticShoutouts': ['Bob'], 'queueBlacklist': ['newuser']}}
+    headers = {'X-CSRF-Token': 'secret'}
+    assert (await client.post('/channel/api/user-lists', json=payload)).status_code == 403
+    assert (await client.post('/channel/api/user-lists', json={**payload, 'channelId': 'other'}, headers=headers)).status_code == 400
+    assert (await client.post('/channel/api/user-lists', json={**payload, 'lists': {'automaticShoutouts': ['good'], 'queueBlacklist': ['bad name']}}, headers=headers)).status_code == 400
+    bot.services.profile_settings.import_automatic_shoutout_lists.assert_not_awaited()
+    assert (await client.post('/channel/api/user-lists', json=payload, headers=headers)).status_code == 200
+    assert bot.services.profile_settings.import_automatic_shoutout_lists.await_args.args[:3] == ('1', {'automatic_shoutouts.users': ['bob']}, False)
+    bot.services.viewer_queue.add_to_blacklist.assert_awaited_once_with('1', 'newuser')
+    bot.services.viewer_queue.remove_from_blacklist.assert_not_awaited()
+    assert (await client.post('/channel/api/user-lists', json={**payload, 'replace': True}, headers=headers)).status_code == 200
+    bot.services.viewer_queue.remove_from_blacklist.assert_awaited_once_with('1', 'queued')
 
 
 @pytest.mark.asyncio

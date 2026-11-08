@@ -361,6 +361,29 @@ class ProfileSettingsService:
                 users.discard(login.casefold())
             await self._set_override(broadcaster_id, "automatic_shoutouts.users", "\n".join(sorted(users)), updated_by)
 
+    async def import_automatic_shoutout_lists(self, broadcaster_id: str, lists: dict[str, list[str]], replace: bool, updated_by: str) -> None:
+        async with self._settings_lock:
+            values = {}
+            for key, users in lists.items():
+                if key not in {"automatic_shoutouts.users", "automatic_shoutouts.blacklist"}:
+                    raise ValueError("Unsupported shoutout list.")
+                existing = set() if replace else set(str(self.get_setting_state(broadcaster_id, key).effective_value).split())
+                values[key] = self.validate_value(self.get_definition(key), "\n".join(sorted(existing | set(users))))
+            async with self.db.acquire() as connection:
+                await connection.execute("BEGIN")
+                try:
+                    await connection.executemany(
+                        "INSERT INTO channel_profile_overrides (broadcaster_id, setting_name, setting_value, updated_by, updated_at) "
+                        "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(broadcaster_id, setting_name) DO UPDATE SET "
+                        "setting_value=excluded.setting_value, updated_by=excluded.updated_by, updated_at=CURRENT_TIMESTAMP",
+                        [(str(broadcaster_id), key, self.serialize_value(value), updated_by) for key, value in values.items()])
+                    await connection.execute("COMMIT")
+                except BaseException:
+                    await connection.execute("ROLLBACK")
+                    raise
+            self.overrides.setdefault(str(broadcaster_id), {}).update(values)
+            self.refresh_active_profile(str(broadcaster_id))
+
     async def set_automatic_shoutouts(self, broadcaster_id: str, values: dict[str, str], updated_by: str) -> None:
         definitions = [definition for definition in PROFILE_SETTING_DEFINITIONS if definition.key.startswith("automatic_shoutouts.")]
         if set(values) != {definition.key for definition in definitions}:

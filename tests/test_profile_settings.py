@@ -14,6 +14,30 @@ def reset_profiles():
 
 
 @pytest.mark.asyncio
+async def test_automatic_shoutout_list_import_merges_replaces_and_validates_before_writing(tmp_path):
+    async with asqlite.create_pool(str(tmp_path / 'list-import.db')) as database:
+        service = ProfileSettingsService(database)
+        await service.setup()
+        profile = ChannelProfile(channel_name='channel')
+        activate_profile('1', profile)
+        service.apply_overrides('1', profile)
+        await service.set_automatic_shoutout_user('1', 'alice', True, 'test')
+        await service.import_automatic_shoutout_lists('1', {'automatic_shoutouts.users': ['bob'], 'automatic_shoutouts.blacklist': ['blocked']}, False, 'test')
+        config = get_active_profile('1').automatic_shoutouts
+        assert config.users.split() == ['alice', 'bob'] and config.blacklist == 'blocked'
+        with pytest.raises(ValueError):
+            await service.import_automatic_shoutout_lists('1', {'automatic_shoutouts.users': ['another'], 'automatic_shoutouts.blacklist': ['bad name']}, True, 'test')
+        assert get_active_profile('1').automatic_shoutouts == config
+        await service.import_automatic_shoutout_lists('1', {'automatic_shoutouts.users': []}, True, 'test')
+        assert get_active_profile('1').automatic_shoutouts.users == ''
+        assert get_active_profile('1').automatic_shoutouts.blacklist == 'blocked'
+        reloaded = ProfileSettingsService(database)
+        await reloaded.setup()
+        assert reloaded.overrides['1']['automatic_shoutouts.users'] == ''
+        assert reloaded.overrides['1']['automatic_shoutouts.blacklist'] == 'blocked'
+
+
+@pytest.mark.asyncio
 async def test_automatic_shoutout_membership_edits_preserve_other_users_and_persist(tmp_path):
     import asyncio
     async with asqlite.create_pool(str(tmp_path / 'shoutout-users.db')) as database:
