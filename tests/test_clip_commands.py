@@ -248,3 +248,51 @@ async def test_verification_error_gets_a_reply_instead_of_success():
     await command.clip.callback(command,ctx)
     assert ctx.messages == []
     assert ctx.replies[-1] == ClipConfig().messages.authorization_required
+
+
+@pytest.mark.asyncio
+async def test_clip_diagnostics_distinguish_empty_errors_and_found(monkeypatch, caplog):
+    fake_poll_clock(monkeypatch)
+    caplog.set_level("INFO")
+    bot = FakeClipBot()
+    responses = [None, HTTPException(status=503, extra={}),
+                 ClientConnectionError("secret-token"), TimeoutError("secret-token"), bot.clip]
+    async def lookup(**kwargs):
+        response = responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        if response is not None:
+            yield response
+    bot.fetch_clips = lookup
+    assert await ClipService(bot).wait_for_clip("channel", "clip-1", 60) is bot.clip
+    for expected in ("result=empty", "status=503", "result=network_error", "result=timeout", "result=found",
+                     "outcome=found attempts=5 empty=1 errors=3"):
+        assert expected in caplog.text
+    assert "secret-token" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_clip_diagnostics_report_empty_deadline(monkeypatch, caplog):
+    fake_poll_clock(monkeypatch)
+    caplog.set_level("INFO")
+    bot = FakeClipBot()
+    async def empty(**kwargs):
+        if False:
+            yield
+    bot.fetch_clips = empty
+    assert await ClipService(bot).wait_for_clip("channel", "clip-1", 1) is None
+    assert "outcome=deadline attempts=1 empty=1 errors=0" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_clip_diagnostics_report_fatal_http_error(caplog):
+    caplog.set_level("INFO")
+    bot = FakeClipBot()
+    async def denied(**kwargs):
+        raise HTTPException(status=401, extra={})
+        yield
+    bot.fetch_clips = denied
+    with pytest.raises(HTTPException):
+        await ClipService(bot).wait_for_clip("channel", "clip-1", 60)
+    assert "status=401 retryable=False" in caplog.text
+    assert "outcome=http_error attempts=1 empty=0 errors=1" in caplog.text
