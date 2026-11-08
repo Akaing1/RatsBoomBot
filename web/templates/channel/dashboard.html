@@ -844,8 +844,7 @@
             feedContent.appendChild(list);
         }
 
-        function moderationIcon(action) {
-            const paths = {
+        const moderationIconPaths = {
                 ban: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM6 6l12 12',
                 check: 'm5 12 4 4L19 6',
                 clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 3v6l4 2',
@@ -860,12 +859,14 @@
                 smile: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM8 9h1m6 0h1M7 14q5 6 10 0',
                 terms: 'M5 3h14v18H5V3Zm3 5h8m-8 4h8m-8 4h5',
             };
-            const key = (action.action_key || '').replace(/^shared_chat_/, '');
-            const type = ({unban: 'check', untimeout: 'check', timeout: 'clock', delete: 'trash', warn: 'warning',
+        const moderationIconTypes = {unban: 'check', untimeout: 'check', timeout: 'clock', delete: 'trash', warn: 'warning',
                 mod: 'shield', unmod: 'shield', vip: 'star', unvip: 'star', unraid: 'raid', followers: 'people', followersoff: 'people',
                 slow: 'clock', slowoff: 'clock', subscribers: 'star', subscribersoff: 'star', uniquechat: 'chat', uniquechatoff: 'chat',
                 emoteonly: 'smile', emoteonlyoff: 'smile', add_blocked_term: 'terms', remove_blocked_term: 'terms',
-                add_permitted_term: 'terms', remove_permitted_term: 'terms', approve_unban_request: 'check', deny_unban_request: 'ban'})[key] || key;
+                add_permitted_term: 'terms', remove_permitted_term: 'terms', approve_unban_request: 'check', deny_unban_request: 'ban'};
+        function moderationIcon(action) {
+            const key = (action.action_key || '').replace(/^shared_chat_/, '');
+            const type = moderationIconTypes[key] || key;
             const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             icon.setAttribute('viewBox', '0 0 24 24');
             icon.setAttribute('aria-hidden', 'true');
@@ -874,7 +875,7 @@
             icon.classList.toggle('is-warning', ['timeout', 'warn'].includes(key));
             icon.classList.toggle('is-positive', ['unban', 'untimeout', 'mod', 'vip', 'approve_unban_request'].includes(key));
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            path.setAttribute('d', paths[type] || paths.shield);
+            path.setAttribute('d', moderationIconPaths[type] || moderationIconPaths.shield);
             icon.appendChild(path);
             return icon;
         }

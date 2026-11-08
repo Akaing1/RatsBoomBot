@@ -38,6 +38,9 @@ class RedeemService:
         if not callable(request):
             return {}
         broadcaster_id = str(broadcaster_id)
+        expires, icons = self._reward_icons.get(broadcaster_id, (0, {}))
+        if time.monotonic() < expires:
+            return icons
         async with self._reward_icon_locks.setdefault(broadcaster_id, asyncio.Lock()):
             expires, icons = self._reward_icons.get(broadcaster_id, (0, {}))
             if time.monotonic() < expires:
@@ -45,12 +48,13 @@ class RedeemService:
             try:
                 payload = await asyncio.wait_for(request(Route('GET', 'channel_points/custom_rewards',
                     token_for=broadcaster_id, params={'broadcaster_id': broadcaster_id})), 10)
-                icons = {}
+                refreshed_icons = {}
                 for reward in payload.get('data', []):
                     image = reward.get('image') or reward.get('default_image') or {}
                     url = image.get('url_2x') or image.get('url_1x') or image.get('url_4x')
                     if url:
-                        icons[str(reward['title']).strip().casefold()] = url
+                        refreshed_icons[str(reward['title']).strip().casefold()] = url
+                icons = refreshed_icons
                 ttl = 3600
             except Exception:
                 LOGGER.warning('[Redeems] Could not load reward icons for %s.', broadcaster_id)

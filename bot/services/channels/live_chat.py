@@ -1034,10 +1034,12 @@ class LiveChatService:
         messages = self.messages[broadcaster_id]
         self.messages[broadcaster_id] = deque(
             (message for message in messages if platform != "both" and message.platform != platform), maxlen=messages.maxlen)
-        self.activity_history.commands[broadcaster_id] = deque(
-            (message for message in self.activity_history.commands[broadcaster_id]
-             if platform != 'both' and message.get('platform') != platform), maxlen=100)
-        self.activity_history.changed(broadcaster_id, 'commands')
+        commands = self.activity_history.commands.get(broadcaster_id, ())
+        remaining = deque((message for message in commands
+                           if platform != 'both' and message.get('platform') != platform), maxlen=100)
+        if len(remaining) != len(commands):
+            self.activity_history.commands[broadcaster_id] = remaining
+            self.activity_history.changed(broadcaster_id, 'commands')
         for queue in tuple(self.subscribers.get(broadcaster_id, ())):
             if queue.full():
                 queue.get_nowait()
@@ -1079,9 +1081,11 @@ class LiveChatService:
 
     async def remove_message(self, broadcaster_id: str, message_id: str) -> None:
         broadcaster_id = str(broadcaster_id)
-        self.activity_history.commands[broadcaster_id] = deque(
-            (message for message in self.activity_history.commands[broadcaster_id] if message['id'] != message_id), maxlen=100)
-        self.activity_history.changed(broadcaster_id, 'commands')
+        commands = self.activity_history.commands.get(broadcaster_id, ())
+        remaining = deque((message for message in commands if message['id'] != message_id), maxlen=100)
+        if len(remaining) != len(commands):
+            self.activity_history.commands[broadcaster_id] = remaining
+            self.activity_history.changed(broadcaster_id, 'commands')
         messages = self.messages.get(broadcaster_id)
         if messages is not None:
             deleted_message = None

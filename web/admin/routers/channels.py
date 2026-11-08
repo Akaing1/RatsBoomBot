@@ -5,6 +5,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
+from bot.services.channels.broadcaster_settings import SOCIAL_SETTING_PLATFORMS
 from config.settings import settings
 from storage.database import delete_token
 from web.admin.auth import require_admin, require_owner, validate_csrf_token
@@ -63,10 +64,10 @@ async def save_admin_channel_customization(request: Request, broadcaster_id: str
             setter = services.broadcaster_settings.set_discord_url if setting_name == "social.discord_url" else services.broadcaster_settings.set_youtube_url
             await setter(broadcaster_id, value.strip())
             message = "Social link updated."
-        elif setting_name in {"social.tiktok_url", "social.x_url", "social.kofi_url", "social.vgen_url", "social.throne_url", "social.website_url"}:
+        elif setting_name in SOCIAL_SETTING_PLATFORMS:
             if action != "save":
                 raise ValueError("Use Save Changes to update or clear a social link.")
-            await services.broadcaster_settings.set_social_url(broadcaster_id, setting_name.removeprefix("social.").removesuffix("_url"), value.strip())
+            await services.broadcaster_settings.set_social_url(broadcaster_id, SOCIAL_SETTING_PLATFORMS[setting_name], value.strip())
             message = "Social link updated."
         else:
             definition = services.profile_settings.get_definition(setting_name)

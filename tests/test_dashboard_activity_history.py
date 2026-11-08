@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import asqlite
 import pytest
+from unittest.mock import Mock
 
 from bot.services.channels.live_chat import LiveChatService, UnifiedChatMessage
 from storage.migration_runner import run_migrations
@@ -32,6 +33,10 @@ async def test_commands_and_moderation_restore_without_busy_chat_or_cross_channe
         assert restored.get_moderation_activity('2')['mod_actions'] == []
         await restored.remove_message('1', 'command')
         await restored.activity_history.flush()
+        changed = restored.activity_history.changed = Mock(wraps=restored.activity_history.changed)
+        await restored.remove_message('1', 'ordinary-chat')
+        restored.clear_chat('1')
+        changed.assert_not_called()
         again = LiveChatService(db)
         await again.setup()
         assert again.history('1', 'commands') == []

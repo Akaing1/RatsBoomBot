@@ -20,6 +20,7 @@ from bot.command_registry import build_command_help_groups
 from bot.shared.pending_raids import raid_lock, raid_state, raid_viewer_count, remember_raid
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
 from bot.services.channels.profile_settings import LOYALTY_GROUP
+from bot.services.channels.broadcaster_settings import SOCIAL_SETTING_PLATFORMS
 from bot.services.channels.stream_metadata import (
     StreamCategoryNotFoundError, clear_stream_category, update_stream_game, update_stream_title
 )
@@ -2528,10 +2529,10 @@ async def update_channel_customization(request: Request, setting_name: str = For
                 raise ValueError("Choose On or Off.")
             await services.broadcaster_settings.set_follow_raid(broadcaster_id, value == "1")
             message = "Follow raid preference saved."
-        elif setting_name in {"social.tiktok_url", "social.x_url", "social.kofi_url", "social.vgen_url", "social.throne_url", "social.website_url"}:
+        elif setting_name in SOCIAL_SETTING_PLATFORMS:
             if action != "save":
                 raise ValueError("Unknown social action.")
-            await services.broadcaster_settings.set_social_url(broadcaster_id, setting_name.removeprefix("social.").removesuffix("_url"), value)
+            await services.broadcaster_settings.set_social_url(broadcaster_id, SOCIAL_SETTING_PLATFORMS[setting_name], value)
             message = "Social URL was updated."
         elif setting_name == "social.discord_url":
             await services.broadcaster_settings.set_discord_url(broadcaster_id, value.strip())

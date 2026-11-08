@@ -4,6 +4,7 @@ from urllib.parse import urlsplit
 
 LOGGER = logging.getLogger("RatBoomBot")
 EXTRA_SOCIAL_LINKS = {"tiktok": "TikTok", "x": "X", "kofi": "Ko-Fi", "vgen": "VGen", "throne": "Throne", "website": "Website"}
+SOCIAL_SETTING_PLATFORMS = {f"social.{platform}_url": platform for platform in EXTRA_SOCIAL_LINKS}
 
 
 @dataclass

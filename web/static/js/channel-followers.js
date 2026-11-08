@@ -356,10 +356,10 @@
         windowDirty = false;
     }
     function render(nextRows) {
-        closeFavoriteConfirmation();
         renderDay = new Date().toDateString();
         const signature = renderDay + JSON.stringify(nextRows);
         if (signature === rowsSignature) return;
+        closeFavoriteConfirmation();
         rowsSignature = signature;
         const same = rows.length === nextRows.length && rows.every((item, index) => item.user_id === nextRows[index].user_id);
         if (same) {
@@ -398,6 +398,7 @@
         } catch (error) {
             if (error.name === 'AbortError' || request !== sequence) return;
             status.textContent = 'Unable to update the follower list.'; warning.textContent = error.message; warning.hidden = false;
+            timer = setTimeout(() => { if (!document.hidden) load(); }, 30000);
         } finally { if (request === sequence) { refresh.disabled = false; root.removeAttribute('aria-busy'); } }
     }
     form.addEventListener('submit', event => event.preventDefault());

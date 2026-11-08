@@ -17,6 +17,16 @@ test('category artwork selects responsive sources as the preview expands', {skip
         const image = page.locator('img');
         await page.waitForFunction(() => document.querySelector('img').sizes === '24px');
         assert.match(await image.getAttribute('srcset'), /1081998272_IGDB-384x512.jpg 384w/);
+        const rewrites = await image.evaluate(async node => {
+            let mutations = 0;
+            const observer = new MutationObserver(records => { mutations += records.length; });
+            observer.observe(node, {attributes: true});
+            categoryArtwork.set(node, 'https://static-cdn.jtvnw.net/ttv-boxart/1081998272_IGDB-96x128.jpg');
+            await new Promise(resolve => setTimeout(resolve, 50));
+            observer.disconnect();
+            return mutations;
+        });
+        assert.equal(rewrites, 0, 'Unchanged artwork does not rewrite sources or restart observation');
         await image.evaluate(node => { node.style.width = '240px'; node.style.height = '320px'; });
         await page.waitForFunction(() => document.querySelector('img').sizes === '240px');
         await page.waitForFunction(() => document.querySelector('img').currentSrc.endsWith('-768x1024.jpg'));

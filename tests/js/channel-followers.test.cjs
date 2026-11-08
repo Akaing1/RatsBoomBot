@@ -423,9 +423,13 @@ test('raid favorites stay pinned, share dashboard storage and use a sliding remo
         await page.check('[name=raid_favorites]');
         await page.waitForFunction(() => document.querySelectorAll('.follower-name').length === 1);
         await page.click('.followers-roles-menu summary');
-        const callsBefore = await page.evaluate(() => calls.length);
+        let callsBefore = await page.evaluate(() => calls.length);
         await star.click();
         assert.equal(await page.locator('.follower-favorite-action.is-confirming').count(), 1);
+        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+        await page.waitForFunction(previous => calls.length > previous && !document.querySelector('[data-followers-refresh]').disabled, callsBefore);
+        assert.equal(await page.locator('.follower-favorite-action.is-confirming').count(), 1, 'Unchanged refresh preserves the confirmation');
+        callsBefore = await page.evaluate(() => calls.length);
         const remove = page.locator('.follower-favorite-remove').first();
         assert.equal(await remove.isEnabled(), true);
         await page.waitForTimeout(200);
