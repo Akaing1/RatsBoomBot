@@ -23,7 +23,7 @@ body {
 }
 a { color: inherit; text-decoration: none; }
 button, input { font: inherit; }
-.dashboard-hover-tooltip { position: fixed; z-index: 2000; inset: auto; box-sizing: border-box; width: max-content; margin: 0; max-width: min(360px, calc(100vw - 16px)); padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); box-shadow: 0 4px 16px rgba(0,0,0,.3); color: var(--text); font-size: 13px; line-height: 1.4; text-align: center; overflow-wrap: anywhere; pointer-events: none; }
+.dashboard-hover-tooltip { position: fixed; z-index: 2000; inset: auto; box-sizing: border-box; width: max-content; margin: 0; max-width: min(360px, calc(100vw - 16px)); padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); box-shadow: 0 4px 16px rgba(0,0,0,.3); color: var(--text); font-size: 13px; line-height: 1.4; text-align: center; white-space: pre-line; overflow-wrap: anywhere; pointer-events: none; }
 .dashboard-hover-tooltip[hidden] { display: none; }
 
 .app-shell {

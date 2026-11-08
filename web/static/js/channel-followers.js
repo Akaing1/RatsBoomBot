@@ -26,10 +26,11 @@
         try { const saved = JSON.parse(localStorage.getItem(favoriteKey) || '[]'); favorites = new Set(Array.isArray(saved) ? saved.filter(id => typeof id === 'string' && /^\d{1,25}$/.test(id)).slice(0, 100) : []); } catch (_) { favorites = new Set(); }
     }
     readFavorites();
-    let pendingFavorite = null;
+    let pendingFavorite = null, shoutoutsEnabled = false;
+    const shoutoutSaving = new Set();
     function closeFavoriteConfirmation(event) {
         if (pendingFavorite === null) return;
-        if (event && event.target.closest('.follower-favorite-action')?.dataset.userId === pendingFavorite) return;
+        if (event && event.target.closest('.follower-favorite-action') === pendingFavorite) return;
         pendingFavorite = null;
         for (const action of body.querySelectorAll('.follower-favorite-action.is-confirming')) {
             action.classList.remove('is-confirming');
@@ -38,14 +39,17 @@
     }
     document.addEventListener('pointerdown', closeFavoriteConfirmation);
     const standardColumns = [['name', 'Name'], ['raid_favorite', '★'], ['roles', 'Roles'], ['messages', 'Messages'], ['followed_at', 'Following Since'], ['last_seen', 'Last Active']];
+    const visibleStandardColumns = () => shoutoutsEnabled ? [...standardColumns.slice(0, 2), ['automatic_shoutout', 'Shoutouts'], ...standardColumns.slice(2)] : standardColumns;
+    const slidingFraction = () => shoutoutsEnabled ? .56 : .66;
     const extraColumns = [
         ['first_redeems', 'First redeems'], ['check_ins', 'Check-ins'],
         ['achievement_count', 'Achievements', 'Unique achievements unlocked in this channel.'],
         ['points', 'Current points'], ['lifetime_points', 'Points earned'],
         ['points_spent', 'Points spent', 'Historical spending totals are not recorded.'],
-        ['watch_minutes', 'Watch time', 'Estimated from live chat presence samples.'],
+        ['watch_minutes', 'Watch time'],
     ];
     const sortableColumns = new Set([...standardColumns, ...extraColumns].map(([key]) => key));
+    sortableColumns.add('automatic_shoutout');
     function writeLocation() {
         const url = new URL(location.href);
         url.hash = new URLSearchParams({columns: botColumns ? 'bot' : 'standard', sort: form.elements.sort.value, direction: form.elements.direction.value}).toString();
@@ -61,18 +65,18 @@
         form.elements.sort.value = sort; form.elements.direction.value = direction;
         if (initial) { botColumns = showBot; return; }
         if (showBot !== botColumns) await switchColumns(showBot, false, false);
-        if (changedSort && !stopped) { clearTimeout(debounce); page = 1; load(); }
+        if (changedSort && !stopped) { closeAllStats(); clearTimeout(debounce); page = 1; load(); }
     }
     function onHashChange() { restoreLocation(); }
     window.addEventListener('hashchange', onHashChange);
     function buildColumns() {
-        const columns = [...standardColumns, ['next', ''], ['back', ''], ...extraColumns];
+        const columns = [...visibleStandardColumns(), ['next', ''], ['back', ''], ...extraColumns];
         columnCount = columns.length;
         const header = table.tHead.rows[0], group = table.querySelector('colgroup');
         header.replaceChildren(); group.replaceChildren();
         for (const [key, label] of columns) {
             const col = document.createElement('col');
-            col.dataset.fraction = key === 'name' ? '28' : key === 'raid_favorite' ? '6' : ['next', 'back'].includes(key) ? '4' : standardColumns.some(([id]) => id === key) ? '15.5' : String(62 / 7);
+            col.dataset.fraction = key === 'name' ? '28' : key === 'raid_favorite' ? '6' : key === 'automatic_shoutout' ? '10' : ['next', 'back'].includes(key) ? '4' : standardColumns.some(([id]) => id === key) ? String(shoutoutsEnabled ? 13 : 15.5) : String((shoutoutsEnabled ? 52 : 62) / 7);
             group.append(col);
             const th = document.createElement('th'); th.scope = 'col';
             if (['next', 'back'].includes(key)) {
@@ -87,6 +91,7 @@
             const button = document.createElement('button'), icon = document.createElement('span');
             button.type = 'button'; button.dataset.followersSort = key; button.append(document.createTextNode(label));
             if (key === 'raid_favorite') button.dataset.sortLabel = 'Raid favorites';
+            if (key === 'automatic_shoutout') { button.dataset.sortLabel = 'Automatic shoutouts'; button.title = 'Automatic shoutouts'; }
             icon.setAttribute('aria-hidden', 'true'); icon.textContent = '↕'; button.append(icon); th.append(button);
             header.append(th);
         }
@@ -103,11 +108,12 @@
     function sizeColumns() {
         const width = columnViewWidth();
         if (width === sizedWidth) return;
-        sizedWidth = width; table.style.width = `${width * 1.66}px`;
+        sizedWidth = width; table.style.width = `${width * (1 + slidingFraction())}px`;
         table.style.setProperty('--followers-view-width', `${width}px`);
         table.style.setProperty('--followers-name-width', `${width * .28}px`);
+        table.style.setProperty('--followers-favorite-width', `${width * .06}px`);
         for (const col of table.querySelectorAll('col')) col.style.width = `${width * Number(col.dataset.fraction) / 100}px`;
-        if (!switchingColumns) panel.scrollLeft = botColumns ? width * .66 : 0;
+        if (!switchingColumns) panel.scrollLeft = botColumns ? width * slidingFraction() : 0;
     }
     async function switchColumns(showBot, focus = false, updateLocation = true) {
         if (switchingColumns) return;
@@ -116,7 +122,7 @@
         botColumns = showBot; syncColumnView();
         if (updateLocation) writeLocation();
         try {
-            const from = panel.scrollLeft, to = botColumns ? columnViewWidth() * .66 : 0;
+            const from = panel.scrollLeft, to = botColumns ? columnViewWidth() * slidingFraction() : 0;
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) panel.scrollLeft = to;
             else await new Promise(resolve => {
                 const start = performance.now();
@@ -141,7 +147,7 @@
         clearTimeout(snapTimer);
         if (switchingColumns || draggingColumns || stopped) return;
         snapTimer = setTimeout(() => {
-            const right = columnViewWidth() * .66, showBot = panel.scrollLeft >= right / 2;
+            const right = columnViewWidth() * slidingFraction(), showBot = panel.scrollLeft >= right / 2;
             if (Math.abs(panel.scrollLeft - (showBot ? right : 0)) > 1 || botColumns !== showBot) switchColumns(showBot);
         }, 150);
     }
@@ -150,7 +156,15 @@
     function endColumnDrag() { if (draggingColumns) { draggingColumns = false; scheduleColumnSnap(); } }
     document.addEventListener('pointerup', endColumnDrag);
     document.addEventListener('pointercancel', endColumnDrag);
-    const rendered = new Map(), heights = new Map(), images = new Map(), imageQueue = new Set(), imageRetry = new Map();
+    const rendered = new Map(), heights = new Map(), images = new Map(), imageQueue = new Set(), imageRetry = new Map(), partners = new Map();
+    function partnerMarker(name, enabled) {
+        name.querySelector('.follower-partner')?.remove();
+        if (!enabled) return;
+        const badge = document.createElement('span'); badge.className = 'follower-partner';
+        badge.title = 'Twitch Partner'; badge.setAttribute('role', 'img'); badge.setAttribute('aria-label', 'Twitch Partner');
+        badge.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 1 3 3 4-.2.2 4 3 3-3 3-.2 4-4-.2-3 3-3-3-4 .2-.2-4-3-3 3-3 .2-4 4 .2z"/><path d="m7.5 12 3 3 6-6" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        name.append(badge);
+    }
     let rows = [], rowsSignature = '', renderDay = '', offsets = [0], page = 1, controller, timer, debounce, sequence = 0, frame = 0, windowDirty = true;
     let imageTimer, imageController, imageBusy = false, stopped = false;
     const avatarObserver = new IntersectionObserver(entries => {
@@ -176,9 +190,13 @@
             if (!response.ok) throw new Error('Profile pictures unavailable');
             const data = await response.json();
             const found = new Map((data.profiles || []).map(item => [item.id, item.profile_image_url]));
+            for (const profile of data.profiles || []) partners.set(profile.id, profile.is_partner === true);
             for (const id of ids) images.set(id, found.get(id) || '');
             const requested = new Set(ids);
-            for (const img of body.querySelectorAll('[data-follower-avatar]')) if (requested.has(img.dataset.followerAvatar)) applyImage(img, images.get(img.dataset.followerAvatar));
+            for (const img of body.querySelectorAll('[data-follower-avatar]')) if (requested.has(img.dataset.followerAvatar)) {
+                applyImage(img, images.get(img.dataset.followerAvatar));
+                partnerMarker(img.closest('.follower-person').querySelector('.follower-name'), partners.get(img.dataset.followerAvatar));
+            }
         } catch (error) { if (error.name !== 'AbortError') for (const id of ids) imageRetry.set(id, Date.now() + 30_000); }
         finally { imageBusy = false; if (imageQueue.size && !stopped) imageTimer = setTimeout(loadImages, 50); }
     }
@@ -188,10 +206,11 @@
         offsets = [0]; let extraRows = 0;
         rows.forEach((item, index) => {
             const measured = heights.get(item.user_id) || {};
-            offsets.push(offsets[index] + (measured.row || 68) + (expanded.has(item.user_id) ? measured.details || 170 : 0));
             const pair = rendered.get(index);
+            const visibleDetails = expanded.has(item.user_id) || pair && !pair.details.hidden;
+            offsets.push(offsets[index] + (measured.row || 68) + (visibleDetails ? measured.details || 170 : 0));
             if (pair) { pair.row.setAttribute('aria-rowindex', String(index + extraRows + 2)); pair.details.setAttribute('aria-rowindex', String(index + extraRows + 3)); }
-            if (expanded.has(item.user_id)) extraRows++;
+            if (visibleDetails) extraRows++;
         });
         table.setAttribute('aria-rowcount', String(rows.length + extraRows + 1));
     }
@@ -241,7 +260,7 @@
     function roleTags(item) {
         const group = document.createElement('div'); group.className = 'follower-roles';
         const labels = item.role_labels || [];
-        for (const label of labels) { const tag = document.createElement('span'); tag.className = 'follower-role-tag'; tag.textContent = label; group.append(tag); }
+        for (const label of labels) { const tag = document.createElement('span'); tag.className = 'follower-role-tag'; tag.textContent = label; tag.title = label; group.append(tag); }
         if (!labels.length) { group.textContent = '—'; group.classList.add('is-empty'); }
         return group;
     }
@@ -249,7 +268,7 @@
         if (details.firstChild) return;
         const detailCell = cell(details, ''); detailCell.colSpan = columnCount;
         const list = document.createElement('dl');
-        const pairs = [...extraColumns.map(([key, label, tooltip]) => [label, statValue(item, key, true), tooltip]),
+        const pairs = [...extraColumns.map(([key, label, tooltip]) => [label, statValue(item, key, true), key === 'watch_minutes' ? watchTime(item[key]) : tooltip]),
             ['First seen in channel', date(item.first_seen)], ['Last active in channel', date(item.last_seen)], ['Twitch user ID', item.user_id]];
         for (const [title, value, tooltip] of pairs) {
             const group = document.createElement('div'), term = document.createElement('dt'), description = document.createElement('dd');
@@ -291,6 +310,7 @@
             text.textContent = username && displayName.toLowerCase() !== username.toLowerCase() ? `${displayName} (${username})` : username || displayName;
             toggle.setAttribute('aria-expanded', String(!details.hidden)); toggle.setAttribute('aria-controls', details.id);
             name.append(text);
+            partnerMarker(name, item.is_partner ?? partners.get(item.user_id));
             person.append(toggle, avatar, name); cell(row, '').append(person);
             const favorite = document.createElement('button'); favorite.type = 'button'; favorite.className = 'follower-favorite';
             favorite.textContent = favorites.has(item.user_id) ? '★' : '☆';
@@ -302,6 +322,20 @@
             remove.title = 'Are you sure you want to remove this raid favorite?'; remove.setAttribute('aria-label', `Confirm removing ${item.login || item.name} from raid favorites`);
             strip.append(favorite, remove); action.append(strip);
             cell(row, '').className = 'follower-favorite-cell'; row.lastElementChild.append(action);
+            if (shoutoutsEnabled) {
+                const holder = document.createElement('div'), track = document.createElement('div');
+                holder.className = 'follower-favorite-action follower-shoutout-action'; holder.dataset.userId = item.user_id;
+                track.className = 'follower-favorite-strip';
+                const control = root.querySelector('[data-followers-shoutout-toggle]').content.firstElementChild.cloneNode(true);
+                control.classList.toggle('live', item.automatic_shoutout);
+                control.setAttribute('aria-checked', String(item.automatic_shoutout));
+                control.setAttribute('aria-label', `Automatic shoutout: ${item.login || item.name}`);
+                control.title = 'Automatic shoutout'; control.disabled = shoutoutSaving.has(item.user_id);
+                const confirm = remove.cloneNode(true); confirm.title = 'Remove from automatic shoutouts?';
+                confirm.setAttribute('aria-label', `Confirm removing ${item.login || item.name} from automatic shoutouts`);
+                track.append(control, confirm); holder.append(track);
+                cell(row, '').className = 'follower-shoutout-cell'; row.lastElementChild.append(holder);
+            }
             cell(row, '').append(roleTags(item));
             cell(row, number(item.messages)).className = 'follower-number';
             const followed = cell(row, date(item.followed_at, true));
@@ -317,7 +351,8 @@
             cell(row, '').className = 'follower-switch-cell';
             for (const [key, , tooltip] of extraColumns) {
                 const metric = cell(row, statValue(item, key)); metric.classList.add('follower-number');
-                if (tooltip) metric.title = tooltip;
+                if (key === 'watch_minutes') metric.title = watchTime(item[key]);
+                else if (tooltip) metric.title = tooltip;
             }
             if (!details.hidden) ensureDetails(item, details);
             if (images.has(item.user_id)) applyImage(img, images.get(item.user_id)); else avatarObserver.observe(img);
@@ -355,10 +390,16 @@
         rebuildOffsets();
         windowDirty = false;
     }
-    function render(nextRows) {
+    function render(nextRows, preserveScroll = false) {
         renderDay = new Date().toDateString();
         const signature = renderDay + JSON.stringify(nextRows);
         if (signature === rowsSignature) return;
+        const scrollY = window.scrollY, scrollX = panel.scrollLeft;
+        function restoreScroll() {
+            if (!preserveScroll) return;
+            panel.scrollLeft = scrollX;
+            window.scrollTo({top: scrollY, behavior: 'instant'});
+        }
         closeFavoriteConfirmation();
         rowsSignature = signature;
         const same = rows.length === nextRows.length && rows.every((item, index) => item.user_id === nextRows[index].user_id);
@@ -368,15 +409,15 @@
                 rowObserver.unobserve(pair.row); rowObserver.unobserve(pair.details); avatarObserver.unobserve(pair.row.querySelector('img'));
                 pair.row.remove(); pair.details.remove(); rendered.delete(index);
             }
-            rows = nextRows; rebuildOffsets(); renderWindow();
+            rows = nextRows; rebuildOffsets(); renderWindow(); restoreScroll();
             return;
         }
         rowObserver.disconnect(); avatarObserver.disconnect(); rendered.clear(); body.replaceChildren();
         rows = nextRows; body.dataset.totalRows = String(rows.length); rebuildOffsets();
-        if (panel.getBoundingClientRect().top < 0) window.scrollTo({top: window.scrollY + panel.getBoundingClientRect().top, behavior: 'instant'});
-        renderWindow();
+        if (!preserveScroll && panel.getBoundingClientRect().top < 0) window.scrollTo({top: window.scrollY + panel.getBoundingClientRect().top, behavior: 'instant'});
+        renderWindow(); restoreScroll();
     }
-    async function load(force = false) {
+    async function load(force = false, preserveScroll = false) {
         clearTimeout(timer); controller?.abort(); controller = new AbortController();
         const request = ++sequence;
         syncSortHeaders();
@@ -389,7 +430,15 @@
             const data = await response.json();
             if (request !== sequence) return;
             if (!response.ok) throw new Error(data.detail || 'Followers could not be loaded.');
-            page = data.page; render(data.rows);
+            const enabled = data.automatic_shoutouts_enabled === true;
+            if (enabled !== shoutoutsEnabled) {
+                closeFavoriteConfirmation(); shoutoutsEnabled = enabled; sizedWidth = 0;
+                rowsSignature = ''; rowObserver.disconnect(); avatarObserver.disconnect(); rendered.clear(); body.replaceChildren();
+                root.querySelector('[data-followers-shoutout-filter]').hidden = !enabled;
+                if (!enabled) form.elements.automatic_shoutouts.checked = false;
+                syncRoleCount(); buildColumns(); syncSortHeaders();
+            }
+            page = data.page; render(data.rows, preserveScroll);
             status.textContent = data.loading ? data.total > 0 && data.loaded >= data.total ? 'Loading follower details…' : `Loading followers… ${number(data.loaded)} of ${number(data.total)}` : `${number(data.count)} matching followers · ${number(data.total)} total`;
             warning.textContent = [data.error, ...(data.warnings || [])].filter(Boolean).join(' '); warning.hidden = !warning.textContent;
             root.querySelector('[data-followers-page]').textContent = `Page ${page} of ${data.pages}`;
@@ -401,10 +450,22 @@
             timer = setTimeout(() => { if (!document.hidden) load(); }, 30000);
         } finally { if (request === sequence) { refresh.disabled = false; root.removeAttribute('aria-busy'); } }
     }
+    function closeAllStats() {
+        expanded.clear();
+        for (const {row, details} of rendered.values()) {
+            details.querySelector('.follower-detail-content')?.getAnimations().forEach(animation => {
+                animation.onfinish = null; animation.cancel();
+            });
+            details.hidden = true;
+            row.querySelector('.follower-expand').setAttribute('aria-expanded', 'false');
+        }
+        rebuildOffsets(); scheduleRender();
+    }
     form.addEventListener('submit', event => event.preventDefault());
     table.tHead.addEventListener('click', event => {
         const button = event.target.closest('[data-followers-sort]');
         if (!button || switchingColumns) return;
+        closeAllStats();
         clearTimeout(debounce);
         const sort = button.dataset.followersSort;
         form.elements.direction.value = form.elements.sort.value === sort
@@ -412,9 +473,9 @@
             : sort === 'name' ? 'asc' : 'desc';
         form.elements.sort.value = sort; writeLocation(); page = 1; load();
     });
-    form.addEventListener('change', event => { if (event.target === form.elements.search) return; clearTimeout(debounce); page = 1; load(); });
-    root.querySelector('[name="page_size"]').addEventListener('change', () => { clearTimeout(debounce); page = 1; load(); });
-    form.elements.search.addEventListener('input', () => { clearTimeout(debounce); clearTimeout(timer); controller?.abort(); sequence++; page = 1; debounce = setTimeout(() => load(), 250); });
+    form.addEventListener('change', event => { if (event.target === form.elements.search) return; closeAllStats(); clearTimeout(debounce); page = 1; load(); });
+    root.querySelector('[name="page_size"]').addEventListener('change', () => { closeAllStats(); clearTimeout(debounce); page = 1; load(); });
+    form.elements.search.addEventListener('input', () => { closeAllStats(); clearTimeout(debounce); clearTimeout(timer); controller?.abort(); sequence++; page = 1; debounce = setTimeout(() => load(), 250); });
     prev.addEventListener('click', () => { page--; load(); }); next.addEventListener('click', () => { page++; load(); });
     refresh.addEventListener('click', () => load(true));
     function refreshVisibleFollowers() { if (!document.hidden && !stopped) load(); }
@@ -426,7 +487,7 @@
         closeFavoriteConfirmation();
         if (form.elements.raid_favorites.checked || form.elements.sort.value === 'raid_favorite') { load(); return; }
         for (const {row} of rendered.values()) {
-            const action = row.querySelector('.follower-favorite-action'), button = action.querySelector('.follower-favorite');
+            const action = row.querySelector('.follower-favorite-cell .follower-favorite-action'), button = action.querySelector('.follower-favorite');
             const selected = favorites.has(action.dataset.userId);
             button.textContent = selected ? '★' : '☆'; button.setAttribute('aria-pressed', String(selected));
         }
@@ -440,25 +501,66 @@
         catch (_) { warning.textContent = 'Raid favorites could not be saved in this browser.'; warning.hidden = false; return; }
         favorites = updated; updateFavoriteState();
     }
+    async function saveShoutout(item, enabled) {
+        if (shoutoutSaving.has(item.user_id)) return;
+        shoutoutSaving.add(item.user_id); closeFavoriteConfirmation();
+        const control = body.querySelector(`.follower-shoutout-action[data-user-id="${item.user_id}"] .follower-shoutout`);
+        if (control) control.disabled = true;
+        try {
+            const response = await fetch('/channel/api/followers/automatic-shoutout', {method: 'POST', headers: {Accept: 'application/json'},
+                body: new URLSearchParams({user_id: item.user_id, enabled: String(enabled), csrf_token: root.dataset.csrfToken})});
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || 'Automatic shoutouts could not be saved.');
+            if (!stopped) await load(false, true);
+        } catch (error) { if (!stopped) { warning.textContent = error.message; warning.hidden = false; } }
+        finally {
+            shoutoutSaving.delete(item.user_id);
+            const current = body.querySelector(`.follower-shoutout-action[data-user-id="${item.user_id}"] .follower-shoutout`);
+            if (current) current.disabled = false;
+        }
+    }
     body.addEventListener('click', event => {
         const row = event.target.closest('[data-follower-index]');
         if (!row || row.classList.contains('follower-details') || event.target.closest('a,input,select,textarea')) return;
         const index = Number(row.dataset.followerIndex), item = rows[index], pair = rendered.get(index);
         if (!pair || pair.row !== row) return;
         const button = event.target.closest('button');
-        if (button?.classList.contains('follower-favorite')) {
-            if (!favorites.has(item.user_id)) { saveFavorite(item.user_id, false); return; }
-            if (pendingFavorite === item.user_id) { closeFavoriteConfirmation(); return; }
-            closeFavoriteConfirmation(); pendingFavorite = item.user_id;
+        if (button?.matches('.follower-favorite,.follower-shoutout')) {
+            const isShoutout = button.classList.contains('follower-shoutout');
+            if (!(isShoutout ? item.automatic_shoutout : favorites.has(item.user_id))) {
+                if (isShoutout) saveShoutout(item, true); else saveFavorite(item.user_id, false);
+                return;
+            }
+            if (pendingFavorite === button.closest('.follower-favorite-action')) { closeFavoriteConfirmation(); return; }
+            closeFavoriteConfirmation(); pendingFavorite = button.closest('.follower-favorite-action');
             const action = button.closest('.follower-favorite-action'), remove = action.querySelector('.follower-favorite-remove');
             action.classList.add('is-confirming'); remove.disabled = false; remove.tabIndex = 0;
         } else if (button?.classList.contains('follower-favorite-remove')) {
-            if (pendingFavorite === item.user_id) saveFavorite(item.user_id, true);
+            if (pendingFavorite === button.closest('.follower-favorite-action')) {
+                if (pendingFavorite.classList.contains('follower-shoutout-action')) saveShoutout(item, false);
+                else saveFavorite(item.user_id, true);
+            }
         } else if (!button || button.classList.contains('follower-expand')) {
-            if (pair.details.hidden) ensureDetails(item, pair.details);
-            pair.details.hidden = !pair.details.hidden;
-            row.querySelector('.follower-expand').setAttribute('aria-expanded', String(!pair.details.hidden));
-            if (pair.details.hidden) expanded.delete(item.user_id); else expanded.add(item.user_id);
+            const open = !expanded.has(item.user_id), wasHidden = pair.details.hidden;
+            if (open) ensureDetails(item, pair.details);
+            const content = pair.details.querySelector('.follower-detail-content');
+            const height = wasHidden ? 0 : content.getBoundingClientRect().height;
+            const opacity = wasHidden ? 0 : Number(getComputedStyle(content).opacity);
+            content.getAnimations().forEach(animation => animation.cancel());
+            pair.details.hidden = false;
+            if (open) expanded.add(item.user_id); else expanded.delete(item.user_id);
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) pair.details.hidden = !open;
+            else {
+                const animation = content.animate([{height: `${height}px`, opacity, overflow: 'clip'},
+                    {height: `${open ? content.scrollHeight : 0}px`, opacity: open ? 1 : 0, overflow: 'clip'}],
+                    {duration: 180, easing: 'ease-out', fill: 'forwards'});
+                animation.onfinish = () => {
+                    pair.details.hidden = !open;
+                    animation.cancel();
+                    rebuildOffsets(); scheduleRender();
+                };
+            }
+            row.querySelector('.follower-expand').setAttribute('aria-expanded', String(open));
             rebuildOffsets(); scheduleRender();
         }
     });
@@ -472,14 +574,15 @@
     window.addEventListener('storage', syncFavoriteStorage);
     body.addEventListener('keydown', event => {
         if (event.key === 'Escape' && event.target.closest('.follower-favorite-action')) {
-            event.preventDefault(); closeFavoriteConfirmation(); event.target.closest('.follower-favorite-action').querySelector('.follower-favorite').focus(); return;
+            event.preventDefault(); closeFavoriteConfirmation(); event.target.closest('.follower-favorite-action').querySelector('.follower-favorite,.follower-shoutout').focus(); return;
         }
-        if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey || !event.target.matches(event.shiftKey ? '.follower-expand' : '.follower-favorite')) return;
+        const lastControl = shoutoutsEnabled ? '.follower-shoutout' : '.follower-favorite';
+        if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey || !event.target.matches(event.shiftKey ? '.follower-expand' : lastControl)) return;
         const index = Number(event.target.closest('[data-follower-index]').dataset.followerIndex) + (event.shiftKey ? -1 : 1);
         if (index < 0 || index >= rows.length || rendered.has(index)) return;
         event.preventDefault();
         window.scrollTo({top: window.scrollY + body.getBoundingClientRect().top + offsets[index] - 8, behavior: 'instant'});
-        renderWindow(); rendered.get(index)?.row.querySelector(event.shiftKey ? '.follower-favorite' : '.follower-expand').focus({preventScroll: true});
+        renderWindow(); rendered.get(index)?.row.querySelector(event.shiftKey ? lastControl : '.follower-expand').focus({preventScroll: true});
     });
     window.addEventListener('pagehide', () => {
         stopped = true;

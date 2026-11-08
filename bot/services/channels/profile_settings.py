@@ -351,6 +351,16 @@ class ProfileSettingsService:
         async with self._settings_lock:
             return await self._set_override(broadcaster_id, setting_name, raw_value, updated_by)
 
+    async def set_automatic_shoutout_user(self, broadcaster_id: str, login: str, enabled: bool, updated_by: str) -> None:
+        async with self._settings_lock:
+            state = self.get_setting_state(broadcaster_id, "automatic_shoutouts.users")
+            users = set(state.effective_value.casefold().split())
+            if enabled:
+                users.add(login.casefold())
+            else:
+                users.discard(login.casefold())
+            await self._set_override(broadcaster_id, "automatic_shoutouts.users", "\n".join(sorted(users)), updated_by)
+
     async def set_automatic_shoutouts(self, broadcaster_id: str, values: dict[str, str], updated_by: str) -> None:
         definitions = [definition for definition in PROFILE_SETTING_DEFINITIONS if definition.key.startswith("automatic_shoutouts.")]
         if set(values) != {definition.key for definition in definitions}:

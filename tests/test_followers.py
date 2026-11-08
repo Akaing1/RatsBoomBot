@@ -63,6 +63,104 @@ async def ready(client, bot):
 
 
 @pytest.mark.asyncio
+async def test_partner_filter_scans_all_followers_and_reuses_profile_cache(directory):
+    client, _, _, bot, _ = directory
+    await ready(client, bot)
+    original = bot._http.request_json.side_effect
+    profile_calls = []
+    async def profiles(route):
+        if route.path == 'users':
+            profile_calls.append(route)
+            return {'data': [{'id': user_id, 'broadcaster_type': 'partner' if user_id == '125' else 'affiliate',
+                              'profile_image_url': f'https://example.com/{user_id}.png'} for user_id in route.params['id']]}
+        return await original(route)
+    bot._http.request_json.side_effect = profiles
+    await client.get('/channel/api/followers?rank=partner')
+    await bot._followers_directory_cache['1']['partner_task']
+    data = (await client.get('/channel/api/followers?rank=partner')).json()
+    assert data['count'] == 1 and data['rows'][0]['user_id'] == '125'
+    assert data['rows'][0]['is_partner'] is True
+    assert 'Partner' in data['rows'][0]['role_labels']
+    assert len(profile_calls) == 2 and all(route.token_for == '1' for route in profile_calls)
+    assert (await client.get('/channel/api/followers/profiles?ids=125')).json()['profiles'][0]['is_partner'] is True
+    assert len(profile_calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_automatic_shoutout_column_sorts_filters_and_updates_whitelist(directory, monkeypatch):
+    from bot.profiles import AutomaticShoutouts
+    client, _, _, bot, _ = directory
+    await ready(client, bot)
+    config = AutomaticShoutouts(users='user002')
+    monkeypatch.setattr(followers, 'get_active_profile', lambda channel_id: SimpleNamespace(automatic_shoutouts=config))
+    service = SimpleNamespace(set_automatic_shoutout_user=AsyncMock())
+    bot.services.profile_settings = service
+    result = (await client.get('/channel/api/followers?sort=automatic_shoutout&direction=desc')).json()
+    assert result['automatic_shoutouts_enabled'] is True
+    assert result['rows'][0]['user_id'] == '2' and result['rows'][0]['automatic_shoutout'] is True
+    assert (await client.get('/channel/api/followers?automatic_shoutouts=true')).json()['count'] == 1
+    data = {'user_id': '2', 'enabled': 'false', 'csrf_token': 'secret'}
+    assert (await client.post('/channel/api/followers/automatic-shoutout', data=data)).status_code == 200
+    assert service.set_automatic_shoutout_user.await_args.args[:3] == ('1', 'user002', False)
+    data['csrf_token'] = 'wrong'
+    assert (await client.post('/channel/api/followers/automatic-shoutout', data=data)).status_code == 403
+    data.update(user_id='999', csrf_token='secret')
+    assert (await client.post('/channel/api/followers/automatic-shoutout', data=data)).status_code == 404
+    config = AutomaticShoutouts(raid=0, interactions=0)
+    assert (await client.get('/channel/api/followers')).json()['automatic_shoutouts_enabled'] is False
+    data['user_id'] = '2'
+    assert (await client.post('/channel/api/followers/automatic-shoutout', data=data)).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_partner_filter_survives_profile_cache_eviction(directory):
+    client, _, _, bot, _ = directory
+    await ready(client, bot)
+    now = followers.time.monotonic()
+    bot._raid_browser_profile_cache = {
+        ('1', '1'): (now, {'id': '1', 'broadcaster_type': 'partner'}),
+        **{('1', str(i)): (now, None) for i in range(1000, 1999)},
+    }
+    original = bot._http.request_json.side_effect
+    async def profiles(route):
+        if route.path == 'users':
+            return {'data': [{'id': user_id, 'broadcaster_type': 'affiliate'} for user_id in route.params['id']]}
+        return await original(route)
+    bot._http.request_json.side_effect = profiles
+    await client.get('/channel/api/followers?rank=partner')
+    await bot._followers_directory_cache['1']['partner_task']
+    response = await client.get('/channel/api/followers?rank=partner')
+    assert response.status_code == 200
+    assert [row['user_id'] for row in response.json()['rows']] == ['1']
+
+
+@pytest.mark.asyncio
+async def test_partner_filter_retries_failed_requests_without_caching_empty_results(directory):
+    client, _, _, bot, _ = directory
+    await ready(client, bot)
+    original = bot._http.request_json.side_effect
+    unavailable = True
+    async def profiles(route):
+        if route.path == 'users':
+            if unavailable:
+                raise RuntimeError('Profile request failed')
+            return {'data': [{'id': user_id, 'broadcaster_type': 'partner'} for user_id in route.params['id']]}
+        return await original(route)
+    bot._http.request_json.side_effect = profiles
+    await client.get('/channel/api/followers?rank=partner')
+    snapshot = bot._followers_directory_cache['1']
+    await snapshot['partner_task']
+    assert (await client.get('/channel/api/followers?rank=partner')).status_code == 503
+    assert not snapshot.get('partner_checked')
+    unavailable = False
+    snapshot['partner_expires'] = 0
+    await client.get('/channel/api/followers?rank=partner')
+    await snapshot['partner_task']
+    response = await client.get('/channel/api/followers?rank=partner')
+    assert response.status_code == 200 and response.json()['count'] == 128
+
+
+@pytest.mark.asyncio
 async def test_only_followers_channel_points_global_sort_and_no_redundant_twitch_calls(directory):
     client, session, db, bot, calls = directory
     await ready(client, bot)

@@ -1332,7 +1332,7 @@ def raid_browser_cached_profiles(runtime_bot, broadcaster_id, channels):
     return profiles, missing
 
 
-async def raid_browser_profiles(runtime_bot, broadcaster_id, channels):
+async def raid_browser_profiles(runtime_bot, broadcaster_id, channels, *, strict=False):
     """Fetch authoritative profile data independently of ranking lookups."""
     profiles, missing = raid_browser_cached_profiles(runtime_bot, broadcaster_id, channels)
     cache = getattr(runtime_bot, "_raid_browser_profile_cache", None)
@@ -1350,6 +1350,8 @@ async def raid_browser_profiles(runtime_bot, broadcaster_id, channels):
                     cache.pop(next(iter(cache)))
                 cache[key] = (time.monotonic(), found.get(user_id))
     except Exception:
+        if strict:
+            raise
         LOGGER.warning("[Dashboard] Partner status unavailable for raid-browser channels.")
     return profiles
 

@@ -2,21 +2,24 @@
 {% block title %}Followers | RatsBoomBot{% endblock %}
 {% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/channel-followers.css') }}?v={{ deployment_stamp() }}">{% endblock %}
 {% block content %}
-<section class="followers-page" data-followers data-channel-id="{{ channel_id }}">
+<section class="followers-page" data-followers data-channel-id="{{ channel_id }}" data-csrf-token="{{ csrf_token }}">
+    <template data-followers-shoutout-toggle><button type="button" class="follower-shoutout" role="switch"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="shoutout-horn" d="M3 11v4h4l11 5V4L7 11H3ZM7 15l2 6M21 9v6"/></svg></button></template>
     <header class="page-header"><h2>Followers</h2>
     <form id="followers-controls" class="followers-controls" data-followers-controls>
         <label class="followers-search"><span class="sr-only">Search followers</span><input type="search" name="search" placeholder="Search followers…" maxlength="100"></label>
         <details class="followers-roles-menu">
-        <summary>Roles<span data-followers-role-count></span></summary>
-        <fieldset class="followers-role-filter"><legend class="sr-only">Roles</legend>
+        <summary>Filters<span data-followers-role-count></span></summary>
+        <fieldset class="followers-role-filter"><legend class="sr-only">Filters</legend>
             <label><input type="checkbox" name="rank" value="mod">Moderator</label>
             <label><input type="checkbox" name="rank" value="vip">VIP</label>
             <label><input type="checkbox" name="rank" value="subscriber">Subscriber</label>
             <label><input type="checkbox" name="mutual" value="true">Mutual followers</label>
+            <label><input type="checkbox" name="rank" value="partner">Partner</label>
             <label><input type="checkbox" name="rank" value="tier1">Tier 1</label>
             <label><input type="checkbox" name="rank" value="tier2">Tier 2</label>
             <label><input type="checkbox" name="rank" value="tier3">Tier 3</label>
             <label><input type="checkbox" name="raid_favorites" value="true">Raid favorites</label>
+            <label data-followers-shoutout-filter hidden><input type="checkbox" name="automatic_shoutouts" value="true">Automatic shoutouts</label>
         </fieldset>
         </details>
         <input type="hidden" name="sort" value="followed_at">

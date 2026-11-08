@@ -14,6 +14,27 @@ def reset_profiles():
 
 
 @pytest.mark.asyncio
+async def test_automatic_shoutout_membership_edits_preserve_other_users_and_persist(tmp_path):
+    import asyncio
+    async with asqlite.create_pool(str(tmp_path / 'shoutout-users.db')) as database:
+        service = ProfileSettingsService(database)
+        await service.setup()
+        profile = ChannelProfile(channel_name='channel')
+        activate_profile('1', profile)
+        service.apply_overrides('1', profile)
+        await asyncio.gather(service.set_automatic_shoutout_user('1', 'Alice', True, 'test'),
+                             service.set_automatic_shoutout_user('1', 'bob', True, 'test'))
+        assert get_active_profile('1').automatic_shoutouts.users.split() == ['alice', 'bob']
+        await service.set_automatic_shoutout_user('1', 'alice', False, 'test')
+        reloaded = ProfileSettingsService(database)
+        await reloaded.setup()
+        reloaded.apply_overrides('1', profile)
+        assert get_active_profile('1').automatic_shoutouts.users == 'bob'
+        await reloaded.set_automatic_shoutout_user('1', 'bob', False, 'test')
+        assert get_active_profile('1').automatic_shoutouts.users == ''
+
+
+@pytest.mark.asyncio
 async def test_timer_schedule_overrides_persist_and_update_live_profile(tmp_path):
     profile = ChannelProfile(channel_name='schedule-test')
     activate_profile('schedule', profile)
