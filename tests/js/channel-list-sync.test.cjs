@@ -5,9 +5,10 @@ const vm = require('node:vm');
 
 function setup() {
     const storage = new Map([['ratsboombot:raid-favorites:1', '["10"]'], ['ratsboombot:raid-blacklist:1', '["20"]']]);
-    const calls = [], events = [];
+    const calls = [], events = [], alerts = [], messages = [];
     const state = {version: 1, channelId: '1', lists: {automaticShoutouts: ['alice'], incomingRaidBlacklist: ['blocked'], queueBlacklist: ['queued']}};
-    const context = {window: {dispatchEvent: event => events.push(event)}, document: {querySelector: () => ({value: 'secret'})},
+    const context = {console: Object.fromEntries(['info', 'warn', 'error'].map(level => [level, (...args) => messages.push({level, text: args.join(' ')})])),
+        window: {dispatchEvent: event => events.push(event), alert: message => alerts.push(message)}, document: {querySelector: () => ({value: 'secret'})},
         localStorage: {getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value)},
         StorageEvent: class { constructor(type, properties) { Object.assign(this, {type}, properties); } },
         fetch: async (url, options) => {
@@ -19,7 +20,7 @@ function setup() {
             return {ok: true, json: async () => JSON.parse(JSON.stringify(state))};
         }};
     vm.runInNewContext(fs.readFileSync('web/static/js/channel-list-sync.js', 'utf8'), context);
-    return {helper: context.window.ratsLists, window: context.window, context, storage, calls, events, state};
+    return {helper: context.window.ratsLists, window: context.window, context, storage, calls, events, alerts, messages, state};
 }
 
 test('simple export and import commands copy, paste and cancel without extra console steps', async () => {
@@ -28,13 +29,20 @@ test('simple export and import commands copy, paste and cancel without extra con
     ui.context.navigator = {clipboard: {writeText: async data => { copied = data; }}};
     await ui.window.exportLists();
     assert.equal(JSON.parse(copied).channelId, '1');
+    assert.match(ui.messages.at(-1).text, /Export successful.*clipboard/);
     ui.window.prompt = () => copied;
     assert.equal((await ui.window.importLists()).mode, 'merge');
+    assert.match(ui.alerts[0], /Lists imported successfully \(merge\)/);
+    assert.match(ui.alerts[0], /Incoming raid blacklist: 1/);
+    assert.match(ui.messages.at(-1).text, /Import successful/);
+    assert.ok(ui.messages.some(message => /server settings saved/.test(message.text)));
     assert.equal((await ui.window.importLists({replace: true})).mode, 'replace');
     const count = ui.calls.length;
     ui.window.prompt = () => null;
     assert.equal(await ui.window.importLists(), 'Import cancelled.');
     assert.equal(ui.calls.length, count);
+    assert.equal(ui.alerts.length, 2);
+    assert.match(ui.messages.at(-1).text, /Import cancelled/);
     ui.context.navigator.clipboard.writeText = async () => { throw new Error('Clipboard unavailable'); };
     let fallback;
     ui.window.prompt = (message, text) => { fallback = text; };
@@ -46,6 +54,43 @@ test('console export includes local and saved lists without credentials', async 
     const ui = setup(), exported = JSON.parse(await ui.helper.export());
     assert.deepEqual(exported, {...ui.state, lists: {...ui.state.lists, raidFavorites: ['10'], raidBlacklist: ['20']}});
     assert.equal(JSON.stringify(exported).includes('secret'), false);
+});
+
+test('file commands transfer complete JSON and allow cancelling the file picker', async () => {
+    const ui = setup();
+    let blob, name, fileData, cancelled = false;
+    ui.context.Blob = Blob;
+    ui.context.URL = {createObjectURL: value => { blob = value; return 'blob:export'; }, revokeObjectURL() {}};
+    ui.context.setTimeout = callback => callback();
+    ui.context.document.body = {append() {}};
+    ui.context.document.createElement = type => {
+        const events = {};
+        return {files: [{text: async () => fileData}], addEventListener: (name, callback) => { events[name] = callback; },
+            remove() {}, click() { if (type === 'a') name = this.download; else events[cancelled ? 'cancel' : 'change'](); }};
+    };
+    await ui.window.exportLists({file: true});
+    fileData = await blob.text();
+    assert.match(name, /^ratsboombot-lists-1-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/);
+    assert.deepEqual(JSON.parse(fileData).lists.raidFavorites, ['10']);
+    assert.equal((await ui.window.importLists({file: true})).mode, 'merge');
+    assert.equal((await ui.window.importLists({file: true, replace: true})).mode, 'replace');
+    cancelled = true;
+    const count = ui.calls.length;
+    assert.equal(await ui.window.importLists({file: true}), 'Import cancelled.');
+    assert.equal(ui.calls.length, count);
+});
+
+test('truncated pasted JSON gives a recovery message and changes nothing', async () => {
+    const ui = setup();
+    await assert.rejects(ui.helper.import('{"version":1,"lists":{"automaticShoutouts":["user", "... "123"]}}'), /incomplete or invalid JSON.*No lists were changed/);
+    assert.equal(ui.calls.length, 0);
+    assert.equal(ui.events.length, 0);
+    assert.equal(ui.storage.get('ratsboombot:raid-favorites:1'), '["10"]');
+    ui.window.prompt = () => 'invalid JSON';
+    await assert.rejects(ui.window.importLists());
+    assert.equal(ui.alerts.length, 0);
+    assert.match(ui.messages.at(-1).text, /Import failed/);
+    assert.equal(ui.messages.some(message => /Import successful/.test(message.text)), false);
 });
 
 test('console import merges by default, replaces only supplied lists and notifies storage listeners', async () => {
