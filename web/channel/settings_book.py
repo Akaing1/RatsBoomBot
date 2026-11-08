@@ -26,7 +26,7 @@ TOGGLE_SECTION = {
     "feature": {"points": "loyalty", "timers": "timers", "raid_bosses": "pets", "redeems": "events", "follow_responses": "events", "subscription_responses": "events", "resubscription_responses": "events", "gifted_subscription_responses": "events", "raid_responses": "events", "ad_announcements": "events"},
     "global_group": {"points": "loyalty", "viewer_queue": "queue", "shoutouts": "shoutouts", "socials": "connections", "clips": "chat", "settings": "chat"},
 }
-LABELS = {"raid_responses": "Outgoing raid messages", "raid_bosses": "Boss Hunt", "globals": "All global commands", "channel": "Channel profile", "points": "Loyalty Points", "league": "League of Legends"}
+LABELS = {"raid_responses": "Outgoing raid messages", "raid_bosses": "Boss Hunt", "globals": "All global commands", "channel": "Enable bot", "points": "Loyalty Points", "league": "League of Legends"}
 
 RELATED_SETTINGS = {
     ("profile_feature", "league"): [("games", "league-of-legends", "Customize League of Legends")],
@@ -36,7 +36,7 @@ RELATED_SETTINGS = {
 
 TOGGLE_DESCRIPTIONS = {
     ("feature", "raid_responses"): "Send your messages when you start a raid.",
-    ("feature", "channel"): "Enable your channel's bot profile and its features.",
+    ("feature", "channel"): "Turn off to disable all bot features and commands in your channel.",
     ("feature", "timers"): "Send your scheduled chat messages and announcements.",
     ("feature", "ad_announcements"): "Notify chat before a scheduled ad break starts.",
     ("feature", "points"): "Enable the channel's loyalty points features.",
@@ -88,7 +88,9 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
                 or (kind == "feature" and value == "raid_responses" and command.syntax == "!startraid <channel>")
             )]
             description = TOGGLE_DESCRIPTIONS.get((kind, value)) or (commands[0].description if commands else f"Enable {label.lower()} for your channel.")
-            if section == "pets":
+            if kind == "feature" and value == "channel":
+                panel = "Enable bot"
+            elif section == "pets":
                 panel = "Pets" if kind == "global_command" else "Boss Hunt"
             elif section == "general" and kind == "global_group":
                 panel = "Commands"
@@ -141,7 +143,7 @@ def build_settings_sections(groups, channel_features, profile_features, global_g
         section['blocked'] = section['blocked_by_profile'] or section['blocked_by_globals']
         section['standalone_panels'] = sorted(
             panels.items(),
-            key=lambda item: (section['key'] == 'general' and item[0] != 'Feature controls', item[0]),
+            key=lambda item: (section['key'] == 'general' and item[0] != 'Enable bot', item[0]),
             reverse=section['key'] == 'pets',
         )
     order = ('general', 'chat', 'events', 'shoutouts', 'timers', 'connections', 'loyalty', 'queue', 'pets', 'games')

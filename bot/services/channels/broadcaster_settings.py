@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 LOGGER = logging.getLogger("RatBoomBot")
+EXTRA_SOCIAL_LINKS = {"tiktok": "TikTok", "x": "X", "kofi": "Ko-Fi", "vgen": "VGen", "throne": "Throne", "website": "Website"}
+SOCIAL_SETTING_PLATFORMS = {f"social.{platform}_url": platform for platform in EXTRA_SOCIAL_LINKS}
 
 
 @dataclass
@@ -14,6 +16,8 @@ class BroadcasterSettings:
     x_url: str | None = None
     kofi_url: str | None = None
     vgen_url: str | None = None
+    throne_url: str | None = None
+    website_url: str | None = None
     timers_enabled: bool = True
     follow_raid: bool = True
 
@@ -63,7 +67,7 @@ class BroadcasterSettingsService:
             async with self.db.acquire() as connection:
                 row = await connection.fetchone(query, (broadcaster_id,))
                 social_rows = await connection.fetchall("SELECT platform, url FROM broadcaster_social_links WHERE broadcaster_id = ?", (broadcaster_id,))
-                socials = {f"{item['platform']}_url": item['url'] for item in social_rows if item['platform'] in {"tiktok", "x", "kofi", "vgen"}}
+                socials = {f"{item['platform']}_url": item['url'] for item in social_rows if item['platform'] in EXTRA_SOCIAL_LINKS}
         except Exception:
             LOGGER.exception(
                 "[Broadcaster Settings] Failed to load settings for broadcaster %s.",
@@ -92,7 +96,7 @@ class BroadcasterSettingsService:
         )
 
     async def set_social_url(self, broadcaster_id: str, platform: str, url: str) -> None:
-        if platform not in {"tiktok", "x", "kofi", "vgen"}:
+        if platform not in EXTRA_SOCIAL_LINKS:
             raise ValueError("Unknown social platform.")
         url = url.strip()
         parsed = urlsplit(url)

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from bot.profiles import ChannelProfile, FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName
+from bot.services.channels.broadcaster_settings import EXTRA_SOCIAL_LINKS
 
 
 class CommandPermission(str, Enum):
@@ -145,8 +146,13 @@ SOCIAL_COMMANDS = CommandGroupDefinition(
     description="Share the channel's configured community links.",
     commands=(
         CommandDefinition("!socials", "Show every configured social link.", global_group=GlobalCommandGroup.SOCIALS),
-        CommandDefinition("!socials discord", "Show the configured Discord link.", global_group=GlobalCommandGroup.SOCIALS),
-        CommandDefinition("!socials youtube", "Show the configured YouTube link.", global_group=GlobalCommandGroup.SOCIALS)
+        CommandDefinition("!socials twitch", "Show your channel's Twitch link.", global_group=GlobalCommandGroup.SOCIALS),
+        CommandDefinition("!socials youtube", "Show the configured YouTube link.", global_group=GlobalCommandGroup.SOCIALS),
+        CommandDefinition("!socials discord", "Show the configured Discord link.", global_group=GlobalCommandGroup.SOCIALS)
+    ) + tuple(
+        CommandDefinition(f"!socials {platform}", f"Show the configured {label} link.", global_group=GlobalCommandGroup.SOCIALS,
+                          aliases=("twitter",) if platform == "x" else ())
+        for platform, label in EXTRA_SOCIAL_LINKS.items()
     )
 )
 

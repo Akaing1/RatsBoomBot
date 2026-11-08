@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from twitchio.ext import commands
 
 from bot.profiles import GlobalCommandGroup, get_active_profile, render_profile_message
+from bot.services.channels.broadcaster_settings import EXTRA_SOCIAL_LINKS
 from bot.shared.commands.helpers import get_context_broadcaster_id, is_global_group_enabled
 
 
@@ -83,6 +84,15 @@ async def send_youtube_response(bot, ctx: commands.Context) -> None:
     await send_social_message(ctx, profile.social_messages.youtube, youtube_url=settings.youtube_url)
 
 
+async def send_extra_social_response(bot, ctx: commands.Context, platform: str) -> None:
+    settings = await get_social_settings(bot, ctx)
+    if settings is None:
+        return
+    label = EXTRA_SOCIAL_LINKS[platform]
+    url = getattr(settings, f"{platform}_url", None)
+    await ctx.reply(f"{label}: {url}" if url else f"No {label} link has been set for this channel yet.")
+
+
 class SocialCommands(commands.Component):
 
     def __init__(self, bot):
@@ -111,7 +121,14 @@ class SocialCommands(commands.Component):
 
         discord = settings.discord_url or "not set"
         youtube = settings.youtube_url or "not set"
-        await send_social_message(ctx, profile.social_messages.overview, discord_url=discord, youtube_url=youtube)
+        extra_urls = {f"{platform}_url": getattr(settings, f"{platform}_url", None) for platform in EXTRA_SOCIAL_LINKS}
+        template = profile.social_messages.overview
+        message = render_profile_message(template, discord_url=discord, youtube_url=youtube,
+                                         **{key: value or "not set" for key, value in extra_urls.items()})
+        if message:
+            links = [f"{label}: {extra_urls[platform + '_url']}" for platform, label in EXTRA_SOCIAL_LINKS.items()
+                     if extra_urls[platform + '_url'] and '{' + platform + '_url}' not in template]
+            await ctx.reply(" | ".join([message, *links]))
 
     @socials.command(name="discord")
     async def socials_discord(self, ctx: commands.Context) -> None:
@@ -134,3 +151,36 @@ class SocialCommands(commands.Component):
             broadcaster_id or "unknown"
         )
         await send_youtube_response(self.bot, ctx)
+
+    @socials.command(name="twitch")
+    async def socials_twitch(self, ctx: commands.Context) -> None:
+        if await get_social_settings(self.bot, ctx) is None:
+            return
+        profile = get_active_profile(get_context_broadcaster_id(ctx))
+        name = getattr(ctx.broadcaster, "name", None) or (profile.channel_name if profile else None)
+        if name:
+            await ctx.reply(f"Twitch: https://www.twitch.tv/{name}")
+
+    @socials.command(name="tiktok")
+    async def socials_tiktok(self, ctx: commands.Context) -> None:
+        await send_extra_social_response(self.bot, ctx, "tiktok")
+
+    @socials.command(name="x", aliases=["twitter"])
+    async def socials_x(self, ctx: commands.Context) -> None:
+        await send_extra_social_response(self.bot, ctx, "x")
+
+    @socials.command(name="kofi")
+    async def socials_kofi(self, ctx: commands.Context) -> None:
+        await send_extra_social_response(self.bot, ctx, "kofi")
+
+    @socials.command(name="vgen")
+    async def socials_vgen(self, ctx: commands.Context) -> None:
+        await send_extra_social_response(self.bot, ctx, "vgen")
+
+    @socials.command(name="throne")
+    async def socials_throne(self, ctx: commands.Context) -> None:
+        await send_extra_social_response(self.bot, ctx, "throne")
+
+    @socials.command(name="website")
+    async def socials_website(self, ctx: commands.Context) -> None:
+        await send_extra_social_response(self.bot, ctx, "website")

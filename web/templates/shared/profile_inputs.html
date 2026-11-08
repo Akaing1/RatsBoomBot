@@ -1,4 +1,5 @@
 {% from "channel/settings_switch.html" import status_switch, toggle_details, command_reference %}
+{% from "shared/social_icon.html" import social_icon %}
 {% if setting_message %}
     <div class="toggle-feedback {% if setting_result == 'success' %}success{% else %}error{% endif %}" role="status">
         <span class="toggle-feedback-icon">{% if setting_result == "success" %}&#10003;{% else %}!{% endif %}</span>
@@ -25,19 +26,21 @@
     <div{% if youtube_chat is defined and not settings_notebook | default(false) %} data-social-panel="links"{% endif %}{% if youtube_chat is defined and not settings_notebook | default(false) and social_tab == 'youtube' %} hidden{% endif %}>
     <div class="profile-settings-grid">
         {% for key, label, description, current_value in [
-            ("social.discord_url", "Discord URL", "Used by the channel's Discord and social commands.", channel_settings.discord_url),
             ("social.youtube_url", "YouTube URL", "Used by the channel's YouTube and social commands.", channel_settings.youtube_url),
+            ("social.discord_url", "Discord URL", "Used by the channel's Discord and social commands.", channel_settings.discord_url),
             ("social.tiktok_url", "TikTok URL", "Your TikTok profile link.", channel_settings.tiktok_url),
             ("social.x_url", "X URL", "Your X profile link.", channel_settings.x_url),
             ("social.kofi_url", "Ko-Fi URL", "Your Ko-Fi page link.", channel_settings.kofi_url),
-            ("social.vgen_url", "VGen URL", "Your VGen profile link.", channel_settings.vgen_url)
+            ("social.vgen_url", "VGen URL", "Your VGen profile link.", channel_settings.vgen_url),
+            ("social.throne_url", "Throne URL", "Your Throne wishlist link.", channel_settings.throne_url),
+            ("social.website_url", "Website URL", "Your personal website link.", channel_settings.website_url)
         ] %}
             {% if settings_notebook | default(false) or key in ["social.discord_url", "social.youtube_url"] %}
             <article class="toggle-card profile-setting-card">
                 <form method="post" action="{{ customization_action | default('/channel/customization') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="setting_name" value="{{ key }}">
-                    <div class="toggle-card-heading"><div><h4>{{ label }}</h4><p>{{ description }}</p></div>{% if settings_notebook | default(false) and key == 'social.youtube_url' %}<a class="settings-help-link settings-heading-link" data-settings-link href="?section=general#youtube-chat-connection">Connect YouTube chat</a>{% endif %}</div>
+                    <div class="toggle-card-heading"><div><h4 class="social-platform-heading">{{ social_icon(key.removeprefix('social.').removesuffix('_url')) }}<span>{{ label }}</span></h4><p>{{ description }}</p></div>{% if settings_notebook | default(false) and key == 'social.youtube_url' %}<a class="settings-help-link settings-heading-link" data-settings-link href="?section=general#youtube-chat-connection">Connect YouTube chat</a>{% endif %}</div>
                     {% if settings_notebook | default(false) %}<div class="settings-field-body">{% endif %}
                     <input class="profile-setting-input" type="url" name="value" value="{{ current_value or '' }}" placeholder="https://">
                     <div class="toggle-actions profile-setting-actions"><button class="button primary" type="submit" name="action" value="save">Save Changes</button></div>

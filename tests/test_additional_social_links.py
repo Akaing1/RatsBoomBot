@@ -8,7 +8,7 @@ async def test_extra_socials_persist_and_stay_channel_scoped(tmp_path):
     async with asqlite.create_pool(str(tmp_path / 'socials.db')) as db:
         service = BroadcasterSettingsService(db)
         await service.setup()
-        for platform in ('tiktok', 'x', 'kofi', 'vgen'):
+        for platform in ('tiktok', 'x', 'kofi', 'vgen', 'throne', 'website'):
             await service.set_social_url('1', platform, f'https://example.com/{platform}')
             assert getattr(await service.get_settings('1'), f'{platform}_url') == f'https://example.com/{platform}'
             assert getattr(await service.get_settings('2'), f'{platform}_url') is None

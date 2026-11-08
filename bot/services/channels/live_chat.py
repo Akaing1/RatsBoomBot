@@ -16,6 +16,7 @@ import grpc
 from bot.profiles import get_active_profile
 from bot.shared_chat import is_shared_message
 from bot.services.channels.chat_notices import notification_details
+from bot.services.channels.dashboard_activity import DashboardActivityHistory
 from bot.services.channels import youtube_live_chat_pb2
 from config.settings import settings
 from web.shared.youtube_oauth import YOUTUBE_API_URL, YOUTUBE_TOKEN_URL, YouTubeChannel, YouTubeTokenResponse, fetch_youtube_channel
@@ -136,7 +137,8 @@ class LiveChatService:
         self.token_broadcasters: dict[str, str] = {}
         self.messages: dict[str, deque[UnifiedChatMessage]] = defaultdict(lambda: deque(maxlen=250))
         self.pinned_messages: dict[str, dict[str, object]] = {}
-        self.mod_actions: dict[str, deque[dict[str, object]]] = defaultdict(lambda: deque(maxlen=100))
+        self.activity_history = DashboardActivityHistory(db)
+        self.mod_actions = self.activity_history.mod_actions
         self.automod_messages: dict[str, dict[str, dict[str, object]]] = defaultdict(dict)
         self.message_ids: dict[str, set[str]] = defaultdict(set)
         self.message_id_order: dict[str, deque[str]] = defaultdict(deque)
@@ -164,6 +166,11 @@ class LiveChatService:
         self.started = False
 
     async def setup(self) -> None:
+        await self.activity_history.setup()
+        for broadcaster_id, messages in self.activity_history.commands.items():
+            for message in messages:
+                self.message_ids[broadcaster_id].add(message['id'])
+                self.message_id_order[broadcaster_id].append(message['id'])
         async with self.db.acquire() as connection:
             connection_rows = await connection.fetchall(
                 "SELECT broadcaster_id, youtube_channel_id, youtube_channel_title, access_token, refresh_token, expires_at FROM youtube_chat_connections"
@@ -223,6 +230,7 @@ class LiveChatService:
 
     async def stop(self) -> None:
         self.started = False
+        await self.activity_history.flush()
         tasks = tuple(self.tasks.values()) + tuple(self.seventv_tasks.values()) + tuple(self.twitch_badge_tasks.values())
 
         if self.seventv_global_task is not None:
@@ -1000,6 +1008,9 @@ class LiveChatService:
             self.message_ids[broadcaster_id].discard(expired_id)
 
         self.messages[broadcaster_id].append(message)
+        if message.kind == "command" and not message.deleted:
+            self.activity_history.commands[broadcaster_id].append(message.as_dict())
+            self.activity_history.changed(broadcaster_id, 'commands')
 
         for queue in tuple(self.subscribers.get(broadcaster_id, ())):
             if queue.full():
@@ -1012,6 +1023,8 @@ class LiveChatService:
         return True
 
     def history(self, broadcaster_id: str, view: str = "both") -> list[dict[str, object]]:
+        if normalize_chat_view(view) == 'commands':
+            return list(self.activity_history.commands.get(str(broadcaster_id), ()))
         return [message.as_dict() for message in self.messages.get(str(broadcaster_id), ())
                 if not message.deleted and message_matches_view(message, view)]
 
@@ -1021,6 +1034,12 @@ class LiveChatService:
         messages = self.messages[broadcaster_id]
         self.messages[broadcaster_id] = deque(
             (message for message in messages if platform != "both" and message.platform != platform), maxlen=messages.maxlen)
+        commands = self.activity_history.commands.get(broadcaster_id, ())
+        remaining = deque((message for message in commands
+                           if platform != 'both' and message.get('platform') != platform), maxlen=100)
+        if len(remaining) != len(commands):
+            self.activity_history.commands[broadcaster_id] = remaining
+            self.activity_history.changed(broadcaster_id, 'commands')
         for queue in tuple(self.subscribers.get(broadcaster_id, ())):
             if queue.full():
                 queue.get_nowait()
@@ -1062,6 +1081,11 @@ class LiveChatService:
 
     async def remove_message(self, broadcaster_id: str, message_id: str) -> None:
         broadcaster_id = str(broadcaster_id)
+        commands = self.activity_history.commands.get(broadcaster_id, ())
+        remaining = deque((message for message in commands if message['id'] != message_id), maxlen=100)
+        if len(remaining) != len(commands):
+            self.activity_history.commands[broadcaster_id] = remaining
+            self.activity_history.changed(broadcaster_id, 'commands')
         messages = self.messages.get(broadcaster_id)
         if messages is not None:
             deleted_message = None
@@ -1162,6 +1186,7 @@ class LiveChatService:
             "source_channel": source_name if is_shared_action and source_id != str(broadcaster_id) else None,
             "timestamp": datetime.now(UTC).isoformat()
         })
+        self.activity_history.changed(broadcaster_id, 'mod_actions')
 
     def hold_automod_message(self, payload) -> None:
         broadcaster_id = str(payload.broadcaster.id)

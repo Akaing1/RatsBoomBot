@@ -188,7 +188,7 @@ class AutomaticShoutouts:
 
 @dataclass(frozen=True)
 class SocialMessages:
-    overview: str = "Discord: {discord_url} | YouTube: {youtube_url}"
+    overview: str = "YouTube: {youtube_url} | Discord: {discord_url}"
     discord: str = "Join the community on Discord: {discord_url}"
     youtube: str = "Catch up on YouTube: {youtube_url}"
     discord_unavailable: str = "No Discord link has been set for this channel yet."

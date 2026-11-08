@@ -1,8 +1,37 @@
 import asqlite
 import pytest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 from bot.profiles import RedeemConfig
 from bot.services.engagement.redeems import RedeemService
+
+
+@pytest.mark.asyncio
+async def test_reward_icons_use_custom_or_default_images_and_share_cached_lookup(tmp_path, monkeypatch):
+    request = AsyncMock(return_value={'data': [
+        {'title': 'Choose a Game', 'image': {'url_2x': 'https://example.com/custom.png'}, 'default_image': {'url_2x': 'https://example.com/default.png'}},
+        {'title': 'Hydrate', 'image': None, 'default_image': {'url_1x': 'https://example.com/water.png'}},
+    ]})
+    async with asqlite.create_pool(str(tmp_path / 'icons.db')) as db:
+        service = RedeemService(SimpleNamespace(_http=SimpleNamespace(request_json=request)), db, None)
+        await service.setup()
+        monkeypatch.setattr(service, 'get_redeem_config', lambda channel: None)
+        for index, title in enumerate(('Choose a Game', 'Hydrate')):
+            await service.record_activity(redemption_id=str(index), broadcaster_id='1', user_id='2', username='viewer',
+                                          reward_title=title, user_input=None, stream_id=None)
+        result = await service.get_dashboard_activity(broadcaster_id='1')
+        icons = {entry['reward_title']: entry['reward_icon_url'] for entry in result['redemptions']}
+        assert icons == {'Choose a Game': 'https://example.com/custom.png', 'Hydrate': 'https://example.com/water.png'}
+        await service.get_dashboard_activity(broadcaster_id='1')
+        request.assert_awaited_once()
+        route = request.call_args.args[0]
+        assert route.token_for == '1' and route.params['broadcaster_id'] == '1'
+        service._reward_icons['1'] = (0, icons)
+        request.side_effect = RuntimeError('Unavailable')
+        assert await service.reward_icons('1') == icons
+        await service.reward_icons('1')
+        assert request.await_count == 2
 
 
 @pytest.mark.asyncio

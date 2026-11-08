@@ -2,8 +2,10 @@ import asyncio
 import logging
 import random
 import sqlite3
+import time
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from twitchio.http import Route
 
 from bot.profiles import FeatureName, RedeemConfig, TargetTimeoutRedeemConfig, get_active_profile, render_profile_message
 
@@ -28,6 +30,37 @@ class RedeemService:
         self.points = points_service
         self.counters = counter_service
         self._moderator_restore_tasks: set[asyncio.Task] = set()
+        self._reward_icons = {}
+        self._reward_icon_locks = {}
+
+    async def reward_icons(self, broadcaster_id):
+        request = getattr(getattr(self.bot, '_http', None), 'request_json', None)
+        if not callable(request):
+            return {}
+        broadcaster_id = str(broadcaster_id)
+        expires, icons = self._reward_icons.get(broadcaster_id, (0, {}))
+        if time.monotonic() < expires:
+            return icons
+        async with self._reward_icon_locks.setdefault(broadcaster_id, asyncio.Lock()):
+            expires, icons = self._reward_icons.get(broadcaster_id, (0, {}))
+            if time.monotonic() < expires:
+                return icons
+            try:
+                payload = await asyncio.wait_for(request(Route('GET', 'channel_points/custom_rewards',
+                    token_for=broadcaster_id, params={'broadcaster_id': broadcaster_id})), 10)
+                refreshed_icons = {}
+                for reward in payload.get('data', []):
+                    image = reward.get('image') or reward.get('default_image') or {}
+                    url = image.get('url_2x') or image.get('url_1x') or image.get('url_4x')
+                    if url:
+                        refreshed_icons[str(reward['title']).strip().casefold()] = url
+                icons = refreshed_icons
+                ttl = 3600
+            except Exception:
+                LOGGER.warning('[Redeems] Could not load reward icons for %s.', broadcaster_id)
+                ttl = 60
+            self._reward_icons[broadcaster_id] = (time.monotonic() + ttl, icons)
+            return icons
 
     async def setup(self) -> None:
         LOGGER.info("[Redeems] Preparing redeem claim storage.")
@@ -298,6 +331,15 @@ class RedeemService:
             for row in redemption_rows
             if row["reward_title"].strip().lower() not in excluded_titles
         ]
+
+        icons = await self.reward_icons(broadcaster_id) if checkins or redemptions else {}
+        for entry in redemptions:
+            if url := icons.get(entry['reward_title'].strip().casefold()):
+                entry['reward_icon_url'] = url
+        for entry in checkins:
+            title = getattr(config, f"{entry['type']}_title", '') if config else ''
+            if url := icons.get(title.strip().casefold()):
+                entry['reward_icon_url'] = url
 
         return {
             "stream_id": None,

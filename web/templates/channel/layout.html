@@ -153,6 +153,7 @@
     {% if moderator_mode %}<script src="/static/js/mod-authorization.js?v={{ deployment_stamp() }}" defer></script>{% else %}<script src="/static/js/channel-authorization.js?v={{ deployment_stamp() }}" defer></script>{% endif %}
     <script src="/static/js/user-row-confirmation.js?v={{ deployment_stamp() }}-centered-slide" defer></script>
     <script src="/static/js/user-list-pagination.js?v={{ deployment_stamp() }}" defer></script>
+    {% if not moderator_mode %}<script src="/static/js/channel-list-sync.js?v={{ deployment_stamp() }}" defer></script>{% endif %}
     {% block page_scripts %}{% endblock %}
 </body>
 </html>

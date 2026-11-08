@@ -5,7 +5,7 @@ let chromium;
 try { ({chromium} = require('playwright')); } catch (_) {}
 const executablePath = process.env.CHAT_TEST_BROWSER_PATH || chromium?.executablePath();
 const skip = !chromium || !fs.existsSync(executablePath || '');
-async function setup(browser, width = 1100, hash = '') {
+async function setup(browser, width = 1100, hash = '', shoutouts = false) {
     const page = await browser.newPage({viewport: {width, height: 850}});
     await page.route('https://test.local/**', route => route.fulfill({contentType: 'text/html', body: '<html></html>'}));
     await page.route('https://static-cdn.jtvnw.net/**', route => route.fulfill({contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/f1sAAAAASUVORK5CYII=', 'base64')}));
@@ -13,32 +13,166 @@ async function setup(browser, width = 1100, hash = '') {
     const template = fs.readFileSync('web/templates/channel/followers.html', 'utf8');
     const content = '<section class="followers-page"' + template.split('<section class="followers-page"')[1].split('</section>')[0] + '</section>';
     await page.setContent(`<style>${fs.readFileSync('web/static/css/style.css', 'utf8')}\n${fs.readFileSync('web/static/css/channel-followers.css', 'utf8')}body{margin:0;padding:16px;box-sizing:border-box}</style>${content.replace('data-channel-id="{{ channel_id }}"', 'data-channel-id="1"')}`);
-    await page.evaluate(() => {
+    await page.evaluate(shoutouts => {
+        window.shoutoutsEnabled = shoutouts; window.shoutoutUsers = [];
         window.calls = []; window.profileCalls = [];
         window.fetch = async (url, options) => {
+            if (url === '/channel/api/followers/automatic-shoutout') {
+                const id = options.body.get('user_id');
+                window.shoutoutUsers = window.shoutoutUsers.filter(value => value !== id);
+                if (options.body.get('enabled') === 'true') window.shoutoutUsers.push(id);
+                return {ok: true, json: async () => ({enabled: options.body.get('enabled') === 'true'})};
+            }
             const params = new URL(url, location.href).searchParams;
             if (url.startsWith('/channel/api/followers/profiles')) {
                 profileCalls.push(url);
-                return {ok: true, json: async () => ({profiles: params.get('ids').split(',').map(id => ({id, profile_image_url: `https://static-cdn.jtvnw.net/test/${id}.png`}))})};
+                return {ok: true, json: async () => ({profiles: params.get('ids').split(',').map(id => ({id, is_partner: window.rowUpdates?.[id]?.is_partner === true, profile_image_url: `https://static-cdn.jtvnw.net/test/${id}.png`}))})};
             }
             calls.push(url);
             if (params.get('search') === 'error') return {ok: false, json: async () => ({detail: 'Reconnect Twitch.'})};
             let rows = Array.from({length: 128}, (_, i) => ({user_id: String(i + 1), name: i === 8 ? 'USER9' : i === 9 ? 'Friendly Cat' : `User${String(i + 1).padStart(3, '0')}`, login: `user${i + 1}`,
                 followed_at: '2026-10-01T00:00:00Z', label: i === 1 ? 'VIP · Sub tier 2' : 'Follower', role_labels: i === 1 ? ['VIP', 'Sub tier 2'] : [], points: i * 10, messages: i,
                 lifetime_points: i * 20, first_redeems: 3, check_ins: 12, achievement_count: 2, points_spent: null, watch_minutes: 125, first_seen: null, last_watched: i === 0 ? null : '2026-10-25 22:00:00', last_seen: i === 0 ? null : '2026-10-26 01:00:00', ...(window.rowUpdates?.[String(i + 1)] || {})}));
+            rows.forEach(row => { row.automatic_shoutout = window.shoutoutUsers.includes(row.user_id); });
+            if (params.get('automatic_shoutouts') === 'true') rows = rows.filter(row => row.automatic_shoutout);
             if (params.get('rank')) rows = rows.filter(row => row.role_labels.includes('VIP'));
             if (params.get('mutual') === 'true') rows = rows.filter(row => row.user_id === '2');
             if (params.get('raid_favorites') === 'true') rows = rows.filter(row => (params.get('favorites') || '').split(',').includes(row.user_id));
             if (params.get('search')) rows = rows.filter(row => row.name.toLowerCase().includes(params.get('search').toLowerCase()));
+            if (params.get('sort') === 'automatic_shoutout') rows.sort((a, b) => (Number(a.automatic_shoutout) - Number(b.automatic_shoutout)) * (params.get('direction') === 'asc' ? 1 : -1));
             const size = Number(params.get('page_size')), pages = Math.max(1, Math.ceil(rows.length / size)), page = Math.min(Number(params.get('page')), pages), count = rows.length;
             rows = rows.slice((page - 1) * size, page * size);
-            return {ok: true, json: async () => ({rows, page, pages, count, total: 128, loaded: 128, loading: false, warnings: [], error: ''})};
+            return {ok: true, json: async () => ({rows, page, pages, count, total: 128, loaded: 128, loading: false, warnings: [], error: '', automatic_shoutouts_enabled: window.shoutoutsEnabled})};
         };
-    });
+    }, shoutouts);
     await page.addScriptTag({content: fs.readFileSync('web/static/js/channel-followers.js', 'utf8')});
     await page.waitForFunction(() => document.querySelector('[data-followers-rows]').dataset.totalRows === '25');
     return page;
 }
+
+test('automatic shoutouts share the whitelist, remain pinned and confirm removals inline', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser, 1100, '', true);
+        const toggle = page.locator('.follower-shoutout').first();
+        await toggle.click();
+        await page.waitForFunction(() => document.querySelector('.follower-shoutout').getAttribute('aria-checked') === 'true');
+        await toggle.click();
+        assert.deepEqual(await page.evaluate(() => window.shoutoutUsers), ['1']);
+        const confirmation = page.locator('.follower-shoutout-action.is-confirming .follower-favorite-remove');
+        await confirmation.waitFor();
+        await page.click('h2');
+        assert.equal(await confirmation.count(), 0);
+        await toggle.click();
+        await confirmation.click();
+        await page.waitForFunction(() => document.querySelector('.follower-shoutout').getAttribute('aria-checked') === 'false');
+        await page.click('[data-followers-sort=automatic_shoutout]');
+        assert.equal(await page.locator('[data-followers-column=automatic_shoutout]').getAttribute('aria-sort'), 'descending');
+        await page.locator('[data-followers-columns]').click();
+        await page.waitForFunction(() => !document.querySelector('[data-followers-columns]').disabled);
+        const bounds = await page.locator('.follower-shoutout-cell').first().boundingBox();
+        assert.ok(bounds.x > 0 && bounds.x + bounds.width < 1100);
+        await page.click('.followers-roles-menu summary');
+        await page.check('[name=automatic_shoutouts]');
+        await page.waitForFunction(() => new URL(window.calls.at(-1), location.href).searchParams.get('automatic_shoutouts') === 'true');
+        const disabled = await setup(browser);
+        assert.equal(await disabled.locator('.follower-shoutout').count(), 0);
+        assert.equal(await disabled.locator('[data-followers-shoutout-filter]').isVisible(), false);
+    } finally { await browser.close(); }
+});
+
+test('automatic shoutout edits preserve scrolling even when the sort order changes', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser, 1100, '#sort=automatic_shoutout&direction=desc', true);
+        await page.selectOption('[name=page_size]', '50');
+        await page.waitForFunction(() => document.querySelector('[data-followers-rows]').dataset.totalRows === '50');
+        await page.evaluate(() => window.scrollTo(0, 1000));
+        await page.waitForTimeout(100);
+        const id = await page.locator('.follower-shoutout-action').evaluateAll(nodes => nodes.find(node => {
+            const rect = node.getBoundingClientRect(); return rect.top > 50 && rect.bottom < innerHeight - 50;
+        }).dataset.userId);
+        const before = await page.evaluate(() => ({y: scrollY, x: document.querySelector('.followers-table-wrap').scrollLeft}));
+        await page.locator(`.follower-shoutout-action[data-user-id="${id}"] .follower-shoutout`).click();
+        await page.waitForFunction(id => window.shoutoutUsers.includes(id) && !document.querySelector('[data-followers]').hasAttribute('aria-busy'), id);
+        const after = await page.evaluate(() => ({y: scrollY, x: document.querySelector('.followers-table-wrap').scrollLeft}));
+        assert.equal(after.y, before.y);
+        assert.equal(after.x, before.x);
+    } finally { await browser.close(); }
+});
+
+test('opening follower stats expands and fades with reduced-motion support', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser);
+        const animation = await page.evaluate(() => {
+            document.querySelector('.follower-expand').click();
+            const effect = document.querySelector('.follower-detail-content').getAnimations()[0].effect;
+            return {frames: effect.getKeyframes(), duration: effect.getTiming().duration};
+        });
+        assert.equal(animation.duration, 180);
+        assert.equal(animation.frames[0].height, '0px');
+        assert.equal(animation.frames[0].opacity, '0');
+        await page.waitForFunction(() => document.querySelector('.follower-detail-content').getAnimations().length === 0);
+        await page.locator('.follower-expand').first().click();
+        const closing = await page.locator('.follower-detail-content').first().evaluate(node => node.getAnimations()[0].effect.getKeyframes().at(-1));
+        assert.equal(closing.height, '0px');
+        assert.equal(closing.opacity, '0');
+        await page.waitForFunction(() => document.querySelector('.follower-details').hidden);
+        await page.emulateMedia({reducedMotion: 'reduce'});
+        await page.locator('.follower-expand').first().click();
+        assert.equal(await page.locator('.follower-detail-content').first().evaluate(node => node.getAnimations().length), 0);
+    } finally { await browser.close(); }
+});
+
+test('sorting and filtering immediately close extra stats without an animation', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser);
+        for (const action of ['sort', 'filter', 'search']) {
+            const result = await page.evaluate(action => {
+                const expand = document.querySelector('.follower-expand');
+                expand.click();
+                if (action === 'sort') document.querySelector('[data-followers-sort=messages]').click();
+                else {
+                    const input = document.querySelector(action === 'filter' ? '[name=mutual]' : '[name=search]');
+                    if (action === 'filter') input.checked = true; else input.value = 'User';
+                    input.dispatchEvent(new Event(action === 'filter' ? 'change' : 'input', {bubbles: true}));
+                }
+                return {hidden: [...document.querySelectorAll('.follower-details')].every(node => node.hidden),
+                    animations: [...document.querySelectorAll('.follower-detail-content')].reduce((sum, node) => sum + node.getAnimations().length, 0)};
+            }, action);
+            assert.deepEqual(result, {hidden: true, animations: 0});
+            await page.waitForTimeout(300);
+            assert.equal(await page.locator('.follower-expand[aria-expanded=true]').count(), 0);
+        }
+    } finally { await browser.close(); }
+});
+
+test('partner checkmarks sit to the right of names and remain pinned across columns', {skip}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await setup(browser);
+        await page.evaluate(() => { window.rowUpdates = {'1': {is_partner: true}}; });
+        await page.click('[data-followers-refresh]');
+        const badge = page.locator('.follower-name .follower-partner').first();
+        await badge.waitFor();
+        assert.equal(await badge.getAttribute('aria-label'), 'Twitch Partner');
+        const placement = await badge.evaluate(node => {
+            const icon = node.getBoundingClientRect(), text = node.previousElementSibling.getBoundingClientRect();
+            return {right: icon.left >= text.right, centered: Math.abs(icon.y + icon.height / 2 - text.y - text.height / 2) < 1};
+        });
+        assert.deepEqual(placement, {right: true, centered: true});
+        await page.locator('[data-followers-columns]').click();
+        assert.equal(await badge.count(), 1);
+        await page.evaluate(() => { window.rowUpdates = {'1': {is_partner: false}}; });
+        await page.click('[data-followers-refresh]');
+        await page.waitForFunction(() => !document.querySelector('.follower-partner'));
+        await page.click('.followers-roles-menu summary');
+        await page.check('[name=rank][value=partner]');
+        await page.waitForFunction(() => calls.at(-1).includes('rank=partner'));
+    } finally { await browser.close(); }
+});
 
 test('followers pagination, page sizes, rank filters and expandable details', {skip}, async () => {
     const browser = await chromium.launch({executablePath, headless: true});
@@ -423,9 +557,13 @@ test('raid favorites stay pinned, share dashboard storage and use a sliding remo
         await page.check('[name=raid_favorites]');
         await page.waitForFunction(() => document.querySelectorAll('.follower-name').length === 1);
         await page.click('.followers-roles-menu summary');
-        const callsBefore = await page.evaluate(() => calls.length);
+        let callsBefore = await page.evaluate(() => calls.length);
         await star.click();
         assert.equal(await page.locator('.follower-favorite-action.is-confirming').count(), 1);
+        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+        await page.waitForFunction(previous => calls.length > previous && !document.querySelector('[data-followers-refresh]').disabled, callsBefore);
+        assert.equal(await page.locator('.follower-favorite-action.is-confirming').count(), 1, 'Unchanged refresh preserves the confirmation');
+        callsBefore = await page.evaluate(() => calls.length);
         const remove = page.locator('.follower-favorite-remove').first();
         assert.equal(await remove.isEnabled(), true);
         await page.waitForTimeout(200);
