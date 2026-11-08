@@ -1252,7 +1252,7 @@ html.raid-browser-open { overflow: hidden; }
 .activity-badge.first { border-color: rgba(245,196,81,.4); background: rgba(245,196,81,.1); color: #f5c451; }
 .activity-badge.second { border-color: rgba(126,185,255,.4); background: rgba(126,185,255,.1); color: #7eb9ff; }
 .redemption-activity-item { display: flex; }
-.activity-reward-icon { display: block; flex: 0 0 28px; width: 28px; height: 28px; object-fit: contain; align-self: center; }
+.activity-reward-icon { display: block; flex: 0 0 24px; width: 24px; height: 24px; object-fit: contain; align-self: center; }
 .activity-reward-icon[hidden] { display: none; }
 .activity-moderation-icon { flex: 0 0 22px; width: 22px; height: 22px; align-self: center; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .activity-moderation-icon.is-destructive { stroke: #f87171; }
