@@ -145,14 +145,14 @@ async def get_note(request: Request, identity: str):
 
 
 @router.get("/channel/api/for-you/clips")
-async def channel_clips(request: Request, days: int = 0, after: str = ""):
+async def channel_clips(request: Request, days: int = 0, after: str = "", sort: str = "views"):
     from datetime import datetime, timedelta, timezone
     import asyncio
     import logging
     from web.channel.routers.dashboard import raid_browser_cached_request
 
     _, channel = workspace_context(request)
-    if days not in {0, 1, 7, 30} or len(after) > 2048:
+    if days not in {0, 1, 7, 30} or len(after) > 2048 or sort not in {"views", "newest"}:
         raise HTTPException(400, "Invalid clip filters.")
     bot = get_bot()
     if bot is None:
@@ -164,8 +164,19 @@ async def channel_clips(request: Request, days: int = 0, after: str = ""):
         params["started_at"] = start.strftime("%Y-%m-%dT%H:%M:%SZ")
     if after:
         params["after"] = after
+    if sort == "newest":
+        from web.channel.clip_order import latest_clips
+        try:
+            payload = await asyncio.wait_for(latest_clips(
+                lambda values: raid_browser_cached_request(bot, channel, "clips", values),
+                channel, days, after), timeout=15)
+        except ValueError as error:
+            raise HTTPException(400, "Invalid clip cursor.") from error
+        except Exception as error:
+            raise HTTPException(502, "Could not load latest clips. Please try again.") from error
     try:
-        payload = await asyncio.wait_for(raid_browser_cached_request(bot, channel, "clips", params), timeout=15)
+        if sort != "newest":
+            payload = await asyncio.wait_for(raid_browser_cached_request(bot, channel, "clips", params), timeout=15)
     except Exception as error:
         extra = getattr(error, "extra", {})
         message = str(extra.get("message", ""))[:300] if isinstance(extra, dict) else ""
