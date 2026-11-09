@@ -1090,6 +1090,8 @@ html.raid-browser-open { overflow: hidden; }
 .live-chat-message[data-merged-message-id] { --chat-edge-color: #7dd3fc; }
 .live-chat-message.kind-send-error { background: linear-gradient(rgb(239 68 68 / .08), rgb(239 68 68 / .08)), var(--surface-raised); }
 .live-chat-message.kind-send-error .live-chat-name { color: #ff8784; }
+.live-chat-message.kind-notice { --chat-edge-color: #fbbf24; border: 1px solid #fbbf24; border-left-width: 3px; background: linear-gradient(rgb(251 191 36 / .14), rgb(251 191 36 / .14)), var(--surface-raised); }
+.live-chat-message.kind-notice:not(.is-deleted) .live-chat-message-content { filter: none; opacity: 1; }
 .live-chat-notice { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 4px; font-size: 13px; overflow-wrap: anywhere; }
 .live-chat-notice-label { color: #c4b5fd; font-size: 11px; }
 .live-chat-notice-text { color: var(--text); }

@@ -660,12 +660,11 @@ async def channel_viewer_queue_action(
 
     try:
         channel = runtime_bot.create_partialuser(str(broadcaster_id))
-        for text in ([message, warning] if warning else [message]):
-            sent_message = await runtime_bot.services.chat_identity.send_message(channel, text)
-            sent = getattr(sent_message, "sent", getattr(sent_message, "is_sent", False))
-            sent_message_id = getattr(sent_message, "id", None)
-            if sent and sent_message_id:
-                runtime_bot.services.live_chat.tag_command_response(str(broadcaster_id), str(sent_message_id))
+        sent_message = await runtime_bot.services.chat_identity.send_message(channel, message)
+        sent = getattr(sent_message, "sent", getattr(sent_message, "is_sent", False))
+        sent_message_id = getattr(sent_message, "id", None)
+        if sent and sent_message_id:
+            runtime_bot.services.live_chat.tag_command_response(str(broadcaster_id), str(sent_message_id))
     except Exception:
         LOGGER.exception(
             "[Dashboard] Viewer queue action succeeded, but its Twitch chat response could not be sent for broadcaster %s.",
@@ -678,7 +677,8 @@ async def channel_viewer_queue_action(
         "size": len(users),
         "users": get_queue_members(runtime_bot.services, broadcaster_id),
         "selected": selected,
-        "message": message
+        "message": message,
+        **({"warning": warning} if warning else {})
     })
 
 

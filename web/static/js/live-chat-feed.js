@@ -317,6 +317,7 @@
         const body = makeElement("p", "live-chat-text");
         const segments = Array.isArray(message.segments) ? message.segments : [];
         let hasBody = false;
+        let actionLinked = false;
         function appendBits(amount) {
             const bits = makeElement('span', 'live-chat-bits');
             const label = `${amount.toLocaleString()} ${amount === 1 ? 'Bit' : 'Bits'}`;
@@ -326,6 +327,17 @@
             body.appendChild(bits); hasBody = true;
         }
         function appendText(text) {
+            const action = message.local_only && message.action;
+            if (!actionLinked && typeof action?.label === 'string' && action.label && typeof action.url === 'string'
+                && /^\/(?![\\/])[^\\\s]*$/.test(action.url) && text.includes(action.label)) {
+                actionLinked = true;
+                const index = text.indexOf(action.label);
+                appendText(text.slice(0, index));
+                const link = makeElement('a', 'live-chat-link', action.label);
+                link.href = action.url; body.appendChild(link);
+                appendText(text.slice(index + action.label.length)); hasBody = true;
+                return;
+            }
             appendLinkedText(body, text, plain => {
                 let start = 0;
                 if (message.bits > 0) {
@@ -659,6 +671,13 @@
             });
             document.addEventListener("dashboard-chat-send-error", onSendError);
             window.addEventListener("beforeunload", () => document.removeEventListener("dashboard-chat-send-error", onSendError), {once: true});
+            const onNotice = event => renderMessage(feed, {
+                id: `local-notice:${++localErrorSequence}`, platform: 'twitch', kind: 'notice',
+                local_only: true, is_bot: true, display_name: 'RatsBoomBot · Only you', message: event.detail.message, action: event.detail.action,
+                timestamp: new Date().toISOString()
+            });
+            document.addEventListener('dashboard-chat-notice', onNotice);
+            window.addEventListener('beforeunload', () => document.removeEventListener('dashboard-chat-notice', onNotice), {once: true});
         }
         source.addEventListener("chat-participants", event => {
             try { feed.filters?.participants?.(JSON.parse(event.data)); } catch (_) {}

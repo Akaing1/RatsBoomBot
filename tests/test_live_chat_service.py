@@ -1130,14 +1130,13 @@ async def test_open_queue_warns_when_join_commands_are_disabled(monkeypatch, is_
         features=SimpleNamespace(is_global_group_enabled=Mock(return_value=commands_enabled)),
         broadcasters=SimpleNamespace(get_broadcasters=lambda: {'channel-1': SimpleNamespace(login='streamer', display_name='Different display name')}),
         live_chat=SimpleNamespace(tag_command_response=Mock()),
-        chat_identity=SimpleNamespace(send_message=AsyncMock(side_effect=[
-            SimpleNamespace(sent=True, id='queue-message'), SimpleNamespace(sent=True, id='queue-warning')
-        ])))
+        chat_identity=SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(sent=True, id='queue-message'))))
     bot = SimpleNamespace(services=services, create_partialuser=lambda _: SimpleNamespace(id='channel-1'))
     monkeypatch.setattr(dashboard_router, 'get_bot', lambda: bot)
     request = Request({'type': 'http', 'session': {CHANNEL_USER_ID_KEY: 'channel-1', CSRF_SESSION_KEY: 'csrf'}})
     response = await dashboard_router.channel_viewer_queue_action(request, 'toggle', 'csrf')
     assert response.status_code == 200
+    assert services.chat_identity.send_message.await_count == 1
     if is_open:
         queue.close_queue.assert_awaited_once_with('channel-1')
         assert services.chat_identity.send_message.await_count == 1
@@ -1147,13 +1146,12 @@ async def test_open_queue_warns_when_join_commands_are_disabled(monkeypatch, is_
         assert messages[0] == 'Queue opened.'
         assert json.loads(response.body)['message'] == 'Queue opened.'
         if commands_enabled:
-            assert len(messages) == 1
+            assert 'warning' not in json.loads(response.body)
         else:
-            assert len(messages) == 2
-            assert messages[1].startswith('@streamer, ')
-            assert 'commands are disabled' in messages[1] and '!join' in messages[1]
-            assert [call.args for call in services.live_chat.tag_command_response.call_args_list] == [
-                ('channel-1', 'queue-message'), ('channel-1', 'queue-warning')]
+            warning = json.loads(response.body)['warning']
+            assert warning.startswith('@streamer, ')
+            assert 'commands are disabled' in warning and '!join' in warning
+            services.live_chat.tag_command_response.assert_called_once_with('channel-1', 'queue-message')
 
 
 @pytest.mark.asyncio

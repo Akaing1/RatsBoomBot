@@ -336,6 +336,12 @@
             lastSignature = null;
             if (!simulationActive) renderQueue(result, false, action === "top" || action === "bottom" ? position : 0);
             showStatus(result.message || "Queue updated.", "success");
+            if (typeof result.warning === 'string' && result.warning) {
+                document.dispatchEvent(new CustomEvent('dashboard-chat-notice', {detail: {
+                    message: result.warning,
+                    action: {label: 'Settings', url: `${globalThis.document?.body?.dataset?.channelRoot || '/channel'}/settings?section=queue`}
+                }}));
+            }
         } catch (error) {
             showStatus(error.message, "error");
             if (action === "reorder") {
