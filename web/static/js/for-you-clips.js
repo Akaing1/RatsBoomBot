@@ -41,8 +41,14 @@
         controller?.abort(); controller = new AbortController(); const current = ++generation;
         if (reset) { loaded = false; clips = []; cursor = ''; grid.replaceChildren(); find('[data-clips-count]').textContent = '– 0 loaded'; more.hidden = true; }
         status.textContent = 'Loading clips…'; find('[data-clips-signin]').hidden = true; more.disabled = true;
+        const targetCount = clips.length + 50;
+        const days = find('#clip-days').value, sort = find('#clip-sort').value;
+        const seenCursors = new Set();
         try {
-            const params = new URLSearchParams({days:find('#clip-days').value,after:cursor,sort:find('#clip-sort').value});
+            do {
+            if (seenCursors.has(cursor)) throw new Error('Clip pagination stopped progressing. Please retry.');
+            seenCursors.add(cursor);
+            const params = new URLSearchParams({days,after:cursor,sort});
             const response = await fetch((document.body.dataset.channelRoot || '/channel') + '/api/for-you/clips?' + params, {signal:controller.signal,cache:'no-store',credentials:'same-origin'});
             if (response.status === 401) {
                 throw new Error('Your channel session needs attention. Sign in again, then retry.');
@@ -55,8 +61,10 @@
             if (current !== generation) return;
             clips = [...new Map([...clips,...result.clips].map(c => [c.id,c])).values()];
             cursor = result.cursor;
-            if (!clips.length && cursor && find('#clip-sort').value === 'newest') { await load(false); return; }
             loaded = true; more.hidden = !cursor; render();
+            if (cursor && clips.length < targetCount) status.textContent = 'Loading clips…';
+            } while (cursor && clips.length < targetCount);
+
         } catch (error) { if (error.name !== 'AbortError' && current === generation) { status.textContent = error.message; find('[data-clips-signin]').hidden = !error.message.includes('Sign in again'); } }
         finally { if (current === generation) more.disabled = false; }
     }
