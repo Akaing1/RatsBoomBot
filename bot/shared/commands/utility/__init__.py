@@ -315,6 +315,31 @@ class UtilityCommands(commands.Component):
 
         await ctx.reply(message)
 
+    @commands.command(aliases=["rollall"])
+    async def dailies(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
+        self.log_command(ctx, "dailies")
+        if not self.command_enabled(ctx, GlobalCommandName.DAILIES):
+            return
+
+        results = []
+        for command in (GlobalCommandName.STINKY, GlobalCommandName.LUCKY,
+                        GlobalCommandName.SMART, GlobalCommandName.HEIGHT):
+            if not self.command_enabled(ctx, command):
+                continue
+            value = random.randint(12, 96) if command is GlobalCommandName.HEIGHT else random.randint(0, 100)
+            await self.record_roll(ctx, command.value, user, value)
+            if command is GlobalCommandName.HEIGHT:
+                feet, inches = divmod(value, 12)
+                results.append(f'height: {feet}\' {inches}"')
+            else:
+                results.append(f"{command.value}: {value}%")
+
+        if not results:
+            await ctx.reply("No achievement roll commands are enabled in this channel.")
+            return
+        target_name = user or ctx.chatter.name
+        await ctx.reply(f"{target_name}'s rolls — " + " | ".join(results))
+
     @commands.command()
     async def pp(self, ctx: commands.Context, user: LocalizedUser = None) -> None:
         self.log_command(ctx, "pp")

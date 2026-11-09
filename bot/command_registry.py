@@ -110,6 +110,7 @@ UTILITY_COMMANDS = CommandGroupDefinition(
         CommandDefinition("!8ball <question>", "Ask a yes/no question for a random, conversational prediction.", global_command=GlobalCommandName.EIGHT_BALL),
         CommandDefinition("!kaboom [username]", "Blow yourself or another chatter up.", global_command=GlobalCommandName.KABOOM),
         CommandDefinition("!stinky [username]", "Generate a random stinky percentage.", global_command=GlobalCommandName.STINKY),
+        CommandDefinition("!dailies [username]", "Roll enabled stinky, lucky, smart, and height measurements together.", global_command=GlobalCommandName.DAILIES, aliases=("rollall",)),
         CommandDefinition("!lucky [username]", "Generate a random luck percentage.", global_command=GlobalCommandName.LUCKY),
         CommandDefinition("!smart [username]", "Generate a random smart percentage.", global_command=GlobalCommandName.SMART),
         CommandDefinition("!height [username]", "Generate a height from 1' 0\" through 8' 0\".", global_command=GlobalCommandName.HEIGHT),

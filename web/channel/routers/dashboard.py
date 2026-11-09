@@ -593,6 +593,7 @@ async def channel_viewer_queue_state(request: Request):
 
     return JSONResponse({
         "open": viewer_queue.is_queue_open(broadcaster_id),
+        "commands_enabled": services.features.is_global_group_enabled(broadcaster_id, GlobalCommandGroup.VIEWER_QUEUE),
         "size": len(queue_users),
         "users": get_queue_members(services, broadcaster_id)
     })
@@ -617,10 +618,23 @@ async def channel_viewer_queue_action(
         return JSONResponse({"detail": "Bot runtime unavailable."}, status_code=503)
     queue = runtime_bot.services.viewer_queue
     message = "Queue updated."
+    warning = None
     selected: list[str] = []
 
     if action == "toggle":
-        message = await (queue.close_queue(broadcaster_id) if queue.is_queue_open(broadcaster_id) else queue.open_queue(broadcaster_id))
+        opening = not queue.is_queue_open(broadcaster_id)
+        commands_disabled = opening and not runtime_bot.services.features.is_global_group_enabled(
+            broadcaster_id, GlobalCommandGroup.VIEWER_QUEUE
+        )
+        message = await (queue.open_queue(broadcaster_id) if opening else queue.close_queue(broadcaster_id))
+        if commands_disabled:
+            broadcaster = runtime_bot.services.broadcasters.get_broadcasters().get(str(broadcaster_id))
+            login = getattr(broadcaster, "login", None)
+            warning = (
+                (f"@{login}, " if login else "")
+                + "the queue is open, but viewer queue commands are disabled. "
+                "Viewers cannot join with !join. Enable Viewer queue commands in Settings."
+            )
     elif action in {"next", "next4", "next5"}:
         next_count = count if action == "next" else (4 if action == "next4" else 5)
         if not 1 <= next_count <= 10:
@@ -645,11 +659,12 @@ async def channel_viewer_queue_action(
 
     try:
         channel = runtime_bot.create_partialuser(str(broadcaster_id))
-        sent_message = await runtime_bot.services.chat_identity.send_message(channel, message)
-        sent = getattr(sent_message, "sent", getattr(sent_message, "is_sent", False))
-        sent_message_id = getattr(sent_message, "id", None)
-        if sent and sent_message_id:
-            runtime_bot.services.live_chat.tag_command_response(str(broadcaster_id), str(sent_message_id))
+        for text in ([message, warning] if warning else [message]):
+            sent_message = await runtime_bot.services.chat_identity.send_message(channel, text)
+            sent = getattr(sent_message, "sent", getattr(sent_message, "is_sent", False))
+            sent_message_id = getattr(sent_message, "id", None)
+            if sent and sent_message_id:
+                runtime_bot.services.live_chat.tag_command_response(str(broadcaster_id), str(sent_message_id))
     except Exception:
         LOGGER.exception(
             "[Dashboard] Viewer queue action succeeded, but its Twitch chat response could not be sent for broadcaster %s.",
@@ -2228,6 +2243,7 @@ async def channel_dashboard(request: Request):
             "runtime_unavailable": False,
             "channel_settings": channel_settings,
             "queue_open": viewer_queue.is_queue_open(broadcaster_id),
+            "queue_commands_enabled": services.features.is_global_group_enabled(broadcaster_id, GlobalCommandGroup.VIEWER_QUEUE),
             "queue_users": viewer_queue.list_queue(broadcaster_id),
             "queue_members": get_queue_members(services, broadcaster_id),
             "queue_size": viewer_queue.size(broadcaster_id),

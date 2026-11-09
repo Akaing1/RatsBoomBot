@@ -109,11 +109,18 @@ def chat_event(kind, event, timestamp="", badge_catalog=None, emotes=None):
     for fragment in content.get("fragments", []):
         emote = fragment.get("emote") or {}
         segment = {"type": "text", "text": fragment.get("text", "")}
+        if fragment.get('type') == 'cheermote':
+            segment.update(type='cheermote', provider='twitch')
+        gif_url = (fragment.get("gif") or {}).get("url", "")
+        if fragment.get("type") == "gif":
+            segment['text'] = segment['text'] or 'GIF'
+            if isinstance(gif_url, str) and gif_url.startswith("https://"):
+                segment.update(type="gif", provider="twitch", url=gif_url)
         emote_id = str(emote.get("id", ""))
         if fragment.get("type") == "emote" and emote_id and all(c.isalnum() or c in "_-" for c in emote_id):
             segment.update(type="emote", provider="twitch",
                            url=f"https://static-cdn.jtvnw.net/emoticons/v2/{emote_id}/default/dark/2.0")
-        if segment["text"] or segment["type"] == "emote":
+        if segment["text"] or segment["type"] in {"emote", "gif"}:
             segments.append(segment)
     if emotes and (segments or message_text):
         source = tuple(ChatSegment(**segment) for segment in segments) or (ChatSegment("text", message_text),)
@@ -138,6 +145,8 @@ def chat_event(kind, event, timestamp="", badge_catalog=None, emotes=None):
         "platform": "twitch", "kind": "message", "username": "Anonymous" if event.get("chatter_is_anonymous") else event.get("chatter_user_login", ""),
         "display_name": "Anonymous" if event.get("chatter_is_anonymous") else event.get("chatter_user_name", ""), "color": event.get("color", ""),
         "timestamp": timestamp, "message": message_text,
+        "bits": max(0, int((event.get('cheer') or {}).get('bits', 0) or 0)),
+        "gigantified_emote": event.get('message_type') == 'power_ups_gigantified_emote',
         "is_shared": shared, "source_channel_id": source_id or str(event.get("broadcaster_user_id") or ""),
         "source_channel_login": event.get("source_broadcaster_user_login") or "",
         "source_channel_name": event.get("source_broadcaster_user_name") or event.get("source_broadcaster_user_login") or source_id,

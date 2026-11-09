@@ -25,4 +25,11 @@ def notification_details(notice_type, system_message, data=None):
         streak = f"{streak_months} consecutive months"
         if streak not in summary:
             summary += f" · {streak}"
-    return {"notice_type": kind, "notice_label": label, "notice": summary}
+    result = {"notice_type": kind, "notice_label": label, "notice": summary}
+    if kind == 'watch_streak':
+        count = value('streak_count', value('streak', 0))
+        if isinstance(count, int) and not isinstance(count, bool) and count > 0:
+            result['watch_streak'] = count
+            if not system_message:
+                result['notice'] = f'Watched {count} consecutive {"stream" if count == 1 else "streams"}!'
+    return result

@@ -15,8 +15,10 @@
     function message(...args) { if (active) return emitMessage(...args); }
     window.dashboardChatDebug = {
         active,
-        youtube(enabled = true) {
-            window.sessionStorage.setItem(key, String(Boolean(enabled)));
+        youtube(enabled = !active) {
+            active = Boolean(enabled);
+            window.dashboardChatDebug.active = active;
+            window.sessionStorage.setItem(key, String(active));
             window.location.reload();
         },
         message,
@@ -29,6 +31,8 @@
                 giftsub: ['sub_gift', 'Gift sub', 'Test viewer gifted a Tier 1 sub to Test recipient!'],
                 giftsubs: ['community_sub_gift', 'Gift subs', 'Test viewer gifted 5 Tier 1 subs to the community!'],
                 watchstreak: ['watch_streak', 'Watch streak', 'Test viewer watched 10 consecutive streams!'],
+                bits: ['', '', '', 'Cheer100 This is a test Bits message!'],
+                spacedbits: ['', '', '', 'Cheer100 hello Cheer50 world'],
                 substreak: ['resub', 'Resubscription', 'Test viewer subscribed for 12 months! · 6 consecutive months'],
                 redeem: ['redemption', 'Redeem', 'Redeemed Hydrate · 1,000 points', 'Time for water!'],
                 raid: ['raid', 'Incoming raid', 'Test raider is raiding with 25 viewers!']
@@ -38,12 +42,18 @@
                 const [notice_type, notice_label, notice, text = ''] = samples[key];
                 const id = `twitch:test-notice-${Date.now()}-${++sequence}`;
                 document.dispatchEvent(new CustomEvent('dashboard-chat-test-notice', {detail: {
-                    id, platform: 'twitch', kind: 'chat', test_mode: true, username: 'test_viewer',
+                    id, platform: 'twitch', kind: 'chat', test_mode: true, local_preview: true, username: 'test_viewer',
                     display_name: key === 'raid' ? 'Test raider' : 'Test viewer',
                     timestamp: new Date().toISOString(), message: text, notice_type, notice_label, notice,
+                    watch_streak: key === 'watchstreak' ? 10 : 0,
+                    bits: key === 'bits' ? 100 : key === 'spacedbits' ? 150 : 0,
                     badges: ['sub', 'resub'].includes(notice_type) ? ['subscriber'] : [],
                     is_redeem: key === 'redeem'
                 }}));
+                const rows = [...document.querySelectorAll('.live-chat-message[data-message-id]')].filter(row => row.dataset?.messageId === id);
+                if (!rows.length) console.warn('[Chat preview] No chat feed received the sample. Refresh the dashboard and try again.');
+                else if (rows.every(row => row.hidden)) console.warn(`[Chat preview] ${key} is hidden by the current chat filters. Enable ${notice_type ? 'Bots and Redeems' : 'Non-subs and Messages'} to see it.`);
+                else console.info(`[Chat preview] ${key} sample added to chat.`);
                 return id;
             });
         },

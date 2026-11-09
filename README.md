@@ -306,7 +306,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 | Group | Commands |
 | --- | --- |
-| Utility | `!kamikaze [username]`, `!hi`, `!choice`, `!8ball <question>`, `!kaboom`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats [@username]`, `!me [@username]` |
+| Utility | `!kamikaze [username]`, `!hi`, `!choice`, `!8ball <question>`, `!kaboom`, `!dailies [username]`, `!stinky`, `!lucky`, `!smart`, `!height`, `!pp`, `!lurk`, `!help`, `!stats [@username]`, `!me [@username]` |
 | Viewer queue | `!open`, `!close`, `!join`, `!leave`, `!queue`, `!next`, `!remove`, `!clear` |
 | Socials | `!socials`, `!socials discord`, `!socials youtube` |
 | Settings | `!set discord <url>`, `!set youtube <url>`, `!set game <game name>`, `!set title <stream title>`, `!timers`, `!timers on`, `!timers off` |
@@ -318,6 +318,8 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 | Quotes | `!quote`, `!quote <number>`, `!quote add <message>`, `!quote remove <number>` |
 | Overwatch | `!ow`, `!owrank`, `!owrecord`, `!owreset` |
 | League of Legends | `!champs`, `!champs <champion>`, `!register <Riot ID> [region]`, `!unregister`, `!rank [chatter]`, `!ladder` |
+
+`!dailies [username]` (alias `!rollall`) rolls all enabled achievement measurements (`stinky`, `lucky`, `smart`, and `height`) in one reply. It shares each measurement's existing limit: only the first attempt per measured user per live stream counts for achievements, whether invoked individually or together. Offline rolls still respond without achievement credit.
 
 While a channel is live, connected logged-in chatters earn 15 passive points every two minutes. Twitch's connected-chatter list is used as an approximation of watch activity; the broadcaster and configured bot identities are excluded. The bot identity used by the channel must authorize `moderator:read:chatters` and be a moderator in that channel. Payout intervals are persisted so a bot restart cannot award the same interval twice.
 
