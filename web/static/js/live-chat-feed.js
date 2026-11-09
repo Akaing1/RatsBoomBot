@@ -235,7 +235,8 @@
         row.dataset.chatType = category.type;
         row.dataset.chatOrigin = message.is_shared ? 'shared' : 'local';
         row.dataset.chatChannel = category.channel || 'local';
-        row.hidden = feed.filters ? !feed.filters.allows(category) : false;
+        if (message.local_preview) row.dataset.localPreview = 'true';
+        row.hidden = !message.local_preview && feed.filters ? !feed.filters.allows(category) : false;
         if (message.deleted) row.classList.add("is-deleted");
         if (message.mentioned) row.classList.add("is-mentioned");
         if (message.is_bot || message.notice_type) row.classList.add("is-bot");
@@ -278,6 +279,9 @@
             }
         });
         heading.appendChild(name);
+        if (Number.isSafeInteger(message.bits) && message.bits > 0) {
+            row.classList.add('has-bits');
+        }
 
         let timestamp = null;
         const date = new Date(message.timestamp);
@@ -288,10 +292,35 @@
         const body = makeElement("p", "live-chat-text");
         const segments = Array.isArray(message.segments) ? message.segments : [];
         let hasBody = false;
+        function appendBits(amount) {
+            const bits = makeElement('span', 'live-chat-bits');
+            const label = `${amount.toLocaleString()} ${amount === 1 ? 'Bit' : 'Bits'}`;
+            bits.title = label; bits.setAttribute('aria-label', label);
+            bits.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 14 12 23 2 14Z" fill="currentColor"/><path d="m12 2 0 12H2Zm0 12 10 0-10 9Z" fill="#9147ff"/></svg>';
+            if (amount !== 1) bits.appendChild(makeElement('span', '', amount.toLocaleString()));
+            body.appendChild(bits); hasBody = true;
+        }
+        function appendText(text) {
+            let start = 0;
+            if (message.bits > 0) {
+                for (const match of text.matchAll(/\bcheer(\d+)\b/gi)) {
+                    const amount = Number(match[1]);
+                    if (!Number.isSafeInteger(amount) || amount <= 0) continue;
+                    body.appendChild(document.createTextNode(text.slice(start, match.index)));
+                    appendBits(amount); start = match.index + match[0].length;
+                }
+            }
+            body.appendChild(document.createTextNode(text.slice(start)));
+            if (text.trim()) hasBody = true;
+        }
 
         if (segments.length) {
             segments.forEach(segment => {
                 const text = typeof segment?.text === "string" ? segment.text : "";
+                if (segment?.type === 'cheermote' && message.bits > 0) {
+                    const amount = Number(text.match(/(\d+)$/)?.[1]);
+                    if (Number.isSafeInteger(amount) && amount > 0) { appendBits(amount); return; }
+                }
                 const url = typeof segment?.url === "string" ? segment.url : "";
                 const trustedEmoteUrl = /^https:\/\/(?:static-cdn\.jtvnw\.net|cdn\.7tv\.app)\//.test(url);
 
@@ -315,12 +344,12 @@
                     body.appendChild(emote);
                     hasBody = true;
                 } else {
-                    body.appendChild(document.createTextNode(text));
-                    if (text.trim()) hasBody = true;
+                    appendText(text);
                 }
             });
         } else {
-            body.textContent = message.message || ''; hasBody = Boolean(body.textContent.trim());
+            if (message.bits > 0) appendText(message.message || '');
+            else { body.textContent = message.message || ''; hasBody = Boolean(body.textContent.trim()); }
         }
 
         if (message.is_shared) {
@@ -513,7 +542,7 @@
             const anchor = followNewest ? null : rows.find(row => !row.hidden && row.getBoundingClientRect().bottom > viewportTop);
             const anchorTop = anchor?.getBoundingClientRect().top;
             rows.forEach(row => {
-                row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'});
+                row.hidden = row.dataset.localPreview !== 'true' && !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'});
             });
             feed.merger?.refresh();
             if (followNewest) scrollToNewest(feed);
@@ -524,7 +553,7 @@
             ? window.dashboardChatFilters?.attachMirror(refreshFilters)
             : window.dashboardChatFilters?.attach(element, refreshFilters);
         feed.merger = element.classList.contains("dashboard-chat-feed") ? window.createChatMessageMerger?.({
-            allows: row => !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'}),
+            allows: row => row.dataset.localPreview === 'true' || !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'}),
             onChange: () => { if (feed.followNewest) scrollToNewest(feed); }
         }) : null;
         if (feed.merger) {

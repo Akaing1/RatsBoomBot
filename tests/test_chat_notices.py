@@ -20,6 +20,20 @@ def notice_payload(kind, **data):
     )
 
 
+@pytest.mark.parametrize('amount', [1, 100, 10000])
+def test_bits_amount_survives_dashboard_and_preview_messages(amount):
+    payload = notice_payload('unused')
+    payload.cheer = SimpleNamespace(bits=amount)
+    payload.text = f'Cheer{amount} hello'
+    message = LiveChatService(None).publish_twitch(payload)
+    assert message.as_dict()['bits'] == amount
+    assert message.message == f'Cheer{amount} hello'
+    result = chat_event('channel.chat.message', {'message_id': 'cheer', 'cheer': {'bits': amount},
+        'message': {'text': payload.text}})['message']
+    assert result['bits'] == amount
+    assert result['message'] == message.message
+
+
 
 @pytest.mark.parametrize("kind,data,label", [
     ("sub", {}, "Subscription"), ("sub", {"prime": True}, "Prime subscription"),

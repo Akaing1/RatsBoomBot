@@ -123,7 +123,7 @@ def test_chat_filters_replace_command_toggle_and_only_apply_to_combined_chat():
     assert "addEventListener('focusout'" not in filters
     assert "dashboard-chat-filters.js" in dashboard
     assert dashboard.index('data-chat-filter-toggle') < dashboard.index('data-chat-lock')
-    assert 'row.hidden = feed.filters ? !feed.filters.allows(category) : false;' in script
+    assert 'row.hidden = !message.local_preview && feed.filters ? !feed.filters.allows(category) : false;' in script
     assert 'const rows = [...element.querySelectorAll(".live-chat-message")];' in script
     assert 'rows.forEach(row => {' in script
     assert 'if (!row.hidden) feed.hasUnseenMessages = true;' in script

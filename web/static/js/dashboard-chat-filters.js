@@ -1,10 +1,13 @@
 (() => {
     const platforms = {twitch: ['vips', 'mods', 'subs', 'non_subs', 'bots'],
         youtube: ['youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots']};
-    const messageTypes = ['commands', 'redeems', 'messages', 'gifs'];
+    const messageTypes = ['commands', 'redeems', 'messages', 'gifs', 'bits'];
     function migrateTypes(types, version = 0) {
         const keys = [...types];
         if (version < 7 && keys.includes('messages')) keys.push('gifs');
+        if (version < 8) {
+            if (keys.includes('messages')) keys.push('bits');
+        }
         return [...new Set(keys)];
     }
 
@@ -20,7 +23,8 @@
     function category(message) {
         const isNotice = Boolean(message.notice_type);
         const source = {origin: message.is_shared ? 'shared' : 'local', channel: message.is_shared ? String(message.source_channel_id || '') : 'local'};
-        const type = (message.segments || []).some(segment => segment.type === 'gif') ? 'gifs' : message.is_redeem || isNotice || message.kind === 'redeem' || message.kind === 'redemption'
+        const type = message.bits > 0 ? 'bits'
+            : (message.segments || []).some(segment => segment.type === 'gif') ? 'gifs' : message.is_redeem || isNotice || message.kind === 'redeem' || message.kind === 'redemption'
             ? 'redeems' : message.kind === 'command' ? 'commands' : 'messages';
         if (message.is_bot || isNotice) {
             return {user: message.platform === 'youtube' ? 'youtube_bots' : 'bots', type, ...source};
@@ -188,7 +192,7 @@
         });
         document.addEventListener('click', event => { if (!control.contains(event.target)) close(); });
         document.addEventListener('dashboard-carousel-card-changed', () => close());
-        const snapshot = () => ({version: 7, origin, channels: {...channels}, connectedPlatforms, users: [...enabled.users], types: [...enabled.types]});
+        const snapshot = () => ({version: 8, origin, channels: {...channels}, connectedPlatforms, users: [...enabled.users], types: [...enabled.types]});
         const syncUrl = !window.dashboardChatDebug?.active && control.dataset.preferencesUrl;
         const syncStatus = control.querySelector('[data-chat-filter-sync-status]');
         let remoteReady = false, loading = false, dirty = false, saving = false, pending = null;

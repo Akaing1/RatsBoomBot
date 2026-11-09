@@ -78,6 +78,7 @@ class UnifiedChatMessage:
     source_channel_login: str = ""
     source_channel_name: str = ""
     source_message_id: str = ""
+    bits: int = 0
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
@@ -287,6 +288,7 @@ class LiveChatService:
             message=message_text,
             timestamp=timestamp_value,
             color=str(getattr(color, "html", color) or "") or None,
+            bits=max(0, int(getattr(getattr(payload, 'cheer', None), 'bits', 0) or 0)),
             user_id="" if getattr(payload, "anonymous", False) else str(getattr(chatter, "id", "") or ""),
             **(notice or {}),
             badges=badges,
@@ -452,6 +454,9 @@ class LiveChatService:
 
         for fragment in fragments:
             text = str(getattr(fragment, "text", ""))
+            if getattr(fragment, 'type', None) == 'cheermote':
+                segments.append(ChatSegment('cheermote', text, provider='twitch'))
+                continue
             emote = getattr(fragment, "emote", None)
             gif = getattr(fragment, "gif", None)
             if getattr(fragment, "type", None) == "gif":

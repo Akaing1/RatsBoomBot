@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 function setup(enabled = false) {
     const key = 'ratsboombot:youtube-chat-test', storage = new Map(enabled ? [[key, 'true']] : []);
-    const events = [], handlers = {}, classes = () => ({add() {}});
+    const events = [], handlers = {}, logs = [], classes = () => ({add() {}});
     const badge = {dataset: {}, classList: classes()}, details = {hidden: true};
     const section = {children: [{}, details], querySelector: () => badge};
     const youtube = {disabled: true, hidden: true, closest: () => section};
@@ -18,10 +18,45 @@ function setup(enabled = false) {
     const window = {sessionStorage: {getItem: name => storage.get(name), setItem: (name, value) => storage.set(name, value)},
         location: {reload() {reloads++;}}};
     vm.runInNewContext(fs.readFileSync('web/static/js/dashboard-chat-test-mode.js', 'utf8'), {
-        window, document, CustomEvent: class {constructor(type, options) {this.type = type; this.detail = options.detail;}}
+        window, document, console: {warn: text => logs.push(text), info: text => logs.push(text)}, CustomEvent: class {constructor(type, options) {this.type = type; this.detail = options.detail;}}
     });
-    return {api: window.dashboardChatDebug, form, input, youtube, twitch, details, badge, dot, events, handlers, storage, window, key, reloads: () => reloads};
+    return {api: window.dashboardChatDebug, document, logs, form, input, youtube, twitch, details, badge, dot, events, handlers, storage, window, key, reloads: () => reloads};
 }
+
+test('notice samples explain hidden filters and missing chat listeners', () => {
+    const app = setup();
+    app.api.notice('watchstreak');
+    assert.match(app.logs.at(-1), /No chat feed received/);
+    app.document.querySelectorAll = () => [{dataset: {messageId: app.events.at(-1).detail.id}, hidden: true}];
+    app.api.notice('watchstreak');
+    assert.match(app.logs.at(-1), /Enable Bots and Redeems/);
+    app.document.querySelectorAll = () => [{dataset: {messageId: app.events.at(-1).detail.id}, hidden: false}];
+    app.api.notice('watchstreak');
+    assert.match(app.logs.at(-1), /sample added to chat/);
+});
+
+test('Bits sample previews 100 Bits locally without enabling simulated connections', () => {
+    const app = setup();
+    app.api.notice('bits');
+    assert.equal(app.api.active, false);
+    assert.equal(app.events.length, 1);
+    const event = app.events[0];
+    assert.equal(event.type, 'dashboard-chat-test-notice');
+    assert.equal(event.detail.bits, 100);
+    assert.equal(event.detail.platform, 'twitch');
+    assert.equal(event.detail.test_mode, true);
+    assert.equal(event.detail.local_preview, true);
+    assert.match(event.detail.message, /Cheer100/);
+    assert.equal(event.detail.notice_type, '');
+});
+
+test('spaced-Bits sample provides a local preview with the combined amount', () => {
+    const app = setup();
+    app.api.notice('spacedbits');
+    assert.equal(app.events[0].detail.bits, 150);
+    assert.equal(app.events[0].detail.message, 'Cheer100 hello Cheer50 world');
+    assert.equal(app.events[0].detail.local_preview, true);
+});
 
 test('test command opts into a session-only simulation and can turn it off again', () => {
     const app = setup(); assert.equal(app.api.active, false);
@@ -83,8 +118,8 @@ test('failure applies only to selected destinations and validates console argume
 test('notice simulations cover every event locally without enabling simulated connection or sends', () => {
     const app = setup();
     const ids = app.api.notice('all');
-    assert.equal(ids.length, 10);
-    assert.equal(new Set(ids).size, 10);
+    assert.equal(ids.length, 12);
+    assert.equal(new Set(ids).size, ids.length);
     assert.ok(app.events.every(event => event.type === 'dashboard-chat-test-notice' && event.detail.test_mode));
     assert.ok(app.events.every(event => event.detail.platform === 'twitch'));
     assert.equal(app.events.filter(event => event.detail.is_redeem).length, 1);

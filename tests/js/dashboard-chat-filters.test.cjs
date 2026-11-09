@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages', 'gifs']};
+const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages', 'gifs', 'bits']};
 
 function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], remote = {}) {
     const handlers = {}, documentHandlers = {}, buttonHandlers = {}, changes = [];
@@ -79,6 +79,24 @@ test('GIF filters are independent, persist, and migrate older message selections
     assert.equal(mirror.allows(category), false);
 });
 
+test('Bits, watch streaks, and gigantified emotes have independent filters and mirror to OBS', () => {
+    const ui = setup();
+    const samples = [[{bits: 100}, 'bits']];
+    for (const [message, type] of samples) {
+        const category = ui.api.category({platform: 'twitch', ...message});
+        assert.equal(category.type, type);
+        ui.change(type, false);
+        assert.equal(ui.filter.allows(category), false);
+        ui.change(type, true);
+        assert.equal(ui.filter.allows(category), true);
+    }
+    const mirror = ui.api.attachMirror(() => {});
+    const old = {version: 7, users: axes.users, types: ['messages', 'redeems']};
+    mirror.update(old);
+    for (const [message] of samples) assert.equal(mirror.allows(ui.api.category({platform: 'twitch', ...message})), true);
+    mirror.update({...old, version: 8});
+    for (const [message] of samples) assert.equal(mirror.allows(ui.api.category({platform: 'twitch', ...message})), false);
+});
 
 
 
@@ -296,15 +314,15 @@ test('Clear buttons are visible only for sections with disabled options', () => 
 
 test('button count tracks enabled options across both independent sections', () => {
     const ui = setup();
-    assert.equal(ui.countLabel.textContent, '| 14');
+    assert.equal(ui.countLabel.textContent, '| 15');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
     ui.change('bots', false);
-    assert.equal(ui.countLabel.textContent, '| 13');
+    assert.equal(ui.countLabel.textContent, '| 14');
     assert.equal(ui.button.classList.contains('has-filter-count'), true);
     ui.solo(ui.option('messages'));
     assert.equal(ui.countLabel.textContent, '| 10');
     ui.clear('all');
-    assert.equal(ui.countLabel.textContent, '| 14');
+    assert.equal(ui.countLabel.textContent, '| 15');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
 });
 
@@ -377,7 +395,7 @@ test('switching carousel cards dismisses the dropdown', () => {
 });
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
-const prefs = (users = ['mods'], types = ['messages']) => ({version: 7, origin: 'all', channels: {}, connectedPlatforms: ['twitch', 'youtube'], users, types});
+const prefs = (users = ['mods'], types = ['messages']) => ({version: 8, origin: 'all', channels: {}, connectedPlatforms: ['twitch', 'youtube'], users, types});
 const response = preferences => ({ok: true, json: async () => ({preferences})});
 const dataset = {preferencesUrl: '/channel/api/chat/preferences', csrfToken: 'valid'};
 

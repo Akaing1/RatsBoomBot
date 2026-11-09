@@ -135,10 +135,48 @@ test('local notice samples reach an open preview and detach when it closes', () 
     assert.equal(app.documentHandlers['dashboard-chat-test-notice'], undefined);
 });
 
+test('Bits messages show the diamond icon, amount, and purple highlight without changing ordinary messages', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'bits', platform: 'twitch', username: 'cheerer', bits: 1000, message: 'Cheer1000 hello'}});
+    const row = app.element.children.at(-1), bits = row.querySelector('.live-chat-bits');
+    assert.equal(row.classList.contains('has-bits'), true);
+    assert.equal(bits['aria-label'], '1,000 Bits');
+    assert.match(bits.innerHTML, /<svg/);
+    assert.equal(row.querySelector('.live-chat-text').textContent, '1,000 hello');
+    assert.equal(row.querySelector('.live-chat-message-heading').querySelector('.live-chat-bits'), undefined);
+    app.receive('ordinary');
+    assert.equal(app.element.children.at(-1).classList.contains('has-bits'), false);
+});
 
 
+test('a single Bit displays only its icon while keeping an accessible amount', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'single-bit', platform: 'twitch', bits: 1, message: 'Cheer1'}});
+    const bits = app.element.children.at(-1).querySelector('.live-chat-bits');
+    assert.equal(bits['aria-label'], '1 Bit');
+    assert.equal(bits.textContent, '');
+    assert.match(bits.innerHTML, /<svg/);
+});
 
+test('Bits spaced through a message replace each cheer in place without a total', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'spaced-bits', platform: 'twitch', bits: 150, message: 'Cheer100 hello Cheer50 world'}});
+    const row = app.element.children.at(-1);
+    assert.deepEqual(row.querySelectorAll('.live-chat-bits').map(bits => bits['aria-label']), ['100 Bits', '50 Bits']);
+    const text = row.querySelector('.live-chat-text').textContent;
+    assert.equal(text.replace(/\s+/g, ' '), '100 hello 50 world');
+    assert.doesNotMatch(text, /Cheer\d+/i);
+});
 
+test('Bits-only cheers show only the icon and count, including custom cheermote names', () => {
+    const app = setup();
+    for (const segments of [[], [{type: 'cheermote', text: 'CustomCheer500'}]]) {
+        app.feed.receive({type: 'message', message: {id: `cheer-${segments.length}`, platform: 'twitch', bits: 500, message: 'Cheer500', segments}});
+        const row = app.element.children.at(-1);
+        assert.equal(row.querySelector('.live-chat-bits')['aria-label'], '500 Bits');
+        assert.equal(row.querySelector('.live-chat-text').textContent, '500');
+    }
+});
 
 
 
@@ -314,6 +352,19 @@ test('private send failures are bot messages for the affected platform and obey 
 });
 
 
+test('local display previews remain visible when chat filters exclude their category', () => {
+    const callback = source.match(/const refreshFilters = \(\) => \{([\s\S]*?)\n        \};/)[1];
+    const rows = [
+        {hidden: false, dataset: {localPreview: 'true', chatUser: 'bots', chatType: 'redeems'}},
+        {hidden: false, dataset: {chatUser: 'bots', chatType: 'redeems'}},
+    ];
+    vm.runInNewContext(`(() => {${callback}})()`, {
+        element: {querySelectorAll: () => rows, getBoundingClientRect: () => ({top: 0})},
+        feed: {followNewest: true, filters: {allows: () => false}}, scrollToNewest() {}, updateJumpButton() {},
+    });
+    assert.equal(rows[0].hidden, false);
+    assert.equal(rows[1].hidden, true);
+});
 
 test('shared messages display a text-safe source label and retain the destination message ID', () => {
     const app = setup();
