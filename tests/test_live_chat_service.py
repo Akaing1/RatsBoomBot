@@ -1408,9 +1408,10 @@ async def test_dashboard_chat_users_are_scoped_to_authenticated_channel(monkeypa
     }] if broadcaster_id == "channel-1" else [])
     services = SimpleNamespace(
         broadcasters=SimpleNamespace(get_broadcasters=lambda: {"channel-1": broadcaster}),
-        chatters=chatters
+        chatters=chatters, features=SimpleNamespace()
     )
     monkeypatch.setattr(dashboard_router, "get_bot", lambda: SimpleNamespace(services=services))
+    monkeypatch.setattr(dashboard_router, "get_active_profile", lambda _: None)
     request = Request({
         "type": "http", "method": "GET", "path": "/channel/api/chat/users", "headers": [],
         "query_string": b"", "server": ("testserver", 80), "client": ("127.0.0.1", 12345),
@@ -1421,7 +1422,7 @@ async def test_dashboard_chat_users_are_scoped_to_authenticated_channel(monkeypa
 
     assert response.status_code == 200
     assert json.loads(response.body) == {
-        "users": [{"username": "actual_login", "display_name": "Display Name"}]
+        "users": [{"username": "actual_login", "display_name": "Display Name"}], "commands": []
     }
 
 
@@ -2120,7 +2121,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert "(user.display_name || '').toLocaleLowerCase().includes(match.query)" in autocomplete_script
     assert 'command.name.includes(match.query)' in autocomplete_script
     assert '!emote.name.toLocaleLowerCase().includes(match.query)' in autocomplete_script
-    assert 'before.match(/^\\/([A-Za-z]*)$/)' in autocomplete_script
+    assert 'before.match(/^([!/])([A-Za-z0-9_]*)$/)' in autocomplete_script
     assert "event.key === 'Tab'" in autocomplete_script
     assert "navigateMessageHistory(direction)" in composer_script
     assert "caretAtStart" in composer_script

@@ -26,6 +26,7 @@ from bot.services.channels.stream_metadata import (
 )
 from config.settings import settings
 from web.channel.settings_book import build_settings_sections
+from web.channel.chat_commands import chat_command_catalog
 from web.admin.auth import get_csrf_token, validate_csrf_token
 from web.channel.auth import CHANNEL_USER_ID_KEY, logout_channel_user, current_channel_id, settings_actor
 from web.channel.api_context import resolve_channel_api_context
@@ -1973,7 +1974,9 @@ async def channel_chat_users(request: Request):
     runtime_bot = context.runtime_bot
 
     return JSONResponse({
-        "users": runtime_bot.services.chatters.list_channel_identities(str(broadcaster_id))
+        "users": runtime_bot.services.chatters.list_channel_identities(str(broadcaster_id)),
+        "commands": chat_command_catalog(runtime_bot.services.features, str(broadcaster_id),
+            get_active_profile(str(broadcaster_id)), moderator=bool(getattr(request.state, 'channel_access', None)))
     })
 
 

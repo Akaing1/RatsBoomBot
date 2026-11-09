@@ -1203,7 +1203,8 @@ html.raid-browser-open { overflow: hidden; }
 .chat-emote-picker-note.requires-reconnect { background: rgba(245,196,81,.1); color: #f5d98b; font-size: 10px; }
 .chat-emote-picker-note.requires-reconnect a { display: inline-block; margin-left: 2px; color: #fff0bd; text-decoration: underline; text-underline-offset: 2px; }
 .chat-emote-suggestions { display: flex; max-height: min(45vh,360px); flex-direction: column; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 5px; }
-.chat-emote-suggestion { display: grid; grid-template-columns: 30px minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 5px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.chat-emote-suggestion { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 5px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.chat-emote-suggestion.has-completion-visual { grid-template-columns: 30px minmax(0,1fr) auto; }
 .chat-emote-suggestion.active, .chat-emote-suggestion:hover { background: rgba(139,92,246,.18); }
 .chat-emote-suggestion img { width: 28px; height: 28px; object-fit: contain; }
 .chat-completion-icon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 7px; background: rgba(139,92,246,.18); color: #d8bcff; font-size: 16px; font-weight: 900; }

@@ -88,10 +88,19 @@
         kind: "command",
         name,
         value: `/${name}`,
+        syntax: `/${name}${usage ? ` ${usage}` : ""}`,
         label: `/${name}${usage ? ` ${usage}` : ""}`,
         detail: "COMMAND",
         description
     })).sort((left, right) => left.name.localeCompare(right.name));
+    let botCommands = [];
+    const durationOptions = {
+        timeout: {1: [{value: '60', label: '1 minute'}, {value: '300', label: '5 minutes'}, {value: '600', label: '10 minutes'}, {value: '3600', label: '1 hour'}]},
+        commercial: {0: ['30', '60', '90', '120', '150', '180']},
+        slow: {0: ['3', '5', '10', '30', '60', '120']},
+        followers: {0: [{value: '0', label: 'Any follower'}, {value: '10', label: '10 minutes'}, {value: '60', label: '1 hour'}, {value: '1440', label: '1 day'}, {value: '10080', label: '1 week'}]}
+    };
+    twitchCommands.forEach(command => { command.arguments = durationOptions[command.name]; });
 
     function showStatus(message, tone = "", fadeAfterDelay = false) {
         composer.showStatus(message, tone, fadeAfterDelay);
@@ -159,8 +168,8 @@
         const before = messageInput.value.slice(0, start);
         const after = messageInput.value.slice(end);
         const prefix = before && !/\s$/.test(before) ? " " : "";
-        const suffix = after && !/^\s/.test(after) ? " " : "";
-        const replacement = `${prefix}${value}${suffix || " "}`;
+        const suffix = after && /^\s/.test(after) ? "" : " ";
+        const replacement = `${prefix}${value}${suffix}`;
         if (before.length + replacement.length + after.length > messageInput.maxLength) {
             showStatus("Messages can contain up to 500 characters.", "warning", true);
             return;
@@ -231,6 +240,9 @@
                     typeof user?.username === "string" && /^[A-Za-z0-9_]+$/.test(user.username)
                 );
                 usersLoadedAt = Date.now();
+                botCommands = (Array.isArray(payload.commands) ? payload.commands : []).filter(command =>
+                    command?.kind === 'command' && typeof command.syntax === 'string' && typeof command.value === 'string'
+                    && typeof command.name === 'string' && command.value.startsWith('!'));
                 updateSuggestions();
             } catch (_error) {
                 users = [];
@@ -316,7 +328,7 @@
     }
 
     function handleComposerKey(event) {
-        if (targetSelector.handleKey(event, () => !suggestionBox.hidden && autocomplete.handleKey(event))) return true;
+        if (targetSelector.handleKey(event, () => autocomplete.handleKey(event))) return true;
         if (event.key === "Escape" && replyMessageId.value) {
             event.preventDefault();
             hideSuggestions();
@@ -335,7 +347,7 @@
 
     composer = window.createChatComposer({form, input: messageInput, sendButton, status,
         autocomplete: {box: suggestionBox,
-            getEmotes: () => emotes, getUsers: () => users, getCommands: () => twitchCommands,
+            getEmotes: () => emotes, getUsers: () => users, getCommands: () => [...twitchCommands, ...botCommands],
             loadEmotes, loadUsers, enabled: () => selectedTarget !== "youtube",
             insert: (suggestion, range) => insertValue(suggestion.value, range)},
         onInput() { browsingHistory = false; historyIndex = messageHistory.length; },
