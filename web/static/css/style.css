@@ -1214,6 +1214,7 @@ html.raid-browser-open { overflow: hidden; }
 .chat-target-cycle:not(:disabled):is(:hover, :focus-visible) { text-decoration: underline; text-underline-offset: 3px; }
 .chat-target-cycle:focus-visible { outline: none; }
 .chat-target-cycle:disabled { cursor: default; }
+.chat-target-cycle { overflow: hidden; text-align: left; vertical-align: top; }
 .chat-send-button { flex-shrink: 0; min-height: 36px; }
 .chat-send-status { flex: 1 1 0; min-width: 0; min-height: 14px; margin: 0; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.4; text-align: right; text-overflow: ellipsis; white-space: nowrap; opacity: .8; pointer-events: none; transition: opacity .45s ease; }
 .chat-send-status.is-fading { opacity: 0; }

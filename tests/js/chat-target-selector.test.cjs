@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 function setup(youtubeAvailable = true, withInput = false) {
-    const element = () => ({handlers: {}, dataset: {}, attributes: {}, style: {setProperty(name, value) {this[name] = value;}},
+    const element = () => ({textContent: '', handlers: {}, dataset: {}, attributes: {}, style: {setProperty(name, value) {this[name] = value;}},
         addEventListener(type, handler) { this.handlers[type] = handler; },
         removeEventListener(type) { delete this.handlers[type]; },
         setAttribute(name, value) { this.attributes[name] = value; }});
@@ -93,6 +93,55 @@ test('unchanged prefix dimensions do not trigger extra textarea layouts', () => 
     assert.equal(app.layouts(), 1);
     app.button.getBoundingClientRect = () => ({width: 100}); app.resize();
     assert.equal(app.layouts(), 2);
+});
+
+test('typing abbreviates destinations, and switching expands until the next edit', () => {
+    const app = setup(true, true);
+    app.input.value = 'hello'; app.input.handlers.input();
+    assert.equal(app.button.textContent, '[Tw]');
+    assert.equal(app.input.style['--chat-target-indent'], '34px');
+    assert.equal(app.button.title, 'Twitch');
+    assert.equal(app.changes.length, 1, 'Typing must not change chat destinations');
+    app.selector.handleKey(key('Tab'));
+    assert.equal(app.button.textContent, '[YouTube]');
+    app.input.value += '!'; app.input.handlers.input();
+    assert.equal(app.button.textContent, '[YT]');
+    assert.equal(app.button.title, 'YouTube');
+    app.form.handlers.keydown(key('Shift')); assert.equal(app.button.textContent, '[All]');
+    app.window.handlers.keyup(key('Shift')); assert.equal(app.button.textContent, '[YT]');
+    app.button.handlers.click(); assert.equal(app.button.textContent, '[All]');
+    app.button.handlers.click(); assert.equal(app.button.textContent, '[Twitch]');
+    app.input.handlers.input(); assert.equal(app.button.textContent, '[Tw]');
+    app.input.value = ''; app.input.handlers.input();
+    assert.equal(app.button.textContent, '[Twitch]');
+    app.selector.destroy(); assert.equal(app.input.handlers.input, undefined);
+});
+
+test('single-platform Tab expands the label without changing the destination', () => {
+    const app = setup(false, true);
+    app.input.value = 'hello'; app.input.handlers.input();
+    assert.equal(app.button.textContent, '[Tw]');
+    const tab = key('Tab'); app.selector.handleKey(tab);
+    assert.ok(tab.prevented); assert.equal(app.button.textContent, '[Twitch]');
+    assert.equal(app.changes.length, 1);
+});
+
+test('label resizing animates, cancels interrupted animations and respects reduced motion', () => {
+    const app = setup(true, true), animations = [];
+    let cancelled = 0;
+    app.button.animate = (frames, options) => {
+        animations.push({frames, options}); return {cancel() {cancelled++;}};
+    };
+    app.input.value = 'hello'; app.input.handlers.input();
+    assert.equal(animations.length, 1);
+    assert.equal(animations[0].frames[0].width, '64px');
+    assert.equal(animations[0].frames[1].width, '32px');
+    app.selector.handleKey(key('Tab'));
+    assert.equal(cancelled, 1); assert.equal(animations.length, 2);
+    app.window.matchMedia = () => ({matches: true});
+    app.input.handlers.input(); assert.equal(animations.length, 2);
+    assert.equal(app.button.textContent, '[YT]');
+    app.selector.destroy(); assert.ok(cancelled >= 2);
 });
 
 test('teardown removes modifier listeners and ignores late keyboard events', () => {
