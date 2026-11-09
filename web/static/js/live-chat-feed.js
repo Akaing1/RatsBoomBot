@@ -7,6 +7,30 @@
         return element;
     }
 
+    function appendLinkedText(parent, text, appendPlain = value => parent.appendChild(document.createTextNode(value))) {
+        const links = /\b(?:https?:\/\/|www\.)[^\s<>"']+|\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?(?:[/?#][^\s<>"']*)?/gi;
+        let start = 0;
+        for (const match of text.matchAll(links)) {
+            // Do not turn email addresses or unsupported schemes into partial links.
+            if (match.index && /[\w@:/.-]/.test(text[match.index - 1])) continue;
+            let label = match[0].replace(/[.,!?;:]+$/, '');
+            for (const [open, close] of [['(', ')'], ['[', ']'], ['{', '}']]) {
+                while (label.endsWith(close) && label.split(close).length > label.split(open).length) label = label.slice(0, -1);
+            }
+            let url;
+            try { url = new URL(/^https?:\/\//i.test(label) ? label : `https://${label}`); }
+            catch { continue; }
+            if (!['http:', 'https:'].includes(url.protocol)) continue;
+            appendPlain(text.slice(start, match.index));
+            const link = makeElement('a', 'live-chat-link', label);
+            link.href = url.href;
+            link.target = '_blank'; link.rel = 'noopener noreferrer';
+            parent.appendChild(link);
+            start = match.index + label.length;
+        }
+        appendPlain(text.slice(start));
+    }
+
     function createJumpButton(newestFirst = false) {
         const button = makeElement("button", "live-chat-jump");
         const path = newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";
@@ -302,16 +326,18 @@
             body.appendChild(bits); hasBody = true;
         }
         function appendText(text) {
-            let start = 0;
-            if (message.bits > 0) {
-                for (const match of text.matchAll(/\bcheer(\d+)\b/gi)) {
-                    const amount = Number(match[1]);
-                    if (!Number.isSafeInteger(amount) || amount <= 0) continue;
-                    body.appendChild(document.createTextNode(text.slice(start, match.index)));
-                    appendBits(amount); start = match.index + match[0].length;
+            appendLinkedText(body, text, plain => {
+                let start = 0;
+                if (message.bits > 0) {
+                    for (const match of plain.matchAll(/\bcheer(\d+)\b/gi)) {
+                        const amount = Number(match[1]);
+                        if (!Number.isSafeInteger(amount) || amount <= 0) continue;
+                        body.appendChild(document.createTextNode(plain.slice(start, match.index)));
+                        appendBits(amount); start = match.index + match[0].length;
+                    }
                 }
-            }
-            body.appendChild(document.createTextNode(text.slice(start)));
+                body.appendChild(document.createTextNode(plain.slice(start)));
+            });
             if (text.trim()) hasBody = true;
         }
         const gigantifiedIndex = message.gigantified_emote ? segments.findLastIndex(segment =>
@@ -356,8 +382,7 @@
                 }
             });
         } else {
-            if (message.bits > 0) appendText(message.message || '');
-            else { body.textContent = message.message || ''; hasBody = Boolean(body.textContent.trim()); }
+            appendText(message.message || '');
         }
 
         if (message.is_shared) {
@@ -381,8 +406,12 @@
             if (noticeLabel) notice.appendChild(makeElement("strong", "live-chat-notice-label", noticeLabel));
             if (message.notice_type === 'watch_streak') {
                 notice.appendChild(makeElement('span', 'live-chat-notice-separator', '·'));
-                notice.appendChild(hasBody ? body : makeElement('span', 'live-chat-notice-text', message.notice));
-            } else notice.appendChild(makeElement("span", "live-chat-notice-text", message.notice));
+            }
+            if (message.notice_type === 'watch_streak' && hasBody) notice.appendChild(body);
+            else {
+                const text = makeElement('span', 'live-chat-notice-text');
+                appendLinkedText(text, message.notice); notice.appendChild(text);
+            }
             content.appendChild(notice);
         }
         if (hasBody && message.notice_type !== 'watch_streak') content.appendChild(body);

@@ -1112,6 +1112,8 @@ html.raid-browser-open { overflow: hidden; }
 .live-chat-badge-image { width: auto; height: 16px; object-fit: contain; }
 .live-chat-time { position: absolute; top: 1px; right: 0; color: var(--muted); font-size: 9px; }
 .live-chat-text { max-width: 100%; flex: 0 0 auto; margin: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.4; }
+.live-chat-link { color: #c4b5fd; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.live-chat-link:is(:hover, :focus-visible) { color: #ddd6fe; }
 .live-chat-emote { width: auto; height: 1.75em; max-width: 8em; margin: -.2em .08em; vertical-align: middle; object-fit: contain; }
 .live-chat-emote.is-gigantified { height: 5.25em; max-width: min(100%, 24em); margin: .2em .08em; }
 .live-chat-gif { display: block; width: auto; height: auto; max-width: min(100%, 280px); max-height: 180px; margin: .35em 0; border-radius: 6px; object-fit: contain; }

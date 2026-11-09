@@ -96,7 +96,7 @@ function setup(debug = false) {
         requestAnimationFrame(callback) { frames.set(++nextFrame, callback); return nextFrame; },
         cancelAnimationFrame(id) { frames.delete(id); }};
     if (debug) window.dashboardChatDebug = {};
-    vm.runInNewContext(source, {window, ResizeObserver,
+    vm.runInNewContext(source, {window, ResizeObserver, URL,
         document: {querySelectorAll: () => [], createElement: tag => new Element(tag), createTextNode: text => Object.assign(new Element('#text'), {textContent: text}),
             addEventListener: (type, handler) => { documentHandlers[type] = handler; },
             removeEventListener: type => { delete documentHandlers[type]; }}});
@@ -107,6 +107,46 @@ function setup(debug = false) {
             platform: 'twitch', kind: 'message', username: 'chatter', message: 'hello'}}); },
         flush() { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); }};
 }
+
+test('chat links open safely and preserve surrounding punctuation and balanced URL parentheses', () => {
+    const app = setup();
+    const message = 'Visit https://example.com/a?q=hello&x=1, (www.twitch.tv/tester). example.org/wiki/Test_(thing)!';
+    app.feed.receive({type: 'message', message: {id: 'links', platform: 'youtube', message}});
+    const row = app.element.children.at(-1), links = row.querySelectorAll('.live-chat-link');
+    assert.deepEqual(links.map(link => link.href), ['https://example.com/a?q=hello&x=1', 'https://www.twitch.tv/tester', 'https://example.org/wiki/Test_(thing)']);
+    assert.equal(row.querySelector('.live-chat-text').textContent, message);
+    assert.ok(links.every(link => link.target === '_blank' && link.rel === 'noopener noreferrer'));
+});
+
+test('links coexist with Bits and emotes without parsing cheer text inside a URL', () => {
+    const app = setup(), url = 'https://example.com/Cheer100?x=Cheer50';
+    app.feed.receive({type: 'message', message: {id: 'mixed-links', platform: 'twitch', bits: 1,
+        segments: [{type: 'text', text: `Cheer1 ${url} `},
+            {type: 'emote', text: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0'}]}});
+    const row = app.element.children.at(-1);
+    assert.equal(row.querySelectorAll('.live-chat-bits').length, 1);
+    assert.equal(row.querySelector('.live-chat-link').href, url);
+    assert.ok(row.querySelector('.live-chat-emote'));
+});
+
+test('unsafe schemes, malformed URLs, emails, and HTML remain text', () => {
+    const app = setup();
+    const message = 'javascript:alert(1) javascript:example.com data:text/html,test@example.com user@example.org https://%bad <img src=x onerror=alert(1)>';
+    app.feed.receive({type: 'message', message: {id: 'unsafe-links', platform: 'twitch', message}});
+    const row = app.element.children.at(-1);
+    assert.equal(row.querySelectorAll('.live-chat-link').length, 0);
+    assert.equal(row.querySelector('.live-chat-text').textContent, message);
+    assert.equal(row.querySelectorAll('img').length, 0);
+});
+
+test('notice text also supports clickable links', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'notice-link', platform: 'twitch',
+        notice_type: 'redemption', notice: 'Visit https://example.com/reward.', message: ''}});
+    const notice = app.element.children.at(-1).querySelector('.live-chat-notice-text');
+    assert.equal(notice.querySelector('.live-chat-link').href, 'https://example.com/reward');
+    assert.equal(notice.textContent, 'Visit https://example.com/reward.');
+});
 
 test('shared chat renders GIFs without rewriting signed URLs and handles unavailable media', () => {
     const app = setup(), url = 'https://media.giphy.com/media/example/giphy.gif?cid=full%2Ftoken';
