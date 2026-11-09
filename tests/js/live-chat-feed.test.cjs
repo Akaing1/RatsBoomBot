@@ -148,6 +148,17 @@ test('Bits messages show the diamond icon, amount, and purple highlight without 
     assert.equal(app.element.children.at(-1).classList.contains('has-bits'), false);
 });
 
+test('watch streak notices show the count, flame icon and matching highlighted border', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'streak', platform: 'twitch', username: 'watcher',
+        notice_type: 'watch_streak', notice_label: 'Watch streak', notice: 'Watched 10 consecutive streams!', watch_streak: 10, message: 'Happy to be here!'}});
+    const row = app.element.children.at(-1);
+    assert.equal(row.classList.contains('has-watch-streak'), true);
+    assert.equal(row.querySelector('.live-chat-notice-label').textContent, '10 watch streak');
+    assert.equal(row.querySelector('.live-chat-notice-separator').textContent, '·');
+    assert.equal(row.querySelector('.live-chat-notice').querySelector('.live-chat-text').textContent, 'Happy to be here!');
+    assert.match(row.querySelector('.live-chat-notice-icon').innerHTML, /<svg/);
+});
 
 test('a single Bit displays only its icon while keeping an accessible amount', () => {
     const app = setup();
@@ -217,7 +228,7 @@ test('shared feed renders notices and optional emote-bearing text without blank 
         const row = app.element.children.at(-1);
         assert.equal(row.dataset.noticeType, noticeType);
         assert.equal(row.classList.contains('is-bot'), true);
-        assert.equal(row.querySelector('.live-chat-notice-label').textContent, 'Event');
+        assert.equal(row.querySelector('.live-chat-notice-label').textContent, noticeType === 'watch_streak' ? 'Watch streak' : 'Event');
         assert.equal(row.querySelector('.live-chat-notice-text').textContent, 'Event details');
         assert.equal(row.querySelector('.live-chat-text'), undefined);
     }

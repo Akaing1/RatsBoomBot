@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages', 'gifs', 'bits']};
+const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages', 'gifs', 'bits', 'watch_streaks']};
 
 function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], remote = {}) {
     const handlers = {}, documentHandlers = {}, buttonHandlers = {}, changes = [];
@@ -81,7 +81,7 @@ test('GIF filters are independent, persist, and migrate older message selections
 
 test('Bits, watch streaks, and gigantified emotes have independent filters and mirror to OBS', () => {
     const ui = setup();
-    const samples = [[{bits: 100}, 'bits']];
+    const samples = [[{bits: 100}, 'bits'], [{notice_type: 'watch_streak'}, 'watch_streaks']];
     for (const [message, type] of samples) {
         const category = ui.api.category({platform: 'twitch', ...message});
         assert.equal(category.type, type);
@@ -155,7 +155,7 @@ test('messages have independent user and type classifications', () => {
     assert.equal(category({kind: 'system'}).type, 'messages');
     for (const notice_type of ['sub', 'resub', 'sub_gift', 'community_sub_gift', 'gift_paid_upgrade',
         'prime_paid_upgrade', 'watch_streak', 'redemption', 'raid']) {
-        assert.equal(category({platform: 'twitch', kind: 'chat', notice_type}).type, 'redeems');
+        assert.equal(category({platform: 'twitch', kind: 'chat', notice_type}).type, notice_type === 'watch_streak' ? 'watch_streaks' : 'redeems');
         assert.equal(category({platform: 'twitch', kind: 'chat', notice_type, badges: ['subscriber']}).user, 'bots');
         assert.equal(category({platform: 'youtube', kind: 'chat', notice_type}).user, 'youtube_bots');
     }
@@ -314,15 +314,15 @@ test('Clear buttons are visible only for sections with disabled options', () => 
 
 test('button count tracks enabled options across both independent sections', () => {
     const ui = setup();
-    assert.equal(ui.countLabel.textContent, '| 15');
+    assert.equal(ui.countLabel.textContent, '| 16');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
     ui.change('bots', false);
-    assert.equal(ui.countLabel.textContent, '| 14');
+    assert.equal(ui.countLabel.textContent, '| 15');
     assert.equal(ui.button.classList.contains('has-filter-count'), true);
     ui.solo(ui.option('messages'));
     assert.equal(ui.countLabel.textContent, '| 10');
     ui.clear('all');
-    assert.equal(ui.countLabel.textContent, '| 15');
+    assert.equal(ui.countLabel.textContent, '| 16');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
 });
 

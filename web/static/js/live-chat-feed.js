@@ -361,11 +361,23 @@
         if (message.notice) {
             if (message.notice_type) row.dataset.noticeType = message.notice_type;
             const notice = makeElement("div", "live-chat-notice");
-            if (message.notice_label) notice.appendChild(makeElement("strong", "live-chat-notice-label", message.notice_label));
-            notice.appendChild(makeElement("span", "live-chat-notice-text", message.notice));
+            let noticeLabel = message.notice_label;
+            if (message.notice_type === 'watch_streak') {
+                row.classList.add('has-watch-streak');
+                const icon = makeElement('span', 'live-chat-notice-icon'); icon.setAttribute('aria-hidden', 'true');
+                icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 2c1 5-3 6-3 10-2-1-3-3-3-3-2 3-3 5-3 7a9 9 0 0 0 18 0c0-5-5-10-9-14Z"/><path d="M12 13c-3 3-3 5-1 7 3 1 5-2 1-7Z"/></svg>';
+                notice.appendChild(icon);
+                noticeLabel = Number.isSafeInteger(message.watch_streak) && message.watch_streak > 0
+                    ? `${message.watch_streak.toLocaleString()} watch streak` : 'Watch streak';
+            }
+            if (noticeLabel) notice.appendChild(makeElement("strong", "live-chat-notice-label", noticeLabel));
+            if (message.notice_type === 'watch_streak') {
+                notice.appendChild(makeElement('span', 'live-chat-notice-separator', '·'));
+                notice.appendChild(hasBody ? body : makeElement('span', 'live-chat-notice-text', message.notice));
+            } else notice.appendChild(makeElement("span", "live-chat-notice-text", message.notice));
             content.appendChild(notice);
         }
-        if (hasBody) content.appendChild(body);
+        if (hasBody && message.notice_type !== 'watch_streak') content.appendChild(body);
         if (timestamp) content.appendChild(timestamp);
         row.appendChild(content);
         if (!message.deleted && !message.test_mode && !message.local_only && !message.notice && message.platform === "twitch" && feed.moderationUrl) {

@@ -43,6 +43,7 @@
                     id, platform: 'twitch', kind: 'chat', test_mode: true, local_preview: true, username: 'test_viewer',
                     display_name: key === 'raid' ? 'Test raider' : 'Test viewer',
                     timestamp: new Date().toISOString(), message: text, notice_type, notice_label, notice,
+                    watch_streak: key === 'watchstreak' ? 10 : 0,
                     bits: key === 'bits' ? 100 : key === 'spacedbits' ? 150 : 0,
                     badges: ['sub', 'resub'].includes(notice_type) ? ['subscriber'] : [],
                     is_redeem: key === 'redeem'

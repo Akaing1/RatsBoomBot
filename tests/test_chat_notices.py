@@ -74,6 +74,16 @@ def test_watch_streak_needs_no_new_sdk_fields_and_unhandled_notices_are_ignored(
     assert chat_event("channel.chat.notification", {"notice_type": "announcement"}) is None
 
 
+@pytest.mark.parametrize('count', [1, 10])
+def test_watch_streak_count_handles_sdk_and_raw_events_without_system_text(count):
+    payload = notice_payload('watch_streak', streak=count)
+    payload.system_message = ''
+    main = LiveChatService(None).publish_twitch_notification(payload).as_dict()
+    preview = chat_event('channel.chat.notification', {'message_id': 'streak', 'notice_type': 'watch_streak',
+        'watch_streak': {'streak_count': count}, 'message': {'text': ''}})['message']
+    assert main['watch_streak'] == preview['watch_streak'] == count
+    assert main['notice'] == preview['notice'] == f'Watched {count} consecutive {"stream" if count == 1 else "streams"}!'
+
 
 def test_anonymous_gift_notices_do_not_reveal_identity():
     payload = notice_payload("community_sub_gift")

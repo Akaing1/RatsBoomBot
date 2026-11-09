@@ -79,6 +79,7 @@ class UnifiedChatMessage:
     source_channel_name: str = ""
     source_message_id: str = ""
     bits: int = 0
+    watch_streak: int = 0
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
