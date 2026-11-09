@@ -109,11 +109,16 @@ def chat_event(kind, event, timestamp="", badge_catalog=None, emotes=None):
     for fragment in content.get("fragments", []):
         emote = fragment.get("emote") or {}
         segment = {"type": "text", "text": fragment.get("text", "")}
+        gif_url = (fragment.get("gif") or {}).get("url", "")
+        if fragment.get("type") == "gif":
+            segment['text'] = segment['text'] or 'GIF'
+            if isinstance(gif_url, str) and gif_url.startswith("https://"):
+                segment.update(type="gif", provider="twitch", url=gif_url)
         emote_id = str(emote.get("id", ""))
         if fragment.get("type") == "emote" and emote_id and all(c.isalnum() or c in "_-" for c in emote_id):
             segment.update(type="emote", provider="twitch",
                            url=f"https://static-cdn.jtvnw.net/emoticons/v2/{emote_id}/default/dark/2.0")
-        if segment["text"] or segment["type"] == "emote":
+        if segment["text"] or segment["type"] in {"emote", "gif"}:
             segments.append(segment)
     if emotes and (segments or message_text):
         source = tuple(ChatSegment(**segment) for segment in segments) or (ChatSegment("text", message_text),)

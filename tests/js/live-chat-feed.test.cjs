@@ -2,6 +2,35 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+let chromium;
+try { ({chromium} = require('playwright')); } catch (_) {}
+const executablePath = process.env.CHAT_TEST_BROWSER_PATH || chromium?.executablePath();
+
+test('GIF artwork fits narrow chat panels and remains bounded on desktop', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage();
+        await page.route('https://media.giphy.com/**', route => route.fulfill({contentType: 'image/svg+xml',
+            body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="purple"/></svg>'}));
+        for (const width of [320, 1200]) {
+            await page.setViewportSize({width, height: 700});
+            await page.setContent(`<style>${fs.readFileSync('web/static/css/style.css', 'utf8')}body{padding:16px}#shell{width:100%;max-width:400px}#feed{height:400px;overflow:auto}</style><div id="shell"><div id="feed"></div></div>`);
+            await page.addScriptTag({content: fs.readFileSync('web/static/js/live-chat-feed.js', 'utf8')});
+            await page.evaluate(() => {
+                window.testFeed = window.createTwitchPreviewFeed(document.querySelector('#feed'));
+                window.testFeed.receive({type: 'message', message: {id: 'gif', platform: 'twitch', username: 'tester',
+                    segments: [{type: 'gif', text: 'GIF', url: 'https://media.giphy.com/media/example/giphy.gif?cid=original'}]}});
+            });
+            await page.waitForFunction(() => document.querySelector('.live-chat-gif')?.naturalWidth > 0);
+            const fits = await page.locator('.live-chat-gif').evaluate(image => {
+                const bounds = image.getBoundingClientRect(), body = image.parentElement.getBoundingClientRect();
+                return bounds.width <= 280 && bounds.height <= 180 && bounds.left >= body.left && bounds.right <= body.right + 1;
+            });
+            assert.equal(fits, true);
+            await page.evaluate(() => window.testFeed.destroy());
+        }
+    } finally { await browser.close(); }
+});
 
 test('timestamps reserve a compact gutter only when present, not space for the hover buttons', () => {
     const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
@@ -26,6 +55,8 @@ class Element {
     }
     set className(value) { this.classes = new Set(value.split(/\s+/)); }
     get className() { return [...this.classes].join(' '); }
+    set textContent(value) { this._text = String(value); this.children = []; }
+    get textContent() { return (this._text || '') + this.children.map(child => child.textContent || '').join(''); }
     get scrollHeight() { return this.children.length * 20; }
     appendChild(child) { child.parentNode = this; this.children.push(child); }
     append(...children) { children.forEach(child => this.appendChild(child)); }
@@ -34,6 +65,7 @@ class Element {
         if (this.parentNode) this.parentNode.children.splice(this.parentNode.children.indexOf(this), 1);
         this.parentNode = null;
     }
+    replaceWith(child) { const parent = this.parentNode, index = parent.children.indexOf(this); parent.children[index] = child; child.parentNode = parent; this.parentNode = null; }
     setAttribute(name, value) { this[name] = value; }
     addEventListener(name, callback) { this.handlers[name] = callback; }
     removeEventListener(name) { delete this.handlers[name]; }
@@ -65,7 +97,7 @@ function setup(debug = false) {
         cancelAnimationFrame(id) { frames.delete(id); }};
     if (debug) window.dashboardChatDebug = {};
     vm.runInNewContext(source, {window, ResizeObserver,
-        document: {querySelectorAll: () => [], createElement: tag => new Element(tag),
+        document: {querySelectorAll: () => [], createElement: tag => new Element(tag), createTextNode: text => Object.assign(new Element('#text'), {textContent: text}),
             addEventListener: (type, handler) => { documentHandlers[type] = handler; },
             removeEventListener: type => { delete documentHandlers[type]; }}});
     const shell = new Element(), element = new Element(); shell.appendChild(element);
@@ -75,6 +107,20 @@ function setup(debug = false) {
             platform: 'twitch', kind: 'message', username: 'chatter', message: 'hello'}}); },
         flush() { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); }};
 }
+
+test('shared chat renders GIFs without rewriting signed URLs and handles unavailable media', () => {
+    const app = setup(), url = 'https://media.giphy.com/media/example/giphy.gif?cid=full%2Ftoken';
+    app.feed.receive({type: 'message', message: {id: 'gif', platform: 'twitch', username: 'chatter', segments: [{type: 'gif', text: 'GIF', url}]}});
+    const row = app.element.children.at(-1), gif = row.querySelector('.live-chat-gif');
+    assert.equal(gif.src, url);
+    assert.equal(gif.srcset, undefined);
+    assert.equal(gif.alt, 'GIF');
+    assert.equal(gif.referrerPolicy, 'no-referrer');
+    gif.handlers.error();
+    assert.equal(row.querySelector('.live-chat-gif-fallback').textContent, 'GIF unavailable');
+    app.feed.receive({type: 'message', message: {id: 'bad-gif', platform: 'twitch', segments: [{type: 'gif', text: 'GIF', url: 'javascript:alert(1)'}]}});
+    assert.equal(app.element.children.at(-1).querySelector('.live-chat-gif'), undefined);
+});
 
 test('local notice samples reach an open preview and detach when it closes', () => {
     const app = setup(true);
@@ -88,6 +134,13 @@ test('local notice samples reach an open preview and detach when it closes', () 
     app.feed.destroy();
     assert.equal(app.documentHandlers['dashboard-chat-test-notice'], undefined);
 });
+
+
+
+
+
+
+
 
 test('chosen name colors survive dashboard legacy and preview formats', () => {
     const app = setup();
@@ -259,6 +312,8 @@ test('private send failures are bot messages for the affected platform and obey 
     vm.runInContext(`(() => {${callback}})()`, context);
     assert.deepEqual(rows.map(row => row.hidden), [true, false]);
 });
+
+
 
 test('shared messages display a text-safe source label and retain the destination message ID', () => {
     const app = setup();

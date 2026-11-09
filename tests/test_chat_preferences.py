@@ -16,7 +16,7 @@ from web.channel.routers import dashboard
 from web.public import routers as public
 from web.shared.live_chat import stream_chat_events
 
-PREFERENCES = {'version': 6, 'origin': 'all', 'channels': {}, 'connectedPlatforms': ['twitch', 'youtube'],
+PREFERENCES = {'version': 7, 'origin': 'all', 'channels': {}, 'connectedPlatforms': ['twitch', 'youtube'],
                'users': ['mods', 'youtube_members'], 'types': ['messages']}
 
 
@@ -26,6 +26,15 @@ PREFERENCES = {'version': 6, 'origin': 'all', 'channels': {}, 'connectedPlatform
 def test_invalid_preferences_are_rejected(value):
     with pytest.raises(ValueError):
         normalize_chat_preferences(value)
+
+
+def test_gif_preferences_migrate_old_message_filters_without_overriding_new_selections():
+    old = {**PREFERENCES, 'version': 6}
+    assert normalize_chat_preferences(old)['types'] == ['messages', 'gifs']
+    assert normalize_chat_preferences({**old, 'types': ['commands']})['types'] == ['commands']
+    assert normalize_chat_preferences(PREFERENCES)['types'] == ['messages']
+    assert normalize_chat_preferences({**PREFERENCES, 'types': ['gifs']})['types'] == ['gifs']
+
 
 
 @pytest.mark.asyncio

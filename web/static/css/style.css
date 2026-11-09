@@ -1105,6 +1105,8 @@ html.raid-browser-open { overflow: hidden; }
 .live-chat-time { position: absolute; top: 1px; right: 0; color: var(--muted); font-size: 9px; }
 .live-chat-text { max-width: 100%; flex: 0 0 auto; margin: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.4; }
 .live-chat-emote { width: auto; height: 1.75em; max-width: 8em; margin: -.2em .08em; vertical-align: middle; object-fit: contain; }
+.live-chat-gif { display: block; width: auto; height: auto; max-width: min(100%, 280px); max-height: 180px; margin: .35em 0; border-radius: 6px; object-fit: contain; }
+.live-chat-gif-fallback { color: var(--muted); font-size: .9em; }
 .kind-command .live-chat-text { color: #d8bcff; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .live-chat-empty { display: grid; min-height: 170px; flex: 1; place-items: center; color: var(--muted); font-size: 12px; text-align: center; }
 .live-chat-jump { --jump-fill: rgba(32,36,44,.96); position: absolute; z-index: 5; right: 50%; bottom: 10px; display: grid; width: 36px; height: 36px; place-items: center; isolation: isolate; overflow: hidden; padding: 7px; transform: translateX(50%); border: 2px solid rgba(139,92,246,.7); border-radius: 999px; background: var(--jump-fill); box-shadow: 0 7px 20px rgba(0,0,0,.35); color: #ddd6fe; cursor: pointer; backdrop-filter: blur(8px); }

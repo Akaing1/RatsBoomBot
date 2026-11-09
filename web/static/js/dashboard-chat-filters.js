@@ -1,7 +1,12 @@
 (() => {
     const platforms = {twitch: ['vips', 'mods', 'subs', 'non_subs', 'bots'],
         youtube: ['youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots']};
-    const messageTypes = ['commands', 'redeems', 'messages'];
+    const messageTypes = ['commands', 'redeems', 'messages', 'gifs'];
+    function migrateTypes(types, version = 0) {
+        const keys = [...types];
+        if (version < 7 && keys.includes('messages')) keys.push('gifs');
+        return [...new Set(keys)];
+    }
 
     function dropdownPosition(anchor, size, viewport) {
         const minTop = viewport.top + 8;
@@ -15,7 +20,7 @@
     function category(message) {
         const isNotice = Boolean(message.notice_type);
         const source = {origin: message.is_shared ? 'shared' : 'local', channel: message.is_shared ? String(message.source_channel_id || '') : 'local'};
-        const type = message.is_redeem || isNotice || message.kind === 'redeem' || message.kind === 'redemption'
+        const type = (message.segments || []).some(segment => segment.type === 'gif') ? 'gifs' : message.is_redeem || isNotice || message.kind === 'redeem' || message.kind === 'redemption'
             ? 'redeems' : message.kind === 'command' ? 'commands' : 'messages';
         if (message.is_bot || isNotice) {
             return {user: message.platform === 'youtube' ? 'youtube_bots' : 'bots', type, ...source};
@@ -64,7 +69,7 @@
             }
             for (const axis of Object.keys(axes)) {
                 if (Array.isArray(saved?.[axis])) {
-                    const keys = saved[axis].filter(key => axes[axis].includes(key));
+                    const keys = (axis === 'types' ? migrateTypes(saved[axis], saved.version) : saved[axis]).filter(key => axes[axis].includes(key));
                     if (axis === 'users') {
                         if (!saved.version || saved.version < 3) {
                             keys.push(...platforms.youtube.filter(key => axes.users.includes(key)));
@@ -183,7 +188,7 @@
         });
         document.addEventListener('click', event => { if (!control.contains(event.target)) close(); });
         document.addEventListener('dashboard-carousel-card-changed', () => close());
-        const snapshot = () => ({version: 6, origin, channels: {...channels}, connectedPlatforms, users: [...enabled.users], types: [...enabled.types]});
+        const snapshot = () => ({version: 7, origin, channels: {...channels}, connectedPlatforms, users: [...enabled.users], types: [...enabled.types]});
         const syncUrl = !window.dashboardChatDebug?.active && control.dataset.preferencesUrl;
         const syncStatus = control.querySelector('[data-chat-filter-sync-status]');
         let remoteReady = false, loading = false, dirty = false, saving = false, pending = null;
@@ -323,7 +328,8 @@
         sync();
         persistSelection();
         if (syncUrl) Promise.resolve().then(loadRemote);
-        return {participants, allows: category => allowsChannel(category) && enabled.users.has(category.user) && enabled.types.has(category.type)};
+        return {participants, allows: category => allowsChannel(category) && enabled.users.has(category.user)
+            && enabled.types.has(category.type)};
     }
     function channelAllowed(saved, {origin = 'local', channel = 'local'}) {
         if (origin === 'local') return true;
@@ -334,12 +340,14 @@
     function attachMirror(onChange) {
         let enabled = null;
         return {
-            allows: category => !enabled || channelAllowed(enabled, category) && enabled.users.includes(category.user) && enabled.types.includes(category.type),
+            allows: category => !enabled || channelAllowed(enabled, category) && enabled.users.includes(category.user)
+                && enabled.types.includes(category.type),
             update(saved) {
+                const types = saved?.types?.length ? migrateTypes(saved.types, saved.version) : messageTypes;
                 enabled = saved ? {
                     origin: saved.origin || 'all', channels: saved.channels || {},
                     users: saved.users?.length ? saved.users : (saved.connectedPlatforms || Object.keys(platforms)).flatMap(key => platforms[key] || []),
-                    types: saved.types?.length ? saved.types : messageTypes
+                    types
                 } : null;
                 onChange();
             }

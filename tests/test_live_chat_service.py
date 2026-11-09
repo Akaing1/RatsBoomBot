@@ -53,6 +53,21 @@ def test_twitch_name_colors_use_html_format():
     assert service.publish_twitch(payload).color is None
 
 
+def test_native_twitch_gifs_keep_the_complete_asset_url_in_history():
+    from twitchio import ChatMessageFragment
+    url = 'https://media.giphy.com/media/example/giphy.gif?cid=signed%2Fvalue&rid=giphy.gif'
+    payload = twitch_payload('a GIF', 'native-gif')
+    payload.fragments = [ChatMessageFragment({'type': 'gif', 'text': '', 'gif': {'gif_id': 'example', 'url': url}}, http=None)]
+    service = LiveChatService(None)
+    message = service.publish_twitch(payload)
+    assert message.segments == (ChatSegment('gif', 'GIF', url, 'twitch'),)
+    assert message.as_dict()['segments'][0]['url'] == url
+    assert service.history('channel-1')[0]['segments'] == message.as_dict()['segments']
+    payload.id = 'bad-gif'
+    payload.fragments = [SimpleNamespace(type='gif', text='GIF', gif=SimpleNamespace(asset='javascript:alert(1)'))]
+    assert service.publish_twitch(payload).segments == (ChatSegment('text', 'GIF'),)
+
+
 def test_twitch_messages_are_split_between_chat_and_commands():
     bot = SimpleNamespace(get_command=lambda name: object() if name == "points" else None)
     service = LiveChatService(None, bot=bot)

@@ -14,6 +14,16 @@ from web.channel.routers import dashboard
 from web.shared import raid_chat
 
 
+def test_preview_gif_fragments_preserve_signed_urls_and_surrounding_text():
+    url = 'https://media.giphy.com/media/example/giphy.gif?cid=full%2Ftoken'
+    event = {'message_id': 'gif', 'message': {'text': 'hello GIF', 'fragments': [
+        {'type': 'text', 'text': 'hello '}, {'type': 'gif', 'text': '', 'gif': {'url': url}}]}}
+    segments = raid_chat.chat_event('channel.chat.message', event)['message']['segments']
+    assert segments == [{'type': 'text', 'text': 'hello '}, {'type': 'gif', 'text': 'GIF', 'provider': 'twitch', 'url': url}]
+    event['message']['fragments'][1]['gif']['url'] = 'data:image/gif;base64,unsafe'
+    assert raid_chat.chat_event('channel.chat.message', event)['message']['segments'] == [{'type': 'text', 'text': 'hello '}, {'type': 'text', 'text': 'GIF'}]
+
+
 def request(user="1"):
     return Request({"type": "http", "session": {CHANNEL_USER_ID_KEY: user, CSRF_SESSION_KEY: "valid"} if user else {}})
 

@@ -287,6 +287,7 @@
 
         const body = makeElement("p", "live-chat-text");
         const segments = Array.isArray(message.segments) ? message.segments : [];
+        let hasBody = false;
 
         if (segments.length) {
             segments.forEach(segment => {
@@ -294,7 +295,16 @@
                 const url = typeof segment?.url === "string" ? segment.url : "";
                 const trustedEmoteUrl = /^https:\/\/(?:static-cdn\.jtvnw\.net|cdn\.7tv\.app)\//.test(url);
 
-                if (segment?.type === "emote" && trustedEmoteUrl) {
+                if (segment?.type === "gif" && /^https:\/\/[^/\s]+\//i.test(url)) {
+                    const gif = makeElement("img", "live-chat-gif");
+                    gif.src = url;
+                    gif.alt = text || "GIF";
+                    gif.title = 'GIF';
+                    gif.loading = 'lazy'; gif.decoding = 'async'; gif.referrerPolicy = 'no-referrer';
+                    gif.addEventListener('error', () => gif.replaceWith(makeElement('span', 'live-chat-gif-fallback', 'GIF unavailable')), {once: true});
+                    body.appendChild(gif);
+                    hasBody = true;
+                } else if (segment?.type === "emote" && trustedEmoteUrl) {
                     const emote = makeElement("img", "live-chat-emote");
                     emote.src = url;
                     emote.srcset = emoteSrcset(url);
@@ -303,12 +313,14 @@
                     emote.loading = "eager";
                     emote.decoding = "async";
                     body.appendChild(emote);
+                    hasBody = true;
                 } else {
                     body.appendChild(document.createTextNode(text));
+                    if (text.trim()) hasBody = true;
                 }
             });
         } else {
-            body.textContent = message.message || "";
+            body.textContent = message.message || ''; hasBody = Boolean(body.textContent.trim());
         }
 
         if (message.is_shared) {
@@ -324,7 +336,7 @@
             notice.appendChild(makeElement("span", "live-chat-notice-text", message.notice));
             content.appendChild(notice);
         }
-        if (message.message || segments.length) content.appendChild(body);
+        if (hasBody) content.appendChild(body);
         if (timestamp) content.appendChild(timestamp);
         row.appendChild(content);
         if (!message.deleted && !message.test_mode && !message.local_only && !message.notice && message.platform === "twitch" && feed.moderationUrl) {

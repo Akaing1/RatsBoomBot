@@ -20,6 +20,7 @@ def notice_payload(kind, **data):
     )
 
 
+
 @pytest.mark.parametrize("kind,data,label", [
     ("sub", {}, "Subscription"), ("sub", {"prime": True}, "Prime subscription"),
     ("resub", {"streak_months": 6}, "Resubscription"),
@@ -57,6 +58,7 @@ def test_watch_streak_needs_no_new_sdk_fields_and_unhandled_notices_are_ignored(
     assert "10 consecutive streams" in service.publish_twitch_notification(payload).notice
     assert service.publish_twitch_notification(notice_payload("announcement")) is None
     assert chat_event("channel.chat.notification", {"notice_type": "announcement"}) is None
+
 
 
 def test_anonymous_gift_notices_do_not_reveal_identity():
@@ -146,10 +148,10 @@ def test_installed_twitchio_preserves_watch_streak_system_message():
         "prime_paid_upgrade", "raid", "pay_it_forward", "announcement", "bits_badge_tier", "charity_donation",
         "shared_chat_sub", "shared_chat_resub", "shared_chat_sub_gift", "shared_chat_community_sub_gift",
         "shared_chat_gift_paid_upgrade", "shared_chat_prime_paid_upgrade", "shared_chat_raid",
-        "shared_chat_pay_it_forward", "shared_chat_announcement")}
+        "shared_chat_pay_it_forward", "shared_chat_announcement", "modiversary", "shared_chat_modiversary")}
     event.update(broadcaster_user_id="1", broadcaster_user_login="channel", broadcaster_user_name="Channel",
         chatter_user_id="2", chatter_user_login="viewer", chatter_user_name="Viewer", chatter_is_anonymous=False,
         color="", badges=[], system_message="Viewer watched 10 consecutive streams!", message_id="streak",
-        message={"text": "", "fragments": []}, notice_type="watch_streak", watch_streak={"streak_count": 10})
+        message={"text": "", "fragments": []}, notice_type="watch_streak", watch_streak={"streak_count": 10, "channel_points_awarded": 0})
     payload = ChatNotification(event, http=Mock())
     assert "10 consecutive streams" in LiveChatService(None).publish_twitch_notification(payload).notice

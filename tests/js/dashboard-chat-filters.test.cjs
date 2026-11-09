@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages']};
+const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages', 'gifs']};
 
 function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], remote = {}) {
     const handlers = {}, documentHandlers = {}, buttonHandlers = {}, changes = [];
@@ -56,6 +56,31 @@ function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], 
     };
     return {api, filter, channelList, channel, toggleChannel, syncStatus, inputs, groups, platformInputs, platform, connectionBadges, timers, clears, countLabel, option, change, clear, solo, handlers, documentHandlers, buttonHandlers, options, button, changes};
 }
+
+test('GIF filters are independent, persist, and migrate older message selections', () => {
+    const ui = setup();
+    const category = ui.api.category({platform: 'twitch', segments: [{type: 'gif', url: 'https://media.giphy.com/media/example.gif'}]});
+    assert.equal(category.type, 'gifs');
+    assert.equal(ui.filter.allows(category), true);
+    ui.change('gifs', false);
+    assert.equal(ui.filter.allows(category), false);
+    assert.equal(ui.filter.allows({user: 'non_subs', type: 'messages'}), true);
+    ui.solo(ui.option('gifs'));
+    assert.equal(ui.filter.allows(category), true);
+    assert.equal(ui.filter.allows({user: 'non_subs', type: 'messages'}), false);
+    const old = {version: 6, users: axes.users, types: ['messages']};
+    const migrated = setup(new Map([['ratsboombot:chat-filters:test', JSON.stringify(old)]]));
+    assert.equal(migrated.option('gifs').checked, true);
+    migrated.change('gifs', false);
+    const mirror = migrated.api.attachMirror(() => {});
+    mirror.update(old);
+    assert.equal(mirror.allows(category), true);
+    mirror.update({...old, version: 7});
+    assert.equal(mirror.allows(category), false);
+});
+
+
+
 
 test('connected badges fade after 1.5 seconds on first open only; disconnected badges remain visible', () => {
     const ui = setup(new Map(), ['twitch']);
@@ -271,15 +296,15 @@ test('Clear buttons are visible only for sections with disabled options', () => 
 
 test('button count tracks enabled options across both independent sections', () => {
     const ui = setup();
-    assert.equal(ui.countLabel.textContent, '| 13');
+    assert.equal(ui.countLabel.textContent, '| 14');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
     ui.change('bots', false);
-    assert.equal(ui.countLabel.textContent, '| 12');
+    assert.equal(ui.countLabel.textContent, '| 13');
     assert.equal(ui.button.classList.contains('has-filter-count'), true);
     ui.solo(ui.option('messages'));
     assert.equal(ui.countLabel.textContent, '| 10');
     ui.clear('all');
-    assert.equal(ui.countLabel.textContent, '| 13');
+    assert.equal(ui.countLabel.textContent, '| 14');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
 });
 
@@ -352,7 +377,7 @@ test('switching carousel cards dismisses the dropdown', () => {
 });
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
-const prefs = (users = ['mods'], types = ['messages']) => ({version: 6, origin: 'all', channels: {}, connectedPlatforms: ['twitch', 'youtube'], users, types});
+const prefs = (users = ['mods'], types = ['messages']) => ({version: 7, origin: 'all', channels: {}, connectedPlatforms: ['twitch', 'youtube'], users, types});
 const response = preferences => ({ok: true, json: async () => ({preferences})});
 const dataset = {preferencesUrl: '/channel/api/chat/preferences', csrfToken: 'valid'};
 

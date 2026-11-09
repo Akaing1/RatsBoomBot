@@ -453,6 +453,15 @@ class LiveChatService:
         for fragment in fragments:
             text = str(getattr(fragment, "text", ""))
             emote = getattr(fragment, "emote", None)
+            gif = getattr(fragment, "gif", None)
+            if getattr(fragment, "type", None) == "gif":
+                url = str(getattr(gif, "asset", gif) or "")
+                if url.startswith("https://"):
+                    # Twitch requires the original GIF URL, including its query string.
+                    segments.append(ChatSegment("gif", text or "GIF", url, "twitch"))
+                    continue
+                segments.append(ChatSegment('text', text or 'GIF'))
+                continue
 
             if getattr(fragment, "type", None) == "emote" and emote is not None:
                 emote_id = str(getattr(emote, "id", ""))
