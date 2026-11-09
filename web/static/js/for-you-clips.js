@@ -42,7 +42,7 @@
         if (reset) { loaded = false; clips = []; cursor = ''; grid.replaceChildren(); find('[data-clips-count]').textContent = '– 0 loaded'; more.hidden = true; }
         status.textContent = 'Loading clips…'; find('[data-clips-signin]').hidden = true; more.disabled = true;
         try {
-            const params = new URLSearchParams({days:find('#clip-days').value,after:cursor});
+            const params = new URLSearchParams({days:find('#clip-days').value,after:cursor,sort:find('#clip-sort').value});
             const response = await fetch((document.body.dataset.channelRoot || '/channel') + '/api/for-you/clips?' + params, {signal:controller.signal,cache:'no-store',credentials:'same-origin'});
             if (response.status === 401) {
                 throw new Error('Your channel session needs attention. Sign in again, then retry.');
@@ -53,14 +53,16 @@
             const result = await response.json(); if (!response.ok) throw new Error(result.detail || 'Unable to load clips.');
             if (!Array.isArray(result.clips)) throw new Error('Unexpected clip response. Please reload this page.');
             if (current !== generation) return;
-            clips = [...new Map([...clips,...result.clips].map(c => [c.id,c])).values()].slice(0,1000);
-            cursor = result.cursor; loaded = true; more.hidden = !cursor || clips.length >= 1000; render();
+            clips = [...new Map([...clips,...result.clips].map(c => [c.id,c])).values()];
+            cursor = result.cursor;
+            if (!clips.length && cursor && find('#clip-sort').value === 'newest') { await load(false); return; }
+            loaded = true; more.hidden = !cursor; render();
         } catch (error) { if (error.name !== 'AbortError' && current === generation) { status.textContent = error.message; find('[data-clips-signin]').hidden = !error.message.includes('Sign in again'); } }
         finally { if (current === generation) more.disabled = false; }
     }
     form.addEventListener('submit', e => e.preventDefault());
     find('#clip-days').addEventListener('change', () => load(true));
-    find('#clip-search').addEventListener('input', render); find('#clip-sort').addEventListener('change',render);
+    find('#clip-search').addEventListener('input', render); find('#clip-sort').addEventListener('change', () => load(true));
     more.addEventListener('click', () => load(false));
     find('[data-clip-close]').addEventListener('click', () => dialog.close());
     dialog.addEventListener('close', () => {
