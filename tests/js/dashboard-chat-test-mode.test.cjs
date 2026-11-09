@@ -66,6 +66,18 @@ test('test command opts into a session-only simulation and can turn it off again
     app.api.youtube(false); assert.equal(app.storage.get(app.key), 'false'); assert.equal(app.reloads(), 2);
 });
 
+test('YouTube test connection toggles by default and still accepts explicit on/off values', () => {
+    const app = setup();
+    app.api.youtube(); assert.equal(app.api.active, true); assert.equal(app.storage.get(app.key), 'true');
+    app.api.youtube(); assert.equal(app.api.active, false); assert.equal(app.storage.get(app.key), 'false');
+    app.api.youtube(true); app.api.youtube(true);
+    assert.equal(app.api.active, true); assert.equal(app.storage.get(app.key), 'true');
+    app.api.youtube(false); app.api.youtube(false);
+    assert.equal(app.api.active, false); assert.equal(app.storage.get(app.key), 'false');
+    const enabled = setup(true);
+    enabled.api.youtube(); assert.equal(enabled.api.active, false); assert.equal(enabled.storage.get(enabled.key), 'false');
+});
+
 test('simulated connection enables platform filters and supplies clearly marked samples', () => {
     const app = setup(true);
     assert.equal(app.form.dataset.youtubeConnected, 'true'); assert.match(app.input.placeholder, /not sent/);

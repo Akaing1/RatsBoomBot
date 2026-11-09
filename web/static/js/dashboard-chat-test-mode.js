@@ -15,8 +15,10 @@
     function message(...args) { if (active) return emitMessage(...args); }
     window.dashboardChatDebug = {
         active,
-        youtube(enabled = true) {
-            window.sessionStorage.setItem(key, String(Boolean(enabled)));
+        youtube(enabled = !active) {
+            active = Boolean(enabled);
+            window.dashboardChatDebug.active = active;
+            window.sessionStorage.setItem(key, String(active));
             window.location.reload();
         },
         message,
