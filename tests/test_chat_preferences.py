@@ -30,7 +30,7 @@ def test_invalid_preferences_are_rejected(value):
 
 def test_gif_preferences_migrate_old_message_filters_without_overriding_new_selections():
     old = {**PREFERENCES, 'version': 6}
-    assert normalize_chat_preferences(old)['types'] == ['messages', 'gifs', 'bits']
+    assert normalize_chat_preferences(old)['types'] == ['messages', 'gifs', 'bits', 'gigantified_emotes']
     assert normalize_chat_preferences({**old, 'types': ['commands']})['types'] == ['commands']
     assert normalize_chat_preferences(PREFERENCES)['types'] == ['messages']
     assert normalize_chat_preferences({**PREFERENCES, 'types': ['gifs']})['types'] == ['gifs']
@@ -38,8 +38,8 @@ def test_gif_preferences_migrate_old_message_filters_without_overriding_new_sele
 
 def test_event_type_filters_migrate_previous_categories_and_keep_current_selections():
     previous = {**PREFERENCES, 'version': 7, 'types': ['messages', 'redeems']}
-    assert normalize_chat_preferences(previous)['types'] == ['messages', 'redeems', 'bits', 'watch_streaks']
-    for event in ['bits', 'watch_streaks']:
+    assert normalize_chat_preferences(previous)['types'] == ['messages', 'redeems', 'bits', 'gigantified_emotes', 'watch_streaks']
+    for event in ['bits', 'watch_streaks', 'gigantified_emotes']:
         assert normalize_chat_preferences({**PREFERENCES, 'types': [event]})['types'] == [event]
 
 

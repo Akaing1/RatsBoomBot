@@ -160,7 +160,7 @@
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="chat-filter-button-label">Filter</span><span data-chat-filter-count aria-hidden="true"></span>
                     </button>
                     <div id="chat-filter-options" class="chat-filter-options" data-chat-filter-options popover="manual" role="group" aria-label="Chat filters" hidden>
-                        {% for group, group_key, entries in [('Users', 'users', [('vips', 'VIPs'), ('mods', 'Mods'), ('subs', 'Subs'), ('non_subs', 'Non-subs'), ('bots', 'Bots')]), ('Message types', 'types', [('messages', 'Messages'), ('gifs', 'GIFs'), ('bits', 'Bits'), ('watch_streaks', 'Watch streaks'), ('commands', 'Commands'), ('redeems', 'Redeems')])] %}
+                        {% for group, group_key, entries in [('Users', 'users', [('vips', 'VIPs'), ('mods', 'Mods'), ('subs', 'Subs'), ('non_subs', 'Non-subs'), ('bots', 'Bots')]), ('Message types', 'types', [('messages', 'Messages'), ('gifs', 'GIFs'), ('bits', 'Bits'), ('watch_streaks', 'Watch streaks'), ('gigantified_emotes', 'Gigantified emotes'), ('commands', 'Commands'), ('redeems', 'Redeems')])] %}
                         <div class="chat-filter-group" role="group" aria-label="{{ group }}">
                             <div class="chat-filter-options-header chat-filter-section-header">
                                 <span class="chat-filter-group-title">{{ group }}</span>

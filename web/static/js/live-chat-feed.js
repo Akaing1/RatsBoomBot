@@ -241,6 +241,7 @@
         if (message.mentioned) row.classList.add("is-mentioned");
         if (message.is_bot || message.notice_type) row.classList.add("is-bot");
         if (messageAccents.has(message.accent)) row.classList.add(`accent-${message.accent}`);
+        if (message.gigantified_emote) { row.classList.add('has-gigantified-emote'); row.dataset.chatGigantified = 'true'; }
         row.dataset.messageId = message.id;
         row.dataset.chatUserId = message.user_id || "";
 
@@ -313,9 +314,11 @@
             body.appendChild(document.createTextNode(text.slice(start)));
             if (text.trim()) hasBody = true;
         }
+        const gigantifiedIndex = message.gigantified_emote ? segments.findLastIndex(segment =>
+            segment?.type === 'emote' && /^https:\/\/static-cdn\.jtvnw\.net\//.test(segment.url || '')) : -1;
 
         if (segments.length) {
-            segments.forEach(segment => {
+            segments.forEach((segment, index) => {
                 const text = typeof segment?.text === "string" ? segment.text : "";
                 if (segment?.type === 'cheermote' && message.bits > 0) {
                     const amount = Number(text.match(/(\d+)$/)?.[1]);
@@ -335,8 +338,13 @@
                     hasBody = true;
                 } else if (segment?.type === "emote" && trustedEmoteUrl) {
                     const emote = makeElement("img", "live-chat-emote");
-                    emote.src = url;
-                    emote.srcset = emoteSrcset(url);
+                    const gigantified = index === gigantifiedIndex;
+                    emote.src = gigantified ? url.replace(/\/2\.0$/, '/3.0') : url;
+                    if (!gigantified) emote.srcset = emoteSrcset(url);
+                    if (gigantified) {
+                        emote.dataset.gigantifiedEmote = 'true';
+                        if (feed.filters?.gigantified?.() ?? true) emote.classList.add('is-gigantified');
+                    }
                     emote.alt = text;
                     emote.title = segment.provider ? `${text} (${segment.provider})` : text;
                     emote.loading = "eager";
@@ -554,7 +562,10 @@
             const anchor = followNewest ? null : rows.find(row => !row.hidden && row.getBoundingClientRect().bottom > viewportTop);
             const anchorTop = anchor?.getBoundingClientRect().top;
             rows.forEach(row => {
-                row.hidden = row.dataset.localPreview !== 'true' && !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'});
+                row.hidden = row.dataset.localPreview !== 'true' && !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local', gigantified: row.dataset.chatGigantified === 'true'});
+                for (const emote of row.querySelectorAll?.('[data-gigantified-emote]') || []) {
+                    emote.classList.toggle('is-gigantified', feed.filters.gigantified?.() ?? true);
+                }
             });
             feed.merger?.refresh();
             if (followNewest) scrollToNewest(feed);
@@ -565,7 +576,7 @@
             ? window.dashboardChatFilters?.attachMirror(refreshFilters)
             : window.dashboardChatFilters?.attach(element, refreshFilters);
         feed.merger = element.classList.contains("dashboard-chat-feed") ? window.createChatMessageMerger?.({
-            allows: row => row.dataset.localPreview === 'true' || !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'}),
+            allows: row => row.dataset.localPreview === 'true' || !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local', gigantified: row.dataset.chatGigantified === 'true'}),
             onChange: () => { if (feed.followNewest) scrollToNewest(feed); }
         }) : null;
         if (feed.merger) {

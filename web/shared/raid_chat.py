@@ -146,6 +146,7 @@ def chat_event(kind, event, timestamp="", badge_catalog=None, emotes=None):
         "display_name": "Anonymous" if event.get("chatter_is_anonymous") else event.get("chatter_user_name", ""), "color": event.get("color", ""),
         "timestamp": timestamp, "message": message_text,
         "bits": max(0, int((event.get('cheer') or {}).get('bits', 0) or 0)),
+        "gigantified_emote": event.get('message_type') == 'power_ups_gigantified_emote',
         "is_shared": shared, "source_channel_id": source_id or str(event.get("broadcaster_user_id") or ""),
         "source_channel_login": event.get("source_broadcaster_user_login") or "",
         "source_channel_name": event.get("source_broadcaster_user_name") or event.get("source_broadcaster_user_login") or source_id,

@@ -4,7 +4,7 @@ PLATFORM_USERS = {
     "twitch": ("vips", "mods", "subs", "non_subs", "bots"),
     "youtube": ("youtube_mods", "youtube_members", "youtube_non_members", "youtube_bots"),
 }
-MESSAGE_TYPES = ("commands", "redeems", "messages", "gifs", "bits", "watch_streaks")
+MESSAGE_TYPES = ("commands", "redeems", "messages", "gifs", "bits", "watch_streaks", "gigantified_emotes")
 
 
 def normalize_chat_preferences(value):
@@ -33,7 +33,7 @@ def normalize_chat_preferences(value):
         additions.append('gifs')
     if version < 8:
         if 'messages' in result['types']:
-            additions.append('bits')
+            additions.extend(('bits', 'gigantified_emotes'))
         if 'redeems' in result['types']:
             additions.append('watch_streaks')
     result['types'] = list(dict.fromkeys([*result['types'], *additions]))

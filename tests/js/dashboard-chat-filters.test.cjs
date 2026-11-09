@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages', 'gifs', 'bits', 'watch_streaks']};
+const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages', 'gifs', 'bits', 'watch_streaks', 'gigantified_emotes']};
 
 function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], remote = {}) {
     const handlers = {}, documentHandlers = {}, buttonHandlers = {}, changes = [];
@@ -96,9 +96,54 @@ test('Bits, watch streaks, and gigantified emotes have independent filters and m
     for (const [message] of samples) assert.equal(mirror.allows(ui.api.category({platform: 'twitch', ...message})), true);
     mirror.update({...old, version: 8});
     for (const [message] of samples) assert.equal(mirror.allows(ui.api.category({platform: 'twitch', ...message})), false);
+    const giant = ui.api.category({platform: 'twitch', gigantified_emote: true});
+    assert.equal(giant.type, 'messages');
+    ui.change('gigantified_emotes', false);
+    assert.equal(ui.filter.allows(giant), true);
+    assert.equal(ui.filter.gigantified(), false);
+    assert.equal(mirror.allows(giant), true);
+    assert.equal(mirror.gigantified(), false);
+    ui.change('gigantified_emotes', true);
+    assert.equal(ui.filter.gigantified(), true);
 });
 
+test('soloing gigantified emotes shows only matching messages and persists to OBS', () => {
+    const ui = setup(), giant = ui.api.category({platform: 'twitch', gigantified_emote: true}), normal = ui.api.category({platform: 'twitch'});
+    ui.solo(ui.option('gigantified_emotes'));
+    assert.equal(ui.filter.allows(giant), true);
+    assert.equal(ui.filter.allows(normal), false);
+    const mirror = ui.api.attachMirror(() => {});
+    mirror.update({version: 8, users: axes.users, types: ['gigantified_emotes']});
+    assert.equal(mirror.allows(giant), true);
+    assert.equal(mirror.allows(normal), false);
+    ui.solo(ui.option('gigantified_emotes'));
+    assert.equal(ui.filter.allows(normal), true);
+    ui.change('gigantified_emotes', false);
+    assert.equal(ui.filter.allows(giant), true);
+    assert.equal(ui.filter.gigantified(), false);
+});
 
+test('enabled gigantified option includes matching messages while disabling it falls back to Messages', () => {
+    const ui = setup(), giant = ui.api.category({platform: 'twitch', gigantified_emote: true}), normal = ui.api.category({platform: 'twitch'});
+    ui.solo(ui.option('bits'));
+    assert.equal(ui.filter.allows(giant), false);
+    ui.change('gigantified_emotes', true);
+    assert.equal(ui.filter.allows(giant), true);
+    assert.equal(ui.filter.allows(normal), false);
+    ui.change('gigantified_emotes', false);
+    assert.equal(ui.filter.allows(giant), false);
+    assert.equal(ui.filter.gigantified(), false);
+    ui.change('messages', true);
+    assert.equal(ui.filter.allows(giant), true);
+    assert.equal(ui.filter.allows(normal), true);
+    const mirror = ui.api.attachMirror(() => {});
+    mirror.update({version: 8, users: axes.users, types: ['bits', 'gigantified_emotes']});
+    assert.equal(mirror.allows(giant), true);
+    assert.equal(mirror.allows(normal), false);
+    mirror.update({version: 8, users: axes.users, types: ['messages']});
+    assert.equal(mirror.allows(giant), true);
+    assert.equal(mirror.gigantified(), false);
+});
 
 test('connected badges fade after 1.5 seconds on first open only; disconnected badges remain visible', () => {
     const ui = setup(new Map(), ['twitch']);
@@ -314,15 +359,15 @@ test('Clear buttons are visible only for sections with disabled options', () => 
 
 test('button count tracks enabled options across both independent sections', () => {
     const ui = setup();
-    assert.equal(ui.countLabel.textContent, '| 16');
+    assert.equal(ui.countLabel.textContent, '| 17');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
     ui.change('bots', false);
-    assert.equal(ui.countLabel.textContent, '| 15');
+    assert.equal(ui.countLabel.textContent, '| 16');
     assert.equal(ui.button.classList.contains('has-filter-count'), true);
     ui.solo(ui.option('messages'));
     assert.equal(ui.countLabel.textContent, '| 10');
     ui.clear('all');
-    assert.equal(ui.countLabel.textContent, '| 16');
+    assert.equal(ui.countLabel.textContent, '| 17');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
 });
 

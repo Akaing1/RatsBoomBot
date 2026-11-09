@@ -34,6 +34,15 @@ def test_bits_amount_survives_dashboard_and_preview_messages(amount):
     assert result['message'] == message.message
 
 
+def test_gigantified_emote_flag_survives_dashboard_and_preview_messages():
+    payload = notice_payload('unused')
+    payload.type = 'power_ups_gigantified_emote'
+    assert LiveChatService(None).publish_twitch(payload).as_dict()['gigantified_emote'] is True
+    event = {'message_id': 'large-emote', 'message_type': payload.type, 'message': {'text': 'Kappa'}}
+    assert chat_event('channel.chat.message', event)['message']['gigantified_emote'] is True
+    event['message_type'] = 'text'
+    assert chat_event('channel.chat.message', event)['message']['gigantified_emote'] is False
+
 
 @pytest.mark.parametrize("kind,data,label", [
     ("sub", {}, "Subscription"), ("sub", {"prime": True}, "Prime subscription"),

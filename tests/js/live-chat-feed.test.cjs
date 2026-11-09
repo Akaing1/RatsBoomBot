@@ -189,7 +189,28 @@ test('Bits-only cheers show only the icon and count, including custom cheermote 
     }
 });
 
+test('gigantified power-ups enlarge native emotes and load their higher-resolution artwork', () => {
+    const app = setup(), url = 'https://static-cdn.jtvnw.net/emoticons/v2/25/static/dark/2.0';
+    for (const large of [true, false]) {
+        app.feed.receive({type: 'message', message: {id: `large-${large}`, platform: 'twitch', gigantified_emote: large,
+            segments: [{type: 'emote', text: 'Kappa', url}]}});
+        const row = app.element.children.at(-1), emote = row.querySelector('.live-chat-emote');
+        assert.equal(row.classList.contains('has-gigantified-emote'), large);
+        assert.equal(emote.classList.contains('is-gigantified'), large);
+        assert.equal(emote.src, large ? url.replace('/2.0', '/3.0') : url);
+    }
+});
 
+test('mixed gigantified messages enlarge only the last native emote occurrence', () => {
+    const app = setup(), native = 'https://static-cdn.jtvnw.net/emoticons/v2/25/static/dark/2.0';
+    const thirdParty = 'https://cdn.7tv.app/emote/test/2x.webp';
+    app.feed.receive({type: 'message', message: {id: 'mixed-large', platform: 'twitch', gigantified_emote: true,
+        segments: [{type: 'emote', text: 'Kappa', url: native}, {type: 'text', text: ' '},
+            {type: 'emote', text: 'Kappa', url: native}, {type: 'emote', text: 'Other', url: thirdParty}]}});
+    const emotes = app.element.children.at(-1).querySelectorAll('.live-chat-emote');
+    assert.deepEqual(emotes.map(emote => emote.classList.contains('is-gigantified')), [false, true, false]);
+    assert.deepEqual(emotes.map(emote => emote.src), [native, native.replace('/2.0', '/3.0'), thirdParty]);
+});
 
 test('chosen name colors survive dashboard legacy and preview formats', () => {
     const app = setup();
@@ -362,6 +383,19 @@ test('private send failures are bot messages for the affected platform and obey 
     assert.deepEqual(rows.map(row => row.hidden), [true, false]);
 });
 
+test('gigantified preference resizes existing emotes without hiding their messages', () => {
+    const callback = source.match(/const refreshFilters = \(\) => \{([\s\S]*?)\n        \};/)[1];
+    let large = false, applied;
+    const emote = {classList: {toggle: (name, enabled) => { applied = enabled; }}};
+    const row = {hidden: false, dataset: {chatUser: 'non_subs', chatType: 'messages'}, querySelectorAll: () => [emote]};
+    const context = {element: {querySelectorAll: () => [row], getBoundingClientRect: () => ({top: 0})},
+        feed: {followNewest: true, filters: {allows: () => true, gigantified: () => large}}, scrollToNewest() {}, updateJumpButton() {}};
+    vm.runInNewContext(`(() => {${callback}})()`, context);
+    assert.equal(applied, false); assert.equal(row.hidden, false);
+    large = true;
+    vm.runInNewContext(`(() => {${callback}})()`, context);
+    assert.equal(applied, true); assert.equal(row.hidden, false);
+});
 
 test('local display previews remain visible when chat filters exclude their category', () => {
     const callback = source.match(/const refreshFilters = \(\) => \{([\s\S]*?)\n        \};/)[1];

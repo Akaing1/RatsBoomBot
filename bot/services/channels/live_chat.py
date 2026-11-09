@@ -79,6 +79,7 @@ class UnifiedChatMessage:
     source_channel_name: str = ""
     source_message_id: str = ""
     bits: int = 0
+    gigantified_emote: bool = False
     watch_streak: int = 0
 
     def as_dict(self) -> dict[str, object]:
@@ -290,6 +291,7 @@ class LiveChatService:
             timestamp=timestamp_value,
             color=str(getattr(color, "html", color) or "") or None,
             bits=max(0, int(getattr(getattr(payload, 'cheer', None), 'bits', 0) or 0)),
+            gigantified_emote=str(getattr(payload, 'type', '')) == 'power_ups_gigantified_emote',
             user_id="" if getattr(payload, "anonymous", False) else str(getattr(chatter, "id", "") or ""),
             **(notice or {}),
             badges=badges,
