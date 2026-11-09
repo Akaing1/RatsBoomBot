@@ -35,6 +35,7 @@
     const stateButton = panel.querySelector("[data-queue-toggle]");
     const count = panel.querySelector("[data-queue-count]");
     const status = panel.querySelector("[data-queue-action-status]");
+    const commandsWarning = panel.querySelector("[data-queue-commands-warning]");
     const nextCountSelect = panel.querySelector("[data-queue-next-select]");
     const nextCountPicker = nextCountSelect.closest(".queue-next-picker");
     const nextCountLabel = panel.querySelector("[data-queue-next-count]");
@@ -154,6 +155,7 @@
     }
 
     function updateState(data) {
+        if (commandsWarning && typeof data.commands_enabled === 'boolean') commandsWarning.hidden = data.commands_enabled;
         const isOpen = Boolean(data.open);
         const users = Array.isArray(data.users) ? data.users : [];
         stateButton.dataset.open = String(isOpen);

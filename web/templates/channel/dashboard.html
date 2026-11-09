@@ -493,6 +493,11 @@
                     </div>
                 {% endif %}
             </div>
+            {% if can_customize %}
+            <p class="queue-commands-warning" data-queue-commands-warning{% if queue_commands_enabled | default(true) %} hidden{% endif %}>
+                Queue commands are disabled. <a href="{{ channel_root }}/settings?section=queue">Enable viewer queue commands</a> so viewers can join with !join.
+            </p>
+            {% endif %}
         </section>
 
     </div>

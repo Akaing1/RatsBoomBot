@@ -2041,6 +2041,8 @@ body.landing-page {
 .queue-action-status.is-fading { opacity: 0; }
 .queue-action-status.success { color: var(--success); }
 .queue-action-status.error { color: var(--danger); }
+.queue-commands-warning { flex: 0 0 auto; margin: auto 0 8px; padding-top: 12px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.queue-commands-warning a { color: #c4b5fd; text-decoration: underline; text-underline-offset: 2px; }
 .queue-list-item { cursor: grab; touch-action: pan-y; }
 .queue-list .queue-list-item.dragging { display: none !important; }
 .queue-drop-placeholder { position: relative; display: grid !important; box-sizing: border-box; grid-template-columns: 30px minmax(0,1fr); align-items: center; gap: 13px; min-height: 54px; padding: 8px 0; border: 1px dashed var(--accent) !important; border-radius: 8px; background: rgba(139,92,246,.12); color: var(--muted); font-size: 12px; }

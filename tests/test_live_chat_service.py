@@ -1103,6 +1103,60 @@ async def test_dashboard_can_reply_to_a_twitch_message(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('enabled', [False, True])
+async def test_queue_state_reports_whether_join_commands_are_enabled(monkeypatch, enabled):
+    services = SimpleNamespace(
+        viewer_queue=SimpleNamespace(is_queue_open=lambda _: True, list_queue=lambda _: [], list_queue_members=lambda _: []),
+        features=SimpleNamespace(is_global_group_enabled=Mock(return_value=enabled)),
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {'channel-1': SimpleNamespace(id='channel-1')})
+    )
+    monkeypatch.setattr(dashboard_router, 'get_bot', lambda: SimpleNamespace(services=services))
+    request = Request({'type': 'http', 'session': {CHANNEL_USER_ID_KEY: 'channel-1'}})
+    response = await dashboard_router.channel_viewer_queue_state(request)
+    assert response.status_code == 200
+    assert json.loads(response.body)['commands_enabled'] is enabled
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('is_open,commands_enabled', [(False, False), (False, True), (True, False)])
+async def test_open_queue_warns_when_join_commands_are_disabled(monkeypatch, is_open, commands_enabled):
+    queue = SimpleNamespace(
+        is_queue_open=lambda _: is_open,
+        open_queue=AsyncMock(return_value='Queue opened.'),
+        close_queue=AsyncMock(return_value='Queue closed.'),
+        list_queue=lambda _: [], list_queue_members=lambda _: []
+    )
+    services = SimpleNamespace(viewer_queue=queue,
+        features=SimpleNamespace(is_global_group_enabled=Mock(return_value=commands_enabled)),
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {'channel-1': SimpleNamespace(login='streamer', display_name='Different display name')}),
+        live_chat=SimpleNamespace(tag_command_response=Mock()),
+        chat_identity=SimpleNamespace(send_message=AsyncMock(side_effect=[
+            SimpleNamespace(sent=True, id='queue-message'), SimpleNamespace(sent=True, id='queue-warning')
+        ])))
+    bot = SimpleNamespace(services=services, create_partialuser=lambda _: SimpleNamespace(id='channel-1'))
+    monkeypatch.setattr(dashboard_router, 'get_bot', lambda: bot)
+    request = Request({'type': 'http', 'session': {CHANNEL_USER_ID_KEY: 'channel-1', CSRF_SESSION_KEY: 'csrf'}})
+    response = await dashboard_router.channel_viewer_queue_action(request, 'toggle', 'csrf')
+    assert response.status_code == 200
+    if is_open:
+        queue.close_queue.assert_awaited_once_with('channel-1')
+        assert services.chat_identity.send_message.await_count == 1
+    else:
+        queue.open_queue.assert_awaited_once_with('channel-1')
+        messages = [call.args[1] for call in services.chat_identity.send_message.await_args_list]
+        assert messages[0] == 'Queue opened.'
+        assert json.loads(response.body)['message'] == 'Queue opened.'
+        if commands_enabled:
+            assert len(messages) == 1
+        else:
+            assert len(messages) == 2
+            assert messages[1].startswith('@streamer, ')
+            assert 'commands are disabled' in messages[1] and '!join' in messages[1]
+            assert [call.args for call in services.live_chat.tag_command_response.call_args_list] == [
+                ('channel-1', 'queue-message'), ('channel-1', 'queue-warning')]
+
+
+@pytest.mark.asyncio
 async def test_dashboard_viewer_queue_actions_send_their_chat_response(monkeypatch):
     queue = SimpleNamespace(
         requeue=AsyncMock(return_value=(True, "Moved alice to position 1.")),
