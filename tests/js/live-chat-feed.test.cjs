@@ -2,6 +2,35 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+let chromium;
+try { ({chromium} = require('playwright')); } catch (_) {}
+const executablePath = process.env.CHAT_TEST_BROWSER_PATH || chromium?.executablePath();
+
+test('GIF artwork fits narrow chat panels and remains bounded on desktop', {skip: !chromium || !fs.existsSync(executablePath || '')}, async () => {
+    const browser = await chromium.launch({executablePath, headless: true});
+    try {
+        const page = await browser.newPage();
+        await page.route('https://media.giphy.com/**', route => route.fulfill({contentType: 'image/svg+xml',
+            body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="purple"/></svg>'}));
+        for (const width of [320, 1200]) {
+            await page.setViewportSize({width, height: 700});
+            await page.setContent(`<style>${fs.readFileSync('web/static/css/style.css', 'utf8')}body{padding:16px}#shell{width:100%;max-width:400px}#feed{height:400px;overflow:auto}</style><div id="shell"><div id="feed"></div></div>`);
+            await page.addScriptTag({content: fs.readFileSync('web/static/js/live-chat-feed.js', 'utf8')});
+            await page.evaluate(() => {
+                window.testFeed = window.createTwitchPreviewFeed(document.querySelector('#feed'));
+                window.testFeed.receive({type: 'message', message: {id: 'gif', platform: 'twitch', username: 'tester',
+                    segments: [{type: 'gif', text: 'GIF', url: 'https://media.giphy.com/media/example/giphy.gif?cid=original'}]}});
+            });
+            await page.waitForFunction(() => document.querySelector('.live-chat-gif')?.naturalWidth > 0);
+            const fits = await page.locator('.live-chat-gif').evaluate(image => {
+                const bounds = image.getBoundingClientRect(), body = image.parentElement.getBoundingClientRect();
+                return bounds.width <= 280 && bounds.height <= 180 && bounds.left >= body.left && bounds.right <= body.right + 1;
+            });
+            assert.equal(fits, true);
+            await page.evaluate(() => window.testFeed.destroy());
+        }
+    } finally { await browser.close(); }
+});
 
 test('timestamps reserve a compact gutter only when present, not space for the hover buttons', () => {
     const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
@@ -26,6 +55,8 @@ class Element {
     }
     set className(value) { this.classes = new Set(value.split(/\s+/)); }
     get className() { return [...this.classes].join(' '); }
+    set textContent(value) { this._text = String(value); this.children = []; }
+    get textContent() { return (this._text || '') + this.children.map(child => child.textContent || '').join(''); }
     get scrollHeight() { return this.children.length * 20; }
     appendChild(child) { child.parentNode = this; this.children.push(child); }
     append(...children) { children.forEach(child => this.appendChild(child)); }
@@ -34,6 +65,7 @@ class Element {
         if (this.parentNode) this.parentNode.children.splice(this.parentNode.children.indexOf(this), 1);
         this.parentNode = null;
     }
+    replaceWith(child) { const parent = this.parentNode, index = parent.children.indexOf(this); parent.children[index] = child; child.parentNode = parent; this.parentNode = null; }
     setAttribute(name, value) { this[name] = value; }
     addEventListener(name, callback) { this.handlers[name] = callback; }
     removeEventListener(name) { delete this.handlers[name]; }
@@ -64,8 +96,8 @@ function setup(debug = false) {
         requestAnimationFrame(callback) { frames.set(++nextFrame, callback); return nextFrame; },
         cancelAnimationFrame(id) { frames.delete(id); }};
     if (debug) window.dashboardChatDebug = {};
-    vm.runInNewContext(source, {window, ResizeObserver,
-        document: {querySelectorAll: () => [], createElement: tag => new Element(tag),
+    vm.runInNewContext(source, {window, ResizeObserver, URL,
+        document: {querySelectorAll: () => [], createElement: tag => new Element(tag), createTextNode: text => Object.assign(new Element('#text'), {textContent: text}),
             addEventListener: (type, handler) => { documentHandlers[type] = handler; },
             removeEventListener: type => { delete documentHandlers[type]; }}});
     const shell = new Element(), element = new Element(); shell.appendChild(element);
@@ -75,6 +107,60 @@ function setup(debug = false) {
             platform: 'twitch', kind: 'message', username: 'chatter', message: 'hello'}}); },
         flush() { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); }};
 }
+
+test('chat links open safely and preserve surrounding punctuation and balanced URL parentheses', () => {
+    const app = setup();
+    const message = 'Visit https://example.com/a?q=hello&x=1, (www.twitch.tv/tester). example.org/wiki/Test_(thing)!';
+    app.feed.receive({type: 'message', message: {id: 'links', platform: 'youtube', message}});
+    const row = app.element.children.at(-1), links = row.querySelectorAll('.live-chat-link');
+    assert.deepEqual(links.map(link => link.href), ['https://example.com/a?q=hello&x=1', 'https://www.twitch.tv/tester', 'https://example.org/wiki/Test_(thing)']);
+    assert.equal(row.querySelector('.live-chat-text').textContent, message);
+    assert.ok(links.every(link => link.target === '_blank' && link.rel === 'noopener noreferrer'));
+});
+
+test('links coexist with Bits and emotes without parsing cheer text inside a URL', () => {
+    const app = setup(), url = 'https://example.com/Cheer100?x=Cheer50';
+    app.feed.receive({type: 'message', message: {id: 'mixed-links', platform: 'twitch', bits: 1,
+        segments: [{type: 'text', text: `Cheer1 ${url} `},
+            {type: 'emote', text: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0'}]}});
+    const row = app.element.children.at(-1);
+    assert.equal(row.querySelectorAll('.live-chat-bits').length, 1);
+    assert.equal(row.querySelector('.live-chat-link').href, url);
+    assert.ok(row.querySelector('.live-chat-emote'));
+});
+
+test('unsafe schemes, malformed URLs, emails, and HTML remain text', () => {
+    const app = setup();
+    const message = 'javascript:alert(1) javascript:example.com data:text/html,test@example.com user@example.org https://%bad <img src=x onerror=alert(1)>';
+    app.feed.receive({type: 'message', message: {id: 'unsafe-links', platform: 'twitch', message}});
+    const row = app.element.children.at(-1);
+    assert.equal(row.querySelectorAll('.live-chat-link').length, 0);
+    assert.equal(row.querySelector('.live-chat-text').textContent, message);
+    assert.equal(row.querySelectorAll('img').length, 0);
+});
+
+test('notice text also supports clickable links', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'notice-link', platform: 'twitch',
+        notice_type: 'redemption', notice: 'Visit https://example.com/reward.', message: ''}});
+    const notice = app.element.children.at(-1).querySelector('.live-chat-notice-text');
+    assert.equal(notice.querySelector('.live-chat-link').href, 'https://example.com/reward');
+    assert.equal(notice.textContent, 'Visit https://example.com/reward.');
+});
+
+test('shared chat renders GIFs without rewriting signed URLs and handles unavailable media', () => {
+    const app = setup(), url = 'https://media.giphy.com/media/example/giphy.gif?cid=full%2Ftoken';
+    app.feed.receive({type: 'message', message: {id: 'gif', platform: 'twitch', username: 'chatter', segments: [{type: 'gif', text: 'GIF', url}]}});
+    const row = app.element.children.at(-1), gif = row.querySelector('.live-chat-gif');
+    assert.equal(gif.src, url);
+    assert.equal(gif.srcset, undefined);
+    assert.equal(gif.alt, 'GIF');
+    assert.equal(gif.referrerPolicy, 'no-referrer');
+    gif.handlers.error();
+    assert.equal(row.querySelector('.live-chat-gif-fallback').textContent, 'GIF unavailable');
+    app.feed.receive({type: 'message', message: {id: 'bad-gif', platform: 'twitch', segments: [{type: 'gif', text: 'GIF', url: 'javascript:alert(1)'}]}});
+    assert.equal(app.element.children.at(-1).querySelector('.live-chat-gif'), undefined);
+});
 
 test('local notice samples reach an open preview and detach when it closes', () => {
     const app = setup(true);
@@ -87,6 +173,83 @@ test('local notice samples reach an open preview and detach when it closes', () 
     assert.equal(app.element.children.length, 1);
     app.feed.destroy();
     assert.equal(app.documentHandlers['dashboard-chat-test-notice'], undefined);
+});
+
+test('Bits messages show the diamond icon, amount, and purple highlight without changing ordinary messages', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'bits', platform: 'twitch', username: 'cheerer', bits: 1000, message: 'Cheer1000 hello'}});
+    const row = app.element.children.at(-1), bits = row.querySelector('.live-chat-bits');
+    assert.equal(row.classList.contains('has-bits'), true);
+    assert.equal(bits['aria-label'], '1,000 Bits');
+    assert.match(bits.innerHTML, /<svg/);
+    assert.equal(row.querySelector('.live-chat-text').textContent, '1,000 hello');
+    assert.equal(row.querySelector('.live-chat-message-heading').querySelector('.live-chat-bits'), undefined);
+    app.receive('ordinary');
+    assert.equal(app.element.children.at(-1).classList.contains('has-bits'), false);
+});
+
+test('watch streak notices show the count, flame icon and matching highlighted border', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'streak', platform: 'twitch', username: 'watcher',
+        notice_type: 'watch_streak', notice_label: 'Watch streak', notice: 'Watched 10 consecutive streams!', watch_streak: 10, message: 'Happy to be here!'}});
+    const row = app.element.children.at(-1);
+    assert.equal(row.classList.contains('has-watch-streak'), true);
+    assert.equal(row.querySelector('.live-chat-notice-label').textContent, '10 watch streak');
+    assert.equal(row.querySelector('.live-chat-notice-separator').textContent, '·');
+    assert.equal(row.querySelector('.live-chat-notice').querySelector('.live-chat-text').textContent, 'Happy to be here!');
+    assert.match(row.querySelector('.live-chat-notice-icon').innerHTML, /<svg/);
+});
+
+test('a single Bit displays only its icon while keeping an accessible amount', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'single-bit', platform: 'twitch', bits: 1, message: 'Cheer1'}});
+    const bits = app.element.children.at(-1).querySelector('.live-chat-bits');
+    assert.equal(bits['aria-label'], '1 Bit');
+    assert.equal(bits.textContent, '');
+    assert.match(bits.innerHTML, /<svg/);
+});
+
+test('Bits spaced through a message replace each cheer in place without a total', () => {
+    const app = setup();
+    app.feed.receive({type: 'message', message: {id: 'spaced-bits', platform: 'twitch', bits: 150, message: 'Cheer100 hello Cheer50 world'}});
+    const row = app.element.children.at(-1);
+    assert.deepEqual(row.querySelectorAll('.live-chat-bits').map(bits => bits['aria-label']), ['100 Bits', '50 Bits']);
+    const text = row.querySelector('.live-chat-text').textContent;
+    assert.equal(text.replace(/\s+/g, ' '), '100 hello 50 world');
+    assert.doesNotMatch(text, /Cheer\d+/i);
+});
+
+test('Bits-only cheers show only the icon and count, including custom cheermote names', () => {
+    const app = setup();
+    for (const segments of [[], [{type: 'cheermote', text: 'CustomCheer500'}]]) {
+        app.feed.receive({type: 'message', message: {id: `cheer-${segments.length}`, platform: 'twitch', bits: 500, message: 'Cheer500', segments}});
+        const row = app.element.children.at(-1);
+        assert.equal(row.querySelector('.live-chat-bits')['aria-label'], '500 Bits');
+        assert.equal(row.querySelector('.live-chat-text').textContent, '500');
+    }
+});
+
+test('gigantified power-ups enlarge native emotes and load their higher-resolution artwork', () => {
+    const app = setup(), url = 'https://static-cdn.jtvnw.net/emoticons/v2/25/static/dark/2.0';
+    for (const large of [true, false]) {
+        app.feed.receive({type: 'message', message: {id: `large-${large}`, platform: 'twitch', gigantified_emote: large,
+            segments: [{type: 'emote', text: 'Kappa', url}]}});
+        const row = app.element.children.at(-1), emote = row.querySelector('.live-chat-emote');
+        assert.equal(row.classList.contains('has-gigantified-emote'), large);
+        assert.equal(emote.classList.contains('is-gigantified'), large);
+        assert.equal(emote.src, large ? url.replace('/2.0', '/3.0') : url);
+    }
+});
+
+test('mixed gigantified messages enlarge only the last native emote occurrence', () => {
+    const app = setup(), native = 'https://static-cdn.jtvnw.net/emoticons/v2/25/static/dark/2.0';
+    const thirdParty = 'https://cdn.7tv.app/emote/test/2x.webp';
+    app.feed.receive({type: 'message', message: {id: 'mixed-large', platform: 'twitch', gigantified_emote: true,
+        segments: [{type: 'emote', text: 'Kappa', url: native}, {type: 'text', text: ' '},
+            {type: 'emote', text: 'Kappa', url: native}, {type: 'emote', text: 'Other', url: thirdParty}]}});
+    const emotes = app.element.children.at(-1).querySelectorAll('.live-chat-emote');
+    assert.deepEqual(emotes.map(emote => emote.classList.contains('is-gigantified')), [false, true, false]);
+    assert.deepEqual(emotes.map(emote => emote.src), [native, native.replace('/2.0', '/3.0'), thirdParty]);
 });
 
 test('chosen name colors survive dashboard legacy and preview formats', () => {
@@ -126,7 +289,7 @@ test('shared feed renders notices and optional emote-bearing text without blank 
         const row = app.element.children.at(-1);
         assert.equal(row.dataset.noticeType, noticeType);
         assert.equal(row.classList.contains('is-bot'), true);
-        assert.equal(row.querySelector('.live-chat-notice-label').textContent, 'Event');
+        assert.equal(row.querySelector('.live-chat-notice-label').textContent, noticeType === 'watch_streak' ? 'Watch streak' : 'Event');
         assert.equal(row.querySelector('.live-chat-notice-text').textContent, 'Event details');
         assert.equal(row.querySelector('.live-chat-text'), undefined);
     }
@@ -258,6 +421,34 @@ test('private send failures are bot messages for the affected platform and obey 
     allowed.delete('bots'); allowed.add('youtube_bots');
     vm.runInContext(`(() => {${callback}})()`, context);
     assert.deepEqual(rows.map(row => row.hidden), [true, false]);
+});
+
+test('gigantified preference resizes existing emotes without hiding their messages', () => {
+    const callback = source.match(/const refreshFilters = \(\) => \{([\s\S]*?)\n        \};/)[1];
+    let large = false, applied;
+    const emote = {classList: {toggle: (name, enabled) => { applied = enabled; }}};
+    const row = {hidden: false, dataset: {chatUser: 'non_subs', chatType: 'messages'}, querySelectorAll: () => [emote]};
+    const context = {element: {querySelectorAll: () => [row], getBoundingClientRect: () => ({top: 0})},
+        feed: {followNewest: true, filters: {allows: () => true, gigantified: () => large}}, scrollToNewest() {}, updateJumpButton() {}};
+    vm.runInNewContext(`(() => {${callback}})()`, context);
+    assert.equal(applied, false); assert.equal(row.hidden, false);
+    large = true;
+    vm.runInNewContext(`(() => {${callback}})()`, context);
+    assert.equal(applied, true); assert.equal(row.hidden, false);
+});
+
+test('local display previews remain visible when chat filters exclude their category', () => {
+    const callback = source.match(/const refreshFilters = \(\) => \{([\s\S]*?)\n        \};/)[1];
+    const rows = [
+        {hidden: false, dataset: {localPreview: 'true', chatUser: 'bots', chatType: 'redeems'}},
+        {hidden: false, dataset: {chatUser: 'bots', chatType: 'redeems'}},
+    ];
+    vm.runInNewContext(`(() => {${callback}})()`, {
+        element: {querySelectorAll: () => rows, getBoundingClientRect: () => ({top: 0})},
+        feed: {followNewest: true, filters: {allows: () => false}}, scrollToNewest() {}, updateJumpButton() {},
+    });
+    assert.equal(rows[0].hidden, false);
+    assert.equal(rows[1].hidden, true);
 });
 
 test('shared messages display a text-safe source label and retain the destination message ID', () => {

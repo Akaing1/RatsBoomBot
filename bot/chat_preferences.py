@@ -4,7 +4,7 @@ PLATFORM_USERS = {
     "twitch": ("vips", "mods", "subs", "non_subs", "bots"),
     "youtube": ("youtube_mods", "youtube_members", "youtube_non_members", "youtube_bots"),
 }
-MESSAGE_TYPES = ("commands", "redeems", "messages")
+MESSAGE_TYPES = ("commands", "redeems", "messages", "gifs", "bits", "watch_streaks", "gigantified_emotes")
 
 
 def normalize_chat_preferences(value):
@@ -18,11 +18,23 @@ def normalize_chat_preferences(value):
             or any(not isinstance(key, str) or (key != "local" and (not key.isascii() or not key.isdigit() or len(key) > 25))
                    or not isinstance(enabled, bool) for key, enabled in channels.items())):
         raise ValueError("Invalid chat channels.")
-    result = {"version": 6, "origin": origin, "channels": dict(channels)}
+    result = {"version": 8, "origin": origin, "channels": dict(channels)}
     for axis, allowed in (("connectedPlatforms", tuple(PLATFORM_USERS)),
                           ("users", sum(PLATFORM_USERS.values(), ())), ("types", MESSAGE_TYPES)):
         keys = value.get(axis)
         if not isinstance(keys, list) or len(keys) > len(allowed) or any(not isinstance(key, str) or key not in allowed for key in keys):
             raise ValueError(f"Invalid chat {axis}.")
         result[axis] = list(dict.fromkeys(keys))
+    version = value.get('version', 0)
+    if not isinstance(version, int):
+        version = 0
+    additions = []
+    if version < 7 and 'messages' in result['types']:
+        additions.append('gifs')
+    if version < 8:
+        if 'messages' in result['types']:
+            additions.extend(('bits', 'gigantified_emotes'))
+        if 'redeems' in result['types']:
+            additions.append('watch_streaks')
+    result['types'] = list(dict.fromkeys([*result['types'], *additions]))
     return result

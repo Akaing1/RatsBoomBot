@@ -53,6 +53,21 @@ def test_twitch_name_colors_use_html_format():
     assert service.publish_twitch(payload).color is None
 
 
+def test_native_twitch_gifs_keep_the_complete_asset_url_in_history():
+    from twitchio import ChatMessageFragment
+    url = 'https://media.giphy.com/media/example/giphy.gif?cid=signed%2Fvalue&rid=giphy.gif'
+    payload = twitch_payload('a GIF', 'native-gif')
+    payload.fragments = [ChatMessageFragment({'type': 'gif', 'text': '', 'gif': {'gif_id': 'example', 'url': url}}, http=None)]
+    service = LiveChatService(None)
+    message = service.publish_twitch(payload)
+    assert message.segments == (ChatSegment('gif', 'GIF', url, 'twitch'),)
+    assert message.as_dict()['segments'][0]['url'] == url
+    assert service.history('channel-1')[0]['segments'] == message.as_dict()['segments']
+    payload.id = 'bad-gif'
+    payload.fragments = [SimpleNamespace(type='gif', text='GIF', gif=SimpleNamespace(asset='javascript:alert(1)'))]
+    assert service.publish_twitch(payload).segments == (ChatSegment('text', 'GIF'),)
+
+
 def test_twitch_messages_are_split_between_chat_and_commands():
     bot = SimpleNamespace(get_command=lambda name: object() if name == "points" else None)
     service = LiveChatService(None, bot=bot)
@@ -108,7 +123,7 @@ def test_chat_filters_replace_command_toggle_and_only_apply_to_combined_chat():
     assert "addEventListener('focusout'" not in filters
     assert "dashboard-chat-filters.js" in dashboard
     assert dashboard.index('data-chat-filter-toggle') < dashboard.index('data-chat-lock')
-    assert 'row.hidden = feed.filters ? !feed.filters.allows(category) : false;' in script
+    assert 'row.hidden = !message.local_preview && feed.filters ? !feed.filters.allows(category) : false;' in script
     assert 'const rows = [...element.querySelectorAll(".live-chat-message")];' in script
     assert 'rows.forEach(row => {' in script
     assert 'if (!row.hidden) feed.hasUnseenMessages = true;' in script
@@ -1085,6 +1100,60 @@ async def test_dashboard_can_reply_to_a_twitch_message(monkeypatch):
         message="This is a reply",
         reply_to_message_id="parent-message"
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('enabled', [False, True])
+async def test_queue_state_reports_whether_join_commands_are_enabled(monkeypatch, enabled):
+    services = SimpleNamespace(
+        viewer_queue=SimpleNamespace(is_queue_open=lambda _: True, list_queue=lambda _: [], list_queue_members=lambda _: []),
+        features=SimpleNamespace(is_global_group_enabled=Mock(return_value=enabled)),
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {'channel-1': SimpleNamespace(id='channel-1')})
+    )
+    monkeypatch.setattr(dashboard_router, 'get_bot', lambda: SimpleNamespace(services=services))
+    request = Request({'type': 'http', 'session': {CHANNEL_USER_ID_KEY: 'channel-1'}})
+    response = await dashboard_router.channel_viewer_queue_state(request)
+    assert response.status_code == 200
+    assert json.loads(response.body)['commands_enabled'] is enabled
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('is_open,commands_enabled', [(False, False), (False, True), (True, False)])
+async def test_open_queue_warns_when_join_commands_are_disabled(monkeypatch, is_open, commands_enabled):
+    queue = SimpleNamespace(
+        is_queue_open=lambda _: is_open,
+        open_queue=AsyncMock(return_value='Queue opened.'),
+        close_queue=AsyncMock(return_value='Queue closed.'),
+        list_queue=lambda _: [], list_queue_members=lambda _: []
+    )
+    services = SimpleNamespace(viewer_queue=queue,
+        features=SimpleNamespace(is_global_group_enabled=Mock(return_value=commands_enabled)),
+        broadcasters=SimpleNamespace(get_broadcasters=lambda: {'channel-1': SimpleNamespace(login='streamer', display_name='Different display name')}),
+        live_chat=SimpleNamespace(tag_command_response=Mock()),
+        chat_identity=SimpleNamespace(send_message=AsyncMock(side_effect=[
+            SimpleNamespace(sent=True, id='queue-message'), SimpleNamespace(sent=True, id='queue-warning')
+        ])))
+    bot = SimpleNamespace(services=services, create_partialuser=lambda _: SimpleNamespace(id='channel-1'))
+    monkeypatch.setattr(dashboard_router, 'get_bot', lambda: bot)
+    request = Request({'type': 'http', 'session': {CHANNEL_USER_ID_KEY: 'channel-1', CSRF_SESSION_KEY: 'csrf'}})
+    response = await dashboard_router.channel_viewer_queue_action(request, 'toggle', 'csrf')
+    assert response.status_code == 200
+    if is_open:
+        queue.close_queue.assert_awaited_once_with('channel-1')
+        assert services.chat_identity.send_message.await_count == 1
+    else:
+        queue.open_queue.assert_awaited_once_with('channel-1')
+        messages = [call.args[1] for call in services.chat_identity.send_message.await_args_list]
+        assert messages[0] == 'Queue opened.'
+        assert json.loads(response.body)['message'] == 'Queue opened.'
+        if commands_enabled:
+            assert len(messages) == 1
+        else:
+            assert len(messages) == 2
+            assert messages[1].startswith('@streamer, ')
+            assert 'commands are disabled' in messages[1] and '!join' in messages[1]
+            assert [call.args for call in services.live_chat.tag_command_response.call_args_list] == [
+                ('channel-1', 'queue-message'), ('channel-1', 'queue-warning')]
 
 
 @pytest.mark.asyncio

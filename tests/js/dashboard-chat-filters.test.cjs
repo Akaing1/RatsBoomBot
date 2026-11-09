@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages']};
+const axes = {users: ['vips', 'mods', 'subs', 'non_subs', 'bots', 'youtube_mods', 'youtube_members', 'youtube_non_members', 'youtube_bots'], types: ['commands', 'redeems', 'messages', 'gifs', 'bits', 'watch_streaks', 'gigantified_emotes']};
 
 function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], remote = {}) {
     const handlers = {}, documentHandlers = {}, buttonHandlers = {}, changes = [];
@@ -56,6 +56,94 @@ function setup(storage = new Map(), connectedPlatforms = ['twitch', 'youtube'], 
     };
     return {api, filter, channelList, channel, toggleChannel, syncStatus, inputs, groups, platformInputs, platform, connectionBadges, timers, clears, countLabel, option, change, clear, solo, handlers, documentHandlers, buttonHandlers, options, button, changes};
 }
+
+test('GIF filters are independent, persist, and migrate older message selections', () => {
+    const ui = setup();
+    const category = ui.api.category({platform: 'twitch', segments: [{type: 'gif', url: 'https://media.giphy.com/media/example.gif'}]});
+    assert.equal(category.type, 'gifs');
+    assert.equal(ui.filter.allows(category), true);
+    ui.change('gifs', false);
+    assert.equal(ui.filter.allows(category), false);
+    assert.equal(ui.filter.allows({user: 'non_subs', type: 'messages'}), true);
+    ui.solo(ui.option('gifs'));
+    assert.equal(ui.filter.allows(category), true);
+    assert.equal(ui.filter.allows({user: 'non_subs', type: 'messages'}), false);
+    const old = {version: 6, users: axes.users, types: ['messages']};
+    const migrated = setup(new Map([['ratsboombot:chat-filters:test', JSON.stringify(old)]]));
+    assert.equal(migrated.option('gifs').checked, true);
+    migrated.change('gifs', false);
+    const mirror = migrated.api.attachMirror(() => {});
+    mirror.update(old);
+    assert.equal(mirror.allows(category), true);
+    mirror.update({...old, version: 7});
+    assert.equal(mirror.allows(category), false);
+});
+
+test('Bits, watch streaks, and gigantified emotes have independent filters and mirror to OBS', () => {
+    const ui = setup();
+    const samples = [[{bits: 100}, 'bits'], [{notice_type: 'watch_streak'}, 'watch_streaks']];
+    for (const [message, type] of samples) {
+        const category = ui.api.category({platform: 'twitch', ...message});
+        assert.equal(category.type, type);
+        ui.change(type, false);
+        assert.equal(ui.filter.allows(category), false);
+        ui.change(type, true);
+        assert.equal(ui.filter.allows(category), true);
+    }
+    const mirror = ui.api.attachMirror(() => {});
+    const old = {version: 7, users: axes.users, types: ['messages', 'redeems']};
+    mirror.update(old);
+    for (const [message] of samples) assert.equal(mirror.allows(ui.api.category({platform: 'twitch', ...message})), true);
+    mirror.update({...old, version: 8});
+    for (const [message] of samples) assert.equal(mirror.allows(ui.api.category({platform: 'twitch', ...message})), false);
+    const giant = ui.api.category({platform: 'twitch', gigantified_emote: true});
+    assert.equal(giant.type, 'messages');
+    ui.change('gigantified_emotes', false);
+    assert.equal(ui.filter.allows(giant), true);
+    assert.equal(ui.filter.gigantified(), false);
+    assert.equal(mirror.allows(giant), true);
+    assert.equal(mirror.gigantified(), false);
+    ui.change('gigantified_emotes', true);
+    assert.equal(ui.filter.gigantified(), true);
+});
+
+test('soloing gigantified emotes shows only matching messages and persists to OBS', () => {
+    const ui = setup(), giant = ui.api.category({platform: 'twitch', gigantified_emote: true}), normal = ui.api.category({platform: 'twitch'});
+    ui.solo(ui.option('gigantified_emotes'));
+    assert.equal(ui.filter.allows(giant), true);
+    assert.equal(ui.filter.allows(normal), false);
+    const mirror = ui.api.attachMirror(() => {});
+    mirror.update({version: 8, users: axes.users, types: ['gigantified_emotes']});
+    assert.equal(mirror.allows(giant), true);
+    assert.equal(mirror.allows(normal), false);
+    ui.solo(ui.option('gigantified_emotes'));
+    assert.equal(ui.filter.allows(normal), true);
+    ui.change('gigantified_emotes', false);
+    assert.equal(ui.filter.allows(giant), true);
+    assert.equal(ui.filter.gigantified(), false);
+});
+
+test('enabled gigantified option includes matching messages while disabling it falls back to Messages', () => {
+    const ui = setup(), giant = ui.api.category({platform: 'twitch', gigantified_emote: true}), normal = ui.api.category({platform: 'twitch'});
+    ui.solo(ui.option('bits'));
+    assert.equal(ui.filter.allows(giant), false);
+    ui.change('gigantified_emotes', true);
+    assert.equal(ui.filter.allows(giant), true);
+    assert.equal(ui.filter.allows(normal), false);
+    ui.change('gigantified_emotes', false);
+    assert.equal(ui.filter.allows(giant), false);
+    assert.equal(ui.filter.gigantified(), false);
+    ui.change('messages', true);
+    assert.equal(ui.filter.allows(giant), true);
+    assert.equal(ui.filter.allows(normal), true);
+    const mirror = ui.api.attachMirror(() => {});
+    mirror.update({version: 8, users: axes.users, types: ['bits', 'gigantified_emotes']});
+    assert.equal(mirror.allows(giant), true);
+    assert.equal(mirror.allows(normal), false);
+    mirror.update({version: 8, users: axes.users, types: ['messages']});
+    assert.equal(mirror.allows(giant), true);
+    assert.equal(mirror.gigantified(), false);
+});
 
 test('connected badges fade after 1.5 seconds on first open only; disconnected badges remain visible', () => {
     const ui = setup(new Map(), ['twitch']);
@@ -112,7 +200,7 @@ test('messages have independent user and type classifications', () => {
     assert.equal(category({kind: 'system'}).type, 'messages');
     for (const notice_type of ['sub', 'resub', 'sub_gift', 'community_sub_gift', 'gift_paid_upgrade',
         'prime_paid_upgrade', 'watch_streak', 'redemption', 'raid']) {
-        assert.equal(category({platform: 'twitch', kind: 'chat', notice_type}).type, 'redeems');
+        assert.equal(category({platform: 'twitch', kind: 'chat', notice_type}).type, notice_type === 'watch_streak' ? 'watch_streaks' : 'redeems');
         assert.equal(category({platform: 'twitch', kind: 'chat', notice_type, badges: ['subscriber']}).user, 'bots');
         assert.equal(category({platform: 'youtube', kind: 'chat', notice_type}).user, 'youtube_bots');
     }
@@ -271,15 +359,15 @@ test('Clear buttons are visible only for sections with disabled options', () => 
 
 test('button count tracks enabled options across both independent sections', () => {
     const ui = setup();
-    assert.equal(ui.countLabel.textContent, '| 13');
+    assert.equal(ui.countLabel.textContent, '| 17');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
     ui.change('bots', false);
-    assert.equal(ui.countLabel.textContent, '| 12');
+    assert.equal(ui.countLabel.textContent, '| 16');
     assert.equal(ui.button.classList.contains('has-filter-count'), true);
     ui.solo(ui.option('messages'));
     assert.equal(ui.countLabel.textContent, '| 10');
     ui.clear('all');
-    assert.equal(ui.countLabel.textContent, '| 13');
+    assert.equal(ui.countLabel.textContent, '| 17');
     assert.equal(ui.button.classList.contains('has-filter-count'), false);
 });
 
@@ -352,7 +440,7 @@ test('switching carousel cards dismisses the dropdown', () => {
 });
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
-const prefs = (users = ['mods'], types = ['messages']) => ({version: 6, origin: 'all', channels: {}, connectedPlatforms: ['twitch', 'youtube'], users, types});
+const prefs = (users = ['mods'], types = ['messages']) => ({version: 8, origin: 'all', channels: {}, connectedPlatforms: ['twitch', 'youtube'], users, types});
 const response = preferences => ({ok: true, json: async () => ({preferences})});
 const dataset = {preferencesUrl: '/channel/api/chat/preferences', csrfToken: 'valid'};
 

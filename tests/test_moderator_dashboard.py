@@ -30,7 +30,7 @@ async def env(tmp_path, monkeypatch):
             get_or_create_widget_token=AsyncMock(), get_pinned_message=Mock(return_value=None),
             find_message=Mock(return_value={'id':'twitch:abc', 'message':'hello'}), pin_message=AsyncMock(),
             clear_pinned_message=AsyncMock(), remove_message=AsyncMock(), resolve_automod_message=Mock())
-        features = SimpleNamespace(is_enabled=Mock(return_value=False),
+        features = SimpleNamespace(is_enabled=Mock(return_value=False), is_global_group_enabled=Mock(return_value=True),
             get_profile_features=Mock(return_value={}), get_channel_features=Mock(return_value={__import__("bot.profiles", fromlist=["FeatureName"]).FeatureName.POINTS: SimpleNamespace(effective_enabled=True, override_enabled=True, blocked_by_profile=False, blocked_by_globals=False)}),
             get_global_groups=Mock(return_value={}), get_global_commands=Mock(return_value={}),
             set_enabled=AsyncMock(return_value=SimpleNamespace(effective_enabled=True)))

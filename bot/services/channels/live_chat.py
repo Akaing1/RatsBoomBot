@@ -78,6 +78,9 @@ class UnifiedChatMessage:
     source_channel_login: str = ""
     source_channel_name: str = ""
     source_message_id: str = ""
+    bits: int = 0
+    gigantified_emote: bool = False
+    watch_streak: int = 0
 
     def as_dict(self) -> dict[str, object]:
         payload = asdict(self)
@@ -287,6 +290,8 @@ class LiveChatService:
             message=message_text,
             timestamp=timestamp_value,
             color=str(getattr(color, "html", color) or "") or None,
+            bits=max(0, int(getattr(getattr(payload, 'cheer', None), 'bits', 0) or 0)),
+            gigantified_emote=str(getattr(payload, 'type', '')) == 'power_ups_gigantified_emote',
             user_id="" if getattr(payload, "anonymous", False) else str(getattr(chatter, "id", "") or ""),
             **(notice or {}),
             badges=badges,
@@ -452,7 +457,19 @@ class LiveChatService:
 
         for fragment in fragments:
             text = str(getattr(fragment, "text", ""))
+            if getattr(fragment, 'type', None) == 'cheermote':
+                segments.append(ChatSegment('cheermote', text, provider='twitch'))
+                continue
             emote = getattr(fragment, "emote", None)
+            gif = getattr(fragment, "gif", None)
+            if getattr(fragment, "type", None) == "gif":
+                url = str(getattr(gif, "asset", gif) or "")
+                if url.startswith("https://"):
+                    # Twitch requires the original GIF URL, including its query string.
+                    segments.append(ChatSegment("gif", text or "GIF", url, "twitch"))
+                    continue
+                segments.append(ChatSegment('text', text or 'GIF'))
+                continue
 
             if getattr(fragment, "type", None) == "emote" and emote is not None:
                 emote_id = str(getattr(emote, "id", ""))

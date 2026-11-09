@@ -7,6 +7,30 @@
         return element;
     }
 
+    function appendLinkedText(parent, text, appendPlain = value => parent.appendChild(document.createTextNode(value))) {
+        const links = /\b(?:https?:\/\/|www\.)[^\s<>"']+|\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?(?:[/?#][^\s<>"']*)?/gi;
+        let start = 0;
+        for (const match of text.matchAll(links)) {
+            // Do not turn email addresses or unsupported schemes into partial links.
+            if (match.index && /[\w@:/.-]/.test(text[match.index - 1])) continue;
+            let label = match[0].replace(/[.,!?;:]+$/, '');
+            for (const [open, close] of [['(', ')'], ['[', ']'], ['{', '}']]) {
+                while (label.endsWith(close) && label.split(close).length > label.split(open).length) label = label.slice(0, -1);
+            }
+            let url;
+            try { url = new URL(/^https?:\/\//i.test(label) ? label : `https://${label}`); }
+            catch { continue; }
+            if (!['http:', 'https:'].includes(url.protocol)) continue;
+            appendPlain(text.slice(start, match.index));
+            const link = makeElement('a', 'live-chat-link', label);
+            link.href = url.href;
+            link.target = '_blank'; link.rel = 'noopener noreferrer';
+            parent.appendChild(link);
+            start = match.index + label.length;
+        }
+        appendPlain(text.slice(start));
+    }
+
     function createJumpButton(newestFirst = false) {
         const button = makeElement("button", "live-chat-jump");
         const path = newestFirst ? "M12 19V5m-6 6 6-6 6 6" : "M12 5v14m-6-6 6 6 6-6";
@@ -235,11 +259,13 @@
         row.dataset.chatType = category.type;
         row.dataset.chatOrigin = message.is_shared ? 'shared' : 'local';
         row.dataset.chatChannel = category.channel || 'local';
-        row.hidden = feed.filters ? !feed.filters.allows(category) : false;
+        if (message.local_preview) row.dataset.localPreview = 'true';
+        row.hidden = !message.local_preview && feed.filters ? !feed.filters.allows(category) : false;
         if (message.deleted) row.classList.add("is-deleted");
         if (message.mentioned) row.classList.add("is-mentioned");
         if (message.is_bot || message.notice_type) row.classList.add("is-bot");
         if (messageAccents.has(message.accent)) row.classList.add(`accent-${message.accent}`);
+        if (message.gigantified_emote) { row.classList.add('has-gigantified-emote'); row.dataset.chatGigantified = 'true'; }
         row.dataset.messageId = message.id;
         row.dataset.chatUserId = message.user_id || "";
 
@@ -278,6 +304,9 @@
             }
         });
         heading.appendChild(name);
+        if (Number.isSafeInteger(message.bits) && message.bits > 0) {
+            row.classList.add('has-bits');
+        }
 
         let timestamp = null;
         const date = new Date(message.timestamp);
@@ -287,28 +316,73 @@
 
         const body = makeElement("p", "live-chat-text");
         const segments = Array.isArray(message.segments) ? message.segments : [];
+        let hasBody = false;
+        function appendBits(amount) {
+            const bits = makeElement('span', 'live-chat-bits');
+            const label = `${amount.toLocaleString()} ${amount === 1 ? 'Bit' : 'Bits'}`;
+            bits.title = label; bits.setAttribute('aria-label', label);
+            bits.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 14 12 23 2 14Z" fill="currentColor"/><path d="m12 2 0 12H2Zm0 12 10 0-10 9Z" fill="#9147ff"/></svg>';
+            if (amount !== 1) bits.appendChild(makeElement('span', '', amount.toLocaleString()));
+            body.appendChild(bits); hasBody = true;
+        }
+        function appendText(text) {
+            appendLinkedText(body, text, plain => {
+                let start = 0;
+                if (message.bits > 0) {
+                    for (const match of plain.matchAll(/\bcheer(\d+)\b/gi)) {
+                        const amount = Number(match[1]);
+                        if (!Number.isSafeInteger(amount) || amount <= 0) continue;
+                        body.appendChild(document.createTextNode(plain.slice(start, match.index)));
+                        appendBits(amount); start = match.index + match[0].length;
+                    }
+                }
+                body.appendChild(document.createTextNode(plain.slice(start)));
+            });
+            if (text.trim()) hasBody = true;
+        }
+        const gigantifiedIndex = message.gigantified_emote ? segments.findLastIndex(segment =>
+            segment?.type === 'emote' && /^https:\/\/static-cdn\.jtvnw\.net\//.test(segment.url || '')) : -1;
 
         if (segments.length) {
-            segments.forEach(segment => {
+            segments.forEach((segment, index) => {
                 const text = typeof segment?.text === "string" ? segment.text : "";
+                if (segment?.type === 'cheermote' && message.bits > 0) {
+                    const amount = Number(text.match(/(\d+)$/)?.[1]);
+                    if (Number.isSafeInteger(amount) && amount > 0) { appendBits(amount); return; }
+                }
                 const url = typeof segment?.url === "string" ? segment.url : "";
                 const trustedEmoteUrl = /^https:\/\/(?:static-cdn\.jtvnw\.net|cdn\.7tv\.app)\//.test(url);
 
-                if (segment?.type === "emote" && trustedEmoteUrl) {
+                if (segment?.type === "gif" && /^https:\/\/[^/\s]+\//i.test(url)) {
+                    const gif = makeElement("img", "live-chat-gif");
+                    gif.src = url;
+                    gif.alt = text || "GIF";
+                    gif.title = 'GIF';
+                    gif.loading = 'lazy'; gif.decoding = 'async'; gif.referrerPolicy = 'no-referrer';
+                    gif.addEventListener('error', () => gif.replaceWith(makeElement('span', 'live-chat-gif-fallback', 'GIF unavailable')), {once: true});
+                    body.appendChild(gif);
+                    hasBody = true;
+                } else if (segment?.type === "emote" && trustedEmoteUrl) {
                     const emote = makeElement("img", "live-chat-emote");
-                    emote.src = url;
-                    emote.srcset = emoteSrcset(url);
+                    const gigantified = index === gigantifiedIndex;
+                    emote.src = gigantified ? url.replace(/\/2\.0$/, '/3.0') : url;
+                    if (!gigantified) emote.srcset = emoteSrcset(url);
+                    if (gigantified) {
+                        emote.dataset.gigantifiedEmote = 'true';
+                        if (feed.filters?.gigantified?.() ?? true) emote.classList.add('is-gigantified');
+                    }
                     emote.alt = text;
                     emote.title = segment.provider ? `${text} (${segment.provider})` : text;
                     emote.loading = "eager";
                     emote.decoding = "async";
                     body.appendChild(emote);
+                    hasBody = true;
                 } else {
-                    body.appendChild(document.createTextNode(text));
+                    appendText(text);
                 }
             });
         } else {
-            body.textContent = message.message || "";
+            appendText(message.message || '');
         }
 
         if (message.is_shared) {
@@ -320,11 +394,27 @@
         if (message.notice) {
             if (message.notice_type) row.dataset.noticeType = message.notice_type;
             const notice = makeElement("div", "live-chat-notice");
-            if (message.notice_label) notice.appendChild(makeElement("strong", "live-chat-notice-label", message.notice_label));
-            notice.appendChild(makeElement("span", "live-chat-notice-text", message.notice));
+            let noticeLabel = message.notice_label;
+            if (message.notice_type === 'watch_streak') {
+                row.classList.add('has-watch-streak');
+                const icon = makeElement('span', 'live-chat-notice-icon'); icon.setAttribute('aria-hidden', 'true');
+                icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 2c1 5-3 6-3 10-2-1-3-3-3-3-2 3-3 5-3 7a9 9 0 0 0 18 0c0-5-5-10-9-14Z"/><path d="M12 13c-3 3-3 5-1 7 3 1 5-2 1-7Z"/></svg>';
+                notice.appendChild(icon);
+                noticeLabel = Number.isSafeInteger(message.watch_streak) && message.watch_streak > 0
+                    ? `${message.watch_streak.toLocaleString()} watch streak` : 'Watch streak';
+            }
+            if (noticeLabel) notice.appendChild(makeElement("strong", "live-chat-notice-label", noticeLabel));
+            if (message.notice_type === 'watch_streak') {
+                notice.appendChild(makeElement('span', 'live-chat-notice-separator', '·'));
+            }
+            if (message.notice_type === 'watch_streak' && hasBody) notice.appendChild(body);
+            else {
+                const text = makeElement('span', 'live-chat-notice-text');
+                appendLinkedText(text, message.notice); notice.appendChild(text);
+            }
             content.appendChild(notice);
         }
-        if (message.message || segments.length) content.appendChild(body);
+        if (hasBody && message.notice_type !== 'watch_streak') content.appendChild(body);
         if (timestamp) content.appendChild(timestamp);
         row.appendChild(content);
         if (!message.deleted && !message.test_mode && !message.local_only && !message.notice && message.platform === "twitch" && feed.moderationUrl) {
@@ -501,7 +591,10 @@
             const anchor = followNewest ? null : rows.find(row => !row.hidden && row.getBoundingClientRect().bottom > viewportTop);
             const anchorTop = anchor?.getBoundingClientRect().top;
             rows.forEach(row => {
-                row.hidden = !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'});
+                row.hidden = row.dataset.localPreview !== 'true' && !feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local', gigantified: row.dataset.chatGigantified === 'true'});
+                for (const emote of row.querySelectorAll?.('[data-gigantified-emote]') || []) {
+                    emote.classList.toggle('is-gigantified', feed.filters.gigantified?.() ?? true);
+                }
             });
             feed.merger?.refresh();
             if (followNewest) scrollToNewest(feed);
@@ -512,7 +605,7 @@
             ? window.dashboardChatFilters?.attachMirror(refreshFilters)
             : window.dashboardChatFilters?.attach(element, refreshFilters);
         feed.merger = element.classList.contains("dashboard-chat-feed") ? window.createChatMessageMerger?.({
-            allows: row => !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local'}),
+            allows: row => row.dataset.localPreview === 'true' || !feed.filters || feed.filters.allows({user: row.dataset.chatUser, type: row.dataset.chatType, origin: row.dataset.chatOrigin || 'local', channel: row.dataset.chatChannel || 'local', gigantified: row.dataset.chatGigantified === 'true'}),
             onChange: () => { if (feed.followNewest) scrollToNewest(feed); }
         }) : null;
         if (feed.merger) {

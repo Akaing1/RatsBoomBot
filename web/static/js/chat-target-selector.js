@@ -2,7 +2,9 @@
     window.createChatTargetSelector = ({form, button, input, youtubeAvailable, onChange, onLayout = () => {}}) => {
         const targets = youtubeAvailable ? ["twitch", "youtube", "both"] : ["twitch"];
         const labels = {twitch: "Twitch", youtube: "YouTube", both: "All"};
+        const shortLabels = {twitch: "Tw", youtube: "YT", both: "All"};
         let selected = "twitch", shifted = false, active = true, prefixWidth = 0;
+        let collapsed = false, labelAnimation = null;
         const target = () => shifted && youtubeAvailable ? "both" : selected;
         function measurePrefix() {
             if (!active || !input) return;
@@ -15,15 +17,31 @@
         function onInputScroll() {
             if (active) button.style.visibility = input.scrollTop > 0 ? "hidden" : "";
         }
+        function renderLabel() {
+            if (!active) return;
+            const current = target();
+            const text = `[${(collapsed ? shortLabels : labels)[current]}]`;
+            if (button.textContent !== text) {
+                const previousWidth = button.getBoundingClientRect().width;
+                labelAnimation?.cancel();
+                button.textContent = text;
+                const width = button.getBoundingClientRect().width;
+                if (previousWidth > 0 && width !== previousWidth && button.animate
+                    && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+                    labelAnimation = button.animate([{width: `${previousWidth}px`}, {width: `${width}px`}],
+                        {duration: 180, easing: 'ease-out'});
+                }
+            }
+            measurePrefix();
+        }
         function render() {
             if (!active) return;
             const current = target();
-            button.textContent = `[${labels[current]}]`;
+            renderLabel();
             button.dataset.target = current;
             button.title = labels[current];
             button.setAttribute("aria-label", `Send to ${labels[current]}. Click or press Tab to change.`);
             button.disabled = targets.length === 1;
-            measurePrefix();
             onChange(current);
         }
         function shift(value) {
@@ -32,6 +50,7 @@
         }
         function select(value) {
             if (!active || !targets.includes(value)) return;
+            collapsed = false;
             selected = value; render();
         }
         function cycle() {
@@ -46,6 +65,7 @@
                 if (complete()) return true;
                 event.preventDefault();
                 if (targets.length > 1) cycle();
+                else if (collapsed) { collapsed = false; renderLabel(); }
                 return true;
             }
             return false;
@@ -56,6 +76,10 @@
         const onFocusOut = event => { if (!form.contains(event.relatedTarget)) shift(false); };
         const onPointer = event => shift(Boolean(event.shiftKey));
         const onClick = () => cycle();
+        const onInput = () => {
+            const next = Boolean(input.value);
+            if (collapsed !== next) { collapsed = next; renderLabel(); }
+        };
         const onButtonKey = event => {
             if (event.key === "Tab" && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 event.preventDefault(); cycle();
@@ -71,10 +95,12 @@
         const observer = input && window.ResizeObserver ? new window.ResizeObserver(measurePrefix) : null;
         observer?.observe(button);
         input?.addEventListener("scroll", onInputScroll);
+        input?.addEventListener("input", onInput);
         render();
         return {target, select, handleKey, destroy() {
             if (!active) return;
             active = false;
+            labelAnimation?.cancel();
             form.removeEventListener("keydown", onDown);
             form.removeEventListener("pointerdown", onPointer);
             form.removeEventListener("focusout", onFocusOut);
@@ -83,6 +109,7 @@
             button.removeEventListener("click", onClick);
             button.removeEventListener("keydown", onButtonKey);
             input?.removeEventListener("scroll", onInputScroll); observer?.disconnect();
+            input?.removeEventListener("input", onInput);
         }};
     };
 })();
