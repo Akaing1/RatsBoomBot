@@ -326,7 +326,14 @@ class TwitchBot(commands.AutoBot):
 
     async def event_command_error(self, payload) -> None:
         exception = getattr(payload, "exception", None)
-        if isinstance(exception, (SlowmodeBlocked, CommandNotFound)):
+        if isinstance(exception, CommandNotFound):
+            if getattr(getattr(self, "services", None), "custom_commands", None) is not None:
+                try:
+                    await self.services.custom_commands.handle(payload.context)
+                except Exception:
+                    LOGGER.exception("[Custom Commands] Command execution failed.")
+            return
+        if isinstance(exception, SlowmodeBlocked):
             return
         context = getattr(payload, "context", None)
         command = getattr(context, "command", None)

@@ -95,7 +95,7 @@ for route in owner.router.routes:
         response_class=route.response_class)
 
 
-WORKSPACE = {'/channel/for-you', '/channel/api/for-you', '/channel/api/for-you/notes',
+WORKSPACE = {'/channel/api/for-you/commands', '/channel/for-you', '/channel/api/for-you', '/channel/api/for-you/notes',
     '/channel/api/for-you/notes/{identity}', '/channel/api/for-you/quotes',
     '/channel/api/for-you/clips', '/channel/api/for-you/clips/download'}
 for route in owner_workspace.router.routes:
