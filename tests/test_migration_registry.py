@@ -140,3 +140,27 @@ async def test_replacing_development_migration_history_is_transactional(tmp_path
                 await migration_runner.run_migration(connection, Migration(71, 'channel_access', broken), superseded_name='follower_last_watched_index')
             assert (await connection.fetchone('SELECT name FROM schema_migrations WHERE version=71'))['name'] == 'follower_last_watched_index'
             assert await connection.fetchone("SELECT name FROM sqlite_master WHERE name='partial_repair'") is None
+
+
+@pytest.mark.asyncio
+async def test_flag_stream_migration_preserves_activation_stream(tmp_path, monkeypatch):
+    current = migration_runner.MIGRATIONS
+    async with asqlite.create_pool(str(tmp_path / 'flag-upgrade.db')) as db:
+        monkeypatch.setattr(migration_runner, 'MIGRATIONS', tuple(m for m in current if m.version < 80))
+        await migration_runner.run_migrations(db)
+        async with db.acquire() as connection:
+            await connection.execute(
+                "INSERT INTO raid_boss_flag_bearers (event_id,broadcaster_id,user_id,username,charges_remaining,activated,purchased_at) "
+                "VALUES (1,'channel','bearer','alice',9,1,'2026-11-09T12:00:00+00:00')"
+            )
+            await connection.execute(
+                "INSERT INTO raid_boss_attacks (event_id,broadcaster_id,stream_id,user_id,username,damage,attacked_at,buff_used,attack_number) "
+                "VALUES (1,'channel','stream-1','bearer','alice',0,'2026-11-09T12:01:00+00:00','flag_bearer',1)"
+            )
+        monkeypatch.setattr(migration_runner, 'MIGRATIONS', current)
+        await migration_runner.run_migrations(db)
+        await migration_runner.run_migrations(db)
+        async with db.acquire() as connection:
+            flag = await connection.fetchone('SELECT stream_id,charges_remaining FROM raid_boss_flag_bearers WHERE event_id=1')
+            assert flag['stream_id'] == 'stream-1'
+            assert flag['charges_remaining'] == 9

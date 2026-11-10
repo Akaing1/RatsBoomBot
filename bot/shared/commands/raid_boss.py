@@ -247,7 +247,7 @@ class RaidBossCommands(commands.Component):
         elif result.startswith("ancient_out_of_stock:"):
             await ctx.reply(f"{config.item_names.ancient_pact} is out of stock for this stream—it was purchased by {result.split(':', 1)[1]}!")
         elif result.startswith("flag_out_of_stock:"):
-            await ctx.reply(f"{config.item_names.flag_bearer} is already claimed for this raid by {result.split(':', 1)[1]}!")
+            await ctx.reply(f"{config.item_names.flag_bearer} is already claimed for this stream by {result.split(':', 1)[1]}!")
         elif result == "active_raid_required":
             await ctx.reply(f"{config.item_names.flag_bearer} can only be purchased while a Boss Hunt encounter is active.")
         elif result == "global_buff_limit":
@@ -273,7 +273,7 @@ class RaidBossCommands(commands.Component):
             elif item_id == "ancient_pact":
                 await self.bot.services.raid_bosses.send_announcement(broadcaster_id, f"@{chatter.name} activated {config.item_names.ancient_pact}! Everyone's base attack ceiling increases by {config.ancient_pact_ceiling_bonus:,} for the rest of this stream.", "purple")
             elif item_id == "flag_bearer":
-                await ctx.reply(f"{config.item_names.flag_bearer} acquired! Your next raid attack will be sacrificed to empower the next {config.flag_bearer_charges} eligible attacks from other players.")
+                await ctx.reply(f"{config.item_names.flag_bearer} acquired! Your next raid attack will be sacrificed to empower the next {config.flag_bearer_charges} eligible attacks from other players. Unused charges expire when this stream ends.")
 
     @raid.command(name="craft")
     async def craft(self, ctx: commands.Context, *, item: str | None = None) -> None:

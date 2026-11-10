@@ -14,6 +14,7 @@ from .v026_flag_bearers_will import migrate as migrate_026
 from .v027_overclocked_weapons import migrate as migrate_027
 from .v036_raid_progress_checkpoints import migrate as migrate_036
 from .v061_adaptive_mini_bosses import migrate as migrate_061
+from .v080_flag_bearer_stream_scope import migrate as migrate_080
 
 
 MIGRATIONS = (
@@ -29,4 +30,5 @@ MIGRATIONS = (
     Migration(27, "overclocked_weapons", migrate_027),
     Migration(36, "raid_progress_checkpoints", migrate_036),
     Migration(61, "adaptive_mini_bosses", migrate_061),
+    Migration(80, "flag_bearer_stream_scope", migrate_080),
 )

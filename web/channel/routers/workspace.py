@@ -145,14 +145,14 @@ async def get_note(request: Request, identity: str):
 
 
 @router.get("/channel/api/for-you/clips")
-async def channel_clips(request: Request, days: int = 0, after: str = ""):
+async def channel_clips(request: Request, days: int = 0, after: str = "", sort: str = "views"):
     from datetime import datetime, timedelta, timezone
     import asyncio
     import logging
     from web.channel.routers.dashboard import raid_browser_cached_request
 
     _, channel = workspace_context(request)
-    if days not in {0, 1, 7, 30} or len(after) > 2048:
+    if days not in {0, 1, 7, 30} or len(after) > 2048 or sort not in {"views", "newest"}:
         raise HTTPException(400, "Invalid clip filters.")
     bot = get_bot()
     if bot is None:
@@ -164,8 +164,19 @@ async def channel_clips(request: Request, days: int = 0, after: str = ""):
         params["started_at"] = start.strftime("%Y-%m-%dT%H:%M:%SZ")
     if after:
         params["after"] = after
+    if sort == "newest":
+        from web.channel.clip_order import latest_clips
+        try:
+            payload = await asyncio.wait_for(latest_clips(
+                lambda values: raid_browser_cached_request(bot, channel, "clips", values),
+                channel, days, after), timeout=15)
+        except ValueError as error:
+            raise HTTPException(400, "Invalid clip cursor.") from error
+        except Exception as error:
+            raise HTTPException(502, "Could not load latest clips. Please try again.") from error
     try:
-        payload = await asyncio.wait_for(raid_browser_cached_request(bot, channel, "clips", params), timeout=15)
+        if sort != "newest":
+            payload = await asyncio.wait_for(raid_browser_cached_request(bot, channel, "clips", params), timeout=15)
     except Exception as error:
         extra = getattr(error, "extra", {})
         message = str(extra.get("message", ""))[:300] if isinstance(extra, dict) else ""
@@ -227,3 +238,49 @@ async def clip_download(request: Request, clip_id: str = Form(..., min_length=1,
         raise HTTPException(404, "Twitch has no download available for this clip.")
     # Signed URLs are temporary: return only on demand and never persist/cache them.
     return JSONResponse({"url": url}, headers={"Cache-Control": "no-store"})
+
+
+@router.get('/channel/api/for-you/commands')
+async def custom_commands(request: Request):
+    from storage.custom_commands import list_commands
+    db, channel = workspace_context(request)
+    return JSONResponse({'items': await list_commands(db, channel)}, headers={'Cache-Control': 'no-store'})
+
+
+@router.post('/channel/api/for-you/commands')
+async def save_custom_command(request: Request, csrf_token: str = Form(...),
+                              action: str = Form(...), definition: str = Form(..., max_length=32000),
+                              revision: int = Form(0, ge=0), args: str = Form('', max_length=500),
+                              role: str = Form('everyone')):
+    import json
+    from bot.command_blocks import validate_command, execute
+    from storage.custom_commands import change_command
+    db, channel = workspace_context(request)
+    validate_csrf_token(request, csrf_token)
+    if action not in {'save', 'delete', 'test'} or role not in {'everyone', 'moderator', 'broadcaster'}:
+        raise HTTPException(status_code=400, detail='Invalid command action or test role.')
+    try:
+        command = validate_command(json.loads(definition))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except (TypeError, RecursionError) as error:
+        raise HTTPException(status_code=400, detail='Invalid block data.') from error
+    if action == 'test':
+        return JSONResponse(execute(command, user='TestViewer', channel='YourChannel', args=args, role=role), headers={'Cache-Control': 'no-store'})
+    if action == 'save':
+        runtime_bot = get_bot()
+        from bot.profiles import get_active_profile
+        profile = get_active_profile(channel)
+        get_command = getattr(runtime_bot, 'get_command', None)
+        if (get_command and get_command(command['name']) is not None) or (
+            profile is not None and command['name'] == profile.points.command_alias
+        ):
+            raise HTTPException(status_code=400, detail='This name is already used by a built-in command. Choose another name.')
+    try:
+        await change_command(db, channel, command, revision, delete=action == 'delete')
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    runtime = getattr(getattr(get_bot(), 'services', None), 'custom_commands', None)
+    if runtime is not None:
+        await runtime.reload(channel)
+    return JSONResponse({'revision': revision + 1}, headers={'Cache-Control': 'no-store'})
