@@ -1,3 +1,4 @@
+from bot.services.channels.custom_commands import CustomCommandService
 import logging
 
 from bot.profiles import FeatureName, get_active_profile
@@ -33,6 +34,7 @@ class ServiceContainer:
         self.chatters = ChatterIdentityService(bot, db)
         self.achievements = AchievementService(db)
         self.command_slowmode = CommandSlowmodeService(db)
+        self.custom_commands = CustomCommandService(db)
         self.quotes = QuoteService(db)
         self.eight_ball = EightBallService(db)
         self.chatter_stats = ChatterStatsService(bot, db, self.broadcasters)
@@ -72,6 +74,7 @@ class ServiceContainer:
 
         services = (
             ("CommandSlowmodeService", self.command_slowmode),
+            ("CustomCommandService", self.custom_commands),
             ("BroadcasterService", self.broadcasters),
             ("BroadcasterSettingsService", self.broadcaster_settings),
             ("ChatIdentityService", self.chat_identity),
