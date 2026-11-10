@@ -1298,7 +1298,8 @@ async def test_flag_bearer_sacrifices_attack_and_receives_bonus_credit(tmp_path,
 
 
 @pytest.mark.asyncio
-async def test_flag_bearer_charge_waits_without_usable_weapon(tmp_path) -> None:
+@pytest.mark.parametrize("weapon_durability", [None, 0, 1])
+async def test_flag_bearer_works_without_usable_weapon(tmp_path, weapon_durability) -> None:
     async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
         points = PointsService(bot=None, db=database)
         service = RaidBossService(bot=None, db=database)
@@ -1308,16 +1309,43 @@ async def test_flag_bearer_charge_waits_without_usable_weapon(tmp_path) -> None:
         await points.add_points("channel-1", "user-1", "alice", 1000)
         await service.spawn("channel-1", "melee", config)
         await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1")
-        await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        if weapon_durability is not None:
+            async with database.acquire() as connection:
+                await connection.execute(
+                    "INSERT INTO raid_boss_inventory (broadcaster_id, user_id, item_id, quantity, durability) VALUES (?, ?, ?, 1, ?)",
+                    ("channel-1", "user-1", "basic_sword", weapon_durability)
+                )
 
-        result = await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+        activated = await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        assert activated.flag_bearer_activated is True
+        assert activated.damage == 0
+
+        results = [
+            await service.attack("channel-1", "stream-1", f"attacker-{index}", f"fighter-{index}", config)
+            for index in range(config.flag_bearer_charges + 1)
+        ]
 
         async with database.acquire() as connection:
             flag = await connection.fetchone("SELECT charges_remaining FROM raid_boss_flag_bearers WHERE event_id = 1")
 
-        assert result.damage == 100
-        assert result.flag_bearer_bonus_damage == 0
-        assert flag["charges_remaining"] == 10
+            inventory = await connection.fetchone(
+                "SELECT durability FROM raid_boss_inventory WHERE broadcaster_id = ? AND user_id = ? AND item_id = ?",
+                ("channel-1", "user-1", "basic_sword")
+            )
+
+        for result in results[:-1]:
+            assert result.damage == 130
+            assert result.flag_bearer_bonus_damage == 30
+            assert result.flag_bearer_username == "alice"
+        assert results[-1].damage == 100
+        assert results[-1].flag_bearer_bonus_damage == 0
+        assert flag["charges_remaining"] == 0
+        assert ("alice", 30 * config.flag_bearer_charges) in await service.get_contributors("channel-1")
+        if weapon_durability is None:
+            assert inventory is None
+        else:
+            assert inventory["durability"] == 0
+
 
 @pytest.mark.asyncio
 async def test_reserved_flag_bearer_blocks_same_chatters_other_global_buff(tmp_path) -> None:
@@ -1769,3 +1797,70 @@ async def test_disabled_stream_online_skips_raid_progress_and_announcements(monk
         method.assert_not_awaited()
     services.stream_logs.start_session.assert_awaited_once()
     services.passive_points.start_for_stream.assert_awaited_once_with("channel-1", "stream-2")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("activated", [False, True])
+async def test_flag_bearer_expires_between_streams(tmp_path, activated) -> None:
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, flag_bearer_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.register_stream("channel-1", "stream-1")
+        assert await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1") == "purchased"
+        if activated:
+            await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+            empowered = await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+            assert empowered.flag_bearer_bonus_damage == 30
+
+        # A restart during the same stream must retain the flag.
+        service = RaidBossService(bot=None, db=database)
+        await service.register_stream("channel-1", "stream-1")
+        async with database.acquire() as connection:
+            assert await connection.fetchone("SELECT 1 FROM raid_boss_flag_bearers WHERE event_id = 1") is not None
+
+        # Even if offline/startup cleanup was missed, another stream cannot use it.
+        result = await service.attack("channel-1", "stream-2", "user-1", "alice", config)
+        assert result.damage == 100
+        assert result.flag_bearer_activated is False
+        result = await service.attack("channel-1", "stream-2", "user-2", "bob", config)
+        assert result.flag_bearer_bonus_damage == 0
+
+        await service.register_stream("channel-1", "stream-2")
+        async with database.acquire() as connection:
+            assert await connection.fetchone("SELECT 1 FROM raid_boss_flag_bearers WHERE event_id = 1") is None
+        assert await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-2") == "purchased"
+
+
+@pytest.mark.asyncio
+async def test_offline_event_expires_flag_and_keeps_earned_contributions(tmp_path) -> None:
+    from bot.shared.events.streams import StreamEvents
+
+    async with asqlite.create_pool(str(tmp_path / "raid.db")) as database:
+        points = PointsService(bot=None, db=database)
+        service = RaidBossService(bot=None, db=database)
+        await points.setup()
+        await run_migrations(database)
+        config = build_config(max_hp=5000, flag_bearer_cost=100)
+        await points.add_points("channel-1", "user-1", "alice", 1000)
+        await service.spawn("channel-1", "melee", config)
+        await service.buy("channel-1", "user-1", "alice", "flag", config, "stream-1")
+        await service.attack("channel-1", "stream-1", "user-1", "alice", config)
+        await service.attack("channel-1", "stream-1", "user-2", "bob", config)
+        services = SimpleNamespace(
+            raid_bosses=service,
+            passive_points=SimpleNamespace(stop_for_stream=AsyncMock()),
+            live_chat=SimpleNamespace(stop_youtube_for_twitch_stream=AsyncMock(), clear_pinned_message=AsyncMock()),
+            stream_logs=SimpleNamespace(end_session=AsyncMock()),
+        )
+        await StreamEvents(SimpleNamespace(services=services)).event_stream_offline(
+            SimpleNamespace(broadcaster=SimpleNamespace(id="channel-1", name="test"))
+        )
+        async with database.acquire() as connection:
+            assert await connection.fetchone("SELECT 1 FROM raid_boss_flag_bearers") is None
+        assert ("alice", 30) in await service.get_contributors("channel-1")
+        assert await service.get_active_event("channel-1") is not None
