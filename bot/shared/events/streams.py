@@ -117,6 +117,7 @@ class StreamEvents(commands.Component):
             broadcaster_id
         )
 
+        await services.raid_bosses.expire_flag_bearer(broadcaster_id)
         await services.raid_bosses.cancel_announcements(broadcaster_id)
         await services.passive_points.stop_for_stream(broadcaster_id)
         await services.live_chat.stop_youtube_for_twitch_stream(broadcaster_id)

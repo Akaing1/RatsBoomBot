@@ -708,7 +708,7 @@ class RaidBossService:
             )
             brutalizer = await connection.fetchone("SELECT COUNT(*) AS attacks FROM raid_boss_attacks WHERE event_id = ? AND user_id = ? AND weapon = 'obsidian_brutalizer'", (event.id, user_id))
             effects = await connection.fetchone("SELECT blessing_username, ancient_pact_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (broadcaster_id, stream_id))
-            flag_bearer = await connection.fetchone("SELECT user_id, username, charges_remaining, activated FROM raid_boss_flag_bearers WHERE event_id = ?", (event.id,))
+            flag_bearer = await connection.fetchone("SELECT user_id, username, charges_remaining, activated FROM raid_boss_flag_bearers WHERE event_id = ? AND stream_id = ?", (event.id, stream_id))
             flag_weapons = []
             flag_active = (
                 flag_bearer is not None
@@ -987,7 +987,14 @@ class RaidBossService:
 
         return max(reached, default=None)
 
+    async def expire_flag_bearer(self, broadcaster_id: str) -> None:
+        async with self._shared_inventory_lock:
+            async with self.db.acquire() as connection:
+                await connection.execute("DELETE FROM raid_boss_flag_bearers WHERE broadcaster_id = ?", (str(broadcaster_id),))
+
     async def register_stream(self, broadcaster_id: str, stream_id: str) -> tuple[RaidBossEvent | None, int]:
+        async with self.db.acquire() as connection:
+            await connection.execute("DELETE FROM raid_boss_flag_bearers WHERE broadcaster_id = ? AND stream_id != ?", (str(broadcaster_id), str(stream_id)))
         if not self.is_enabled(broadcaster_id):
             return await self.get_active_event(broadcaster_id), 0
         event = await self.get_active_event(broadcaster_id)
@@ -1042,6 +1049,8 @@ class RaidBossService:
             return "active_raid_required"
 
         async with self.db.acquire() as connection, immediate_transaction(connection):
+            if stream_id is not None:
+                await connection.execute("DELETE FROM raid_boss_flag_bearers WHERE broadcaster_id = ? AND stream_id != ?", (str(broadcaster_id), str(stream_id)))
             if item_id in {"blessing", "ancient_pact"}:
                 existing = await connection.fetchone("SELECT blessing_user_id, blessing_username, ancient_pact_user_id, ancient_pact_username FROM raid_boss_stream_effects WHERE broadcaster_id = ? AND stream_id = ?", (str(broadcaster_id), str(stream_id)))
 
@@ -1096,7 +1105,7 @@ class RaidBossService:
                     (amount, str(broadcaster_id), str(user_id))
                 )
             elif item_id == "flag_bearer":
-                inserted = await connection.fetchone("INSERT INTO raid_boss_flag_bearers (event_id, broadcaster_id, user_id, username, purchased_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(event_id) DO NOTHING RETURNING username", (event.id, str(broadcaster_id), str(user_id), username, datetime.now(UTC).isoformat()))
+                inserted = await connection.fetchone("INSERT INTO raid_boss_flag_bearers (event_id, broadcaster_id, user_id, username, purchased_at, stream_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(event_id) DO NOTHING RETURNING username", (event.id, str(broadcaster_id), str(user_id), username, datetime.now(UTC).isoformat(), str(stream_id)))
 
                 if inserted is None:
                     existing = await connection.fetchone("SELECT username FROM raid_boss_flag_bearers WHERE event_id = ?", (event.id,))
