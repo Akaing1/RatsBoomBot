@@ -214,3 +214,89 @@ async def test_zero_cooldown_allows_successive_invocations(workspace_client):
     await service.handle(ctx)
     await service.handle(ctx)
     assert ctx.send.await_count == 2
+
+
+def counter_command(blocks=None):
+    c = command(); c.update(cooldown=0, enabled=True)
+    c['blocks'] = blocks if blocks is not None else [
+        {'type': 'counter', 'name': 'deaths', 'operation': 'add', 'value': 1},
+        {'type': 'reply', 'message': 'Deaths: {counter.deaths}'}]
+    return c
+
+
+def test_counter_operations_order_and_permissions():
+    c = counter_command()
+    source = {'deaths': 4}
+    result = execute(c, user='Rat', channel='Mei', counters=source)
+    assert result['messages'] == ['Deaths: 5']
+    assert source == {'deaths': 4}
+    c['blocks'][0].update(operation='subtract', value=2)
+    assert execute(c, user='Rat', channel='Mei', counters=source)['counters']['deaths'] == 2
+    c['blocks'][0].update(operation='set', value=0)
+    assert execute(c, user='Rat', channel='Mei', counters=source)['messages'] == ['Deaths: 0']
+    c['permission'] = 'moderator'
+    assert execute(c, user='Rat', channel='Mei', counters=source)['counters'] == source
+    c['permission'] = 'everyone';c['blocks'] = [{'type':'reply','message':'Missing: {counter.missing}'}]
+    assert execute(c,user='Rat',channel='Mei')['messages'] == ['Missing: 0']
+
+
+@pytest.mark.parametrize('changes', [{'name':'../invalid'}, {'name':'x'*33}, {'operation':'eval'}, {'value':True}, {'value':1.5}, {'value':1000000001}])
+def test_invalid_counter_fields_are_rejected(changes):
+    c = counter_command();c['blocks'][0].update(changes)
+    with pytest.raises(ValueError):validate_command(c)
+
+
+@pytest.mark.asyncio
+async def test_counters_persist_are_channel_scoped_and_preview_never_writes(workspace_client):
+    from storage.custom_commands import run_command, list_counters
+    client, _, db = workspace_client
+    c = counter_command()
+    result = await run_command(db,'alice',c,user='Rat',channel_name='Mei')
+    assert result['messages'] == ['Deaths: 1']
+    preview = await client.post('/channel/api/for-you/commands',data={'csrf_token':'secret','action':'test','definition':json.dumps(c)})
+    assert preview.json()['messages'] == ['Deaths: 2']
+    assert await list_counters(db,'alice') == {'deaths':1}
+    assert await list_counters(db,'bob') == {}
+    service=CustomCommandService(db);await service.setup()
+    assert (await run_command(db,'alice',c,user='Rat',channel_name='Mei'))['messages'] == ['Deaths: 2']
+    assert (await client.get('/channel/api/for-you/commands')).json()['counters'] == {'deaths':2}
+
+
+@pytest.mark.asyncio
+async def test_counter_updates_are_atomic_under_concurrency_and_roll_back_failures(workspace_client):
+    import asyncio
+    from storage.custom_commands import run_command, list_counters
+    _, _, db = workspace_client
+    c = counter_command()
+    await asyncio.gather(*(run_command(db,'alice',c,user='Rat',channel_name='Mei') for _ in range(12)))
+    assert await list_counters(db,'alice') == {'deaths':12}
+    fail = counter_command([{'type':'counter','name':'first','operation':'set','value':1},
+                            {'type':'counter','name':'deaths','operation':'add','value':1}])
+    async with db.acquire() as connection:
+        await connection.execute('UPDATE custom_command_counters SET value = 1000000000000 WHERE broadcaster_id = ?',('alice',))
+        await connection.commit()
+    with pytest.raises(ValueError,match='Counter values'):
+        await run_command(db,'alice',fail,user='Rat',channel_name='Mei')
+    assert await list_counters(db,'alice') == {'deaths':1000000000000}
+    many = {f'c{i}':0 for i in range(100)}
+    with pytest.raises(ValueError,match='100 custom counters'):
+        execute(c,user='Rat',channel='Mei',counters=many)
+
+
+@pytest.mark.asyncio
+async def test_live_counter_commands_share_values_across_command_names(workspace_client):
+    from storage.custom_commands import list_counters
+    _, _, db = workspace_client
+    service = CustomCommandService(db)
+    c = counter_command()
+    show = counter_command([{'type':'reply','message':'Total {counter.deaths}'}]);show['name']='total'
+    service.commands={'1': {'welcome':c,'total':show}}
+    ctx=SimpleNamespace(prefix='!',invoked_with='welcome',broadcaster=SimpleNamespace(id='1',name='Mei'),
+        chatter=SimpleNamespace(id='viewer',name='Rat',moderator=False),message=SimpleNamespace(text='!welcome'),
+        send=AsyncMock(),bot=SimpleNamespace(services=SimpleNamespace(chat_identity=SimpleNamespace(is_custom_bot=lambda _:False),
+        command_slowmode=SimpleNamespace(allow=lambda _:True))))
+    await service.handle(ctx)
+    ctx.invoked_with='total';ctx.message.text='!total'
+    await service.handle(ctx)
+    assert [call.args[0] for call in ctx.send.await_args_list] == ['Deaths: 1','Total 1']
+    assert await list_counters(db,'1') == {'deaths':1}

@@ -28,6 +28,14 @@ test('command editor builds branches, preserves drafts, tests without saving and
         await page.getByRole('button',{name:'+ Add command',exact:true}).click();
         await page.getByLabel('Command name (without !)').fill('welcome');
         await page.getByLabel('Message',{exact:true}).fill('Hello {user}');
+        assert.equal(await page.getByRole('button',{name:'+ Repeat',exact:true}).count(),0);
+        await page.getByRole('button',{name:'+ Counter',exact:true}).click();
+        await page.getByLabel('Counter name',{exact:true}).fill('wins');
+        await page.getByLabel('Operation',{exact:true}).selectOption('set');
+        await page.getByLabel('Value',{exact:true}).fill('4');
+        const counterNode=page.getByRole('button',{name:'Counter 2',exact:true});
+        await counterNode.click({button:'right'});
+        await page.getByRole('menuitem',{name:'Delete',exact:true}).click();
         const firstNode=page.getByRole('button',{name:'Send message 1',exact:true});
         await firstNode.click({button:'right'});
         await page.getByRole('menuitem',{name:'Copy',exact:true}).click();

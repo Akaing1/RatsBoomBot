@@ -1,10 +1,10 @@
 """Cached channel commands with one shared channel cooldown, no script execution."""
 import json
+import logging
 import time
 from types import SimpleNamespace
 
-from bot.command_blocks import execute
-from storage.custom_commands import list_commands
+from storage.custom_commands import list_commands, run_command
 
 
 class CustomCommandService:
@@ -48,6 +48,10 @@ class CustomCommandService:
         self.deadlines[channel] = now + command['cooldown']
         parts = ctx.message.text[len(ctx.prefix):].strip().split(maxsplit=1)
         args = parts[1] if len(parts) > 1 else ''
-        result = execute(command, user=chatter.name, channel=ctx.broadcaster.name, args=args, role=role)
+        try:
+            result = await run_command(self.db, channel, command, user=chatter.name, channel_name=ctx.broadcaster.name, args=args, role=role)
+        except ValueError as error:
+            logging.getLogger(__name__).warning('Custom command %s in channel %s failed: %s', command['name'], channel, error)
+            return
         for message in result['messages']:
             await ctx.send(message)

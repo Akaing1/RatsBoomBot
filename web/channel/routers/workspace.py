@@ -242,9 +242,9 @@ async def clip_download(request: Request, clip_id: str = Form(..., min_length=1,
 
 @router.get('/channel/api/for-you/commands')
 async def custom_commands(request: Request):
-    from storage.custom_commands import list_commands
+    from storage.custom_commands import list_commands, list_counters
     db, channel = workspace_context(request)
-    return JSONResponse({'items': await list_commands(db, channel)}, headers={'Cache-Control': 'no-store'})
+    return JSONResponse({'items': await list_commands(db, channel), 'counters': await list_counters(db, channel)}, headers={'Cache-Control': 'no-store'})
 
 
 @router.post('/channel/api/for-you/commands')
@@ -254,7 +254,7 @@ async def save_custom_command(request: Request, csrf_token: str = Form(...),
                               role: str = Form('everyone'), original_name: str = Form('', max_length=32)):
     import json
     from bot.command_blocks import validate_command, execute
-    from storage.custom_commands import change_command
+    from storage.custom_commands import change_command, run_command
     db, channel = workspace_context(request)
     validate_csrf_token(request, csrf_token)
     if action not in {'save', 'delete', 'test'} or role not in {'everyone', 'moderator', 'broadcaster'}:
@@ -266,7 +266,11 @@ async def save_custom_command(request: Request, csrf_token: str = Form(...),
     except (TypeError, RecursionError) as error:
         raise HTTPException(status_code=400, detail='Invalid block data.') from error
     if action == 'test':
-        return JSONResponse(execute(command, user='TestViewer', channel='YourChannel', args=args, role=role), headers={'Cache-Control': 'no-store'})
+        try:
+            result = await run_command(db, channel, command, preview=True, user='TestViewer', channel_name='YourChannel', args=args, role=role)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return JSONResponse(result, headers={'Cache-Control': 'no-store'})
     if action == 'save':
         runtime_bot = get_bot()
         from bot.profiles import get_active_profile
