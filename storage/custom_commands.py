@@ -35,3 +35,27 @@ async def change_command(db, channel, command, revision, delete=False, original_
             await connection.execute('''INSERT INTO custom_commands (broadcaster_id, name, definition, revision) VALUES (?, ?, ?, ?)
                 ON CONFLICT(broadcaster_id, name) DO UPDATE SET definition = excluded.definition, revision = excluded.revision''',
                 (str(channel), command['name'], json.dumps(command), revision + 1))
+
+
+async def run_command(db, channel, command, *, preview=False, **context):
+    """Serialize counter reads and writes; previews run on a disposable snapshot."""
+    from bot.command_blocks import execute
+    async with db.acquire() as connection:
+        async with immediate_transaction(connection):
+            rows = await connection.fetchall('SELECT name, value FROM custom_command_counters WHERE broadcaster_id = ?', (str(channel),))
+            counters = {row['name']: row['value'] for row in rows}
+            context['channel'] = context.pop('channel_name')
+            result = execute(command, counters=counters, **context)
+            if not preview:
+                for name, value in result['counters'].items():
+                    if counters.get(name) == value:
+                        continue
+                    await connection.execute("""INSERT INTO custom_command_counters (broadcaster_id, name, value) VALUES (?, ?, ?)
+                        ON CONFLICT(broadcaster_id, name) DO UPDATE SET value = excluded.value""", (str(channel), name, value))
+    return result
+
+
+async def list_counters(db, channel):
+    async with db.acquire() as connection:
+        rows = await connection.fetchall('SELECT name, value FROM custom_command_counters WHERE broadcaster_id = ? ORDER BY name', (str(channel),))
+    return {row['name']: row['value'] for row in rows}

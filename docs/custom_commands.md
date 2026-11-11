@@ -31,16 +31,24 @@ Supported blocks:
 - If/else: argument present, complete arguments equal text (case insensitive),
   moderator or broadcaster, and broadcaster only.
 - Random message: one of up to five choices.
-- Repeat: run a sequence one to five times.
+- Counter: increase, decrease, or set a named channel counter. Missing counters
+  start at 0. Counters persist across streams and are shared by all commands in
+  that channel. Add a counter block named `deaths` with Increase by 1, followed
+  by a message `Deaths: {counter.deaths}`. Use Set to 0 to reset it.
+
+Repeat is removed from the toolbox. Saved legacy Repeat blocks remain supported
+for compatibility, including their original execution/output limits.
 
 The test panel uses the same Python interpreter as chat delivery. It accepts
 sample arguments and a viewer role, and returns branch traces and messages. It
-never sends to Twitch, consumes cooldowns, or changes stored commands. Placeholder
+never sends to Twitch, consumes cooldowns, or changes stored commands or counters.
+Tests start with the saved channel counters and show simulated counter results. Placeholder
 values are inserted once; viewer text is never interpreted as another template.
 
 The server accepts only the declared block schema. There is no JavaScript,
-expression evaluation, network access, external command invocation, persistent
-variable storage, or points mutation. Each command is limited to 40 blocks, six
+expression evaluation, network access, external command invocation, arbitrary persistent
+variable storage, or points mutation. Named integer counters are the only mutable
+custom-command state. Each command is limited to 40 blocks, six
 nested levels, 64 execution steps, and three messages on its most expensive path.
 Nested repeats count toward the same totals. Replies are single-line messages
 with a maximum of 450 characters after placeholder substitution.
@@ -56,4 +64,9 @@ and refreshed after dashboard changes; startup reloads them from SQLite.
 Commands are scoped to the authenticated channel. Moderators with settings
 access can manage that channel's commands through their For You page. Saves,
 renames, toggles, and deletes require CSRF protection and a matching revision. A channel
-can store up to 50 commands. Migration 81 creates the storage table.
+can store up to 50 commands. Migration 81 creates the command table; migration 82 creates the counter table.
+Counter updates within one invocation commit atomically before chat delivery,
+preventing lost increments when commands run concurrently. A delivery failure
+does not undo an already committed count. Counters are limited to 100 per channel,
+with values between -1 trillion and 1 trillion, and block amounts between
+-1 billion and 1 billion. Counter names follow the command naming rules.

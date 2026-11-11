@@ -2,6 +2,9 @@
 import re
 
 FIELDS = {'user', 'channel', 'args', 'arg1', 'user.name', 'user.mention', 'user.channel', 'arg.name', 'arg.mention', 'arg.channel', 'channel.name', 'channel.url'}
+COUNTER_NAME = r'[a-z][a-z0-9_]{0,31}'
+COUNTER_LIMIT = 1_000_000_000_000
+
 ROLES = {'everyone', 'moderator', 'broadcaster'}
 
 
@@ -21,7 +24,7 @@ def validate_command(value):
         if not isinstance(value, str) or not value.strip() or len(value) > 450 or any(c in value for c in '\r\n'):
             raise ValueError('Messages must contain 1–450 characters on one line.')
         for field in re.findall(r'\{([^{}]*)\}', value):
-            if field not in FIELDS:
+            if field not in FIELDS and not re.fullmatch(r'counter\.' + COUNTER_NAME, field):
                 raise ValueError('Unknown placeholder. Choose a supported value from the editor.')
 
     def walk(blocks, depth=0):
@@ -52,6 +55,12 @@ def validate_command(value):
                     raise ValueError('Condition values must be at most 100 characters.')
                 a, b = walk(block['then'], depth + 1), walk(block['else'], depth + 1)
                 cost, output = 1 + max(a[0], b[0]), max(a[1], b[1])
+            elif kind == 'counter' and set(block) == {'type', 'name', 'operation', 'value'}:
+                if not isinstance(block['name'], str) or not re.fullmatch(COUNTER_NAME, block['name']):
+                    raise ValueError('Counter names need 1–32 lowercase letters, numbers or underscores, starting with a letter.')
+                if block['operation'] not in {'set', 'add', 'subtract'} or type(block['value']) is not int or not -1_000_000_000 <= block['value'] <= 1_000_000_000:
+                    raise ValueError('Choose a counter operation and an integer between -1000000000 and 1000000000.')
+                cost, output = 1, 0
             elif kind == 'repeat' and set(block) == {'type', 'count', 'blocks'}:
                 if type(block['count']) is not int or not 1 <= block['count'] <= 5:
                     raise ValueError('Repeat between one and five times.')
@@ -65,12 +74,12 @@ def validate_command(value):
     steps, sends = walk(value['blocks'])
     if steps > 64 or sends > 3:
         raise ValueError('A command may run at most 64 steps and send at most three messages, including repeats.')
-    if not nodes or not sends:
-        raise ValueError('Add at least one message block.')
+    if not nodes:
+        raise ValueError('Add at least one block.')
     return value
 
 
-def execute(command, *, user, channel, args='', role='everyone', choose=None):
+def execute(command, *, user, channel, args='', role='everyone', choose=None, counters=None):
     """Collect bounded output before any external effects; also used by the test panel."""
     import random
     validate_command(command)
@@ -87,14 +96,25 @@ def execute(command, *, user, channel, args='', role='everyone', choose=None):
                    'arg.name': arg_login, 'arg.mention': '@' + arg_login if arg_login else '',
                    'arg.channel': 'https://www.twitch.tv/' + arg_login if arg_login else '',
                    'channel.name': values['channel'], 'channel.url': 'https://www.twitch.tv/' + channel_login if channel_login else ''})
+    counters = dict(counters or {})
     output, trace = [], []
     def render(message):
-        return re.sub(r'\{([^{}]+)\}', lambda m: values[m[1]], message)[:450]
+        return re.sub(r'\{([^{}]+)\}', lambda m: str(counters.get(m[1][8:], 0)) if m[1].startswith('counter.') else values[m[1]], message)[:450]
     def walk(blocks):
         for block in blocks:
             kind = block['type']
             if kind == 'reply': output.append(render(block['message'])); trace.append('Send message')
             elif kind == 'random': output.append(render(choose(block['choices']))); trace.append('Choose random message')
+            elif kind == 'counter':
+                name, amount = block['name'], block['value']
+                current = counters.get(name, 0)
+                value = amount if block['operation'] == 'set' else current + (amount if block['operation'] == 'add' else -amount)
+                if abs(value) > COUNTER_LIMIT:
+                    raise ValueError('Counter values must stay between -1000000000000 and 1000000000000.')
+                counters[name] = value
+                if len(counters) > 100:
+                    raise ValueError('A channel can have at most 100 custom counters.')
+                trace.append(f'Counter {name}: {value}')
             elif kind == 'repeat':
                 trace.append(f"Repeat {block['count']} times")
                 for _ in range(block['count']): walk(block['blocks'])
@@ -106,4 +126,4 @@ def execute(command, *, user, channel, args='', role='everyone', choose=None):
     allowed = command['permission'] == 'everyone' or role == 'broadcaster' or role == command['permission']
     if allowed: walk(command['blocks'])
     else: trace.append('Permission denied')
-    return {'messages': output, 'trace': trace}
+    return {'messages': output, 'trace': trace, 'counters': counters}
