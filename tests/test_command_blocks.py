@@ -137,3 +137,80 @@ def test_deep_nesting_and_execution_budget_are_rejected_even_without_many_messag
     no_output = {'type':'if','condition':'has_argument','value':'','then':[],'else':[]}
     c['blocks'] = [{'type':'repeat','count':5,'blocks':[{'type':'repeat','count':5,'blocks':[no_output] * 3}]}, {'type':'reply','message':'Hello'}]
     with pytest.raises(ValueError, match='64 steps'): validate_command(c)
+
+
+def test_structured_placeholders_and_legacy_names_share_safe_values():
+    c = command()
+    c['cooldown'] = 0
+    c['blocks'] = [{'type': 'reply', 'message': '{user.name}|{user.mention}|{user.channel}|{arg.name}|{arg.mention}|{arg.channel}|{channel.name}|{channel.url}|{user}|{channel}|{args}|{arg1}'}]
+    assert execute(c, user='Rat', channel='Mei', args='@Guest extra')['messages'] == [
+        'Rat|@rat|https://www.twitch.tv/rat|guest|@guest|https://www.twitch.tv/guest|Mei|https://www.twitch.tv/mei|Rat|Mei|@Guest extra|@Guest']
+    c['blocks'][0]['message'] = 'Link: {arg.channel}; mention: {arg.mention}; raw: {arg1}'
+    for arg in ['', 'https://evil.example', '{user.name}', '../escape']:
+        assert execute(c, user='Rat', channel='Mei', args=arg)['messages'] == [f'Link: ; mention: ; raw: {arg}']
+
+
+@pytest.mark.parametrize('position', [{'x': -1, 'y': 0}, {'x': True, 'y': 0}, {'x': 0, 'y': 20001},
+                                     {'x': float('nan'), 'y': 0}, {'x': float('inf'), 'y': 0},
+                                     {'x': 0}, {'x': 0, 'y': 0, 'code': 'oops'}, []])
+def test_canvas_positions_are_bounded_and_strict(position):
+    c = command()
+    c['blocks'][0]['position'] = position
+    with pytest.raises(ValueError, match='position'):
+        validate_command(c)
+
+
+def test_layout_is_optional_and_cannot_change_execution_order_or_limits():
+    c = command()
+    c['blocks'] = [{'type': 'reply', 'message': 'first', 'position': {'x': 20000, 'y': 20000}},
+                   {'type': 'reply', 'message': 'second', 'position': {'x': 0, 'y': 0}}]
+    assert execute(c, user='Rat', channel='Mei')['messages'] == ['first', 'second']
+    c['blocks'] *= 2
+    with pytest.raises(ValueError, match='three messages'):
+        validate_command(c)
+
+
+@pytest.mark.asyncio
+async def test_rename_is_atomic_scoped_and_revision_checked(workspace_client):
+    client, session, db = workspace_client
+    url = '/channel/api/for-you/commands'
+    async def save(c, revision=0, original_name=''):
+        return await client.post(url, data={'csrf_token': 'secret', 'action': 'save',
+            'definition': json.dumps(c), 'revision': revision, 'original_name': original_name})
+    c = command(); c['cooldown'] = 0
+    assert (await save(c)).status_code == 200
+    other = copy.deepcopy(c); other['name'] = 'taken'
+    assert (await save(other)).status_code == 200
+    assert (await save(other, 1, 'welcome')).status_code == 409
+    renamed = copy.deepcopy(c); renamed['name'] = 'greetings'
+    renamed['blocks'][0]['position'] = {'x': 500, 'y': 150.5}
+    assert (await save(renamed, 0, 'welcome')).status_code == 409
+    session['channel_user_id'] = 'bob'
+    assert (await save(renamed, 1, 'welcome')).status_code == 409
+    session['channel_user_id'] = 'alice'
+    response = await save(renamed, 1, 'welcome')
+    assert response.status_code == 200
+    assert response.json()['revision'] == 2
+    entries = (await client.get(url)).json()['items']
+    assert {entry['command']['name'] for entry in entries} == {'greetings', 'taken'}
+    assert next(entry['command'] for entry in entries if entry['command']['name'] == 'greetings') == renamed
+    assert (await save(c, 1)).status_code == 409
+    service = CustomCommandService(db)
+    await service.reload('alice')
+    assert 'welcome' not in service.commands['alice']
+    assert service.commands['alice']['greetings'] == renamed
+
+
+@pytest.mark.asyncio
+async def test_zero_cooldown_allows_successive_invocations(workspace_client):
+    _, _, db = workspace_client
+    service = CustomCommandService(db)
+    c = command(); c.update(enabled=True, cooldown=0)
+    service.commands = {'1': {'welcome': c}}
+    ctx = SimpleNamespace(prefix='!', invoked_with='welcome', broadcaster=SimpleNamespace(id='1', name='Mei'),
+        chatter=SimpleNamespace(id='viewer', name='Rat', moderator=False), message=SimpleNamespace(text='!welcome'),
+        send=AsyncMock(), bot=SimpleNamespace(services=SimpleNamespace(
+            chat_identity=SimpleNamespace(is_custom_bot=lambda _: False), command_slowmode=SimpleNamespace(allow=lambda _: True))))
+    await service.handle(ctx)
+    await service.handle(ctx)
+    assert ctx.send.await_count == 2

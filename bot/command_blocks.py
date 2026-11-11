@@ -1,7 +1,7 @@
 """Small declarative command language. Never evaluates code or arbitrary expressions."""
 import re
 
-FIELDS = {'user', 'channel', 'args', 'arg1'}
+FIELDS = {'user', 'channel', 'args', 'arg1', 'user.name', 'user.mention', 'user.channel', 'arg.name', 'arg.mention', 'arg.channel', 'channel.name', 'channel.url'}
 ROLES = {'everyone', 'moderator', 'broadcaster'}
 
 
@@ -13,8 +13,8 @@ def validate_command(value):
         raise ValueError('Use a command name with 1–32 lowercase letters, numbers or underscores, starting with a letter.')
     if type(value['enabled']) is not bool or value['permission'] not in ROLES:
         raise ValueError('Invalid command permissions or enabled state.')
-    if type(value['cooldown']) is not int or not 10 <= value['cooldown'] <= 3600:
-        raise ValueError('Cooldown must be between 10 and 3600 seconds.')
+    if type(value['cooldown']) is not int or not 0 <= value['cooldown'] <= 3600:
+        raise ValueError('Cooldown must be between 0 and 3600 seconds.')
     nodes = 0
 
     def text(value):
@@ -22,7 +22,7 @@ def validate_command(value):
             raise ValueError('Messages must contain 1–450 characters on one line.')
         for field in re.findall(r'\{([^{}]*)\}', value):
             if field not in FIELDS:
-                raise ValueError('Supported placeholders: {user}, {channel}, {args}, {arg1}.')
+                raise ValueError('Unknown placeholder. Choose a supported value from the editor.')
 
     def walk(blocks, depth=0):
         nonlocal nodes
@@ -33,6 +33,10 @@ def validate_command(value):
             nodes += 1
             if nodes > 40 or not isinstance(block, dict):
                 raise ValueError('Use at most 40 blocks.')
+            position = block.get('position')
+            if position is not None and (not isinstance(position, dict) or set(position) != {'x', 'y'} or any(type(v) not in (int, float) or not 0 <= v <= 20000 for v in position.values())):
+                raise ValueError('Invalid block position.')
+            block = {k: v for k, v in block.items() if k != 'position'}
             kind = block.get('type')
             if kind == 'reply' and set(block) == {'type', 'message'}:
                 text(block['message']); cost, output = 1, 1
@@ -73,9 +77,19 @@ def execute(command, *, user, channel, args='', role='everyone', choose=None):
     choose = choose or random.choice
     args = args[:500]
     values = {'user': user[:50], 'channel': channel[:50], 'args': args, 'arg1': args.split()[0] if args.split() else ''}
+    # Channel URLs derive only from Twitch-style login names, never arbitrary input.
+    def login(value):
+        value = value.lstrip('@')
+        return value.lower() if re.fullmatch(r'[A-Za-z0-9_]{1,25}', value) else ''
+    user_login, arg_login, channel_login = login(user), login(values['arg1']), login(channel)
+    values.update({'user.name': values['user'], 'user.mention': '@' + user_login if user_login else '',
+                   'user.channel': 'https://www.twitch.tv/' + user_login if user_login else '',
+                   'arg.name': arg_login, 'arg.mention': '@' + arg_login if arg_login else '',
+                   'arg.channel': 'https://www.twitch.tv/' + arg_login if arg_login else '',
+                   'channel.name': values['channel'], 'channel.url': 'https://www.twitch.tv/' + channel_login if channel_login else ''})
     output, trace = [], []
     def render(message):
-        return re.sub(r'\{(user|channel|args|arg1)\}', lambda m: values[m[1]], message)[:450]
+        return re.sub(r'\{([^{}]+)\}', lambda m: values[m[1]], message)[:450]
     def walk(blocks):
         for block in blocks:
             kind = block['type']

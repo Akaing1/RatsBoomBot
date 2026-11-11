@@ -251,7 +251,7 @@ async def custom_commands(request: Request):
 async def save_custom_command(request: Request, csrf_token: str = Form(...),
                               action: str = Form(...), definition: str = Form(..., max_length=32000),
                               revision: int = Form(0, ge=0), args: str = Form('', max_length=500),
-                              role: str = Form('everyone')):
+                              role: str = Form('everyone'), original_name: str = Form('', max_length=32)):
     import json
     from bot.command_blocks import validate_command, execute
     from storage.custom_commands import change_command
@@ -277,7 +277,7 @@ async def save_custom_command(request: Request, csrf_token: str = Form(...),
         ):
             raise HTTPException(status_code=400, detail='This name is already used by a built-in command. Choose another name.')
     try:
-        await change_command(db, channel, command, revision, delete=action == 'delete')
+        await change_command(db, channel, command, revision, delete=action == 'delete', original_name=original_name or None)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     runtime = getattr(getattr(get_bot(), 'services', None), 'custom_commands', None)
