@@ -37,3 +37,15 @@ test('branch depth includes empty child lists, matching server validation',()=>{
     target.push(reply('deepest allowed'));assert.equal(M.withinDepth(blocks),true);
     target.push(branch());assert.equal(M.withinDepth(blocks),false);
 });
+test('copies retain branches, offset layout and remain independent of their source',()=>{
+    const original=branch();original.position={x:50,y:100};original.then.push(reply('hello'));original.then[0].position={x:350,y:230};
+    const blocks=[original],copy=M.insertCopy(blocks,original,blocks,1,{x:150,y:200});
+    assert.ok(copy);assert.equal(copy.then[0].message,'hello');assert.deepEqual(copy.then[0].position,{x:450,y:330});
+    copy.then[0].message='changed';assert.equal(original.then[0].message,'hello');assert.equal(blocks.length,2);
+});
+test('paste rejects block and nesting limits atomically',()=>{
+    const blocks=Array.from({length:40},()=>reply('hi'));
+    assert.equal(M.insertCopy(blocks,blocks[0],blocks,1),null);assert.equal(blocks.length,40);
+    const tree=[];let target=tree;for(let i=0;i<6;i++){const b=branch();target.push(b);target=b.then;}
+    const before=JSON.stringify(tree);assert.equal(M.insertCopy(tree,branch(),target,0),null);assert.equal(JSON.stringify(tree),before);
+});

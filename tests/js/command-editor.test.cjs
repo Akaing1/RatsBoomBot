@@ -28,6 +28,17 @@ test('command editor builds branches, preserves drafts, tests without saving and
         await page.getByRole('button',{name:'+ Add command',exact:true}).click();
         await page.getByLabel('Command name (without !)').fill('welcome');
         await page.getByLabel('Message',{exact:true}).fill('Hello {user}');
+        const firstNode=page.getByRole('button',{name:'Send message 1',exact:true});
+        await firstNode.click({button:'right'});
+        await page.getByRole('menuitem',{name:'Copy',exact:true}).click();
+        await firstNode.focus();await page.keyboard.press('Shift+F10');
+        await page.getByRole('menuitem',{name:'Duplicate',exact:true}).click();
+        assert.equal(await page.locator('.cc-node').count(),2);
+        await page.getByRole('button',{name:'Send message 2',exact:true}).click({button:'right'});
+        await page.getByRole('menuitem',{name:'Delete',exact:true}).click();
+        assert.equal(await page.locator('.cc-node').count(),1);
+        await firstNode.click({button:'right'});await page.keyboard.press('Escape');
+        assert.equal(await page.getByRole('menu').count(),0);
         assert.equal(await page.getByLabel('Channel cooldown (seconds)').inputValue(),'0');
         await page.getByRole('button',{name:'+ If / else',exact:true}).click();
         await page.getByRole('button',{name:'True +',exact:true}).click();

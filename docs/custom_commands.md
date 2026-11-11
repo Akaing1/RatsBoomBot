@@ -12,7 +12,10 @@ block to edit its fields. Drag blocks to arrange the canvas; positions do not
 change execution order. Drop onto another block to run before it, or onto a
 True/False/Repeat body port to move into that branch. Select a branch port and
 click a toolbox button to add there, or drag a toolbox block onto the canvas.
-Move earlier/later buttons also reorder the selected block. Arrows show sequence
+Right-click a block (or press Shift+F10) to edit, copy, duplicate, paste after,
+move earlier/later, move to the main flow, or delete. Copies include branches.
+Right-click blank canvas to paste into the main flow. The clipboard stays within
+the current page session. Move earlier/later buttons also reorder the selected block. Arrows show sequence
 and branch entry. Pan the canvas, zoom, or use Auto arrange to organize the flow.
 Full screen gives the toolbox its own left column and keeps the canvas and
 properties/test panel side by side on wide screens. Escape exits full screen.

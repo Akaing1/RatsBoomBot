@@ -18,6 +18,18 @@
         if(!withinDepth(blocks)) {target.splice(index,1);source.list.splice(source.index,0,block);return false;}
         return true;
     }
+    function insertCopy(blocks, original, target, index, point) {
+        if(!Array.isArray(target)||index<0||index>target.length)return null;
+        if(target!==blocks&&!flatten(blocks).some(x=>children(x.block).some(([,list])=>list===target)))return null;
+        if(flatten(blocks).length+flatten([original]).length>40)return null;
+        const copy=JSON.parse(JSON.stringify(original)), origin=copy.position||{x:0,y:0};
+        const dx=(point?.x??origin.x+40)-origin.x,dy=(point?.y??origin.y+40)-origin.y;
+        for(const {block} of flatten([copy]))if(block.position)block.position={x:Math.max(0,Math.min(20000,block.position.x+dx)),y:Math.max(0,Math.min(20000,block.position.y+dy))};
+        if(!copy.position&&point)copy.position={...point};
+        target.splice(index,0,copy);
+        if(!withinDepth(blocks)){target.splice(index,1);return null;}
+        arrange(blocks);return copy;
+    }
     function arrange(blocks, force=false) {
         function walk(list,x,y) {
             for(const b of list) {
@@ -29,6 +41,6 @@
         }
         walk(blocks,40,125);
     }
-    const api={children,flatten,withinDepth,move,arrange};
+    const api={children,flatten,withinDepth,move,insertCopy,arrange};
     if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CommandCanvasModel=api;
 })(globalThis);

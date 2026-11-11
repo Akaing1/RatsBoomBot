@@ -8,7 +8,7 @@
     const values={'user.name':'Caller → name','user.mention':'Caller → @mention','user.channel':'Caller → Twitch channel URL','arg.name':'Argument → username','arg.mention':'Argument → @mention','arg.channel':'Argument → Twitch channel URL','channel.name':'This channel → name','channel.url':'This channel → URL',args:'All arguments',arg1:'First argument',user:'Caller name (legacy)',channel:'Channel name (legacy)'};
     let items=[],selected=null,draft=null,active=null,insertion=null,dirty=false,busy=false,loaded=false,loading=false,expanded=false,zoom=1;
     let testArgs='',testRole='everyone',testResult=null,testBusy=false, generation=0;
-    let scroll={left:0,top:0};
+    let scroll={left:0,top:0}, clipboard=null, menu=null, menuOrigin=null;
     function el(tag,text,cls) {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
     const run=fn=>Promise.resolve().then(fn).catch(e=>notify(e.message,true));
     function button(text,fn,cls='button secondary') {const b=el('button',text,cls);b.type='button';b.addEventListener('click',()=>run(fn));return b;}
@@ -72,6 +72,30 @@
         actions.append(button('Remove block',()=>{if(M.children(b).some(([,v])=>v.length)&&!confirm('Remove this block and all its branch blocks?'))return;current.list.splice(current.index,1);active=null;insertion=draft.blocks;mark();render();},'button danger'));parent.append(actions);
         parent.append(el('p','Drag to arrange. Drop on a branch to move into it, or on another block to run before it. Arrows show execution order.','cc-hint'));
     }
+    function dismissMenu(restore=false) {
+        menu?.remove();menu=null;if(restore&&menuOrigin?.isConnected)menuOrigin.focus();menuOrigin=null;
+    }
+    function contextMenu(event, block, point) {
+        if(busy||!draft)return;event.preventDefault();event.stopPropagation();dismissMenu();
+        menuOrigin=event.currentTarget;menu=el('div',undefined,'cc-context-menu');menu.setAttribute('role','menu');menu.setAttribute('aria-label',block?'Block actions':'Canvas actions');
+        const entry=(label,action,disabled=false)=>{const b=button(label,()=>{dismissMenu();if(!busy&&draft)action();},'cc-context-action');b.setAttribute('role','menuitem');b.disabled=disabled;menu.append(b);};
+        const changed=()=>{mark();render();};
+        const paste=(source,target,index,position)=>{const copy=M.insertCopy(draft.blocks,source,target,index,position);if(!copy)return notify('Copy would exceed 40 blocks or six nested levels.',true);active=copy;changed();};
+        if(block){
+            const current=M.flatten(draft.blocks).find(x=>x.block===block);
+            entry('Edit block',()=>{active=block;render();root.querySelector('.cc-inspector input,.cc-inspector textarea,.cc-inspector select')?.focus();});
+            entry('Copy',()=>{clipboard=structuredClone(block);notify('Block copied, including its branches.');});
+            entry('Duplicate',()=>paste(block,current.list,current.index+1));
+            entry('Paste after',()=>paste(clipboard,current.list,current.index+1),!clipboard);
+            for(const [label,offset]of [['Move earlier',-1],['Move later',1]])entry(label,()=>{M.move(draft.blocks,block,current.list,current.index+(offset<0?-1:2));changed();},current.index+offset<0||current.index+offset>=current.list.length);
+            entry('Move to main flow',()=>{if(M.move(draft.blocks,block,draft.blocks,draft.blocks.length)){insertion=draft.blocks;changed();}},current.list===draft.blocks);
+            entry('Delete',()=>{if(M.children(block).some(([,v])=>v.length)&&!confirm('Delete this block and all its branch blocks?'))return;current.list.splice(current.index,1);active=null;insertion=draft.blocks;changed();});
+        }else entry('Paste block',()=>paste(clipboard,draft.blocks,draft.blocks.length,point),!clipboard);
+        root.querySelector('.cc-editor').append(menu);
+        menu.style.left=Math.max(8,Math.min(event.clientX,window.innerWidth-menu.offsetWidth-8))+'px';
+        menu.style.top=Math.max(8,Math.min(event.clientY,window.innerHeight-menu.offsetHeight-8))+'px';
+        menu.querySelector('button:not(:disabled)')?.focus();
+    }
     function renderCanvas(parent) {
         const bar=el('div',undefined,'cc-canvas-toolbar');bar.append(el('strong','Command flow'));
         for(const [text,action]of [['−',()=>zoom=Math.max(.35,zoom-.15)],['+',()=>zoom=Math.min(1.5,zoom+.15)],['Reset view',()=>{zoom=1;scroll={left:0,top:0};}]])bar.append(button(text,()=>{action();render();}));
@@ -86,7 +110,8 @@
         entries.forEach(({block,index,list:sequence},i)=>{
             const n=el('div',undefined,`cc-node cc-${block.type}${active===block?' is-selected':''}`);n.tabIndex=0;n.setAttribute('role','button');n.setAttribute('aria-label',`${names[block.type]} ${i+1}`);n.dataset.node='';n._block=block;n._sequence=sequence;n._index=index;
             n.append(el('strong',`${i+1}. ${names[block.type]}`),el('span',summary(block),'cc-node-summary'));world.append(n);nodes.set(block,n);
-            n.addEventListener('keydown',e=>{if(!busy&&(e.key==='Enter'||e.key===' ')){e.preventDefault();active=block;render();}});
+            n.addEventListener('contextmenu',e=>contextMenu(e,block));
+            n.addEventListener('keydown',e=>{if(e.key==='ContextMenu'||(e.shiftKey&&e.key==='F10')){const box=n.getBoundingClientRect();contextMenu({preventDefault:()=>e.preventDefault(),stopPropagation:()=>e.stopPropagation(),currentTarget:n,clientX:box.x+20,clientY:box.y+20},block);return;}if(!busy&&(e.key==='Enter'||e.key===' ')){e.preventDefault();active=block;render();}});
             n.addEventListener('pointerdown',e=>{
                 if(e.button!==0||busy)return;e.preventDefault();e.stopPropagation();const start={clientX:e.clientX,clientY:e.clientY,...block.position};let moved=false;
                 n.setPointerCapture(e.pointerId);
@@ -108,6 +133,7 @@
             function line(a,b){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',`M ${a.x} ${a.y} C ${a.x} ${a.y+35}, ${b.x} ${b.y-35}, ${b.x} ${b.y}`);svg.append(path);const arrow=document.createElementNS(svg.namespaceURI,'path');arrow.setAttribute('d',`M ${b.x-5} ${b.y-7} L ${b.x} ${b.y} L ${b.x+5} ${b.y-7}`);svg.append(arrow);}
             for(const p of ports){if(!p.branch.length)continue;let from={x:p.x+55,y:p.y+24};for(const b of p.branch){line(from,{x:b.position.x+125,y:b.position.y});from={x:b.position.x+125,y:b.position.y+80};}}
         }
+        view.addEventListener('contextmenu',e=>{if(e.target.closest('.cc-node,.cc-port'))return;const box=world.getBoundingClientRect();contextMenu(e,null,{x:Math.max(0,Math.min(20000,(e.clientX-box.left)/zoom)),y:Math.max(0,Math.min(20000,(e.clientY-box.top)/zoom))});});
         draw();const restore={...scroll};requestAnimationFrame(()=>{if(!view.isConnected)return;view.scrollLeft=restore.left;view.scrollTop=restore.top;});view.addEventListener('scroll',()=>{if(view.isConnected)scroll={left:view.scrollLeft,top:view.scrollTop};});
         view.addEventListener('pointerdown',e=>{if(e.button!==0||e.target.closest('.cc-node,.cc-port'))return;const start={x:e.clientX,y:e.clientY,left:view.scrollLeft,top:view.scrollTop};view.setPointerCapture(e.pointerId);const move=p=>{view.scrollLeft=start.left-(p.clientX-start.x);view.scrollTop=start.top-(p.clientY-start.y);};const end=()=>{view.removeEventListener('pointermove',move);view.removeEventListener('pointerup',end);view.removeEventListener('pointercancel',end);};view.addEventListener('pointermove',move);view.addEventListener('pointerup',end);view.addEventListener('pointercancel',end);});
         view.addEventListener('dragover',e=>{if(!busy)e.preventDefault();});view.addEventListener('drop',e=>{e.preventDefault();const type=e.dataTransfer.getData('text/plain');if(!names[type]||busy)return;const bounds=world.getBoundingClientRect(),hit=e.target.closest('[data-drop-port]');add(type,hit?hit._target:insertion||draft.blocks,{x:Math.max(0,Math.min(20000,(e.clientX-bounds.left)/zoom)),y:Math.max(0,Math.min(20000,(e.clientY-bounds.top)/zoom))});});
@@ -120,6 +146,7 @@
         const test=button(testBusy?'Testing…':'Run test',async()=>{if(testBusy)return;testBusy=true;test.disabled=true;const stamp=generation;try{const response=await request({action:'test',definition:JSON.stringify(draft),args:testArgs,role:testRole});if(stamp===generation){testResult=response;}}finally{testBusy=false;if(draft)render();}});test.disabled=testBusy;parent.append(test,result);
     }
     function render(){
+        dismissMenu();
         document.body.classList.toggle('cc-fullscreen-open',expanded&&!!draft);list.replaceChildren();root.querySelector('[data-command-new]').disabled=busy||loading;
         const rows=items.slice();if(draft&&selected.revision===0)rows.push(selected);
         if(!rows.length)list.append(el('p','No custom commands yet. Add a command to start building.','cc-empty'));
@@ -140,5 +167,8 @@
     root.querySelector('[data-command-new]').addEventListener('click',()=>{if(!busy&&!loading)open({command:{name:'',enabled:false,permission:'everyone',cooldown:0,blocks:[create('reply')]},revision:0});});
     document.querySelector('[data-workspace-tab="commands"]').addEventListener('click',()=>run(async()=>{if(loaded||loading)return;loading=true;render();try{items=(await request()).items;loaded=true;}finally{loading=false;render();}}));
     window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
-    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&expanded&&!busy){expanded=false;render();}});
+    document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target))dismissMenu();});
+    window.addEventListener('resize',()=>dismissMenu());
+    document.addEventListener('scroll',()=>dismissMenu(),true);
+    document.addEventListener('keydown',e=>{if(menu){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();dismissMenu(true);return;}if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const buttons=[...menu.querySelectorAll('button:not(:disabled)')],i=buttons.indexOf(document.activeElement);buttons[e.key==='Home'?0:e.key==='End'?buttons.length-1:(i+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();return;}if(e.key==='Tab')dismissMenu();}if(e.key==='Escape'&&expanded&&!busy){expanded=false;render();}});
 })();
