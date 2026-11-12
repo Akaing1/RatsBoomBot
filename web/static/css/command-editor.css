@@ -19,3 +19,5 @@ body.cc-fullscreen-open{overflow:hidden}.cc-editor.cc-expanded{position:fixed;in
 .cc-node.cc-counter{border-left-color:#5ac9a6;background:#1d302d}
 
 .cc-node.cc-random_number{border-left-color:#66bfe6;background:#1e2c38}
+
+.cc-counters{padding:16px 20px;margin:0 0 22px;border:1px solid var(--cc-border);border-radius:12px;background:#202631}.cc-counters .cc-header{margin:0 0 8px}.cc-counters h4{margin:0}.cc-counter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px;margin-top:14px}.cc-counter-card{padding:14px;border:1px solid var(--cc-border);border-radius:8px;background:#13171e;overflow-wrap:anywhere}.cc-counter-card code{color:#cab0ff}.cc-counter-value{display:block;font-size:26px;margin:8px 0}.cc-counter-card p{margin-bottom:0}

@@ -12,6 +12,7 @@ test('command editor builds branches, preserves drafts, tests without saving and
         const errors=[];page.on('pageerror',e=>errors.push(e.message));
         const calls=[],payloads=[];let failSave=true;
         await page.route('http://editor.test/**',async route=>{
+            if(route.request().url().endsWith('/commands/counters'))return route.fulfill({json:{counters:{wins:9}}});
             if(!route.request().url().endsWith('/commands'))return route.fulfill({body:'<html></html>',contentType:'text/html'});
             const data=new URLSearchParams(route.request().postData()||'');calls.push(data.get('action')||'list');if(data.get('action')==='save')payloads.push(Object.fromEntries(data));
             if(route.request().method()==='GET')return route.fulfill({json:{items:[]}});
@@ -28,6 +29,12 @@ test('command editor builds branches, preserves drafts, tests without saving and
         await page.getByRole('button',{name:'+ Add command',exact:true}).click();
         await page.getByLabel('Command name (without !)').fill('welcome');
         await page.getByLabel('Message',{exact:true}).fill('Hello {user}');
+        await page.getByRole('button',{name:'Refresh counters',exact:true}).click();
+        await page.getByText('Saved values refreshed.',{exact:true}).waitFor();
+        assert.equal(await page.locator('.cc-counter-value').textContent(),'9');
+        assert.equal(await page.getByLabel('Command name (without !)').inputValue(),'welcome');
+        assert.equal(await page.getByLabel('Message',{exact:true}).inputValue(),'Hello {user}');
+
         assert.equal(await page.getByRole('button',{name:'+ Repeat',exact:true}).count(),0);
         await page.getByRole('button',{name:'+ Counter',exact:true}).click();
         await page.getByLabel('Counter name',{exact:true}).fill('wins');

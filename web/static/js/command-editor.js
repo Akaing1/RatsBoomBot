@@ -8,7 +8,7 @@
     const values={'user.name':'Caller → name','user.mention':'Caller → @mention','user.channel':'Caller → Twitch channel URL','arg.name':'Argument → username','arg.mention':'Argument → @mention','arg.channel':'Argument → Twitch channel URL','channel.name':'This channel → name','channel.url':'This channel → URL',args:'All arguments',arg1:'First argument',user:'Caller name (legacy)',channel:'Channel name (legacy)'};
     let items=[],selected=null,draft=null,active=null,insertion=null,dirty=false,busy=false,loaded=false,loading=false,expanded=false,zoom=1;
     let testArgs='',testRole='everyone',testResult=null,testBusy=false, generation=0;
-    let knownCounters={};
+    let knownCounters={}, countersLoading=false, counterFeedback='';
     let scroll={left:0,top:0}, clipboard=null, menu=null, menuOrigin=null;
     function el(tag,text,cls) {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
     const run=fn=>Promise.resolve().then(fn).catch(e=>notify(e.message,true));
@@ -16,9 +16,9 @@
     function notify(text,error=false) {for(const n of [status,...root.querySelectorAll('[data-command-feedback]')]){n.textContent=text;n.classList.toggle('cc-error',error);}}
     function mark() {dirty=true;testResult=null;generation++;const n=root.querySelector('[data-command-dirty]');if(n)n.textContent='Unsaved changes';root.querySelector('[data-test-result]')?.replaceChildren();}
     const leave=()=>!dirty||confirm('Discard your unsaved command changes?');
-    async function request(data) {
+    async function request(data, url=endpoint) {
         const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),15000);
-        try {const response=await fetch(endpoint,{method:data?'POST':'GET',credentials:'same-origin',cache:'no-store',signal:controller.signal,...(data?{body:new URLSearchParams({csrf_token:csrf,...data})}:{})});
+        try {const response=await fetch(url,{method:data?'POST':'GET',credentials:'same-origin',cache:'no-store',signal:controller.signal,...(data?{body:new URLSearchParams({csrf_token:csrf,...data})}:{})});
             const result=await response.json();if(!response.ok)throw new Error(typeof result.detail==='string'?result.detail:'Please check the command fields.');return result;
         } catch(e){if(e.name==='AbortError')throw new Error('Request timed out. Reload before retrying a save.');throw e;}finally{clearTimeout(timer);}
     }
@@ -159,7 +159,30 @@
         if(testResult)result.append(el('pre',Object.entries(testResult.random||{}).map(([name,value])=>`${name}: ${value}`).join('\n'),'cc-result'),el('pre',Object.entries(testResult.counters||{}).map(([name,value])=>`${name}: ${value}`).join('\n'),'cc-result'),el('pre',testResult.trace.join('\n'),'cc-result'),el('pre',testResult.messages.join('\n')||'No messages.','cc-result'));
         const test=button(testBusy?'Testing…':'Run test',async()=>{if(testBusy)return;testBusy=true;test.disabled=true;const stamp=generation;try{const response=await request({action:'test',definition:JSON.stringify(draft),args:testArgs,role:testRole});if(stamp===generation){testResult=response;}}finally{testBusy=false;if(draft)render();}});test.disabled=testBusy;parent.append(test,result);
     }
+    async function refreshCounters(){
+        if(countersLoading)return;countersLoading=true;counterFeedback='';renderCounters();
+        try{knownCounters=(await request(null,endpoint+'/counters')).counters||{};counterFeedback='Saved values refreshed.';}
+        catch(error){counterFeedback=error.message;}
+        finally{countersLoading=false;renderCounters();}
+    }
+    function renderCounters(){
+        const panel=root.querySelector('[data-command-counters]');if(!panel)return;panel.replaceChildren();
+        const header=el('div',undefined,'cc-header');header.append(el('h4','Channel counters'));
+        const refresh=button(countersLoading?'Refreshing…':'Refresh counters',refreshCounters);refresh.disabled=countersLoading||!loaded;header.append(refresh);panel.append(header);
+        panel.append(el('p','Shared across your commands and saved across streams. Refresh to see changes from chat.','cc-hint'));
+        const usage=new Map();
+        for(const item of items)for(const name of M.counterReferences(item.command.blocks)){
+            if(!usage.has(name))usage.set(name,[]);usage.get(name).push('!'+item.command.name+(item.command.enabled?'':' (disabled)'));
+        }
+        const names=[...new Set([...Object.keys(knownCounters),...usage.keys()])].sort();
+        if(!loaded)panel.append(el('p','Loading counters…','cc-hint'));
+        else if(!names.length)panel.append(el('p','No counters yet. Add a Counter block to a command to get started.','cc-hint'));
+        else{const grid=el('div',undefined,'cc-counter-grid');
+            for(const name of names){const card=el('article',undefined,'cc-counter-card');card.append(el('code',name),el('strong',String(Object.hasOwn(knownCounters,name)?knownCounters[name]:0),'cc-counter-value'),el('p',usage.has(name)?'Used by '+usage.get(name).join(', '):'Not used by saved commands','cc-hint'));grid.append(card);}panel.append(grid);}
+        const feedback=el('p',counterFeedback,'cc-hint');feedback.setAttribute('role','status');panel.append(feedback);
+    }
     function render(){
+        renderCounters();
         dismissMenu();
         document.body.classList.toggle('cc-fullscreen-open',expanded&&!!draft);list.replaceChildren();root.querySelector('[data-command-new]').disabled=busy||loading;
         const rows=items.slice();if(draft&&selected.revision===0)rows.push(selected);
@@ -179,7 +202,7 @@
         }
     }
     root.querySelector('[data-command-new]').addEventListener('click',()=>{if(!busy&&!loading)open({command:{name:'',enabled:false,permission:'everyone',cooldown:0,blocks:[create('reply')]},revision:0});});
-    document.querySelector('[data-workspace-tab="commands"]').addEventListener('click',()=>run(async()=>{if(loaded||loading)return;loading=true;render();try{const response=await request();items=response.items;knownCounters=response.counters||{};loaded=true;}finally{loading=false;render();}}));
+    document.querySelector('[data-workspace-tab="commands"]').addEventListener('click',()=>run(async()=>{if(loaded){await refreshCounters();return;}if(loading)return;loading=true;render();try{const response=await request();items=response.items;knownCounters=response.counters||{};loaded=true;}finally{loading=false;render();}}));
     window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
     document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target))dismissMenu();});
     window.addEventListener('resize',()=>dismissMenu());

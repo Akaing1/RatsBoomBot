@@ -456,3 +456,23 @@ async def test_persistent_rate_limit_stops_after_one_retry_and_skips_busy_channe
     service.backoff.clear();service.delivering.add('1')
     await service.handle(ctx)
     assert ctx.send.await_count==2
+
+
+@pytest.mark.asyncio
+async def test_counter_panel_endpoint_is_private_current_and_preserves_orphaned_counters(workspace_client):
+    from storage.custom_commands import run_command,change_command
+    client,session,db=workspace_client
+    c=counter_command()
+    await change_command(db,'alice',c,0)
+    await run_command(db,'alice',c,user='Rat',channel_name='Mei')
+    await change_command(db,'alice',c,1,delete=True)
+    url='/channel/api/for-you/commands/counters'
+    response=await client.get(url)
+    assert response.json()=={'counters':{'deaths':1}}
+    assert response.headers['cache-control']=='no-store'
+    await run_command(db,'alice',c,user='Rat',channel_name='Mei')
+    assert (await client.get(url)).json()['counters']=={'deaths':2}
+    session['channel_user_id']='bob'
+    assert (await client.get(url)).json()=={'counters':{}}
+    session.clear()
+    assert (await client.get(url)).status_code==401
