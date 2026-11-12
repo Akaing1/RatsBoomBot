@@ -147,3 +147,17 @@ async def test_custom_bot_token_is_not_loaded_as_a_broadcaster(tmp_path, monkeyp
         assert len(tokens) == 3
         assert broadcasters == ["channel-1"]
         assert subscriptions == ["subscription-channel-1"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('duplicate',[False,True])
+async def test_chat_rejections_do_not_fall_back_to_another_sender(duplicate):
+    from unittest.mock import AsyncMock
+    from twitchio.exceptions import HTTPException,MessageRejectedError
+    service=ChatIdentityService(SimpleNamespace(bot_id='main-bot'),None)
+    service.sender_id=lambda _: 'custom-bot'
+    error=MessageRejectedError('Duplicate',message=SimpleNamespace(dropped_code='msg_duplicate',dropped_message='Duplicate'),channel=None,content='Hello') if duplicate else HTTPException(status=429,extra='Too fast')
+    broadcaster=SimpleNamespace(id='1',send_message=AsyncMock(side_effect=error))
+    with pytest.raises(type(error)):
+        await service.send_message(broadcaster,'Hello')
+    broadcaster.send_message.assert_awaited_once_with(sender='custom-bot',message='Hello',reply_to_message_id=None)

@@ -81,3 +81,12 @@ preventing lost increments when commands run concurrently. A delivery failure
 does not undo an already committed count. Counters are limited to 100 per channel,
 with values between -1 trillion and 1 trillion, and block amounts between
 -1 billion and 1 billion. Counter names follow the command naming rules.
+
+Live custom-command replies are spaced at least 1.1 seconds apart per channel.
+Twitch message drops (including duplicate replies) are logged as warnings and
+later replies continue. An HTTP 429 pauses delivery for 30 seconds, then retries
+only the failed reply once per invocation; a second 429 stops the remaining
+replies and starts another 30-second backoff. Counter changes are never rerun
+on delivery retries. Invocations arriving while that channel is already executing
+or backing off are ignored before counters execute, preventing a growing queue.
+Configured cooldowns remain independent of these delivery protections.
