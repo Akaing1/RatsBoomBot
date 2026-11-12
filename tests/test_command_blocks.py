@@ -300,3 +300,59 @@ async def test_live_counter_commands_share_values_across_command_names(workspace
     await service.handle(ctx)
     assert [call.args[0] for call in ctx.send.await_args_list] == ['Deaths: 1','Total 1']
     assert await list_counters(db,'1') == {'deaths':1}
+
+
+def random_number_command():
+    return counter_command([{'type':'random_number','name':'roll','min':1,'max':100},
+                            {'type':'reply','message':'Roll: {random.roll}, again: {random.roll}'}])
+
+
+def test_random_number_inclusive_bounds_reuse_and_fresh_invocations():
+    from unittest.mock import Mock
+    c=random_number_command()
+    draw=Mock(side_effect=[1,100])
+    assert execute(c,user='Rat',channel='Mei',draw=draw)['messages'] == ['Roll: 1, again: 1']
+    result=execute(c,user='Rat',channel='Mei',draw=draw)
+    assert result['messages'] == ['Roll: 100, again: 100']
+    assert result['random'] == {'roll':100}
+    assert draw.call_count == 2
+    draw.assert_called_with(1,100)
+    c['blocks'][0].update(min=-3,max=-3)
+    assert execute(c,user='Rat',channel='Mei')['random'] == {'roll':-3}
+
+
+@pytest.mark.parametrize('changes',[{'name':'bad.name'},{'name':'x'*33},{'min':True},{'min':1.5},
+                                     {'min':101},{'min':-1000000001},{'max':1000000001},{'extra':'code'}])
+def test_invalid_random_number_blocks_are_rejected(changes):
+    c=random_number_command();c['blocks'][0].update(changes)
+    with pytest.raises(ValueError):validate_command(c)
+
+
+def test_random_results_follow_branch_order_and_permissions():
+    c=random_number_command()
+    c['blocks'].insert(1,{'type':'random_number','name':'roll','min':5,'max':5})
+    assert execute(c,user='Rat',channel='Mei')['messages'] == ['Roll: 5, again: 5']
+    c['blocks'][0]={'type':'if','condition':'has_argument','value':'','then':[c['blocks'][0]],'else':[]}
+    del c['blocks'][1]
+    with pytest.raises(ValueError,match='has not been generated'):
+        execute(c,user='Rat',channel='Mei')
+    assert execute(c,user='Rat',channel='Mei',args='yes',draw=lambda low,high:5)['random'] == {'roll':5}
+    c['permission']='moderator'
+    assert execute(c,user='Rat',channel='Mei')['random'] == {}
+
+
+@pytest.mark.asyncio
+async def test_random_preview_and_live_runtime_and_failed_result_rollback(workspace_client):
+    from storage.custom_commands import run_command,list_counters
+    client,_,db=workspace_client
+    c=random_number_command();c['blocks'][0].update(min=6,max=6)
+    preview=await client.post('/channel/api/for-you/commands',data={'csrf_token':'secret','action':'test','definition':json.dumps(c)})
+    assert preview.json()['random'] == {'roll':6}
+    result=await run_command(db,'alice',c,user='Rat',channel_name='Mei')
+    assert result['messages']==['Roll: 6, again: 6']
+    assert await list_counters(db,'alice')=={}
+    c['blocks']=[{'type':'counter','name':'wins','operation':'add','value':1},
+                 {'type':'reply','message':'{random.missing}'}]
+    with pytest.raises(ValueError,match='has not been generated'):
+        await run_command(db,'alice',c,user='Rat',channel_name='Mei')
+    assert await list_counters(db,'alice')=={}

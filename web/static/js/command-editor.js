@@ -3,7 +3,7 @@
     const root=document.querySelector('[data-command-editor]');if(!root)return;
     const M=window.CommandCanvasModel, list=root.querySelector('[data-command-list]'), status=root.querySelector('[data-command-status]');
     const endpoint=(document.body.dataset.channelRoot||'/channel')+'/api/for-you/commands', csrf=root.closest('[data-workspace-page]').dataset.csrf;
-    const names={reply:'Send message',if:'If / else',random:'Random message',counter:'Counter'};
+    const names={reply:'Send message',if:'If / else',random:'Random message',counter:'Counter',random_number:'Random Number'};
     const conditions={has_argument:'An argument was provided',argument_equals:'Arguments equal',is_moderator:'Viewer is a moderator or broadcaster',is_broadcaster:'Viewer is the broadcaster'};
     const values={'user.name':'Caller → name','user.mention':'Caller → @mention','user.channel':'Caller → Twitch channel URL','arg.name':'Argument → username','arg.mention':'Argument → @mention','arg.channel':'Argument → Twitch channel URL','channel.name':'This channel → name','channel.url':'This channel → URL',args:'All arguments',arg1:'First argument',user:'Caller name (legacy)',channel:'Channel name (legacy)'};
     let items=[],selected=null,draft=null,active=null,insertion=null,dirty=false,busy=false,loaded=false,loading=false,expanded=false,zoom=1;
@@ -31,12 +31,12 @@
         const wrap=el('label',label), input=el('textarea');input.rows=4;input.maxLength=450;input.value=value;
         input.addEventListener('input',()=>{update(input.value);mark();updateSummary();});wrap.append(input);parent.append(wrap);
         const pick=el('select');pick.setAttribute('aria-label','Insert a value');
-        for(const [key,text]of Object.entries({'':'Insert a value…',...values,...Object.fromEntries([...new Set([...Object.keys(knownCounters),...M.flatten(draft.blocks).filter(x=>x.block.type==='counter').map(x=>x.block.name).filter(n=>/^[a-z][a-z0-9_]{0,31}$/.test(n))])].map(n=>['counter.'+n,'Counter → '+n]))})){ const o=el('option',text);o.value=key;pick.append(o);}
+        for(const [key,text]of Object.entries({'':'Insert a value…',...values,...Object.fromEntries(M.flatten(draft.blocks).filter(x=>x.block.type==='random_number'&&/^[a-z][a-z0-9_]{0,31}$/.test(x.block.name)).map(x=>['random.'+x.block.name,'Random result → '+x.block.name])),...Object.fromEntries([...new Set([...Object.keys(knownCounters),...M.flatten(draft.blocks).filter(x=>x.block.type==='counter').map(x=>x.block.name).filter(n=>/^[a-z][a-z0-9_]{0,31}$/.test(n))])].map(n=>['counter.'+n,'Counter → '+n]))})){ const o=el('option',text);o.value=key;pick.append(o);}
         pick.addEventListener('change',()=>{if(!pick.value)return;input.setRangeText(`{${pick.value}}`,input.selectionStart,input.selectionEnd,'end');update(input.value);mark();updateSummary();pick.value='';input.focus();});parent.append(pick);
     }
-    function summary(b){return b.type==='counter'?`${b.name}: ${b.operation} ${b.value}`:b.type==='reply'?b.message:b.type==='random'?`${b.choices.length} possible replies`:b.type==='repeat'?`${b.count} repetitions`:conditions[b.condition];}
+    function summary(b){if(b.type==='random_number')return `${b.name}: ${b.min} to ${b.max}`;return b.type==='counter'?`${b.name}: ${b.operation} ${b.value}`:b.type==='reply'?b.message:b.type==='random'?`${b.choices.length} possible replies`:b.type==='repeat'?`${b.count} repetitions`:conditions[b.condition];}
     function updateSummary(){root.querySelectorAll('.cc-node').forEach(n=>{if(n._block===active)n.querySelector('.cc-node-summary').textContent=summary(active);});}
-    function create(type) {if(type==='counter')return {type,name:'deaths',operation:'add',value:1};return type==='reply'?{type,message:'Hello, {user.name}!'}:type==='if'?{type,condition:'has_argument',value:'',then:[],else:[]}:type==='random'?{type,choices:['Yes!','No!']}:{type,count:2,blocks:[]};}
+    function create(type) {if(type==='random_number')return {type,name:'roll',min:1,max:100};if(type==='counter')return {type,name:'deaths',operation:'add',value:1};return type==='reply'?{type,message:'Hello, {user.name}!'}:type==='if'?{type,condition:'has_argument',value:'',then:[],else:[]}:type==='random'?{type,choices:['Yes!','No!']}:{type,count:2,blocks:[]};}
     function add(type,target=insertion||draft.blocks,point=null) {
         if(busy||!draft||M.flatten(draft.blocks).length>=40)return notify('A command can have at most 40 blocks.',true);
         const b=create(type);target.push(b);
@@ -58,6 +58,11 @@
         if(!active){parent.append(el('p','Select a block to edit its properties.','cc-hint'));return;}
         const b=active;
         if(b.type==='reply')message(parent,b.message,v=>b.message=v);
+        if(b.type==='random_number'){
+            field(parent,'Result name',b.name,v=>{b.name=v;updateSummary();}).maxLength=32;
+            for(const [key,label]of [['min','Minimum'],['max','Maximum']]){const input=field(parent,label,b[key],v=>{b[key]=Number(v);updateSummary();});input.type='number';input.step=1;input.min=-1000000000;input.max=1000000000;}
+            parent.append(el('p','Both bounds are included. Use {random.name} in a later message. Each run generates a fresh result; reusing the same name replaces it.','cc-hint'));
+        }
         if(b.type==='counter'){
             const name=field(parent,'Counter name',b.name,v=>{b.name=v;updateSummary();});name.maxLength=32;name.setAttribute('list','cc-counter-names');
             const choices=el('datalist');choices.id='cc-counter-names';for(const key of Object.keys(knownCounters)){const option=el('option');option.value=key;choices.append(option);}parent.append(choices);
@@ -151,7 +156,7 @@
         field(parent,'Test arguments',testArgs,v=>testArgs=v,null,false).maxLength=500;
         field(parent,'Test viewer role',testRole,v=>testRole=v,{everyone:'Everyone',moderator:'Moderator',broadcaster:'Broadcaster'},false);
         const result=el('div');result.dataset.testResult='';result.setAttribute('role','status');
-        if(testResult)result.append(el('pre',Object.entries(testResult.counters||{}).map(([name,value])=>`${name}: ${value}`).join('\n'),'cc-result'),el('pre',testResult.trace.join('\n'),'cc-result'),el('pre',testResult.messages.join('\n')||'No messages.','cc-result'));
+        if(testResult)result.append(el('pre',Object.entries(testResult.random||{}).map(([name,value])=>`${name}: ${value}`).join('\n'),'cc-result'),el('pre',Object.entries(testResult.counters||{}).map(([name,value])=>`${name}: ${value}`).join('\n'),'cc-result'),el('pre',testResult.trace.join('\n'),'cc-result'),el('pre',testResult.messages.join('\n')||'No messages.','cc-result'));
         const test=button(testBusy?'Testing…':'Run test',async()=>{if(testBusy)return;testBusy=true;test.disabled=true;const stamp=generation;try{const response=await request({action:'test',definition:JSON.stringify(draft),args:testArgs,role:testRole});if(stamp===generation){testResult=response;}}finally{testBusy=false;if(draft)render();}});test.disabled=testBusy;parent.append(test,result);
     }
     function render(){

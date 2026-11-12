@@ -31,6 +31,14 @@ Supported blocks:
 - If/else: argument present, complete arguments equal text (case insensitive),
   moderator or broadcaster, and broadcaster only.
 - Random message: one of up to five choices.
+- Random Number: generate a whole number between inclusive minimum/maximum
+  bounds (default 1–100) into a named, per-run result. For example, name it
+  `roll`, then send `{user.name} rolled {random.roll}!`. Bounds must be between
+  -1 billion and 1 billion; equal bounds always return that number. Multiple
+  references reuse the same result until another block overwrites that name.
+  Results do not persist between invocations. Referencing a result before its
+  block runs fails the command before counter changes or messages are committed.
+  Test output includes generated values and their ranges.
 - Counter: increase, decrease, or set a named channel counter. Missing counters
   start at 0. Counters persist across streams and are shared by all commands in
   that channel. Add a counter block named `deaths` with Increase by 1, followed
