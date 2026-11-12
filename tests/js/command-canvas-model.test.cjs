@@ -49,3 +49,13 @@ test('paste rejects block and nesting limits atomically',()=>{
     const tree=[];let target=tree;for(let i=0;i<6;i++){const b=branch();target.push(b);target=b.then;}
     const before=JSON.stringify(tree);assert.equal(M.insertCopy(tree,branch(),target,0),null);assert.equal(JSON.stringify(tree),before);
 });
+test('random results are available only after generation on every incoming path',()=>{
+    const roll={type:'random_number',name:'roll',min:1,max:6},msg=reply('{random.roll}'),condition=branch();
+    assert.deepEqual(M.availableRandomBefore([msg,roll],msg),[]);
+    assert.deepEqual(M.availableRandomBefore([roll,msg],msg),['roll']);
+    condition.then=[roll];assert.deepEqual(M.availableRandomBefore([condition,msg],msg),[]);
+    condition.then.push(msg);assert.deepEqual(M.availableRandomBefore([condition],msg),['roll']);
+    condition.then=[roll];condition.else=[{...roll}];assert.deepEqual(M.availableRandomBefore([condition,msg],msg),['roll']);
+    condition.else=[];assert.deepEqual(M.availableRandomBefore([roll,condition,msg],msg),['roll']);
+    assert.deepEqual(M.availableRandomBefore([{type:'repeat',count:2,blocks:[msg,roll]}],msg),[]);
+});

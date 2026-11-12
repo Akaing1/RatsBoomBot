@@ -11,7 +11,7 @@ async def list_commands(db, channel):
 
 
 async def change_command(db, channel, command, revision, delete=False, original_name=None):
-    validate_command(command)
+    validate_command(command, check_random_order=not delete)
     original_name = original_name or command['name']
     async with db.acquire() as connection:
         async with immediate_transaction(connection):

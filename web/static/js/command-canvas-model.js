@@ -41,6 +41,22 @@
         }
         walk(blocks,40,125);
     }
-    const api={children,flatten,withinDepth,move,insertCopy,arrange};
+    function availableRandomBefore(blocks, target) {
+        let found=new Set();
+        function walk(list, incoming) {
+            let available=new Set(incoming);
+            for(const block of list){
+                if(block===target)found=new Set(available);
+                if(block.type==='random_number'&&/^[a-z][a-z0-9_]{0,31}$/.test(block.name))available.add(block.name);
+                else if(block.type==='if'){
+                    const yes=walk(block.then,available),no=walk(block.else,available);
+                    available=new Set([...yes].filter(name=>no.has(name)));
+                }else if(block.type==='repeat')available=walk(block.blocks,available);
+            }
+            return available;
+        }
+        walk(blocks,new Set());return [...found];
+    }
+    const api={availableRandomBefore,children,flatten,withinDepth,move,insertCopy,arrange};
     if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CommandCanvasModel=api;
 })(globalThis);

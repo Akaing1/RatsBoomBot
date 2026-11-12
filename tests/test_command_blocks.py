@@ -336,6 +336,7 @@ def test_random_results_follow_branch_order_and_permissions():
     del c['blocks'][1]
     with pytest.raises(ValueError,match='has not been generated'):
         execute(c,user='Rat',channel='Mei')
+    c['blocks'][0]['else']=[{'type':'random_number','name':'roll','min':5,'max':5}]
     assert execute(c,user='Rat',channel='Mei',args='yes',draw=lambda low,high:5)['random'] == {'roll':5}
     c['permission']='moderator'
     assert execute(c,user='Rat',channel='Mei')['random'] == {}
@@ -356,3 +357,41 @@ async def test_random_preview_and_live_runtime_and_failed_result_rollback(worksp
     with pytest.raises(ValueError,match='has not been generated'):
         await run_command(db,'alice',c,user='Rat',channel_name='Mei')
     assert await list_counters(db,'alice')=={}
+
+
+@pytest.mark.asyncio
+async def test_random_forward_references_are_rejected_on_save_and_preview(workspace_client):
+    client,_,_=workspace_client
+    c=random_number_command();c['blocks'].reverse()
+    for action in ('save','test'):
+        response=await client.post('/channel/api/for-you/commands',data={'csrf_token':'secret','action':action,'definition':json.dumps(c)})
+        assert response.status_code==400
+        assert 'before this message' in response.json()['detail']
+    assert (await client.get('/channel/api/for-you/commands')).json()['items']==[]
+
+
+def test_random_flow_checks_all_choices_branches_and_legacy_repeats():
+    roll={'type':'random_number','name':'roll','min':1,'max':6}
+    message={'type':'reply','message':'{random.roll}'}
+    condition={'type':'if','condition':'has_argument','value':'','then':[roll],'else':[]}
+    c=counter_command([condition,message])
+    with pytest.raises(ValueError,match='every path'):validate_command(c)
+    condition['else']=[copy.deepcopy(roll)];validate_command(c)
+    condition['else']=[];c['blocks']=[roll,condition,message];validate_command(c)
+    c['blocks']=[{'type':'random','choices':['hello','{random.roll}']},roll]
+    with pytest.raises(ValueError,match='before this message'):validate_command(c)
+    c['blocks']=[{'type':'repeat','count':2,'blocks':[message,roll]}]
+    with pytest.raises(ValueError):validate_command(c)
+    c['blocks']=[{'type':'repeat','count':1,'blocks':[roll]},message];validate_command(c)
+
+
+@pytest.mark.asyncio
+async def test_old_invalid_random_commands_can_still_be_deleted(workspace_client):
+    client,_,db=workspace_client
+    c=random_number_command();c['blocks'].reverse()
+    async with db.acquire() as connection:
+        await connection.execute('INSERT INTO custom_commands (broadcaster_id,name,definition,revision) VALUES (?,?,?,1)',('alice',c['name'],json.dumps(c)))
+        await connection.commit()
+    response=await client.post('/channel/api/for-you/commands',data={'csrf_token':'secret','action':'delete','definition':json.dumps(c),'revision':1})
+    assert response.status_code==200
+    assert (await client.get('/channel/api/for-you/commands')).json()['items']==[]

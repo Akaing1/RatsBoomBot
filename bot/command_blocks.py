@@ -8,7 +8,7 @@ COUNTER_LIMIT = 1_000_000_000_000
 ROLES = {'everyone', 'moderator', 'broadcaster'}
 
 
-def validate_command(value):
+def validate_command(value, *, check_random_order=True):
     if not isinstance(value, dict) or set(value) != {'name', 'enabled', 'permission', 'cooldown', 'blocks'}:
         raise ValueError('Invalid command fields.')
     name = value['name']
@@ -82,6 +82,25 @@ def validate_command(value):
         raise ValueError('A command may run at most 64 steps and send at most three messages, including repeats.')
     if not nodes:
         raise ValueError('Add at least one block.')
+    def check_flow(blocks, available):
+        available = set(available)
+        for block in blocks:
+            kind = block['type']
+            messages = [block['message']] if kind == 'reply' else block['choices'] if kind == 'random' else []
+            for message in messages:
+                for name in re.findall(r'\{random\.(' + COUNTER_NAME + r')\}', message):
+                    if name not in available:
+                        raise ValueError(f'Random result {name} has not been generated on every path before this message. Move its Random Number block earlier in the flow.')
+            if kind == 'random_number':
+                available.add(block['name'])
+            elif kind == 'if':
+                available = check_flow(block['then'], available) & check_flow(block['else'], available)
+            elif kind == 'repeat':
+                available = check_flow(block['blocks'], available)
+        return available
+
+    if check_random_order:
+        check_flow(value['blocks'], set())
     return value
 
 
