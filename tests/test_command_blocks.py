@@ -395,3 +395,64 @@ async def test_old_invalid_random_commands_can_still_be_deleted(workspace_client
     response=await client.post('/channel/api/for-you/commands',data={'csrf_token':'secret','action':'delete','definition':json.dumps(c),'revision':1})
     assert response.status_code==200
     assert (await client.get('/channel/api/for-you/commands')).json()['items']==[]
+
+
+@pytest.fixture
+def delivery_clock(monkeypatch):
+    import bot.services.channels.custom_commands as module
+    clock=SimpleNamespace(now=100.,waits=[])
+    async def sleep(delay):
+        clock.waits.append(delay);clock.now+=delay
+    monkeypatch.setattr(module,'time',SimpleNamespace(monotonic=lambda:clock.now))
+    monkeypatch.setattr(module,'asyncio',SimpleNamespace(sleep=sleep))
+    return clock
+
+
+def rejected_reply(code='msg_duplicate'):
+    from twitchio.exceptions import MessageRejectedError
+    return MessageRejectedError('Rejected',message=SimpleNamespace(dropped_code=code,dropped_message='Rejected'),channel=SimpleNamespace(id='1'),content='Hello')
+
+
+@pytest.mark.asyncio
+async def test_duplicate_reply_does_not_abort_remaining_messages(delivery_clock):
+    service=CustomCommandService(None)
+    ctx=SimpleNamespace(send=AsyncMock(side_effect=[rejected_reply(),None,None]))
+    await service._deliver(ctx,'1',['Hello','Rolled 9','Taco 1'])
+    assert [c.args[0] for c in ctx.send.await_args_list]==['Hello','Rolled 9','Taco 1']
+    assert delivery_clock.waits==pytest.approx([1.1,1.1])
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_retries_delivery_without_rerunning_counters(workspace_client,delivery_clock):
+    from twitchio.exceptions import HTTPException
+    from storage.custom_commands import list_counters
+    _,_,db=workspace_client
+    service=CustomCommandService(db);service.commands={'1':{'welcome':counter_command()}}
+    ctx=SimpleNamespace(prefix='!',invoked_with='welcome',broadcaster=SimpleNamespace(id='1',name='Mei'),
+        chatter=SimpleNamespace(id='viewer',name='Rat',moderator=False),message=SimpleNamespace(text='!welcome'),
+        send=AsyncMock(side_effect=[HTTPException(status=429,extra='too fast'),None]),
+        bot=SimpleNamespace(services=SimpleNamespace(chat_identity=SimpleNamespace(is_custom_bot=lambda _:False),command_slowmode=SimpleNamespace(allow=lambda _:True))))
+    await service.handle(ctx)
+    assert [c.args[0] for c in ctx.send.await_args_list]==['Deaths: 1','Deaths: 1']
+    assert await list_counters(db,'1')=={'deaths':1}
+    assert delivery_clock.waits==[30]
+    assert service.delivering==set()
+
+
+@pytest.mark.asyncio
+async def test_persistent_rate_limit_stops_after_one_retry_and_skips_busy_channels(delivery_clock):
+    from twitchio.exceptions import HTTPException
+    service=CustomCommandService(None)
+    ctx=SimpleNamespace(send=AsyncMock(side_effect=HTTPException(status=429,extra='too fast')))
+    await service._deliver(ctx,'1',['a','b','c'])
+    assert ctx.send.await_count==2
+    assert delivery_clock.waits==[30]
+    assert service.backoff['1']>delivery_clock.now
+    c=counter_command();service.commands={'1':{'welcome':c}}
+    ctx.prefix='!';ctx.invoked_with='welcome';ctx.message=SimpleNamespace(text='!welcome')
+    ctx.broadcaster=SimpleNamespace(id='1');ctx.chatter=SimpleNamespace(id='v',moderator=False)
+    ctx.bot=SimpleNamespace(services=SimpleNamespace(chat_identity=SimpleNamespace(is_custom_bot=lambda _:False)))
+    await service.handle(ctx)  # backoff exits before executing counters or sending
+    service.backoff.clear();service.delivering.add('1')
+    await service.handle(ctx)
+    assert ctx.send.await_count==2
