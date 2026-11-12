@@ -59,3 +59,8 @@ test('random results are available only after generation on every incoming path'
     condition.else=[];assert.deepEqual(M.availableRandomBefore([roll,condition,msg],msg),['roll']);
     assert.deepEqual(M.availableRandomBefore([{type:'repeat',count:2,blocks:[msg,roll]}],msg),[]);
 });
+test('counter references include nested updates and message reads without duplicates',()=>{
+    const c=branch();c.then=[{type:'counter',name:'wins',operation:'add',value:1}];
+    c.else=[{type:'random',choices:['{counter.wins}','{counter.losses} {counter.losses}']}];
+    assert.deepEqual(M.counterReferences([c,reply('{counter.unused} {random.roll} {counter.invalid.name}')]),['losses','unused','wins']);
+});

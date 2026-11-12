@@ -57,6 +57,15 @@
         }
         walk(blocks,new Set());return [...found];
     }
-    const api={availableRandomBefore,children,flatten,withinDepth,move,insertCopy,arrange};
+    function counterReferences(blocks) {
+        const names=new Set();
+        for(const {block} of flatten(blocks)){
+            if(block.type==='counter'&&/^[a-z][a-z0-9_]{0,31}$/.test(block.name))names.add(block.name);
+            for(const message of block.type==='reply'?[block.message]:block.type==='random'?block.choices:[])
+                for(const match of message.matchAll(/\{counter\.([a-z][a-z0-9_]{0,31})\}/g))names.add(match[1]);
+        }
+        return [...names].sort();
+    }
+    const api={counterReferences,availableRandomBefore,children,flatten,withinDepth,move,insertCopy,arrange};
     if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CommandCanvasModel=api;
 })(globalThis);

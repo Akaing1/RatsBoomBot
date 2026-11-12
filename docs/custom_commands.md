@@ -90,3 +90,10 @@ replies and starts another 30-second backoff. Counter changes are never rerun
 on delivery retries. Invocations arriving while that channel is already executing
 or backing off are ignored before counters execute, preventing a growing queue.
 Configured cooldowns remain independent of these delivery protections.
+
+The Channel counters panel in Custom Commands lists saved values and the saved
+commands that read or update them (including disabled commands). Referenced
+counters that have not run yet show 0. Counters remain visible after their last
+command is deleted, marked as unused. Refresh counters or return to the tab to
+load current values; refreshing does not discard an open command draft. Preview
+results are simulated and do not replace saved values in this panel.

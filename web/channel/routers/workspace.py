@@ -247,6 +247,13 @@ async def custom_commands(request: Request):
     return JSONResponse({'items': await list_commands(db, channel), 'counters': await list_counters(db, channel)}, headers={'Cache-Control': 'no-store'})
 
 
+@router.get('/channel/api/for-you/commands/counters')
+async def custom_command_counters(request: Request):
+    from storage.custom_commands import list_counters
+    db, channel = workspace_context(request)
+    return JSONResponse({'counters': await list_counters(db, channel)}, headers={'Cache-Control': 'no-store'})
+
+
 @router.post('/channel/api/for-you/commands')
 async def save_custom_command(request: Request, csrf_token: str = Form(...),
                               action: str = Form(...), definition: str = Form(..., max_length=32000),
