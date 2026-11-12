@@ -1,7 +1,6 @@
 from bot.profiles import (
     ChannelAchievementNames,
     CommunityMessages,
-    FirstChatShoutout,
     PointsConfig,
     PointsMessages,
     OverwatchConfig,
@@ -29,16 +28,6 @@ MILKY_GALAXYVT_ACHIEVEMENT_NAMES = ChannelAchievementNames(
     weapons="Fully Loaded",
     buffs="Support Main",
     consumables="Payload Supplied"
-)
-
-
-MILKY_GALAXYVT_FIRST_CHAT_SHOUTOUTS = (
-    FirstChatShoutout(
-        user_id="1251948863",
-        username="ninjakaing",
-        message="Our favorite rat @{username} has arrived! {channel_url}",
-        native_shoutout=True
-    ),
 )
 
 
