@@ -36,6 +36,9 @@ Supported blocks:
   `roll`, then send `{user.name} rolled {random.roll}!`. Bounds must be between
   -1 billion and 1 billion; equal bounds always return that number. Multiple
   references reuse the same result until another block overwrites that name.
+  The value picker only offers results guaranteed to have run before the selected
+  message. Save and preview reject early references, including a roll defined
+  in only one branch and then used after the branches merge.
   Results do not persist between invocations. Referencing a result before its
   block runs fails the command before counter changes or messages are committed.
   Test output includes generated values and their ranges.

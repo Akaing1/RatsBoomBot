@@ -260,7 +260,7 @@ async def save_custom_command(request: Request, csrf_token: str = Form(...),
     if action not in {'save', 'delete', 'test'} or role not in {'everyone', 'moderator', 'broadcaster'}:
         raise HTTPException(status_code=400, detail='Invalid command action or test role.')
     try:
-        command = validate_command(json.loads(definition))
+        command = validate_command(json.loads(definition), check_random_order=action != 'delete')
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except (TypeError, RecursionError) as error:
