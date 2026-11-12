@@ -1,6 +1,6 @@
 <div class="cc-workspace" data-command-editor>
-<header class="cc-header"><div><h3>Custom Commands</h3><p>Build a command with blocks, then try it before enabling it.</p></div><button type="button" class="button primary" data-command-new>+ Add command</button></header>
+<header class="cc-header"><div><h3>Custom Commands</h3><p>Build a command with blocks, then try it before enabling it.</p></div><div class="cc-header-actions"><button type="button" class="button secondary" data-command-manage-counters aria-haspopup="dialog" aria-controls="cc-counter-dialog">Manage Counters</button><button type="button" class="button primary" data-command-new>+ Add command</button></div></header>
 <p role="status" aria-live="polite" data-command-status></p>
-<section class="cc-counters" aria-label="Channel counters" data-command-counters></section>
+<div class="cc-counter-overlay" data-counter-overlay hidden><section id="cc-counter-dialog" class="cc-counter-dialog" role="dialog" aria-modal="true" aria-label="Manage channel counters" tabindex="-1"><div class="cc-counter-dialog-heading"><h3>Manage Counters</h3><button type="button" class="button secondary" data-counter-close aria-label="Close counter manager">Close</button></div><section data-command-counters></section></section></div>
 <div data-command-list></div>
 </div>
