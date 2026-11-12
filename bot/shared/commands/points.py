@@ -351,6 +351,19 @@ class PointsCommandHandler:
 
         if all_in:
             gamble_amount = current_points
+        elif amount.endswith("%"):
+            percentage_text = amount[:-1]
+            if not (
+                1 <= len(percentage_text) <= 3
+                and percentage_text.isascii()
+                and percentage_text.isdecimal()
+                and 1 <= int(percentage_text) <= 100
+            ):
+                await self.send_message(ctx, "Use a whole-number percentage from 1% to 100%, such as !{command} gamble 20%.", command=command_name)
+                return
+            percentage = int(percentage_text)
+            gamble_amount = current_points * percentage // 100
+            all_in = percentage == 100
         else:
             try:
                 gamble_amount = int(amount)
@@ -443,7 +456,7 @@ class PointsCommandHandler:
         await self.send_message(
             ctx,
             "Gambling is grouped with this channel's loyalty commands. "
-            "Use !{command} gamble <amount> or !{command} gamble all.",
+            "Use !{command} gamble <amount>, !{command} gamble 20%, or !{command} gamble all.",
             command=command_name
         )
 

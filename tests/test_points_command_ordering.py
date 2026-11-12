@@ -73,7 +73,7 @@ async def test_global_gamble_command_explains_channel_grouped_syntax(monkeypatch
     assert events == ["reward"]
     ctx.reply.assert_awaited_once_with(
         "Gambling is grouped with this channel's loyalty commands. "
-        "Use !petals gamble <amount> or !petals gamble all."
+        "Use !petals gamble <amount>, !petals gamble 20%, or !petals gamble all."
     )
 
 
