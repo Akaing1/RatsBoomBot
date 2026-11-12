@@ -24,7 +24,7 @@ def validate_command(value):
         if not isinstance(value, str) or not value.strip() or len(value) > 450 or any(c in value for c in '\r\n'):
             raise ValueError('Messages must contain 1–450 characters on one line.')
         for field in re.findall(r'\{([^{}]*)\}', value):
-            if field not in FIELDS and not re.fullmatch(r'counter\.' + COUNTER_NAME, field):
+            if field not in FIELDS and not re.fullmatch(r'(?:counter|random)\.' + COUNTER_NAME, field):
                 raise ValueError('Unknown placeholder. Choose a supported value from the editor.')
 
     def walk(blocks, depth=0):
@@ -55,6 +55,12 @@ def validate_command(value):
                     raise ValueError('Condition values must be at most 100 characters.')
                 a, b = walk(block['then'], depth + 1), walk(block['else'], depth + 1)
                 cost, output = 1 + max(a[0], b[0]), max(a[1], b[1])
+            elif kind == 'random_number' and set(block) == {'type', 'name', 'min', 'max'}:
+                if not isinstance(block['name'], str) or not re.fullmatch(COUNTER_NAME, block['name']):
+                    raise ValueError('Random result names need 1–32 lowercase letters, numbers or underscores, starting with a letter.')
+                if any(type(block[key]) is not int or not -1_000_000_000 <= block[key] <= 1_000_000_000 for key in ('min', 'max')) or block['min'] > block['max']:
+                    raise ValueError('Random bounds must be integers between -1000000000 and 1000000000, with minimum no greater than maximum.')
+                cost, output = 1, 0
             elif kind == 'counter' and set(block) == {'type', 'name', 'operation', 'value'}:
                 if not isinstance(block['name'], str) or not re.fullmatch(COUNTER_NAME, block['name']):
                     raise ValueError('Counter names need 1–32 lowercase letters, numbers or underscores, starting with a letter.')
@@ -79,11 +85,13 @@ def validate_command(value):
     return value
 
 
-def execute(command, *, user, channel, args='', role='everyone', choose=None, counters=None):
+def execute(command, *, user, channel, args='', role='everyone', choose=None, counters=None, draw=None):
     """Collect bounded output before any external effects; also used by the test panel."""
     import random
     validate_command(command)
     choose = choose or random.choice
+    draw = draw or random.randint
+    random_values = {}
     args = args[:500]
     values = {'user': user[:50], 'channel': channel[:50], 'args': args, 'arg1': args.split()[0] if args.split() else ''}
     # Channel URLs derive only from Twitch-style login names, never arbitrary input.
@@ -99,12 +107,26 @@ def execute(command, *, user, channel, args='', role='everyone', choose=None, co
     counters = dict(counters or {})
     output, trace = [], []
     def render(message):
-        return re.sub(r'\{([^{}]+)\}', lambda m: str(counters.get(m[1][8:], 0)) if m[1].startswith('counter.') else values[m[1]], message)[:450]
+        def substitute(match):
+            field = match[1]
+            if field.startswith('counter.'):
+                return str(counters.get(field[8:], 0))
+            if field.startswith('random.'):
+                name = field[7:]
+                if name not in random_values:
+                    raise ValueError(f'Random result {name} has not been generated. Place its Random Number block before this message.')
+                return str(random_values[name])
+            return values[field]
+        return re.sub(r'\{([^{}]+)\}', substitute, message)[:450]
     def walk(blocks):
         for block in blocks:
             kind = block['type']
             if kind == 'reply': output.append(render(block['message'])); trace.append('Send message')
             elif kind == 'random': output.append(render(choose(block['choices']))); trace.append('Choose random message')
+            elif kind == 'random_number':
+                value = draw(block['min'], block['max'])
+                random_values[block['name']] = value
+                trace.append(f"Random {block['name']}: {value} ({block['min']}–{block['max']})")
             elif kind == 'counter':
                 name, amount = block['name'], block['value']
                 current = counters.get(name, 0)
@@ -126,4 +148,4 @@ def execute(command, *, user, channel, args='', role='everyone', choose=None, co
     allowed = command['permission'] == 'everyone' or role == 'broadcaster' or role == command['permission']
     if allowed: walk(command['blocks'])
     else: trace.append('Permission denied')
-    return {'messages': output, 'trace': trace, 'counters': counters}
+    return {'messages': output, 'trace': trace, 'counters': counters, 'random': random_values}
