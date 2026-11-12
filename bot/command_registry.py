@@ -342,7 +342,7 @@ def build_points_group(profile: ChannelProfile) -> CommandGroupDefinition:
         CommandDefinition(f"!{command} [username]", "Show your balance or another chatter's balance.", feature=FeatureName.POINTS, global_group=GlobalCommandGroup.POINTS),
         CommandDefinition(f"!{command} leaderboard", "Show the channel's points leaderboard.", feature=FeatureName.POINTS, global_group=GlobalCommandGroup.POINTS),
         CommandDefinition(f"!{command} give <username> <amount>", "Give some of your points to another chatter.", feature=FeatureName.POINTS, global_group=GlobalCommandGroup.POINTS),
-        CommandDefinition(f"!{command} gamble <amount|all>", "Gamble some or all of your current balance.", feature=FeatureName.POINTS, global_group=GlobalCommandGroup.POINTS),
+        CommandDefinition(f"!{command} gamble <amount|percentage%|all>", "Gamble a fixed amount, a whole-number percentage (1–100%), or all of your current balance.", feature=FeatureName.POINTS, global_group=GlobalCommandGroup.POINTS),
         CommandDefinition(f"!{command} duel <username> <amount>", "Challenge another chatter to a points duel.", feature=FeatureName.POINTS, global_group=GlobalCommandGroup.POINTS),
         CommandDefinition(f"!{command} duel accept", "Accept your pending points duel.", feature=FeatureName.POINTS, global_group=GlobalCommandGroup.POINTS),
         CommandDefinition(f"!{command} duel decline", "Decline your pending points duel.", feature=FeatureName.POINTS, global_group=GlobalCommandGroup.POINTS),
