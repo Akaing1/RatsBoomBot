@@ -102,8 +102,9 @@ async def test_unknown_command_hook_reaches_custom_runtime_and_other_errors_do_n
     from bot.services.channels.command_slowmode import SlowmodeBlocked
     from twitchio.ext.commands.exceptions import CommandNotFound
     service = SimpleNamespace(handle=AsyncMock())
-    bot = SimpleNamespace(services=SimpleNamespace(custom_commands=service))
-    ctx = object()
+    bot = SimpleNamespace(services=SimpleNamespace(custom_commands=service, features=SimpleNamespace(
+        get_profile_enabled=lambda _: True, get_globals_enabled=lambda _: True)))
+    ctx = SimpleNamespace(broadcaster=SimpleNamespace(id="1"))
     await TwitchBot.event_command_error(bot, SimpleNamespace(exception=CommandNotFound('welcome'), context=ctx))
     service.handle.assert_awaited_once_with(ctx)
     await TwitchBot.event_command_error(bot, SimpleNamespace(exception=SlowmodeBlocked('cooldown'), context=ctx))
