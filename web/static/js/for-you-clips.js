@@ -3,18 +3,26 @@
     const panel = document.querySelector('[data-workspace-panel="clips"]');
     if (!panel) return;
     const find = s => panel.querySelector(s), form = find('[data-clips-filters]');
-    const grid = find('[data-clips-grid]'), status = find('[data-clips-status]'), more = find('[data-clips-more]');
+    const grid = find('[data-clips-grid]'), status = find('[data-clips-status]'), previous = find('[data-clips-prev]'), next = find('[data-clips-next]'), retry = find('[data-clips-retry]');
     const dialog = find('[data-clip-player]'), frame = find('[data-clip-frame]');
     let selectedClip = null, downloadGeneration = 0;
-    let clips = [], cursor = '', controller, generation = 0, loaded = false;
+    const pageSize = 50;
+    let clips = [], page = 1, totalPages = 1, controller, generation = 0, loaded = false;
     function render() {
         const query = find('#clip-search').value.trim().toLowerCase();
-        const rows = clips.filter(c => (c.title + ' ' + c.creator_name).toLowerCase().includes(query));
+        const days = Number(find('#clip-days').value);
+        const cutoff = days ? Date.now() - days * 86400000 : -Infinity;
+        const rows = clips.filter(c => Date.parse(c.created_at) >= cutoff &&
+            (c.title + ' ' + c.creator_name).toLowerCase().includes(query));
         rows.sort(find('#clip-sort').value === 'newest'
             ? (a,b) => Date.parse(b.created_at) - Date.parse(a.created_at)
             : (a,b) => b.view_count - a.view_count);
+        totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        page = Math.min(page, totalPages);
+        previous.disabled = page <= 1; next.disabled = page >= totalPages;
+        find('[data-clips-page]').textContent = 'Page ' + page + ' of ' + totalPages;
         grid.replaceChildren();
-        for (const clip of rows) {
+        for (const clip of rows.slice((page - 1) * pageSize, page * pageSize)) {
             const card = document.createElement('button'); card.type = 'button'; card.className = 'fy-clip-card';
             const image = document.createElement('img'); image.loading = 'lazy'; image.alt = '';
             try { const url = new URL(clip.thumbnail_url); if (url.protocol === 'https:') image.src = url.href; } catch {}
@@ -33,45 +41,56 @@
                 find('[data-clip-message]').textContent = ''; dialog.showModal();
             }); grid.append(card);
         }
-        find('[data-clips-count]').textContent = '– ' + clips.length + ' loaded';
-        status.textContent = !clips.length ? 'No clips found in this date range.'
-            : query ? rows.length + ' matching clips' : '';
+        find('[data-clips-count]').textContent = '– ' + rows.length + ' matching clips';
+        status.textContent = !rows.length ? 'No clips match your filters.'
+            : 'Showing ' + ((page - 1) * pageSize + 1) + '–' + Math.min(page * pageSize, rows.length) + ' of ' + rows.length + ' clips.';
     }
-    async function load(reset) {
+    async function load() {
         controller?.abort(); controller = new AbortController(); const current = ++generation;
-        if (reset) { loaded = false; clips = []; cursor = ''; grid.replaceChildren(); find('[data-clips-count]').textContent = '– 0 loaded'; more.hidden = true; }
-        status.textContent = 'Loading clips…'; find('[data-clips-signin]').hidden = true; more.disabled = true;
-        const targetCount = clips.length + 50;
-        const days = find('#clip-days').value, sort = find('#clip-sort').value;
-        const seenCursors = new Set();
+        loaded = false; clips = []; page = 1;
+        let cursor = '';
+        const collection = new Map(), seenCursors = new Set();
+        grid.replaceChildren();
+        find('[data-clips-count]').textContent = '';
+        find('[data-clips-page]').textContent = '';
+        previous.disabled = true; next.disabled = true; retry.hidden = true;
+        status.textContent = 'Loading channel clips…'; find('[data-clips-signin]').hidden = true;
         try {
             do {
-            if (seenCursors.has(cursor)) throw new Error('Clip pagination stopped progressing. Please retry.');
-            seenCursors.add(cursor);
-            const params = new URLSearchParams({days,after:cursor,sort});
-            const response = await fetch((document.body.dataset.channelRoot || '/channel') + '/api/for-you/clips?' + params, {signal:controller.signal,cache:'no-store',credentials:'same-origin'});
-            if (response.status === 401) {
-                throw new Error('Your channel session needs attention. Sign in again, then retry.');
+                if (seenCursors.has(cursor)) throw new Error('Clip pagination stopped progressing. Please retry.');
+                seenCursors.add(cursor);
+                // Scan complete chronological intervals to include older clips even
+                // when Twitch limits its popularity-ordered result set.
+                const params = new URLSearchParams({days:'0', after:cursor, sort:'newest'});
+                const response = await fetch((document.body.dataset.channelRoot || '/channel') + '/api/for-you/clips?' + params, {signal:controller.signal,cache:'no-store',credentials:'same-origin'});
+                if (response.status === 401) throw new Error('Your channel session needs attention. Sign in again, then retry.');
+                if (!(response.headers.get('content-type') || '').includes('application/json'))
+                    throw new Error('Clips could not load (HTTP ' + response.status + '). Please retry shortly. If this continues, check the bot logs.');
+                const result = await response.json();
+                if (current !== generation) return;
+                if (!response.ok) throw new Error(result.detail || 'Unable to load clips.');
+                if (!Array.isArray(result.clips)) throw new Error('Unexpected clip response. Please reload this page.');
+                for (const clip of result.clips) collection.set(clip.id, clip);
+                cursor = result.cursor || '';
+                status.textContent = 'Loading channel clips… ' + collection.size + ' found.';
+            } while (cursor);
+            clips = [...collection.values()]; loaded = true; render();
+        } catch (error) {
+            if (error.name !== 'AbortError' && current === generation) {
+                status.textContent = error.message;
+                find('[data-clips-signin]').hidden = !error.message.includes('Sign in again');
+                retry.hidden = false;
             }
-            if (!(response.headers.get('content-type') || '').includes('application/json')) {
-                throw new Error('Clips could not load (HTTP ' + response.status + '). Please retry shortly. If this continues, check the bot logs.');
-            }
-            const result = await response.json(); if (!response.ok) throw new Error(result.detail || 'Unable to load clips.');
-            if (!Array.isArray(result.clips)) throw new Error('Unexpected clip response. Please reload this page.');
-            if (current !== generation) return;
-            clips = [...new Map([...clips,...result.clips].map(c => [c.id,c])).values()];
-            cursor = result.cursor;
-            loaded = true; more.hidden = !cursor; render();
-            if (cursor && clips.length < targetCount) status.textContent = 'Loading clips…';
-            } while (cursor && clips.length < targetCount);
-
-        } catch (error) { if (error.name !== 'AbortError' && current === generation) { status.textContent = error.message; find('[data-clips-signin]').hidden = !error.message.includes('Sign in again'); } }
-        finally { if (current === generation) more.disabled = false; }
+        }
     }
+    function filterChanged() { page = 1; if (loaded) render(); }
     form.addEventListener('submit', e => e.preventDefault());
-    find('#clip-days').addEventListener('change', () => load(true));
-    find('#clip-search').addEventListener('input', render); find('#clip-sort').addEventListener('change', () => load(true));
-    more.addEventListener('click', () => load(false));
+    find('#clip-days').addEventListener('change', filterChanged);
+    find('#clip-search').addEventListener('input', filterChanged);
+    find('#clip-sort').addEventListener('change', filterChanged);
+    previous.addEventListener('click', () => { if (loaded && page > 1) { --page; render(); } });
+    next.addEventListener('click', () => { if (loaded && page < totalPages) { ++page; render(); } });
+    retry.addEventListener('click', load);
     find('[data-clip-close]').addEventListener('click', () => dialog.close());
     dialog.addEventListener('close', () => {
         frame.replaceChildren(); selectedClip = null; ++downloadGeneration;
@@ -110,7 +129,7 @@
         catch { find('[data-clip-message]').textContent = 'Copy failed. Use the Open on Twitch link.'; }
     });
     document.querySelectorAll('[data-workspace-tab]').forEach(tab => tab.addEventListener('click', () => {
-        if (tab.dataset.workspaceTab === 'clips') { if (!loaded) load(true); }
+        if (tab.dataset.workspaceTab === 'clips') { if (!loaded) load(); }
         else { controller?.abort(); ++generation; dialog.close(); frame.replaceChildren(); }
     }));
 })();
