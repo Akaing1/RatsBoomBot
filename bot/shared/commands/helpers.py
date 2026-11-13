@@ -31,6 +31,17 @@ def get_context_broadcaster_id(ctx: Any) -> str | None:
     return None
 
 
+def are_channel_commands_enabled(bot, ctx: commands.Context) -> bool:
+    broadcaster_id = get_context_broadcaster_id(ctx)
+    services = bot.services
+    if broadcaster_id is None or services is None:
+        return False
+    return (
+        services.features.get_profile_enabled(broadcaster_id)
+        and services.features.get_globals_enabled(broadcaster_id)
+    )
+
+
 def is_feature_enabled(bot, ctx: commands.Context, feature: FeatureName) -> bool:
     broadcaster_id = get_context_broadcaster_id(ctx)
     services = bot.services

@@ -60,7 +60,8 @@ async def test_toggle_persistence_and_permissions(tmp_path, monkeypatch):
 async def test_guard_blocks_before_callback_and_error_is_silent():
     service = CommandSlowmodeService(None)
     service.enabled_channels.add("channel")
-    bot = SimpleNamespace(services=SimpleNamespace(command_slowmode=service))
+    bot = SimpleNamespace(services=SimpleNamespace(command_slowmode=service, features=SimpleNamespace(
+        get_profile_enabled=lambda _: True, get_globals_enabled=lambda _: True)))
     assert await TwitchBot.global_guard(bot, context())
     with pytest.raises(SlowmodeBlocked) as error:
         await TwitchBot.global_guard(bot, context("smart"))
