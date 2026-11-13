@@ -8,6 +8,7 @@ from enum import StrEnum
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from bot.profiles import get_active_profile
+from bot.services.support.moderation_shadow import ModerationShadow
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -77,6 +78,7 @@ class ModerationService:
     def __init__(self, bot, db):
         self.bot = bot
         self.db = db
+        self.shadow = ModerationShadow(db)
         self.recent_messages: dict[str, RecentMessage] = {}
 
     async def setup(self) -> None:
@@ -181,62 +183,16 @@ class ModerationService:
         username = payload.chatter.name
         message = payload.text
 
-        recent_message = self.cache_message(
-            broadcaster_id=broadcaster_id,
-            user_id=user_id,
-            username=username,
-            message=message
-        )
+        fingerprint = self.create_fingerprint(self.normalize_message(message))
 
-        if self.is_protected_user(broadcaster_id, user_id):
-            return ModerationResult(
-                action=ModerationAction.ALLOW,
-                reason="Protected broadcaster or bot account."
-            )
-
-        if await self.is_allowlisted(user_id):
-            LOGGER.debug(
-                "[Moderation] Allowlisted user %s (%s) was permitted in broadcaster %s.",
-                username,
-                user_id,
-                broadcaster_id
-            )
-
-            return ModerationResult(
-                action=ModerationAction.ALLOW,
-                reason="User is present in the moderation allowlist.",
-                source="allowlist"
-            )
-
-        campaign = await self.get_confirmed_campaign(recent_message.fingerprint)
-
-        if campaign is None:
-            return ModerationResult(
-                action=ModerationAction.ALLOW,
-                reason="No confirmed message campaign matched.",
-                fingerprint=recent_message.fingerprint
-            )
-
-        campaign_id = int(campaign["id"])
-        reason = campaign["reason"] or "Message matched a confirmed spam campaign."
-        source = campaign["source"]
-
-        await self.associate_campaign_account(campaign_id=campaign_id, user_id=user_id, username=username)
-
-        LOGGER.warning(
-            "[Moderation] Message from %s (%s) matched campaign %d in broadcaster %s.",
-            username,
-            user_id,
-            campaign_id,
-            broadcaster_id
-        )
-
+        protected = self.is_protected_user(broadcaster_id, user_id) or await self.is_allowlisted(user_id)
+        campaign = await self.get_confirmed_campaign(fingerprint)
+        flagged = campaign is not None and not protected
+        await self.shadow.message(payload, fingerprint, flagged, protected)
         return ModerationResult(
-            action=ModerationAction.BAN,
-            reason=reason,
-            source=source,
-            campaign_id=campaign_id,
-            fingerprint=recent_message.fingerprint
+            action=ModerationAction.ALLOW,
+            reason="Shadow evaluation recorded; observation-only detection.",
+            fingerprint=fingerprint
         )
 
     def cache_message(self, broadcaster_id: str, user_id: str, username: str, message: str) -> RecentMessage:
@@ -275,51 +231,10 @@ class ModerationService:
 
         return recent_message
 
-    async def observe_external_ban(self, broadcaster_id: str, user_id: str, username: str, moderator_id: str, moderator_name: str, reason: str | None, source: str) -> bool:
-        broadcaster_id = str(broadcaster_id)
-        user_id = str(user_id)
-        moderator_id = str(moderator_id)
-        recent_message = self.get_recent_message(broadcaster_id, user_id)
-
-        if recent_message is None:
-            LOGGER.warning(
-                "[Moderation] Could not associate %s ban of %s (%s) with a recent message in broadcaster %s.",
-                source,
-                username,
-                user_id,
-                broadcaster_id
-            )
-            return False
-
-        campaign_id = await self.upsert_campaign(
-            fingerprint=recent_message.fingerprint,
-            normalized_message=recent_message.normalized_message,
-            example_message=recent_message.message,
-            source=source,
-            reason=reason
-        )
-
-        created = await self.record_campaign_observation(
-            campaign_id=campaign_id,
-            broadcaster_id=broadcaster_id,
-            user_id=user_id,
-            username=username,
-            moderator_id=moderator_id,
-            moderator_name=moderator_name,
-            observed_action="ban",
-            source=source,
-            reason=reason,
-            message=recent_message.message
-        )
-
-        await self.associate_campaign_account(campaign_id=campaign_id, user_id=user_id, username=username)
-
-        if not created:
-            return False
-
-        await self.update_campaign_confidence(campaign_id, source)
-
-        return True
+    async def observe_external_ban(self, **observation) -> bool:
+        recorded = await self.shadow.ban(**observation)
+        LOGGER.info("[Moderation] SeryBot ban recorded; message candidates are available in Bot detection.")
+        return recorded
 
     async def upsert_campaign(self, fingerprint: str, normalized_message: str, example_message: str, source: str, reason: str | None) -> int:
         query = """
