@@ -1,6 +1,8 @@
 import logging
 from dataclasses import dataclass
 
+from twitchio.exceptions import HTTPException, MessageRejectedError
+
 LOGGER = logging.getLogger("RatBoomBot")
 
 
@@ -147,7 +149,11 @@ class ChatIdentityService:
 
         try:
             return await broadcaster.send_message(sender=sender_id, message=content, reply_to_message_id=reply_to_message_id)
-        except Exception:
+        except Exception as error:
+            # Twitch chat limits and moderation drops apply to this delivery;
+            # changing sender is not a recovery for an expected rejection.
+            if isinstance(error, MessageRejectedError) or isinstance(error, HTTPException) and error.status == 429:
+                raise
             if sender_id == str(self.bot.bot_id):
                 raise
 

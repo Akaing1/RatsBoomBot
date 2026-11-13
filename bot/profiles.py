@@ -337,7 +337,7 @@ class PointsMessages:
     give_insufficient: str = "You only have {points} {currency}."
     give_success: str = "{sender} gave {amount} {currency} to {username} and now has {points} {currency}."
     gamble_no_points: str = "You do not have any {currency} to gamble."
-    gamble_usage: str = "Use it like this: !{command} gamble 50 or !{command} gamble all"
+    gamble_usage: str = "Use it like this: !{command} gamble 50, !{command} gamble 20%, or !{command} gamble all"
     gamble_invalid: str = "You need to gamble at least 1 {currency}."
     gamble_insufficient: str = "You only have {points} {currency}."
     gamble_win: str = "{username} won {amount} {currency} and now has {new_balance} {currency}!"

@@ -11,7 +11,10 @@ from web.admin.routers.performance import router as performance_router
 from web.admin.routers.runtime_logs import router as runtime_logs_router
 from web.admin.routers.patch_notes import router as patch_notes_router
 
+from web.admin.routers.bot_detection import router as bot_detection_router
+
 router = APIRouter(prefix="/admin")
+router.include_router(bot_detection_router)
 router.include_router(auth_router)
 router.include_router(dashboard_router)
 router.include_router(oauth_router)

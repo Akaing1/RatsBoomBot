@@ -5,6 +5,7 @@ from twitchio import web
 from twitchio.ext import commands
 from twitchio.ext.commands.exceptions import CommandNotFound
 
+from bot.shared.commands.helpers import are_channel_commands_enabled
 from bot.component_loader import load_components
 from bot.context import ChannelContext
 from bot.command_timing import start_command_timing
@@ -17,9 +18,15 @@ from storage.database import create_broadcaster_subscriptions, delete_token, sav
 LOGGER = logging.getLogger("RatBoomBot")
 
 
+class ChannelCommandsDisabled(commands.GuardFailure):
+    """A command silently blocked by the channel master switches."""
+
+
 class TwitchBot(commands.AutoBot):
 
     async def global_guard(self, ctx) -> bool:
+        if not are_channel_commands_enabled(self, ctx):
+            raise ChannelCommandsDisabled("Commands are disabled in this channel.")
         if self.services is not None and not self.services.command_slowmode.allow(ctx):
             raise SlowmodeBlocked("Command slowmode cooldown is active.")
         return True
@@ -326,7 +333,15 @@ class TwitchBot(commands.AutoBot):
 
     async def event_command_error(self, payload) -> None:
         exception = getattr(payload, "exception", None)
-        if isinstance(exception, (SlowmodeBlocked, CommandNotFound)):
+        if isinstance(exception, CommandNotFound):
+            if getattr(getattr(self, "services", None), "custom_commands", None) is not None:
+                try:
+                    if are_channel_commands_enabled(self, payload.context):
+                        await self.services.custom_commands.handle(payload.context)
+                except Exception:
+                    LOGGER.exception("[Custom Commands] Command execution failed.")
+            return
+        if isinstance(exception, (SlowmodeBlocked, ChannelCommandsDisabled)):
             return
         context = getattr(payload, "context", None)
         command = getattr(context, "command", None)

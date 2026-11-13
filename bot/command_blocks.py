@@ -1,0 +1,170 @@
+"""Small declarative command language. Never evaluates code or arbitrary expressions."""
+import re
+
+FIELDS = {'user', 'channel', 'args', 'arg1', 'user.name', 'user.mention', 'user.channel', 'arg.name', 'arg.mention', 'arg.channel', 'channel.name', 'channel.url'}
+COUNTER_NAME = r'[a-z][a-z0-9_]{0,31}'
+COUNTER_LIMIT = 1_000_000_000_000
+
+ROLES = {'everyone', 'moderator', 'broadcaster'}
+
+
+def validate_command(value, *, check_random_order=True):
+    if not isinstance(value, dict) or set(value) != {'name', 'enabled', 'permission', 'cooldown', 'blocks'}:
+        raise ValueError('Invalid command fields.')
+    name = value['name']
+    if not isinstance(name, str) or not re.fullmatch(r'[a-z][a-z0-9_]{0,31}', name):
+        raise ValueError('Use a command name with 1–32 lowercase letters, numbers or underscores, starting with a letter.')
+    if type(value['enabled']) is not bool or value['permission'] not in ROLES:
+        raise ValueError('Invalid command permissions or enabled state.')
+    if type(value['cooldown']) is not int or not 0 <= value['cooldown'] <= 3600:
+        raise ValueError('Cooldown must be between 0 and 3600 seconds.')
+    nodes = 0
+
+    def text(value):
+        if not isinstance(value, str) or not value.strip() or len(value) > 450 or any(c in value for c in '\r\n'):
+            raise ValueError('Messages must contain 1–450 characters on one line.')
+        for field in re.findall(r'\{([^{}]*)\}', value):
+            if field not in FIELDS and not re.fullmatch(r'(?:counter|random)\.' + COUNTER_NAME, field):
+                raise ValueError('Unknown placeholder. Choose a supported value from the editor.')
+
+    def walk(blocks, depth=0):
+        nonlocal nodes
+        if not isinstance(blocks, list) or depth > 6:
+            raise ValueError('Limit branches to six levels.')
+        steps = sends = 0
+        for block in blocks:
+            nodes += 1
+            if nodes > 40 or not isinstance(block, dict):
+                raise ValueError('Use at most 40 blocks.')
+            position = block.get('position')
+            if position is not None and (not isinstance(position, dict) or set(position) != {'x', 'y'} or any(type(v) not in (int, float) or not 0 <= v <= 20000 for v in position.values())):
+                raise ValueError('Invalid block position.')
+            block = {k: v for k, v in block.items() if k != 'position'}
+            kind = block.get('type')
+            if kind == 'reply' and set(block) == {'type', 'message'}:
+                text(block['message']); cost, output = 1, 1
+            elif kind == 'random' and set(block) == {'type', 'choices'}:
+                if not isinstance(block['choices'], list) or not 1 <= len(block['choices']) <= 5:
+                    raise ValueError('Add between one and five random messages.')
+                for choice in block['choices']: text(choice)
+                cost, output = 1, 1
+            elif kind == 'if' and set(block) == {'type', 'condition', 'value', 'then', 'else'}:
+                if block['condition'] not in {'has_argument', 'argument_equals', 'is_moderator', 'is_broadcaster'}:
+                    raise ValueError('Unknown condition.')
+                if not isinstance(block['value'], str) or len(block['value']) > 100:
+                    raise ValueError('Condition values must be at most 100 characters.')
+                a, b = walk(block['then'], depth + 1), walk(block['else'], depth + 1)
+                cost, output = 1 + max(a[0], b[0]), max(a[1], b[1])
+            elif kind == 'random_number' and set(block) == {'type', 'name', 'min', 'max'}:
+                if not isinstance(block['name'], str) or not re.fullmatch(COUNTER_NAME, block['name']):
+                    raise ValueError('Random result names need 1–32 lowercase letters, numbers or underscores, starting with a letter.')
+                if any(type(block[key]) is not int or not -1_000_000_000 <= block[key] <= 1_000_000_000 for key in ('min', 'max')) or block['min'] > block['max']:
+                    raise ValueError('Random bounds must be integers between -1000000000 and 1000000000, with minimum no greater than maximum.')
+                cost, output = 1, 0
+            elif kind == 'counter' and set(block) == {'type', 'name', 'operation', 'value'}:
+                if not isinstance(block['name'], str) or not re.fullmatch(COUNTER_NAME, block['name']):
+                    raise ValueError('Counter names need 1–32 lowercase letters, numbers or underscores, starting with a letter.')
+                if block['operation'] not in {'set', 'add', 'subtract'} or type(block['value']) is not int or not -1_000_000_000 <= block['value'] <= 1_000_000_000:
+                    raise ValueError('Choose a counter operation and an integer between -1000000000 and 1000000000.')
+                cost, output = 1, 0
+            elif kind == 'repeat' and set(block) == {'type', 'count', 'blocks'}:
+                if type(block['count']) is not int or not 1 <= block['count'] <= 5:
+                    raise ValueError('Repeat between one and five times.')
+                a = walk(block['blocks'], depth + 1)
+                cost, output = 1 + block['count'] * a[0], block['count'] * a[1]
+            else:
+                raise ValueError('Unknown block or unsupported block fields.')
+            steps += cost; sends += output
+        return steps, sends
+
+    steps, sends = walk(value['blocks'])
+    if steps > 64 or sends > 3:
+        raise ValueError('A command may run at most 64 steps and send at most three messages, including repeats.')
+    if not nodes:
+        raise ValueError('Add at least one block.')
+    def check_flow(blocks, available):
+        available = set(available)
+        for block in blocks:
+            kind = block['type']
+            messages = [block['message']] if kind == 'reply' else block['choices'] if kind == 'random' else []
+            for message in messages:
+                for name in re.findall(r'\{random\.(' + COUNTER_NAME + r')\}', message):
+                    if name not in available:
+                        raise ValueError(f'Random result {name} has not been generated on every path before this message. Move its Random Number block earlier in the flow.')
+            if kind == 'random_number':
+                available.add(block['name'])
+            elif kind == 'if':
+                available = check_flow(block['then'], available) & check_flow(block['else'], available)
+            elif kind == 'repeat':
+                available = check_flow(block['blocks'], available)
+        return available
+
+    if check_random_order:
+        check_flow(value['blocks'], set())
+    return value
+
+
+def execute(command, *, user, channel, args='', role='everyone', choose=None, counters=None, draw=None):
+    """Collect bounded output before any external effects; also used by the test panel."""
+    import random
+    validate_command(command)
+    choose = choose or random.choice
+    draw = draw or random.randint
+    random_values = {}
+    args = args[:500]
+    values = {'user': user[:50], 'channel': channel[:50], 'args': args, 'arg1': args.split()[0] if args.split() else ''}
+    # Channel URLs derive only from Twitch-style login names, never arbitrary input.
+    def login(value):
+        value = value.lstrip('@')
+        return value.lower() if re.fullmatch(r'[A-Za-z0-9_]{1,25}', value) else ''
+    user_login, arg_login, channel_login = login(user), login(values['arg1']), login(channel)
+    values.update({'user.name': values['user'], 'user.mention': '@' + user_login if user_login else '',
+                   'user.channel': 'https://www.twitch.tv/' + user_login if user_login else '',
+                   'arg.name': arg_login, 'arg.mention': '@' + arg_login if arg_login else '',
+                   'arg.channel': 'https://www.twitch.tv/' + arg_login if arg_login else '',
+                   'channel.name': values['channel'], 'channel.url': 'https://www.twitch.tv/' + channel_login if channel_login else ''})
+    counters = dict(counters or {})
+    output, trace = [], []
+    def render(message):
+        def substitute(match):
+            field = match[1]
+            if field.startswith('counter.'):
+                return str(counters.get(field[8:], 0))
+            if field.startswith('random.'):
+                name = field[7:]
+                if name not in random_values:
+                    raise ValueError(f'Random result {name} has not been generated. Place its Random Number block before this message.')
+                return str(random_values[name])
+            return values[field]
+        return re.sub(r'\{([^{}]+)\}', substitute, message)[:450]
+    def walk(blocks):
+        for block in blocks:
+            kind = block['type']
+            if kind == 'reply': output.append(render(block['message'])); trace.append('Send message')
+            elif kind == 'random': output.append(render(choose(block['choices']))); trace.append('Choose random message')
+            elif kind == 'random_number':
+                value = draw(block['min'], block['max'])
+                random_values[block['name']] = value
+                trace.append(f"Random {block['name']}: {value} ({block['min']}–{block['max']})")
+            elif kind == 'counter':
+                name, amount = block['name'], block['value']
+                current = counters.get(name, 0)
+                value = amount if block['operation'] == 'set' else current + (amount if block['operation'] == 'add' else -amount)
+                if abs(value) > COUNTER_LIMIT:
+                    raise ValueError('Counter values must stay between -1000000000000 and 1000000000000.')
+                counters[name] = value
+                if len(counters) > 100:
+                    raise ValueError('A channel can have at most 100 custom counters.')
+                trace.append(f'Counter {name}: {value}')
+            elif kind == 'repeat':
+                trace.append(f"Repeat {block['count']} times")
+                for _ in range(block['count']): walk(block['blocks'])
+            else:
+                match = {'has_argument': bool(args.strip()), 'argument_equals': args.strip().casefold() == block['value'].casefold(),
+                         'is_moderator': role in {'moderator', 'broadcaster'}, 'is_broadcaster': role == 'broadcaster'}[block['condition']]
+                trace.append(f"{block['condition']}: {'True' if match else 'False'}")
+                walk(block['then'] if match else block['else'])
+    allowed = command['permission'] == 'everyone' or role == 'broadcaster' or role == command['permission']
+    if allowed: walk(command['blocks'])
+    else: trace.append('Permission denied')
+    return {'messages': output, 'trace': trace, 'counters': counters, 'random': random_values}

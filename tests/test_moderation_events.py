@@ -60,9 +60,10 @@ async def test_serybot_ban_is_recorded_and_written_to_stream_log(caplog) -> None
         "moderator_id": settings.SERYBOT_USER_ID,
         "moderator_name": "sery_bot",
         "reason": "Spam Detected.",
-        "source": "serybot"
+        "source": "serybot",
+        "banned_at": None
     }]
-    assert stream_logs.entries == [("channel-1", "MODERATION", "Recorded SeryBot campaign evidence for spammer (user-1) | Reason: Spam Detected.")]
+    assert stream_logs.entries == [("channel-1", "MODERATION", "Recorded SeryBot account evidence for spammer (user-1) | Reason: Spam Detected.")]
     assert "Observed SeryBot banning spammer" in caplog.text
 
 

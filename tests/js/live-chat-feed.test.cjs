@@ -395,6 +395,41 @@ test('filtering preserves the visible anchor when not following new messages', (
     assert.equal(anchor.hidden, false);
 });
 
+test('dashboard notices render as private bot messages without sending to Twitch', () => {
+    const app = setup();
+    const handler = source.match(/const onNotice = event => renderMessage\(feed, \{[\s\S]*?\n            \}\);/)[0];
+    vm.runInNewContext(`${handler}\nonNotice({detail: {message: '@streamer, viewer queue commands are disabled.'}});`, {
+        feed: {}, localErrorSequence: 0,
+        renderMessage: (_feed, message) => {
+            assert.equal(message.local_only, true);
+            assert.equal(message.is_bot, true);
+            app.feed.receive({type: 'message', message});
+        },
+    });
+    const row = app.element.children.at(-1);
+    assert.equal(row.querySelector('.live-chat-text').textContent, '@streamer, viewer queue commands are disabled.');
+    assert.match(row.querySelector('.live-chat-name').textContent, /Only you/);
+    assert.equal(row.classList.contains('is-bot'), true);
+    assert.equal(row.querySelector('.live-chat-message-actions'), undefined);
+});
+
+test('private notices link only Settings without changing their text', () => {
+    const app = setup(), message = '@streamer, enable Viewer queue commands in Settings.';
+    app.feed.receive({type: 'message', message: {id: 'settings-notice', platform: 'twitch', kind: 'notice', local_only: true,
+        is_bot: true, message, action: {label: 'Settings', url: '/channel/settings?section=queue'}}});
+    const body = app.element.children.at(-1).querySelector('.live-chat-text');
+    assert.equal(body.textContent, message);
+    const link = body.querySelector('.live-chat-link');
+    assert.equal(link.textContent, 'Settings');
+    assert.equal(link.href, '/channel/settings?section=queue');
+    for (const [id, local_only, url] of [['remote', false, '/channel/settings'], ['external', true, '//example.com'],
+        ['backslash', true, '/\\example.com'], ['script', true, 'javascript:alert(1)']]) {
+        app.feed.receive({type: 'message', message: {id, platform: 'twitch', local_only, message,
+            action: {label: 'Settings', url}}});
+        assert.equal(app.element.children.at(-1).querySelector('.live-chat-link'), undefined);
+    }
+});
+
 test('private send failures are bot messages for the affected platform and obey filter changes', () => {
     const context = {window: {}, feed: {}, localErrorSequence: 0};
     vm.createContext(context);

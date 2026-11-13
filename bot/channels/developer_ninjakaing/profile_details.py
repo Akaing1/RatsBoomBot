@@ -210,8 +210,8 @@ DEVELOPER_NINJAKAING_POINTS = PointsConfig(
             "You don't have any {currency} to gamble."
         ),
         gamble_usage=(
-            "Use it like this: !{command} gamble 50 "
-            "or !{command} gamble all"
+            "Use it like this: !{command} gamble 50, "
+            "!{command} gamble 20%, or !{command} gamble all"
         ),
         gamble_invalid=(
             "You need to gamble at least 1 {currency}."

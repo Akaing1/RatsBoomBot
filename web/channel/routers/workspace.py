@@ -238,3 +238,74 @@ async def clip_download(request: Request, clip_id: str = Form(..., min_length=1,
         raise HTTPException(404, "Twitch has no download available for this clip.")
     # Signed URLs are temporary: return only on demand and never persist/cache them.
     return JSONResponse({"url": url}, headers={"Cache-Control": "no-store"})
+
+
+@router.get('/channel/api/for-you/commands')
+async def custom_commands(request: Request):
+    from storage.custom_commands import list_commands, list_counters
+    db, channel = workspace_context(request)
+    return JSONResponse({'items': await list_commands(db, channel), 'counters': await list_counters(db, channel)}, headers={'Cache-Control': 'no-store'})
+
+
+@router.get('/channel/api/for-you/commands/counters')
+async def custom_command_counters(request: Request):
+    from storage.custom_commands import list_counters
+    db, channel = workspace_context(request)
+    return JSONResponse({'counters': await list_counters(db, channel)}, headers={'Cache-Control': 'no-store'})
+
+
+@router.post('/channel/api/for-you/commands/counters')
+async def update_custom_command_counter(request: Request, csrf_token: str = Form(...),
+                                        name: str = Form(..., max_length=32),
+                                        value: int = Form(...)):
+    from storage.custom_commands import set_counter
+    db, channel = workspace_context(request)
+    validate_csrf_token(request, csrf_token)
+    try:
+        await set_counter(db, channel, name, value)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return JSONResponse({'name': name, 'value': value}, headers={'Cache-Control': 'no-store'})
+
+
+@router.post('/channel/api/for-you/commands')
+async def save_custom_command(request: Request, csrf_token: str = Form(...),
+                              action: str = Form(...), definition: str = Form(..., max_length=32000),
+                              revision: int = Form(0, ge=0), args: str = Form('', max_length=500),
+                              role: str = Form('everyone'), original_name: str = Form('', max_length=32)):
+    import json
+    from bot.command_blocks import validate_command, execute
+    from storage.custom_commands import change_command, run_command
+    db, channel = workspace_context(request)
+    validate_csrf_token(request, csrf_token)
+    if action not in {'save', 'delete', 'test'} or role not in {'everyone', 'moderator', 'broadcaster'}:
+        raise HTTPException(status_code=400, detail='Invalid command action or test role.')
+    try:
+        command = validate_command(json.loads(definition), check_random_order=action != 'delete')
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except (TypeError, RecursionError) as error:
+        raise HTTPException(status_code=400, detail='Invalid block data.') from error
+    if action == 'test':
+        try:
+            result = await run_command(db, channel, command, preview=True, user='TestViewer', channel_name='YourChannel', args=args, role=role)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return JSONResponse(result, headers={'Cache-Control': 'no-store'})
+    if action == 'save':
+        runtime_bot = get_bot()
+        from bot.profiles import get_active_profile
+        profile = get_active_profile(channel)
+        get_command = getattr(runtime_bot, 'get_command', None)
+        if (get_command and get_command(command['name']) is not None) or (
+            profile is not None and command['name'] == profile.points.command_alias
+        ):
+            raise HTTPException(status_code=400, detail='This name is already used by a built-in command. Choose another name.')
+    try:
+        await change_command(db, channel, command, revision, delete=action == 'delete', original_name=original_name or None)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    runtime = getattr(getattr(get_bot(), 'services', None), 'custom_commands', None)
+    if runtime is not None:
+        await runtime.reload(channel)
+    return JSONResponse({'revision': revision + 1}, headers={'Cache-Control': 'no-store'})

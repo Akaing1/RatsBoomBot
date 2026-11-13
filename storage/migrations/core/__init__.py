@@ -1,5 +1,6 @@
 """Historical migrations owned by core."""
 
+from storage.migrations.core.v083_moderation_shadow import migrate as migrate_083
 from storage.migrations.model import Migration
 
 from .v001_initial_schema import migrate as migrate_001
@@ -49,6 +50,8 @@ from .v076_release_16_draft import migrate as migrate_076
 from .v077_chat_preferences import migrate as migrate_077
 from .v078_eight_ball_history import migrate as migrate_078
 from .v079_dashboard_activity import migrate as migrate_079
+from .v082_custom_counters import migrate as migrate_082
+from .v081_custom_commands import migrate as migrate_081
 
 MIGRATIONS = (
     Migration(1, "initial_schema", migrate_001),
@@ -91,4 +94,7 @@ MIGRATIONS = (
     Migration(77, "chat_preferences", migrate_077),
     Migration(78, "eight_ball_history", migrate_078),
     Migration(79, "dashboard_activity", migrate_079),
+    Migration(81, "custom_commands", migrate_081),
+    Migration(82, "custom_counters", migrate_082),
+    Migration(83, "moderation_shadow", migrate_083),
 )

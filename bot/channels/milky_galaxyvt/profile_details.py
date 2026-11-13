@@ -1,7 +1,6 @@
 from bot.profiles import (
     ChannelAchievementNames,
     CommunityMessages,
-    FirstChatShoutout,
     PointsConfig,
     PointsMessages,
     OverwatchConfig,
@@ -29,16 +28,6 @@ MILKY_GALAXYVT_ACHIEVEMENT_NAMES = ChannelAchievementNames(
     weapons="Fully Loaded",
     buffs="Support Main",
     consumables="Payload Supplied"
-)
-
-
-MILKY_GALAXYVT_FIRST_CHAT_SHOUTOUTS = (
-    FirstChatShoutout(
-        user_id="1251948863",
-        username="ninjakaing",
-        message="Our favorite rat @{username} has arrived! {channel_url}",
-        native_shoutout=True
-    ),
 )
 
 
@@ -159,7 +148,7 @@ MILKY_GALAXYVT_POINTS = PointsConfig(
         add_invalid="The star shard amount must be greater than 0.",
         add_success="Added {amount} {currency} to {username}.",
         gamble_no_points="You do not have any {currency} to gamble.",
-        gamble_usage="Use it like this: !{command} gamble 50 or !{command} gamble all",
+        gamble_usage="Use it like this: !{command} gamble 50, !{command} gamble 20%, or !{command} gamble all",
         gamble_invalid="You need to gamble at least 1 star shard.",
         gamble_insufficient="You only have {points} {currency}.",
         gamble_win="{username} found {amount} {currency} and now has {new_balance}!",
