@@ -215,7 +215,10 @@
             for(const name of names){
                 const card=el('article',undefined,'cc-counter-card');
                 const current=Object.hasOwn(knownCounters,name)?knownCounters[name]:0;
-                card.append(el('code',name),el('strong',String(current),'cc-counter-value'),el('p',usage.has(name)?'Used by '+usage.get(name).join(', '):'Not used by saved commands','cc-hint'));
+                const details=el('div',undefined,'cc-counter-details');
+                const heading=el('div',undefined,'cc-counter-heading');heading.append(el('code',name),el('strong',String(current),'cc-counter-value'));
+                details.append(heading,el('p',usage.has(name)?'Used by '+usage.get(name).join(', '):'Not used by saved commands','cc-hint'));
+                card.append(details);
                 const actions=el('div',undefined,'cc-counter-actions'),input=el('input');
                 input.type='number';input.step='1';input.min='-1000000000000';input.max='1000000000000';input.value=String(current);input.setAttribute('aria-label','Value for '+name);
                 const save=button('Save',()=>saveCounter(name,Number(input.value)));
