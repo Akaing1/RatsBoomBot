@@ -107,3 +107,18 @@ async def test_timer_supports_minutes_seconds_without_a_reason(workspace_client,
     assert response.json()['timer_due_at'] == 1000 + duration
     assert response.json()['timer_label'] == 'Timer'
     assert (await client.get('/channel/api/for-you')).json()['timer_due_at'] == 1000 + duration
+
+
+@pytest.mark.asyncio
+async def test_counter_manager_updates_are_private_and_require_csrf(workspace_client):
+    client, session, db = workspace_client
+    url = '/channel/api/for-you/commands/counters'
+    assert (await client.post(url, data={'csrf_token': 'wrong', 'name': 'wins', 'value': 7})).status_code == 403
+    assert (await client.post(url, data={'csrf_token': 'secret', 'name': 'wins', 'value': 7})).status_code == 200
+    assert (await client.get(url)).json()['counters']['wins'] == 7
+    session['channel_user_id'] = 'bob'
+    assert (await client.get(url)).json()['counters'] == {}
+    session['channel_user_id'] = 'alice'
+    assert (await client.post(url, data={'csrf_token': 'secret', 'name': 'wins', 'value': 0})).status_code == 200
+    assert (await client.get(url)).json()['counters']['wins'] == 0
+    assert (await client.post(url, data={'csrf_token': 'secret', 'name': 'wins', 'value': 1000000000001})).status_code == 400
