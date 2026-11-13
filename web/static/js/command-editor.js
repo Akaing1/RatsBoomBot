@@ -8,7 +8,7 @@
     const values={'user.name':'Caller → name','user.mention':'Caller → @mention','user.channel':'Caller → Twitch channel URL','arg.name':'Argument → username','arg.mention':'Argument → @mention','arg.channel':'Argument → Twitch channel URL','channel.name':'This channel → name','channel.url':'This channel → URL',args:'All arguments',arg1:'First argument',user:'Caller name (legacy)',channel:'Channel name (legacy)'};
     let items=[],selected=null,draft=null,active=null,insertion=null,dirty=false,busy=false,loaded=false,loading=false,expanded=false,zoom=1;
     let testArgs='',testRole='everyone',testResult=null,testBusy=false, generation=0;
-    let knownCounters={}, countersLoading=false, counterFeedback='';
+    let knownCounters={}, countersLoading=false, counterFeedback='', counterSaving=false, counterOpen=false, counterOpener=null;
     let scroll={left:0,top:0}, clipboard=null, menu=null, menuOrigin=null;
     function el(tag,text,cls) {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
     const run=fn=>Promise.resolve().then(fn).catch(e=>notify(e.message,true));
@@ -165,10 +165,44 @@
         catch(error){counterFeedback=error.message;}
         finally{countersLoading=false;renderCounters();}
     }
+    const counterOverlay=root.querySelector('[data-counter-overlay]');
+    function closeCounters(){
+        if(counterSaving)return;
+        counterOverlay.hidden=true;counterOpen=false;
+        document.body.classList.remove('cc-counters-open');
+        counterOpener?.focus();
+    }
+    async function openCounters(){
+        if(!loaded)return;
+        counterOpener=document.activeElement;counterOverlay.hidden=false;counterOpen=true;
+        root.querySelector('[data-counter-close]').focus();
+        await refreshCounters();
+    }
+    root.querySelector('[data-command-manage-counters]').addEventListener('click',()=>run(openCounters));
+    root.querySelector('[data-counter-close]').addEventListener('click',closeCounters);
+    counterOverlay.addEventListener('click',event=>{if(event.target===counterOverlay)closeCounters();});
+    counterOverlay.addEventListener('keydown',event=>{
+        if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeCounters();return;}
+        if(event.key!=='Tab')return;
+        const controls=[...counterOverlay.querySelectorAll('button:not(:disabled),input:not(:disabled)')];
+        const first=controls[0],last=controls[controls.length-1];
+        if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+        else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    });
+    async function saveCounter(name,value){
+        if(counterSaving)return;
+        if(!Number.isSafeInteger(value)||Math.abs(value)>1000000000000){counterFeedback='Enter a whole number between -1 trillion and 1 trillion.';renderCounters();return;}
+        counterSaving=true;
+        try{
+            const result=await request({name,value:String(value)},endpoint+'/counters');
+            knownCounters[name]=result.value;counterFeedback='Saved '+name+'.';
+        }catch(error){counterFeedback=error.message;}
+        finally{counterSaving=false;renderCounters();}
+    }
     function renderCounters(){
-        const panel=root.querySelector('[data-command-counters]');if(!panel)return;panel.replaceChildren();
+        const panel=root.querySelector('[data-command-counters]');if(!panel||!counterOpen)return;panel.replaceChildren();
         const header=el('div',undefined,'cc-header');header.append(el('h4','Channel counters'));
-        const refresh=button(countersLoading?'Refreshing…':'Refresh counters',refreshCounters);refresh.disabled=countersLoading||!loaded;header.append(refresh);panel.append(header);
+        const refresh=button(countersLoading?'Refreshing…':'Refresh counters',refreshCounters);refresh.disabled=countersLoading||!loaded||counterSaving;header.append(refresh);panel.append(header);
         panel.append(el('p','Shared across your commands and saved across streams. Refresh to see changes from chat.','cc-hint'));
         const usage=new Map();
         for(const item of items)for(const name of M.counterReferences(item.command.blocks)){
@@ -178,13 +212,23 @@
         if(!loaded)panel.append(el('p','Loading counters…','cc-hint'));
         else if(!names.length)panel.append(el('p','No counters yet. Add a Counter block to a command to get started.','cc-hint'));
         else{const grid=el('div',undefined,'cc-counter-grid');
-            for(const name of names){const card=el('article',undefined,'cc-counter-card');card.append(el('code',name),el('strong',String(Object.hasOwn(knownCounters,name)?knownCounters[name]:0),'cc-counter-value'),el('p',usage.has(name)?'Used by '+usage.get(name).join(', '):'Not used by saved commands','cc-hint'));grid.append(card);}panel.append(grid);}
+            for(const name of names){
+                const card=el('article',undefined,'cc-counter-card');
+                const current=Object.hasOwn(knownCounters,name)?knownCounters[name]:0;
+                card.append(el('code',name),el('strong',String(current),'cc-counter-value'),el('p',usage.has(name)?'Used by '+usage.get(name).join(', '):'Not used by saved commands','cc-hint'));
+                const actions=el('div',undefined,'cc-counter-actions'),input=el('input');
+                input.type='number';input.step='1';input.min='-1000000000000';input.max='1000000000000';input.value=String(current);input.setAttribute('aria-label','Value for '+name);
+                const save=button('Save',()=>saveCounter(name,Number(input.value)));
+                const reset=button('Reset',()=>{if(confirm('Reset counter '+name+' to 0?'))return saveCounter(name,0);});
+                input.disabled=counterSaving;save.disabled=counterSaving;reset.disabled=counterSaving;
+                actions.append(input,save,reset);card.append(actions);grid.append(card);
+            }panel.append(grid);}
         const feedback=el('p',counterFeedback,'cc-hint');feedback.setAttribute('role','status');panel.append(feedback);
     }
     function render(){
         renderCounters();
         dismissMenu();
-        document.body.classList.toggle('cc-fullscreen-open',expanded&&!!draft);list.replaceChildren();root.querySelector('[data-command-new]').disabled=busy||loading;
+        document.body.classList.toggle('cc-fullscreen-open',expanded&&!!draft);list.replaceChildren();root.querySelector('[data-command-new]').disabled=busy||loading;root.querySelector('[data-command-manage-counters]').disabled=!loaded||busy||loading;
         const rows=items.slice();if(draft&&selected.revision===0)rows.push(selected);
         if(!rows.length)list.append(el('p','No custom commands yet. Add a command to start building.','cc-empty'));
         for(const item of rows){const isOpen=draft&&selected===item, article=el('article',undefined,'cc-command'),row=el('div',undefined,'cc-row');

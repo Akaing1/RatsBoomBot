@@ -254,6 +254,20 @@ async def custom_command_counters(request: Request):
     return JSONResponse({'counters': await list_counters(db, channel)}, headers={'Cache-Control': 'no-store'})
 
 
+@router.post('/channel/api/for-you/commands/counters')
+async def update_custom_command_counter(request: Request, csrf_token: str = Form(...),
+                                        name: str = Form(..., max_length=32),
+                                        value: int = Form(...)):
+    from storage.custom_commands import set_counter
+    db, channel = workspace_context(request)
+    validate_csrf_token(request, csrf_token)
+    try:
+        await set_counter(db, channel, name, value)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return JSONResponse({'name': name, 'value': value}, headers={'Cache-Control': 'no-store'})
+
+
 @router.post('/channel/api/for-you/commands')
 async def save_custom_command(request: Request, csrf_token: str = Form(...),
                               action: str = Form(...), definition: str = Form(..., max_length=32000),

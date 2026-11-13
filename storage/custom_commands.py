@@ -59,3 +59,26 @@ async def list_counters(db, channel):
     async with db.acquire() as connection:
         rows = await connection.fetchall('SELECT name, value FROM custom_command_counters WHERE broadcaster_id = ? ORDER BY name', (str(channel),))
     return {row['name']: row['value'] for row in rows}
+
+
+async def set_counter(db, channel, name, value):
+    """Change one channel's saved counter without affecting command definitions."""
+    import re
+    if not isinstance(name, str) or not re.fullmatch(r'[a-z][a-z0-9_]{0,31}', name):
+        raise ValueError('Invalid counter name.')
+    if type(value) is not int or not -1_000_000_000_000 <= value <= 1_000_000_000_000:
+        raise ValueError('Counter value must be an integer between -1 trillion and 1 trillion.')
+    async with db.acquire() as connection:
+        async with immediate_transaction(connection):
+            exists = await connection.fetchone(
+                'SELECT 1 FROM custom_command_counters WHERE broadcaster_id = ? AND name = ?',
+                (str(channel), name))
+            if exists is None:
+                count = await connection.fetchone(
+                    'SELECT COUNT(*) AS n FROM custom_command_counters WHERE broadcaster_id = ?',
+                    (str(channel),))
+                if count['n'] >= 100:
+                    raise ValueError('A channel can have at most 100 counters.')
+            await connection.execute("""INSERT INTO custom_command_counters (broadcaster_id, name, value)
+                VALUES (?, ?, ?) ON CONFLICT(broadcaster_id, name) DO UPDATE SET value = excluded.value""",
+                (str(channel), name, value))
