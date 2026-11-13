@@ -119,7 +119,8 @@ class ModerationEvents(commands.Component):
                 moderator_id=moderator_id,
                 moderator_name=moderator_name,
                 reason=reason,
-                source="serybot"
+                source="serybot",
+                banned_at=getattr(payload, "timestamp", None)
             )
         except Exception:
             LOGGER.exception(
@@ -145,7 +146,7 @@ class ModerationEvents(commands.Component):
             broadcaster_id,
             "MODERATION",
             (
-                f"Recorded SeryBot campaign evidence for "
+                f"Recorded SeryBot account evidence for "
                 f"{username} ({user_id}) | "
                 f"Reason: {reason or 'No reason supplied'}"
             )

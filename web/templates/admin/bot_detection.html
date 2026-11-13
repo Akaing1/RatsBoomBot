@@ -1,0 +1,16 @@
+{% extends "admin/layout.html" %}
+{% block title %}Bot detection | RatsBoomBot Admin{% endblock %}
+{% block content %}
+<section class="page-header"><div><p class="eyebrow">Moderation research</p><h2>Bot detection</h2>
+<p class="page-description">Observation only. SeryBot bans are account evidence; nearby messages are candidates, not proof of spam. Times are UTC. Twitch provides notification timestamps rather than exact chat-send times; matches are approximate.</p></div>
+<a class="button secondary" href="/admin/bot-detection">Refresh</a></section>
+<section class="panel"><h3>Recent SeryBot bans</h3><p>Latest 100 observations. Delayed messages can match for ten seconds. Multiple candidates remain ambiguous.</p>
+<div style="overflow-x:auto"><table><thead><tr><th>Time</th><th>Account / channel</th><th>Reason</th><th>Message match</th><th>Comparison</th><th>Candidate messages</th></tr></thead><tbody>
+{% for ban in bans %}<tr><td>{{ ban.time }}</td><td>{{ ban.username }} ({{ ban.user_id }}) / {{ ban.broadcaster_id }}</td><td>{{ ban.reason or 'No reason supplied' }}</td><td>{{ ban.match_status }}<br>Time source: {{ ban.timestamp_source }}</td><td>{{ ban.outcome }}</td><td style="white-space:pre-wrap;overflow-wrap:anywhere;max-width:32rem">{{ ban.messages or 'No matching message observed' }}</td></tr>
+{% else %}<tr><td colspan="6">No SeryBot observations recorded yet.</td></tr>{% endfor %}</tbody></table></div></section>
+<section class="panel"><h3>Detector flags without an observed SeryBot action</h3><p>Latest 100. These need review; absence of an observed ban does not establish a false positive.</p>
+{% for flag in flags %}<p><strong>{{ flag.username }}</strong> / {{ flag.broadcaster_id }}: {{ flag.message }}</p>{% else %}<p>No unmatched detector flags.</p>{% endfor %}</section>
+<section class="panel"><h3>Candidate patterns</h3><p>Correlated wording only. Distinct accounts and channels are evidence counts, not confidence scores. Review suspicious content and legitimate-chat examples before considering enforcement. No patterns are automatically promoted.</p>
+<div style="overflow-x:auto"><table><thead><tr><th>Example</th><th>Distinct accounts</th><th>Channels</th><th>Protected account observed</th></tr></thead><tbody>
+{% for pattern in patterns %}<tr><td style="overflow-wrap:anywhere;max-width:32rem">{{ pattern.example }}</td><td>{{ pattern.accounts }}</td><td>{{ pattern.channels }}</td><td>{{ 'Yes — review carefully' if pattern.protected_seen else 'No (not proof of spam)' }}</td></tr>{% else %}<tr><td colspan="4">No message candidates yet.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}
