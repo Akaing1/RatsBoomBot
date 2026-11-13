@@ -24,6 +24,10 @@ body.cc-fullscreen-open{overflow:hidden}.cc-editor.cc-expanded{position:fixed;in
 .cc-counter-overlay[hidden]{display:none}.cc-counter-overlay{position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center;padding:18px;background:#000b;box-sizing:border-box}
 .cc-counter-dialog{background:#202631;border:1px solid var(--cc-border);border-radius:12px;width:min(720px,100%);max-height:min(85dvh,850px);overflow:auto;padding:22px;box-sizing:border-box;box-shadow:0 20px 60px #0008}
 .cc-counter-dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.cc-counter-dialog-heading h3{margin:0}
-.cc-counters{margin-top:12px}.cc-counters .cc-header{margin:0 0 8px}.cc-counters h4{margin:0}.cc-counter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:12px;margin-top:14px}.cc-counter-card{padding:14px;border:1px solid var(--cc-border);border-radius:8px;background:#13171e;overflow-wrap:anywhere}.cc-counter-card code{color:#cab0ff}.cc-counter-value{display:block;font-size:26px;margin:8px 0}.cc-counter-card p{margin-bottom:0}
-.cc-counter-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:12px}.cc-counter-actions input{width:120px;max-width:100%;background:#0f1218;border:1px solid #51586b;border-radius:6px;color:var(--text,#f3f4f6);padding:8px}.cc-counter-actions button{font-size:12px}
+.cc-counters{margin-top:12px}.cc-counters .cc-header{margin:0 0 8px}.cc-counters h4{margin:0}
+.cc-counter-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-top:12px}
+.cc-counter-card{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 12px;border:1px solid var(--cc-border);border-radius:8px;background:#13171e;overflow-wrap:anywhere}
+.cc-counter-details{min-width:0;flex:1}.cc-counter-heading{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.cc-counter-card code{color:#cab0ff}.cc-counter-value{font-size:20px;line-height:1.2}.cc-counter-card p{margin:4px 0 0}
+.cc-counter-actions{display:flex;gap:7px;align-items:center;flex-shrink:0}.cc-counter-actions input{width:110px;max-width:100%;box-sizing:border-box;background:#0f1218;border:1px solid #51586b;border-radius:6px;color:var(--text,#f3f4f6);padding:8px}.cc-counter-actions button{font-size:12px}
 @media(max-width:650px){.cc-counter-dialog{padding:14px}.cc-header-actions{width:100%}}
+@media(max-width:540px){.cc-counter-card{flex-wrap:wrap;gap:10px}.cc-counter-details{flex-basis:100%}.cc-counter-actions{margin-left:auto;flex-wrap:wrap}}
