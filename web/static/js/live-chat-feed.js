@@ -710,11 +710,11 @@
             }
         });
         source.onopen = () => showConnectionStatus(true);
-        source.onerror = () => {
-            showConnectionStatus(false);
+        source.onerror = () => showConnectionStatus(false);
+        source.addEventListener("error", () => {
             if (youtubeState?.linked && !youtubeState.reauth_required)
                 showYoutubeStatus({...youtubeState, receiving: false, detail: "Connection to the bot lost; reconnecting automatically."});
-        };
+        });
         source.addEventListener("history-complete", () => { feed.historyComplete = true; });
         source.addEventListener("chat-clear", event => {
             const {platform} = JSON.parse(event.data);
