@@ -1327,7 +1327,19 @@ class LiveChatService:
             reauth_required=connection is not None and broadcaster_id in self.youtube_reauth_required,
         )
 
+    def get_youtube_delivery_state(self, broadcaster_id: str) -> dict:
+        """Public chat health, separate from the persisted account link."""
+        broadcaster_id = str(broadcaster_id)
+        state = self.get_youtube_state(broadcaster_id)
+        receiving = bool(state.connected and not state.reauth_required
+                         and state.status == "live"
+                         and self.active_youtube_chat_ids.get(broadcaster_id))
+        return {"linked": state.connected, "receiving": receiving,
+                "reauth_required": state.reauth_required,
+                "status": state.status, "detail": state.detail}
+
     def require_youtube_reauthorization(self, broadcaster_id: str, detail: str) -> None:
+        self.active_youtube_chat_ids.pop(str(broadcaster_id), None)
         self.youtube_reauth_required.add(str(broadcaster_id))
         self.youtube_statuses[str(broadcaster_id)] = ("unavailable", detail)
 
