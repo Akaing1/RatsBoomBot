@@ -11,7 +11,7 @@
                         <h4>YouTube live chat</h4>
                         <p>Connect the YouTube channel that should appear beside Twitch chat and send dashboard replies.</p>
                     </div>
-                    <span data-youtube-settings-status class="toggle-status {% if youtube_chat.status == \"live\" and not youtube_chat.reauth_required %}enabled{% endif %}">{% if youtube_chat.reauth_required %}Disconnected — reauthorize YouTube{% elif youtube_chat.status == "live" %}Connected{% elif youtube_chat.configured %}Disconnected{% else %}Unavailable{% endif %}</span>
+                    <span data-youtube-settings-status class="toggle-status {% if youtube_chat.status == 'live' and not youtube_chat.reauth_required %}enabled{% endif %}">{% if youtube_chat.reauth_required %}Disconnected — reauthorize YouTube{% elif youtube_chat.status == "live" %}Connected{% elif youtube_chat.configured %}Disconnected{% else %}Unavailable{% endif %}</span>
                 </div>
 
                 {% if youtube_chat.connected %}
