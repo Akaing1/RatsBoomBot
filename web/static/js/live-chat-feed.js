@@ -655,7 +655,29 @@
             }).observe(element);
         }
 
+        const youtubeStatus = makeElement("p", "chat-send-status");
+        youtubeStatus.setAttribute("role", "status");
+        youtubeStatus.setAttribute("aria-live", "polite");
+        youtubeStatus.hidden = true;
+        shell.parentNode.insertBefore(youtubeStatus, shell);
+        let youtubeState = null;
+        function showYoutubeStatus(state) {
+            youtubeState = state;
+            youtubeStatus.hidden = !state.linked && !state.reauth_required;
+            youtubeStatus.className = "chat-send-status " + (state.receiving ? "success" : "error");
+            youtubeStatus.textContent = state.reauth_required
+                ? "YouTube disconnected — the channel owner needs to reauthorize YouTube in the dashboard."
+                : state.receiving ? "YouTube connected"
+                : "YouTube disconnected — " + (state.detail || "Waiting for a livestream.");
+        }
         const source = new EventSource(element.dataset.streamUrl);
+        source.addEventListener("youtube-status", event => {
+            try {
+                const state = JSON.parse(event.data);
+                showYoutubeStatus(state);
+                document.dispatchEvent(new CustomEvent("youtube-chat-status", {detail: state}));
+            } catch (_) {}
+        });
         source.addEventListener('access-revoked', () => {
             source.close();
             element.replaceChildren(makeElement('p', 'live-chat-status', element.dataset.mirrorChatPreferences !== undefined ? 'This OBS dock URL has expired. Copy the current URL from Settings.' : 'Channel access ended. Return to My account.'));
@@ -689,6 +711,10 @@
         });
         source.onopen = () => showConnectionStatus(true);
         source.onerror = () => showConnectionStatus(false);
+        source.addEventListener("error", () => {
+            if (youtubeState?.linked && !youtubeState.reauth_required)
+                showYoutubeStatus({...youtubeState, receiving: false, detail: "Connection to the bot lost; reconnecting automatically."});
+        });
         source.addEventListener("history-complete", () => { feed.historyComplete = true; });
         source.addEventListener("chat-clear", event => {
             const {platform} = JSON.parse(event.data);
