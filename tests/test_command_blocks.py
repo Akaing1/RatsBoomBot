@@ -126,7 +126,7 @@ async def test_storage_reloads_after_startup_and_custom_bot_messages_are_ignored
     await service.handle(ctx); ctx.send.assert_not_awaited()
     await change_command(db, '1', c, 1, delete=True)
     await service.reload('1')
-    assert service.commands['1'] == {}
+    assert '1' not in service.commands
 
 
 def test_deep_nesting_and_execution_budget_are_rejected_even_without_many_messages():

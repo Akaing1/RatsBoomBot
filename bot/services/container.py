@@ -1,4 +1,5 @@
 from bot.services.channels.custom_commands import CustomCommandService
+import asyncio
 import logging
 
 from bot.profiles import FeatureName, get_active_profile
@@ -25,6 +26,7 @@ class ServiceContainer:
     def __init__(self, bot, db, broadcaster_ids, league_db=None):
         self.bot = bot
         self.db = db
+        self._command_cleanup_task = None
 
         LOGGER.info("[Services] Creating service container.")
 
@@ -141,10 +143,30 @@ class ServiceContainer:
 
             LOGGER.info("[Services] %s started.", name)
 
+        self._start_command_cleanup()
         LOGGER.info("[Services] Background services started.")
+
+    def _start_command_cleanup(self):
+        if self._command_cleanup_task is None or self._command_cleanup_task.done():
+            self._command_cleanup_task = asyncio.create_task(
+                self._cleanup_command_state(), name="command-state-cleanup")
+
+    async def _cleanup_command_state(self):
+        while True:
+            self.custom_commands.prune_expired()
+            self.command_slowmode.prune_expired()
+            await asyncio.sleep(60)
+
+    async def _stop_command_cleanup(self):
+        task = self._command_cleanup_task
+        self._command_cleanup_task = None
+        if task is not None:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
     async def stop(self) -> None:
         LOGGER.info("[Shutdown] Stopping services.")
+        await self._stop_command_cleanup()
 
         services = (
             ("AutomaticShoutoutService", self.automatic_shoutouts),
