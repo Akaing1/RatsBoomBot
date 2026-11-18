@@ -14,7 +14,7 @@
     {% if progress and progress.status != 'active' %}
     <h2 id="setup-title">{{ 'Setup complete' if progress.status == 'finished' else 'Setup paused' }}</h2>
     {% else %}
-    <p class="eyebrow">Step {{ step + 1 }} of {{ steps | length }}</p>
+    <p class="eyebrow setup-step">Step {{ step + 1 }} of {{ steps | length }}</p>
     <h2 id="setup-title">{{ steps[step] }}</h2>
     <progress value="{{ step + 1 }}" max="{{ steps | length }}" aria-label="Setup progress"></progress>
     {% endif %}

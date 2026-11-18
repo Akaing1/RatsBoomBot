@@ -43,6 +43,7 @@
         const targetBox = target?.getBoundingClientRect();
         const visible = targetBox && targetBox.width && targetBox.height &&
             targetBox.bottom > 0 && targetBox.top < height && targetBox.right > 0 && targetBox.left < width;
+        tour.toggleAttribute('data-anchored', Boolean(visible));
         outline.hidden = !visible;
         pointer.hidden = true;
 
@@ -119,6 +120,7 @@
         if (target?.getClientRects().length) target.scrollIntoView({block: 'center', inline: 'nearest'});
         card.focus({preventScroll: true});
         paint();
+        tour.setAttribute('data-ready', '');
     }, {once: true});
     window.addEventListener('resize', schedulePaint);
     window.addEventListener('scroll', schedulePaint, {capture: true, passive: true});
