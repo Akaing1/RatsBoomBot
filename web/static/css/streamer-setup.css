@@ -1,32 +1,60 @@
+.setup-spotlight {
+    position: fixed;
+    inset: 0;
+    z-index: 1600;
+    pointer-events: none;
+}
+
+.setup-shade {
+    position: absolute;
+    background: rgb(8 10 16 / 76%);
+    pointer-events: auto;
+}
+
+.setup-outline {
+    position: absolute;
+    border: 2px solid #c4b5fd;
+    border-radius: 10px;
+    box-shadow: 0 0 0 3px rgb(167 139 250 / 24%);
+}
+
 .streamer-setup {
-    max-width: 42rem;
-    margin-inline: auto;
-    padding: clamp(1rem, 4vw, 2rem);
+    position: absolute;
+    box-sizing: border-box;
+    width: min(23rem, calc(100% - 24px));
+    max-height: min(70dvh, calc(100% - 24px));
+    left: 12px;
+    top: 12px;
+    margin: 0;
+    padding: 16px;
+    overflow: auto;
+    background: #202333;
+    color: #f6f4ff;
+    border: 1px solid #a78bfa;
+    box-shadow: 0 12px 36px rgb(0 0 0 / 40%);
+    pointer-events: auto;
 }
 
-.streamer-setup progress {
-    width: 100%;
-    height: .5rem;
-    accent-color: #ad9afa;
+.streamer-setup h2 { margin: 0 0 8px; font-size: 1.25rem; }
+.streamer-setup p { margin: 8px 0; }
+.streamer-setup a:not(.button) { color: #d9ccff; text-decoration: underline; }
+.streamer-setup progress { width: 100%; height: .45rem; accent-color: #ad9afa; }
+.streamer-setup ul { padding-inline-start: 1.25rem; margin-block: 8px; }
+.streamer-setup li + li { margin-top: 4px; }
+
+.setup-pointer {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #202333;
+    border: solid #a78bfa;
+    border-width: 0 1px 1px 0;
+    transform: translate(-50%, -50%) rotate(var(--setup-arrow-angle, 45deg));
+    z-index: 1;
 }
 
-.streamer-setup ul {
-    padding-inline-start: 1.25rem;
-}
+.streamer-setup-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
-.streamer-setup li + li {
-    margin-top: .5rem;
-}
-
-.streamer-setup-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .5rem;
-    margin-top: 1.25rem;
-}
-
-.settings-page:target .settings-page-heading,
-.profile-setting-card:target {
-    outline: 2px solid #ad9afa;
-    outline-offset: 3px;
+@media (max-width: 640px) {
+    .streamer-setup { max-height: min(48dvh, calc(100% - 24px)); }
 }
