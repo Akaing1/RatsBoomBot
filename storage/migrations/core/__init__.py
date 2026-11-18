@@ -1,6 +1,7 @@
 """Historical migrations owned by core."""
 
 from storage.migrations.core.v083_moderation_shadow import migrate as migrate_083
+from storage.migrations.core.v084_streamer_setup import migrate as migrate_084
 from storage.migrations.model import Migration
 
 from .v001_initial_schema import migrate as migrate_001
@@ -97,4 +98,5 @@ MIGRATIONS = (
     Migration(81, "custom_commands", migrate_081),
     Migration(82, "custom_counters", migrate_082),
     Migration(83, "moderation_shadow", migrate_083),
+    Migration(84, "streamer_setup", migrate_084),
 )
