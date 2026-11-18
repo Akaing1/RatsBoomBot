@@ -6,6 +6,8 @@ import httpx
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from web.shared.common import templates
 
 from storage.migration_runner import run_migrations
 from web.channel.routers import streamer_setup
@@ -44,10 +46,18 @@ async def test_streamer_setup_saves_progress_and_excludes_delegated_moderators(t
                 request.state.channel_access = {"broadcaster_id": "owner"}
             return await call_next(request)
 
+        @app.get("/channel")
+        @app.get("/channel/settings")
+        async def render_host(request: Request):
+            context = await streamer_setup.tour_context(request, "owner", bot)
+            return HTMLResponse(templates.env.get_template("channel/streamer_setup.html").render(
+                setup_tour=context, csrf_token="secret",
+            ))
+
         app.include_router(streamer_setup.router)
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
             url = "/channel/setup"
-            assert "Start setup" in (await client.get(url)).text
+            assert "Start setup" in (await client.get(url, follow_redirects=True)).text
             assert (await client.get(url, headers={"x-test-moderator": "1"})).status_code == 403
             assert (await client.post(url, data={"action": "next", "expected_step": 0, "csrf_token": "wrong"})).status_code == 403
 
@@ -58,19 +68,20 @@ async def test_streamer_setup_saves_progress_and_excludes_delegated_moderators(t
 
             await act("next", 0)
             await act("next", 0)  # A second tab cannot advance a stale step.
-            assert "/mod RatsBoomBot" in (await client.get(url)).text
+            assert "/mod RatsBoomBot" in (await client.get(url, follow_redirects=True)).text
             await act("check-moderator", 1)
-            assert "Moderator role confirmed" in (await client.get(url)).text
+            assert "Moderator role confirmed" in (await client.get(url, follow_redirects=True)).text
             assert await act("dismiss", 1) == "/channel"
-            assert "Setup paused" in (await client.get(url)).text
+            assert "Setup paused" in (await client.get(url, follow_redirects=True)).text
             await act("resume", 1)
-            for step in (1, 2, 3):
-                await act("next", step)
+            assert await act("next", 1) == "/channel/settings?section=general&tour=1"
+            assert await act("next", 2) == "/channel/settings?section=loyalty&tour=1"
+            assert await act("next", 3) == "/channel?tour=1"
             await act("confirm-command", 4)
-            review = (await client.get(url)).text
+            review = (await client.get(url, follow_redirects=True)).text
             assert "Reply confirmed by you" in review
             assert "Bot moderator role · Confirmed" in review
             assert await act("finish", 5) == "/channel"
-            assert "Setup complete" in (await client.get(url)).text
+            assert "Setup complete" in (await client.get(url, follow_redirects=True)).text
             await act("restart", 5)
-            assert "Start setup" in (await client.get(url)).text
+            assert "Start setup" in (await client.get(url, follow_redirects=True)).text

@@ -46,6 +46,7 @@ from web.shared.protected_users import (
     remove_protected_user
 )
 from storage.streamer_setup import get_setup
+from web.channel.routers.streamer_setup import tour_context
 from web.state import get_bot, get_db
 from storage.incoming_raids import recent_incoming_raids
 
@@ -2238,11 +2239,15 @@ async def channel_dashboard(request: Request):
         dashboard_header_stats = [stat for stat in dashboard_header_stats if stat["key"] == "points_lost"]
     twitch_channel_metadata = await get_twitch_channel_metadata(runtime_bot, broadcaster_id)
 
+    setup_progress = await get_setup(get_db(), str(broadcaster_id))
+    setup_tour = await tour_context(request, str(broadcaster_id), runtime_bot, setup_progress)
+
     return templates.TemplateResponse(
         request=request,
         name="channel/dashboard.html",
         context={
-            "streamer_setup": await get_setup(get_db(), str(broadcaster_id)),
+            "streamer_setup": setup_progress,
+            "setup_tour": setup_tour,
             "active_page": "overview",
             "broadcaster": broadcaster,
             "runtime_unavailable": False,
@@ -2484,6 +2489,7 @@ async def channel_customization_page(request: Request):
         request=request,
         name="channel/settings.html",
         context={
+            "setup_tour": await tour_context(request, str(broadcaster_id), runtime_bot),
             "active_page": "settings",
             "customization_action": f"/me/mod/{broadcaster_id}/customization" if getattr(getattr(request, "state", None), "channel_access", None) else "/channel/customization",
             "timers_active": services.features.is_enabled(broadcaster_id, FeatureName.TIMERS) and (await services.broadcaster_settings.get_settings(broadcaster_id)).timers_enabled,

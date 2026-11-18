@@ -1,11 +1,16 @@
-{% extends "channel/layout.html" %}
-{% block title %}Guided setup | RatsBoomBot{% endblock %}
-{% block page_styles %}
-<link rel="stylesheet" href="/static/css/streamer-setup.css?v={{ deployment_stamp() }}">
-{% endblock %}
-{% block content %}
-<section class="panel streamer-setup" aria-labelledby="setup-title">
-    <a href="/channel">Back to Overview</a>
+{% set progress = setup_tour.progress %}
+{% set step = setup_tour.step %}
+{% set steps = setup_tour.steps %}
+{% set bot_login = setup_tour.bot_login %}
+{% set channel_login = setup_tour.channel_login %}
+{% set points_enabled = setup_tour.points_enabled %}
+{% set points_alias = setup_tour.points_alias %}
+{% set moderator_result = setup_tour.moderator_result %}
+<div class="setup-spotlight" data-setup-spotlight data-step="{{ step }}" data-active="{{ 'false' if progress and progress.status != 'active' else 'true' }}">
+    {% for edge in ['top', 'left', 'right', 'bottom'] %}<div class="setup-shade" data-setup-shade="{{ edge }}" aria-hidden="true"></div>{% endfor %}
+    <div class="setup-outline" data-setup-outline aria-hidden="true" hidden></div>
+    <div class="setup-pointer" data-setup-pointer aria-hidden="true" hidden></div>
+    <section class="panel streamer-setup" role="region" aria-labelledby="setup-title" data-setup-card tabindex="-1">
     {% if progress and progress.status != 'active' %}
     <h2 id="setup-title">{{ 'Setup complete' if progress.status == 'finished' else 'Setup paused' }}</h2>
     {% else %}
@@ -29,25 +34,24 @@
         {% elif progress.moderator_confirmed %}<p role="status">Moderator role confirmed.</p>
         {% elif moderator_result == 'missing' %}<p role="status">Twitch did not list the bot as a moderator. Check the account name and try again.</p>{% endif %}
         {% elif step == 2 %}
-        <p>Enable the bot and choose which tools to use. You can change these settings any time.</p>
+        <p>Use the highlighted control to turn on the bot or a feature. Open any section below to review its controls.</p>
         <ul>
-            <li><a href="/channel/settings?section=general#settings-general">General</a> · Turn the bot on for this channel.</li>
-            <li><a href="/channel/settings?section=chat#settings-chat">Chat</a> · Choose which commands viewers can use.</li>
-            {% if not points_enabled %}<li><a href="/channel/settings?section=loyalty#settings-loyalty">Loyalty Points</a> · Let viewers earn and spend channel currency.</li>{% endif %}
-            <li><a href="/channel/settings?section=queue#settings-queue">Viewer Queue</a> · Organize who joins you next.</li>
-            <li><a href="/channel/settings?section=pets#settings-pets">Pets and Boss Hunt</a> · Give viewers games and rewards to work toward.</li>
+            <li><a href="/channel/settings?section=general&tour=1">General</a> · Turn the bot on for this channel.</li>
+            <li><a href="/channel/settings?section=chat&tour=1">Chat</a> · Choose which commands viewers can use.</li>
+            {% if not points_enabled %}<li><a href="/channel/settings?section=loyalty&tour=1">Loyalty Points</a> · Let viewers earn and spend channel currency.</li>{% endif %}
+            <li><a href="/channel/settings?section=queue&tour=1">Viewer Queue</a> · Organize who joins you next.</li>
+            <li><a href="/channel/settings?section=pets&tour=1">Pets and Boss Hunt</a> · Give viewers games and rewards to work toward.</li>
         </ul>
-        <p>Return to setup from the Overview after saving your choices.</p>
+
         {% elif step == 3 %}
         {% if points_enabled %}
         <p>Give your channel currency a name, such as Stars or Snacks. That name can also become a chat command alias.</p>
-        <p><a href="/channel/settings?section=loyalty#setting-points-display_name">Edit your points name</a></p>
-        <p>Return to setup from the Overview after saving.</p>
+        <p>Use the highlighted setting to change the name, then save and continue.</p>
         {% else %}
-        <p>Loyalty Points is off. If you enable it later, you can name your currency in <a href="/channel/settings?section=loyalty#settings-loyalty">Loyalty Points settings</a>.</p>
+        <p>Loyalty Points is off. If you enable it later, you can name your currency in <a href="/channel/settings?section=loyalty&tour=1">Loyalty Points settings</a>.</p>
         {% endif %}
         {% elif step == 4 %}
-        <p>In your Twitch chat, type <code>{{ '!' ~ points_alias if points_enabled else '!help' }}</code>. Check that the bot and commands are enabled in Settings if you don’t see a reply.</p>
+        <p>In the highlighted chat composer, select Twitch and send <code>{{ '!' ~ points_alias if points_enabled else '!help' }}</code>. Check that the bot and commands are enabled in Settings if you don’t see a reply.</p>
         {% if channel_login %}<p><a href="https://www.twitch.tv/{{ channel_login | urlencode }}/chat" target="_blank" rel="noopener">Open Twitch chat</a></p>{% endif %}
         <button class="button secondary" name="action" value="confirm-command">The bot replied</button>
         {% else %}
@@ -59,6 +63,7 @@
         {% endif %}
 
         <div class="streamer-setup-actions">
+            {% if progress and progress.status != "active" %}<a class="button secondary" href="/channel">Close</a>{% endif %}
             {% if progress and progress.status in ('finished', 'dismissed') %}
             {% if progress.status == 'dismissed' %}<button class="button primary" name="action" value="resume">Resume setup</button>{% endif %}
             <button class="button secondary" name="action" value="restart">Restart tutorial</button>
@@ -72,4 +77,4 @@
         </div>
     </form>
 </section>
-{% endblock %}
+</div>

@@ -6,7 +6,6 @@
 {% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/css/channel-settings.css?v={{ deployment_stamp() }}-shared-whitelist-state">
-<link rel="stylesheet" href="/static/css/streamer-setup.css?v={{ deployment_stamp() }}">
 <header class="page-header"><div><p class="eyebrow">Your channel, your way</p><h2>Settings</h2></div>{% if not moderator_mode %}<a class="button secondary" href="/channel/setup">Guided setup</a>{% endif %}</header>
 {% for result, message in [(toggle_result, toggle_message), (setting_result, setting_message)] %}
 {% if message %}<div class="toggle-feedback {{ 'success' if result == 'success' else 'error' }}" role="status">{{ message }}</div>{% endif %}
