@@ -15,6 +15,10 @@ class CommandSlowmodeService:
         self.enabled_channels = set()
         self.deadlines = {}
 
+    def prune_expired(self, now=None) -> None:
+        now = time.monotonic() if now is None else now
+        self.deadlines = {key: deadline for key, deadline in self.deadlines.items() if deadline > now}
+
     async def setup(self) -> None:
         async with self.db.acquire() as connection:
             rows = await connection.fetchall("SELECT broadcaster_id FROM command_slowmode WHERE enabled = 1")
@@ -48,7 +52,7 @@ class CommandSlowmodeService:
         key = (broadcaster_id, user_id)
         if self.deadlines.get(key, 0) > now:
             return False
-        self.deadlines = {key: deadline for key, deadline in self.deadlines.items() if deadline > now}
+        self.prune_expired(now)
         self.deadlines[key] = now + self.COOLDOWN_SECONDS
         ctx._slowmode_allowed = True
         return True

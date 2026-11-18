@@ -18,7 +18,7 @@ LOGGER = logging.getLogger("RatBoomBot")
 
 
 @router.get("/channel/api/youtube/authorization")
-async def youtube_authorization_status(request: Request):
+async def youtube_authorization_status(request: Request, cached: bool = False):
     broadcaster_id = request.session.get(CHANNEL_USER_ID_KEY)
     headers = {"Cache-Control": "no-store"}
     if not broadcaster_id:
@@ -26,6 +26,9 @@ async def youtube_authorization_status(request: Request):
     runtime_bot = get_bot()
     if runtime_bot is None or runtime_bot.services is None:
         return JSONResponse({"detail": "Authorization check unavailable."}, status_code=503, headers=headers)
+    if cached:
+        state = runtime_bot.services.live_chat.get_youtube_delivery_state(str(broadcaster_id))
+        return JSONResponse({"required": state["reauth_required"], "state": state}, headers=headers)
     try:
         async with asyncio.timeout(8):
             required = await runtime_bot.services.live_chat.check_youtube_authorization(str(broadcaster_id))

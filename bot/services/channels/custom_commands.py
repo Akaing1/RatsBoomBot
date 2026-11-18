@@ -19,6 +19,13 @@ class CustomCommandService:
         self.next_send = {}
         self.backoff = {}
 
+    def prune_expired(self, now=None):
+        """Release idle-channel timestamps without shortening active limits."""
+        now = time.monotonic() if now is None else now
+        for name in ('deadlines', 'next_send', 'backoff'):
+            values = getattr(self, name)
+            setattr(self, name, {key: deadline for key, deadline in values.items() if deadline > now})
+
     async def setup(self):
         async with self.db.acquire() as connection:
             rows = await connection.fetchall('SELECT broadcaster_id, name, definition FROM custom_commands')
@@ -27,7 +34,11 @@ class CustomCommandService:
             self.commands.setdefault(row['broadcaster_id'], {})[row['name']] = json.loads(row['definition'])
 
     async def reload(self, channel):
-        self.commands[str(channel)] = {entry['command']['name']: entry['command'] for entry in await list_commands(self.db, channel)}
+        commands = {entry['command']['name']: entry['command'] for entry in await list_commands(self.db, channel)}
+        if commands:
+            self.commands[str(channel)] = commands
+        else:
+            self.commands.pop(str(channel), None)
 
     async def handle(self, ctx):
         # Only called for an unknown command; registered commands and points aliases win.
@@ -54,7 +65,7 @@ class CustomCommandService:
                                 command=SimpleNamespace(name=command['name'], qualified_name=command['name']))
         if not ctx.bot.services.command_slowmode.allow(proxy):
             return
-        self.deadlines = {key: value for key, value in self.deadlines.items() if value > now}
+        self.prune_expired(now)
         self.deadlines[channel] = now + command['cooldown']
         parts = ctx.message.text[len(ctx.prefix):].strip().split(maxsplit=1)
         args = parts[1] if len(parts) > 1 else ''

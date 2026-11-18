@@ -28,6 +28,18 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str, *
     try:
         yield "retry: 2000\n\n"
 
+        youtube_state = None
+        def youtube_event():
+            nonlocal youtube_state
+            get_state = getattr(service, "get_youtube_delivery_state", None)
+            if not get_state:
+                return None
+            current = get_state(broadcaster_id)
+            if current == youtube_state or (youtube_state is None and not current["linked"]):
+                return None
+            youtube_state = current
+            return f"event: youtube-status\ndata: {json.dumps(current)}\n\n"
+
         roster = None
         roster_checked = 0
         async def participant_event():
@@ -62,6 +74,9 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str, *
                 except Exception:
                     yield "event: access-revoked\ndata: {}\n\n"
                     return
+            event = youtube_event()
+            if event:
+                yield event
             event = await participant_event()
             if event:
                 yield event
