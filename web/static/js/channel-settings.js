@@ -221,6 +221,11 @@
     select(selected, false);
     url.searchParams.set('section', selected);
     history.replaceState(history.state, '', url);
+    // A direct setup link targets a control in the selected settings section.
+    const initialTarget = document.getElementById(url.hash.slice(1));
+    if (initialTarget?.closest('[data-settings-page]')?.dataset.settingsPage === selected) {
+        scrollToSetting(initialTarget);
+    }
     window.addEventListener('popstate', () => {
         const key = new URL(location.href).searchParams.get('section') || book.dataset.selected;
         if (!tabs.some(tab => tab.dataset.settingsTab === key)) return;

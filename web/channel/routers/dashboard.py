@@ -45,7 +45,8 @@ from web.shared.protected_users import (
     search_protected_users,
     remove_protected_user
 )
-from web.state import get_bot
+from storage.streamer_setup import get_setup
+from web.state import get_bot, get_db
 from storage.incoming_raids import recent_incoming_raids
 
 router = APIRouter()
@@ -2241,6 +2242,7 @@ async def channel_dashboard(request: Request):
         request=request,
         name="channel/dashboard.html",
         context={
+            "streamer_setup": await get_setup(get_db(), str(broadcaster_id)),
             "active_page": "overview",
             "broadcaster": broadcaster,
             "runtime_unavailable": False,

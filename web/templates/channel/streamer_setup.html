@@ -1,0 +1,75 @@
+{% extends "channel/layout.html" %}
+{% block title %}Guided setup | RatsBoomBot{% endblock %}
+{% block page_styles %}
+<link rel="stylesheet" href="/static/css/streamer-setup.css?v={{ deployment_stamp() }}">
+{% endblock %}
+{% block content %}
+<section class="panel streamer-setup" aria-labelledby="setup-title">
+    <a href="/channel">Back to Overview</a>
+    {% if progress and progress.status != 'active' %}
+    <h2 id="setup-title">{{ 'Setup complete' if progress.status == 'finished' else 'Setup paused' }}</h2>
+    {% else %}
+    <p class="eyebrow">Step {{ step + 1 }} of {{ steps | length }}</p>
+    <h2 id="setup-title">{{ steps[step] }}</h2>
+    <progress value="{{ step + 1 }}" max="{{ steps | length }}" aria-label="Setup progress"></progress>
+    {% endif %}
+    <form method="post" action="/channel/setup">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="expected_step" value="{{ step }}">
+        {% if progress and progress.status != 'active' %}
+        <p>{{ 'You can run through setup again any time.' if progress.status == 'finished' else 'Pick up where you left off whenever you’re ready.' }}</p>
+        {% elif step == 0 %}
+        <p>Set up RatsBoomBot for your Twitch channel. Check its permissions, choose the tools you want, and try a command. Your place is saved as you go.</p>
+        {% elif step == 1 %}
+        <p>Give your bot moderator access to use features that need it, like Twitch announcements and shoutouts.</p>
+        {% if bot_login %}<p>Type <code>/mod {{ bot_login }}</code> in your own Twitch chat, then check the role here.</p>{% else %}<p>Add your connected bot account as a moderator in Twitch Creator Dashboard → Community → Roles Manager, then check the role here.</p>{% endif %}
+        {% if channel_login %}<p><a href="https://www.twitch.tv/{{ channel_login | urlencode }}/chat" target="_blank" rel="noopener">Open Twitch chat</a></p>{% endif %}
+        <button class="button secondary" name="action" value="check-moderator">Check moderator role</button>
+        {% if moderator_result == 'unavailable' %}<p role="status">Twitch permissions could not be checked. Try again or continue setup.</p>
+        {% elif progress.moderator_confirmed %}<p role="status">Moderator role confirmed.</p>
+        {% elif moderator_result == 'missing' %}<p role="status">Twitch did not list the bot as a moderator. Check the account name and try again.</p>{% endif %}
+        {% elif step == 2 %}
+        <p>Enable the bot and choose which tools to use. You can change these settings any time.</p>
+        <ul>
+            <li><a href="/channel/settings?section=general#settings-general">General</a> · Turn the bot on for this channel.</li>
+            <li><a href="/channel/settings?section=chat#settings-chat">Chat</a> · Choose which commands viewers can use.</li>
+            {% if not points_enabled %}<li><a href="/channel/settings?section=loyalty#settings-loyalty">Loyalty Points</a> · Let viewers earn and spend channel currency.</li>{% endif %}
+            <li><a href="/channel/settings?section=queue#settings-queue">Viewer Queue</a> · Organize who joins you next.</li>
+            <li><a href="/channel/settings?section=pets#settings-pets">Pets and Boss Hunt</a> · Give viewers games and rewards to work toward.</li>
+        </ul>
+        <p>Return to setup from the Overview after saving your choices.</p>
+        {% elif step == 3 %}
+        {% if points_enabled %}
+        <p>Give your channel currency a name, such as Stars or Snacks. That name can also become a chat command alias.</p>
+        <p><a href="/channel/settings?section=loyalty#setting-points-display_name">Edit your points name</a></p>
+        <p>Return to setup from the Overview after saving.</p>
+        {% else %}
+        <p>Loyalty Points is off. If you enable it later, you can name your currency in <a href="/channel/settings?section=loyalty#settings-loyalty">Loyalty Points settings</a>.</p>
+        {% endif %}
+        {% elif step == 4 %}
+        <p>In your Twitch chat, type <code>{{ '!' ~ points_alias if points_enabled else '!help' }}</code>. Check that the bot and commands are enabled in Settings if you don’t see a reply.</p>
+        {% if channel_login %}<p><a href="https://www.twitch.tv/{{ channel_login | urlencode }}/chat" target="_blank" rel="noopener">Open Twitch chat</a></p>{% endif %}
+        <button class="button secondary" name="action" value="confirm-command">The bot replied</button>
+        {% else %}
+        <ul>
+            <li>Bot moderator role · {{ 'Confirmed' if progress.moderator_confirmed else 'Check later' }}</li>
+            <li>Chat command · {{ 'Reply confirmed by you' if progress.command_confirmed else 'Try later' }}</li>
+        </ul>
+        <p>Use <a href="/channel">Overview</a> to manage your stream, <a href="/channel/settings">Settings</a> to change features, and <a href="/channel/for-you">For You</a> for notes, clips, and custom commands.</p>
+        {% endif %}
+
+        <div class="streamer-setup-actions">
+            {% if progress and progress.status in ('finished', 'dismissed') %}
+            {% if progress.status == 'dismissed' %}<button class="button primary" name="action" value="resume">Resume setup</button>{% endif %}
+            <button class="button secondary" name="action" value="restart">Restart tutorial</button>
+            {% else %}
+            {% if step > 0 %}<button class="button secondary" name="action" value="back">Back</button>{% endif %}
+            {% if step == 0 %}<button class="button primary" name="action" value="next">Start setup</button>
+            {% elif step == 5 %}<button class="button primary" name="action" value="finish">Finish setup</button>
+            {% else %}<button class="button primary" name="action" value="next">{{ 'Continue without a test' if step == 4 else 'Next' }}</button>{% endif %}
+            <button class="button secondary" name="action" value="dismiss">{{ 'Skip setup' if step == 0 else 'Finish later' }}</button>
+            {% endif %}
+        </div>
+    </form>
+</section>
+{% endblock %}

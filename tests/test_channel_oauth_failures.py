@@ -126,3 +126,33 @@ async def test_dock_return_cannot_be_external_stale_or_revoked(auth_client, monk
     response = await client.get(f'/oauth/channel/connect?state={state}&code=code')
     assert response.headers['location'] == '/channel'
     assert oauth.DOCK_RETURN_TOKEN_KEY not in session
+
+
+@pytest.mark.asyncio
+async def test_new_channel_gets_setup_prompt_but_existing_channel_does_not(auth_client, tmp_path, monkeypatch):
+    import asqlite
+    from storage.database import save_token
+    from storage.migration_runner import run_migrations
+    from storage.streamer_setup import get_setup
+
+    client, session, _ = auth_client
+    async with asqlite.create_pool(str(tmp_path / "setup-oauth.db")) as db:
+        await run_migrations(db)
+        monkeypatch.setattr(oauth, "get_db", lambda: db)
+        callback = "/oauth/channel/connect?state=expected&code=code"
+        await save_token(db, "existing", "token", "refresh")
+        new_user = oauth.fetch_twitch_user.return_value
+        oauth.fetch_twitch_user.return_value = SimpleNamespace(user_id="existing", login="existing", display_name="Existing")
+        assert (await client.get(callback)).status_code == 303
+        assert await get_setup(db, "existing") is None
+
+        session[CHANNEL_OAUTH_STATE_KEY] = "expected"
+        oauth.fetch_twitch_user.return_value = new_user
+        assert (await client.get(callback)).status_code == 303
+        assert (await get_setup(db, "new"))["step"] == 0
+
+        async with db.acquire() as connection:
+            await connection.execute("UPDATE streamer_setup SET step = 3 WHERE broadcaster_id = 'new'")
+        session[CHANNEL_OAUTH_STATE_KEY] = "expected"
+        assert (await client.get(callback)).status_code == 303
+        assert (await get_setup(db, "new"))["step"] == 3
