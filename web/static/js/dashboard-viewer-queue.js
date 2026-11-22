@@ -613,11 +613,11 @@
                 };
                 simulationActive = true;
             }
-            const names = ["squid", "car", "mina", "rat", "pee", "nyxi", "birb"];
+            const names = window.dashboardTestNames;
             const taken = new Set(simulatedState.users.map(member => typeof member === "string" ? member : member.username));
             const added = [];
             for (let index = 0; index < amount; index += 1) {
-                const base = `test_${names[Math.floor(Math.random() * names.length)]}`;
+                const base = names[Math.floor(Math.random() * names.length)];
                 let username = base;
                 let suffix = 2;
                 while (taken.has(username)) username = `${base}${suffix++}`;
