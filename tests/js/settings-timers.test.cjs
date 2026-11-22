@@ -41,7 +41,7 @@ print(templates.env.get_template('channel/settings_timers.html').render(timer_se
                 book.dispatchEvent(new CustomEvent('settings-save-failed', {detail: {form}}));
             } else book.dispatchEvent(new CustomEvent('settings-saved', {detail: {form, snapshot: JSON.stringify([...data])}}));
         }));
-        for (const file of ['settings-timers.js', 'channel-settings.js']) await page.addScriptTag({path: `web/static/js/${file}`});
+        for (const file of ['state-toggle.js', 'settings-timers.js', 'channel-settings.js']) await page.addScriptTag({path: `web/static/js/${file}`});
         const rows = page.locator('[data-timer-list] .settings-timer-row');
         const save = rows.nth(0).locator('[data-save-timer]');
         const cancel = rows.nth(0).locator('[data-cancel-timer]');
