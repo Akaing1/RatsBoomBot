@@ -316,6 +316,7 @@
         document.body.classList.toggle('channel-page-stream-together', inCall);
         layout.hidden = inCall;
         standaloneLayout.hidden = !inCall;
+        document.querySelector('[data-setup-welcome]')?.toggleAttribute('hidden', inCall);
         if (inCall) {
             for (const element of [stats, chat]) {
                 if (!element) continue;

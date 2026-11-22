@@ -11,6 +11,7 @@ from web.channel.routers import dashboard_router as channel_dashboard_router
 from web.channel.routers.engagement import router as engagement_router
 from web.channel.routers import oauth_router as channel_oauth_router
 from web.channel.routers import youtube_router as channel_youtube_router
+from web.channel.routers.streamer_setup import router as streamer_setup_router
 from web.channel.routers.workspace import router as workspace_router
 from web.channel.routers.followers import router as followers_router
 from web.channel.routers.user_lists import router as user_lists_router
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     application.include_router(channel_oauth_router)
     application.include_router(channel_youtube_router)
     application.include_router(workspace_router)
+    application.include_router(streamer_setup_router)
     application.include_router(followers_router)
     application.include_router(user_lists_router)
     application.include_router(viewer_router)

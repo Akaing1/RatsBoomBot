@@ -19,6 +19,7 @@
         rel="stylesheet"
         href="{{ url_for('static', path='/css/style.css') }}?v={{ deployment_stamp() }}-stream-together-layout"
     >
+    {% if setup_tour and not moderator_mode %}<link rel="stylesheet" href="/static/css/streamer-setup.css?v={{ deployment_stamp() }}">{% endif %}
     {% block page_styles %}{% endblock %}
 </head>
 
@@ -150,6 +151,10 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+    {% if setup_tour and not moderator_mode %}
+    {% include "channel/streamer_setup.html" %}
+    <script src="/static/js/streamer-setup.js?v={{ deployment_stamp() }}" defer></script>
+    {% endif %}
     <script src="{{ url_for('static', path='/js/channel-sidebar.js') }}?v={{ deployment_stamp() }}-stream-together-navigation" defer></script>
     <script src="{{ url_for('static', path='/js/hover-labels.js') }}?v={{ deployment_stamp() }}" defer></script>
     <script src="{{ url_for('static', path='/js/state-toggle.js') }}?v={{ deployment_stamp() }}" defer></script>

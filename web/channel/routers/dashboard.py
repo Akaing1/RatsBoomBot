@@ -46,7 +46,9 @@ from web.shared.protected_users import (
     search_protected_users,
     remove_protected_user
 )
-from web.state import get_bot
+from storage.streamer_setup import get_setup
+from web.channel.routers.streamer_setup import tour_context
+from web.state import get_bot, get_db
 from storage.incoming_raids import recent_incoming_raids
 from storage.stream_together_recency import STREAM_TOGETHER_INITIAL_BOOST, recent_stream_together_participants
 
@@ -2435,12 +2437,17 @@ async def render_channel_dashboard(request: Request, *, stream_together_page: bo
         dashboard_header_stats = [stat for stat in dashboard_header_stats if stat["key"] == "points_lost"]
     twitch_channel_metadata = await get_twitch_channel_metadata(runtime_bot, broadcaster_id)
 
+    setup_progress = await get_setup(get_db(), str(broadcaster_id))
+    setup_tour = await tour_context(request, str(broadcaster_id), runtime_bot, setup_progress)
+
     return templates.TemplateResponse(
         request=request,
         name="channel/stream_together.html" if stream_together_page else "channel/dashboard.html",
         context={
             "active_page": "stream-together" if stream_together_page else "overview",
             "stream_together_page": stream_together_page,
+            "streamer_setup": setup_progress,
+            "setup_tour": setup_tour,
             "broadcaster": broadcaster,
             "runtime_unavailable": False,
             "channel_settings": channel_settings,
@@ -2681,6 +2688,7 @@ async def channel_customization_page(request: Request):
         request=request,
         name="channel/settings.html",
         context={
+            "setup_tour": await tour_context(request, str(broadcaster_id), runtime_bot),
             "active_page": "settings",
             "customization_action": f"/me/mod/{broadcaster_id}/customization" if getattr(getattr(request, "state", None), "channel_access", None) else "/channel/customization",
             "timers_active": services.features.is_enabled(broadcaster_id, FeatureName.TIMERS) and (await services.broadcaster_settings.get_settings(broadcaster_id)).timers_enabled,

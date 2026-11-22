@@ -58,6 +58,7 @@ test('Stream Together session controls work on desktop and mobile without creati
                             <aside class="sidebar" id="channel-navigation" data-channel-sidebar><nav class="navigation"><a class="nav-link" href="/channel">Overview</a><a class="nav-link active" href="/channel/stream-together" aria-current="page">Stream Together</a></nav>
                             <span data-dashboard-carousel-position><span data-dashboard-carousel-count></span><span data-dashboard-carousel-name></span></span></aside>
                             <main class="main-content streamer-main-content">
+                            <section data-setup-welcome hidden>Finish setting up your bot</section>
                             <div class="channel-dashboard-layout" data-dashboard-carousel hidden>
                             <div class="dashboard-chat-column">
                             <div class="dashboard-header-side"><div class="dashboard-header-stats">
@@ -411,6 +412,7 @@ test('Stream Together session controls work on desktop and mobile without creati
                 }, {participantsPath, queuePath}), false, 'The call view skips dashboard polling');
                 const sidebar = page.locator('#channel-navigation');
                 assert.equal(await sidebar.isVisible(), true);
+                assert.equal(await page.locator('[data-setup-welcome]').isVisible(), false);
                 const chatLayout = page.locator('#stream-together-chat');
                 await page.getByRole('button', {name: 'Hide chat', exact: true}).click();
                 assert.equal(await chatLayout.isVisible(), false);
@@ -448,6 +450,7 @@ test('Stream Together session controls work on desktop and mobile without creati
                 else assert.equal(expandingBubbles, 0);
                 await page.locator('.stream-together-stats-exit').waitFor({state: 'detached'});
                 await page.waitForURL('http://dashboard.test/channel');
+                assert.equal(await page.locator('[data-setup-welcome]').isVisible(), true);
                 assert.equal(await page.evaluate(({participantsPath, queuePath, guestsPath}) => {
                     if (!fetched.includes(participantsPath) || !fetched.includes(queuePath)) return false;
                     const count = fetched.filter(path => path === guestsPath).length;
@@ -459,6 +462,7 @@ test('Stream Together session controls work on desktop and mobile without creati
                 assert.equal(await page.getByRole('textbox', {name: 'Chat message'}).inputValue(), 'unsent draft');
                 await page.goBack();
                 await page.waitForURL('http://dashboard.test/channel/stream-together');
+                assert.equal(await page.locator('[data-setup-welcome]').isVisible(), false);
                 assert.equal(await chatLayout.isVisible(), true);
                 assert.equal(await page.evaluate(() => mountedChat.querySelector('[data-live-chat-feed]').scrollTop), 64);
                 assert.equal(await page.getByRole('textbox', {name: 'Chat message'}).inputValue(), 'unsent draft');

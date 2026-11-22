@@ -9,7 +9,7 @@ from storage import stream_together_recency
 from storage.migrations.core.v001_initial_schema import migrate as migrate_initial
 from storage.migrations.core.v008_chatter_identities import migrate as migrate_identities
 from storage.migrations.core.v013_chatter_profiles import migrate as migrate_stats
-from storage.migrations.core.v084_last_streamed_together import migrate
+from storage.migrations.core.v085_last_streamed_together import migrate
 
 
 @pytest.mark.asyncio

@@ -12,6 +12,18 @@
 {% endblock %}
 
 {% block content %}
+{% if not moderator_mode and streamer_setup and streamer_setup.status == 'active' and (not setup_tour or setup_tour.step == 0) %}
+<section class="panel" data-setup-welcome aria-label="Guided setup"{% if stream_together_page %} hidden{% endif %}>
+    <h2>{{ 'Welcome to RatsBoomBot' if streamer_setup.step == 0 else 'Finish setting up your bot' }}</h2>
+    <p>{{ 'Check bot permissions, choose your features, and try a command.' if streamer_setup.step == 0 else 'Your progress is saved.' }}</p>
+    <a class="button primary" href="/channel/setup">{{ 'Start guided setup' if streamer_setup.step == 0 else 'Resume setup' }}</a>
+    <form method="post" action="/channel/setup" style="display:inline-block">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="expected_step" value="{{ streamer_setup.step }}">
+        <button class="button secondary" name="action" value="dismiss">{{ 'Skip setup' if streamer_setup.step == 0 else 'Finish later' }}</button>
+    </form>
+</section>
+{% endif %}
 
 <link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard-for-you.css') }}?v={{ deployment_stamp() }}">
 <dialog class="for-you-dialog" data-fy-dialog aria-labelledby="for-you-alert-title">

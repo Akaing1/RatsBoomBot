@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from config.settings import settings
 from storage.custom_bot_authorization_repository import consume_custom_bot_authorization_request, create_custom_bot_authorization_request, get_custom_bot_authorization_request
 from storage.database import delete_token, save_token
+from storage.streamer_setup import initialize_setup, is_new_streamer
 from web.admin.auth import validate_csrf_token
 from web.channel.auth import (
     CHANNEL_USER_ID_KEY,
@@ -223,6 +224,8 @@ async def public_channel_callback(request: Request, code: str | None = None, sta
         runtime_bot = get_bot()
         runtime_db = get_db()
 
+        first_connection = runtime_db is not None and await is_new_streamer(runtime_db, twitch_user.user_id)
+
         if runtime_bot is not None:
             await runtime_bot.onboard_broadcaster(user_id=twitch_user.user_id, token=token_response.access_token, refresh=token_response.refresh_token)
         elif runtime_db is not None:
@@ -230,6 +233,8 @@ async def public_channel_callback(request: Request, code: str | None = None, sta
         else:
             return render_channel_auth_error(request, title="Runtime unavailable", message="The RatsBoomBot runtime is not available.", status_code=503)
 
+        if first_connection:
+            await initialize_setup(runtime_db, twitch_user.user_id)
         login_channel_user(request, twitch_user.user_id, twitch_user.login, twitch_user.display_name)
     except Exception:
         return render_channel_auth_error(request, title="Channel connection failed", message="The channel could not be connected. Please try again shortly.", status_code=500)
