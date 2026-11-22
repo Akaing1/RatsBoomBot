@@ -48,6 +48,7 @@ from web.shared.protected_users import (
 )
 from web.state import get_bot
 from storage.incoming_raids import recent_incoming_raids
+from storage.stream_together_recency import STREAM_TOGETHER_INITIAL_BOOST, recent_stream_together_participants
 
 router = APIRouter()
 
@@ -126,7 +127,7 @@ def raid_size_bonus(own, candidate, maximum):
 
 def raid_relevance_breakdown(*, same_category=False, shared_tags=(), same_team=False,
                          both_vtubers=False, followed=False, mutual=False, suggested=False, same_language=False, recent_raid=0,
-                         own_viewers=None, viewers=None, own_followers=None, followers=None):
+                         recent_stream_together=0, own_viewers=None, viewers=None, own_followers=None, followers=None):
     # Compatibility outweighs simply being followed/suggested. Treat VTuber
     # separately so it isn't counted again among generic shared tags.
     other_tags = {str(tag).strip().casefold() for tag in shared_tags} - {"vtuber", ""}
@@ -141,6 +142,7 @@ def raid_relevance_breakdown(*, same_category=False, shared_tags=(), same_team=F
         "Suggested": 120 * suggested,
         "Same language": 20 * same_language,
         "Recent raid": round(300 * max(0, min(1, recent_raid))),
+        "Recent Stream Together": round(STREAM_TOGETHER_INITIAL_BOOST * max(0, min(1, recent_stream_together))),
         "Similar viewer count": raid_size_bonus(own_viewers, viewers, 180),
         "Similar channel size": raid_size_bonus(own_followers, followers, 120),
     }
@@ -904,16 +906,23 @@ async def channel_raid_browser(
         (suggested_streams, suggested_ids, suggested_status), (team_streams, team_members), followed_streams = sources
         favorite_availability = None
         recent_raiders = {}
+        recent_participants = {}
         if recommended:
             try:
                 recent_raiders = await recent_incoming_raids(getattr(runtime_bot.services, "db", None), broadcaster_id)
             except Exception:
                 LOGGER.warning("[Dashboard] Recent incoming raids unavailable for %s.", broadcaster_id)
-        recent_raid_streams = []
-        if recent_raiders and not after and not (following or mutual or same_team or suggested or favorites_only):
-            recent_page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {
-                "user_id": list(recent_raiders), "first": 100})
-            recent_raid_streams = recent_page.get("data", [])
+            try:
+                recent_participants = await recent_stream_together_participants(getattr(runtime_bot.services, "db", None), broadcaster_id)
+            except Exception:
+                LOGGER.warning("[Dashboard] Recent Stream Together participants unavailable for %s.", broadcaster_id)
+        recent_streams = []
+        recent_ids = list(dict.fromkeys([*recent_raiders, *recent_participants]))
+        if recent_ids and not after and not (following or mutual or same_team or suggested or favorites_only):
+            for offset in range(0, len(recent_ids), 100):
+                recent_page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {
+                    "user_id": recent_ids[offset:offset + 100], "first": 100})
+                recent_streams.extend(recent_page.get("data", []))
         discovery_prefix = "fy-discovery:"
         dev_streams = await raid_browser_dev_streams(runtime_bot, broadcaster_id) if not after else []
         broad_for_you = (sort == "for_you" and not (developer_only or favorites_only or following or mutual or same_team or suggested or query or category_id or same_category)
@@ -1040,7 +1049,7 @@ async def channel_raid_browser(
             favorite_page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100})
             favorite_streams = favorite_page.get("data", [])
             favorite_availability = favorite_streams
-        candidates = [*dev_streams, *favorite_streams, *recent_raid_streams, *(followed_streams if not after else []),
+        candidates = [*dev_streams, *favorite_streams, *recent_streams, *(followed_streams if not after else []),
                       *(suggested_streams if recommended and not after else []),
                       *(team_streams if recommended and not after and not (following or mutual) else []), *streams.get("data", [])]
         if favorites_only:
@@ -1097,7 +1106,8 @@ async def channel_raid_browser(
             match_breakdown = raid_relevance_breakdown(same_category=category_match, shared_tags=shared_tags,
                 same_team=bool(teams), both_vtubers=both_vtubers, followed=is_followed,
                 suggested=user_id in suggested_ids, same_language=language_match,
-                recent_raid=recent_raiders.get(user_id, 0)) if recommended else {}
+                recent_raid=recent_raiders.get(user_id, 0),
+                recent_stream_together=recent_participants.get(user_id, 0)) if recommended else {}
             channels.append({
                 "id": str(stream.get("user_id", "")), "login": login,
                 "display_name": str(stream.get("user_name") or login),
@@ -1118,7 +1128,8 @@ async def channel_raid_browser(
                 "reasons": [label for active, label in ((category_match, "Same category"), (both_vtubers, "Both VTubers"),
                            (bool(teams), "Same stream team"), (bool(shared_tags), "Shared tags"),
                            (is_followed, "Following"), (user_id in suggested_ids, "Suggested streamer"),
-                           (user_id in recent_raiders, "Raided you recently"), (language_match, "Same language")) if active],
+                           (user_id in recent_raiders, "Raided you recently"),
+                           (user_id in recent_participants, "Recent Stream Together"), (language_match, "Same language")) if active],
                 "language": str(stream.get("language") or ""),
                 "tags": sorted((str(tag) for tag in (stream.get("tags") or [])),
                                key=lambda tag: (tag.casefold() != "vtuber", tag.casefold())),

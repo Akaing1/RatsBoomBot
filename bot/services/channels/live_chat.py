@@ -133,7 +133,7 @@ class LiveChatService:
         self.shared_chat_rosters: dict[str, tuple[float, list[dict]]] = {}
         self.shared_chat_active: dict[str, bool] = {}
         self.shared_chat_hosts: dict[str, str] = {}
-        self.stream_together = StreamTogetherService(bot)
+        self.stream_together = StreamTogetherService(bot, db=db)
         self._shared_chat_roster_locks: dict[str, asyncio.Lock] = {}
         self._preferences_lock = asyncio.Lock()
         self.connections: dict[str, YouTubeConnection] = {}
@@ -656,6 +656,7 @@ class LiveChatService:
                     if missing:
                         names.update(await self._fetch_twitch_owner_names(str(token), missing))
                     roster = [{"id": key, "name": names.get(key, key)} for key in sorted(ids)]
+                    await self.stream_together.remember_participants(broadcaster_id, ids)
             except (httpx.HTTPError, TimeoutError, RuntimeError):
                 # A transient failure must not remove the user's channel toggles.
                 roster = previous

@@ -1126,6 +1126,29 @@ async def test_recent_raiders_join_recommendations_and_gain_a_recency_boost(monk
 
 
 @pytest.mark.asyncio
+async def test_recent_stream_together_partners_are_discovered_ranked_and_explained(monkeypatch):
+    monkeypatch.setattr(dashboard, "get_suggested_streamers", AsyncMock(return_value=([], "cached")))
+    monkeypatch.setattr(dashboard, "raid_browser_followed_streams", AsyncMock(return_value=[]))
+    monkeypatch.setattr(dashboard, "raid_browser_team_streams", AsyncMock(return_value=([], {})))
+    recent = AsyncMock(return_value={"3": 1, "4": .5})
+    monkeypatch.setattr(dashboard, "recent_stream_together_participants", recent)
+    runtime(monkeypatch, [
+        {"data": [{"game_id": "123", "tags": [], "broadcaster_language": "en"}]},
+        {"data": [stream("3", 1), stream("4", 200)]},
+        {"data": [stream("2", 1000), stream("3", 1)], "pagination": {}},
+    ])
+    payload = json.loads((await dashboard.channel_raid_browser(request(), sort="for_you")).body)
+    assert [item["id"] for item in payload["channels"]] == ["3", "4", "2"]
+    first, second, other = payload["channels"]
+    assert first["match_breakdown"]["Recent Stream Together"] == 2500
+    assert second["match_breakdown"]["Recent Stream Together"] == 1250
+    assert other["match_breakdown"]["Recent Stream Together"] == 0
+    assert "Recent Stream Together" in first["reasons"]
+    assert len({item["id"] for item in payload["channels"]}) == 3
+    recent.assert_awaited_once_with(None, "1")
+
+
+@pytest.mark.asyncio
 async def test_for_you_continues_after_current_category_is_exhausted(monkeypatch):
     monkeypatch.setattr(dashboard, "get_suggested_streamers", AsyncMock(return_value=([], "cached")))
     monkeypatch.setattr(dashboard, "raid_browser_followed_streams", AsyncMock(return_value=[]))

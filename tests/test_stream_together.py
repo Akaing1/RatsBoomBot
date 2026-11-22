@@ -40,6 +40,35 @@ async def test_guest_state_reuses_cache_and_never_exposes_browser_source_token()
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("as_guest", [False, True])
+async def test_confirmed_calls_record_other_participants_without_recording_self(monkeypatch, as_guest):
+    import bot.services.channels.stream_together as module
+    record = AsyncMock()
+    monkeypatch.setattr(module, "record_stream_together_participants", record)
+    service, _ = guest_service()
+    service.db = object()
+    if as_guest:
+        await service.connected_state("2", "1")
+        assert await service.connected_state("3", "1") is None
+        record.assert_awaited_once_with(service.db, "2", {"1"})
+    else:
+        await service.state("1")
+        record.assert_awaited_once_with(service.db, "1", {"2"})
+
+
+@pytest.mark.asyncio
+async def test_recent_partner_storage_failure_does_not_break_call_lookup_and_is_retried(monkeypatch):
+    import bot.services.channels.stream_together as module
+    record = AsyncMock(side_effect=[RuntimeError("database unavailable"), None])
+    monkeypatch.setattr(module, "record_stream_together_participants", record)
+    service, _ = guest_service()
+    service.db = object()
+    assert (await service.state("1"))["session"]["id"] == "call"
+    await service.remember_participants("1", ["2"])
+    assert record.await_count == 2
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize('guest_slot_zero', [False, True])
 async def test_connected_session_uses_guest_token_host_id_and_verifies_membership(guest_slot_zero):
     service, http = guest_service()

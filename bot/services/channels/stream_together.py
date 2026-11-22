@@ -1,9 +1,14 @@
 """Owner-only Stream Together controls using Twitch's Guest Star API."""
 import asyncio
+import logging
 import re
 import time
 
 from twitchio.http import Route
+from storage.stream_together_recency import record_stream_together_participants
+
+
+LOGGER = logging.getLogger("RatBoomBot")
 
 
 class StreamTogetherError(ValueError):
@@ -11,12 +16,32 @@ class StreamTogetherError(ValueError):
 
 
 class StreamTogetherService:
-    def __init__(self, bot):
+    def __init__(self, bot, db=None):
         self.bot = bot
+        self.db = db
+        self._recorded_participants = {}
         self._states = {}
         self._locks = {}
         self._settings = {}
         self._connected_states = {}
+
+    async def remember_participants(self, channel_id, participant_ids):
+        if self.db is None:
+            return
+        now = time.monotonic()
+        participants = {str(value) for value in participant_ids
+                        if re.fullmatch(r"[0-9]{1,25}", str(value)) and str(value) != str(channel_id)}
+        recorded = self._recorded_participants.get(channel_id, {})
+        pending = participants - {user_id for user_id, saved_at in recorded.items() if now - saved_at < 60}
+        if not pending:
+            return
+        try:
+            await record_stream_together_participants(self.db, channel_id, pending)
+        except Exception:
+            LOGGER.warning("[Stream Together] Could not save recent participants for %s.", channel_id, exc_info=True)
+            return
+        self._recorded_participants[channel_id] = {user_id: now if user_id in pending else recorded[user_id]
+                                                   for user_id in participants}
 
     async def connected_state(self, channel_id, host_id):
         """Read an invited channel's session without granting host controls."""
@@ -35,6 +60,8 @@ class StreamTogetherService:
             # Twitch can number slot zero from the authenticated guest's point of view.
             state = {"state": "active", "session": session, "invites": [], "slot_count": 0,
                      "is_host": False} if own_guest else None
+            if own_guest:
+                await self.remember_participants(channel_id, (guest.get("user_id", "") for guest in guests))
             self._connected_states[key] = (now, state)
             return state
 
@@ -58,6 +85,7 @@ class StreamTogetherService:
         if session:
             result = await self._request(channel_id, "GET", "invites", moderator_id=channel_id, session_id=session["id"])
             invites = result.get("data", [])
+            await self.remember_participants(channel_id, (guest.get("user_id", "") for guest in session.get("guests", [])))
         state = {"state": "active" if session else "idle", "session": session, "invites": invites,
                  "slot_count": settings[1].get("slot_count", 0)}
         self._states[channel_id] = (now, state)
