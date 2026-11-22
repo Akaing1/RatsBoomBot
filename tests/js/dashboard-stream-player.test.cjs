@@ -120,3 +120,24 @@ test('blocked playback asks for native Play without an automatic retry', () => {
     assert.match(app.status.textContent, /Playback was blocked.*Press Play/);
     assert.deepEqual(app.commands, []);
 });
+
+test('participant selection switches the existing player and ignores owner live changes while watching a guest', () => {
+    const app = setup(); app.handlers.READY(); app.handlers.PLAYING();
+    app.windowHandlers['dashboard-stream-preview-select']({detail: {channel: 'friend'}});
+    assert.deepEqual(app.commands, ['pause', 'channel:friend']);
+    app.handlers.PLAYING();
+    app.windowHandlers['dashboard-stream-live-changed']({detail: {isLive: false}});
+    assert.deepEqual(app.commands, ['pause', 'channel:friend']);
+    app.windowHandlers['dashboard-stream-preview-select']({detail: {channel: 'example'}});
+    assert.deepEqual(app.commands, ['pause', 'channel:friend', 'pause', 'channel:example']);
+    assert.equal(app.status.hidden, true);
+    assert.equal(app.creations(), 1);
+});
+
+test('participant selection before player readiness is applied once ready and validates the login', () => {
+    const app = setup();
+    app.windowHandlers['dashboard-stream-preview-select']({detail: {channel: 'friend'}});
+    app.windowHandlers['dashboard-stream-preview-select']({detail: {channel: 'https://invalid'}});
+    assert.deepEqual(app.commands, []);
+    app.handlers.READY(); assert.deepEqual(app.commands, ['channel:friend']);
+});

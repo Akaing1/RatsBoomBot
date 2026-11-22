@@ -161,7 +161,7 @@ test('rich emote input in an isolated browser', {skip: !chromium || !fs.existsSy
         await t.test('dashboard integration preserves autocomplete, platform switching, history and All sends', async () => {
             const page = await browser.newPage();
             await page.route('**/*', route => route.abort());
-            const template = fs.readFileSync('web/templates/channel/dashboard.html', 'utf8');
+            const template = fs.readFileSync('web/templates/channel/_combined_chat.html', 'utf8');
             const form = template.match(/<form class="dashboard-chat-composer" data-chat-composer[\s\S]*?<\/form>/)[0];
             await page.setContent(`<style>${fs.readFileSync('web/static/css/style.css', 'utf8')}</style>${form}`);
             await page.evaluate(() => {

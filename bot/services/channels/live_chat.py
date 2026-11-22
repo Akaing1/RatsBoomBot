@@ -17,6 +17,7 @@ from bot.profiles import get_active_profile
 from bot.shared_chat import is_shared_message
 from bot.services.channels.chat_notices import notification_details
 from bot.services.channels.dashboard_activity import DashboardActivityHistory
+from bot.services.channels.stream_together import StreamTogetherService
 from bot.services.channels import youtube_live_chat_pb2
 from config.settings import settings
 from web.shared.youtube_oauth import YOUTUBE_API_URL, YOUTUBE_TOKEN_URL, YouTubeChannel, YouTubeTokenResponse, fetch_youtube_channel
@@ -130,6 +131,9 @@ class LiveChatService:
         self.bot = bot
         self.chat_preferences: dict[str, dict] = {}
         self.shared_chat_rosters: dict[str, tuple[float, list[dict]]] = {}
+        self.shared_chat_active: dict[str, bool] = {}
+        self.shared_chat_hosts: dict[str, str] = {}
+        self.stream_together = StreamTogetherService(bot)
         self._shared_chat_roster_locks: dict[str, asyncio.Lock] = {}
         self._preferences_lock = asyncio.Lock()
         self.connections: dict[str, YouTubeConnection] = {}
@@ -624,12 +628,12 @@ class LiveChatService:
 
         return emotes
 
-    async def shared_chat_participants(self, broadcaster_id: str):
+    async def shared_chat_participants(self, broadcaster_id: str, *, refresh: bool = False):
         """Cache Twitch's session roster across dashboard and dock connections."""
         async with self._shared_chat_roster_locks.setdefault(broadcaster_id, asyncio.Lock()):
             now = time.monotonic()
             cached_at, previous = self.shared_chat_rosters.get(broadcaster_id, (0, []))
-            if now - cached_at < 30:
+            if not refresh and now - cached_at < 30:
                 return previous
             token = (getattr(self.bot, "tokens", {}).get(broadcaster_id) or {}).get("token")
             if not token or self.client is None:
@@ -639,6 +643,12 @@ class LiveChatService:
                     payload = await self._fetch_twitch_emote_page(
                         str(token), "/shared_chat/session", {"broadcaster_id": broadcaster_id})
                     sessions = payload.get("data", [])
+                    self.shared_chat_active[broadcaster_id] = bool(sessions)
+                    host = str(sessions[0].get("host_broadcaster_id") or "") if sessions else ""
+                    if re.fullmatch(r"[0-9]{1,25}", host):
+                        self.shared_chat_hosts[broadcaster_id] = host
+                    else:
+                        self.shared_chat_hosts.pop(broadcaster_id, None)
                     ids = {str(entry["broadcaster_id"]) for entry in sessions[0].get("participants", [])} if sessions else set()
                     ids.discard(broadcaster_id)
                     names = {entry["id"]: entry["name"] for entry in previous}

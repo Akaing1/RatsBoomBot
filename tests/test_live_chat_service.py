@@ -114,15 +114,16 @@ def test_reward_related_chat_messages_expose_redemption_metadata():
 
 def test_chat_filters_replace_command_toggle_and_only_apply_to_combined_chat():
     dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    combined_chat = open("web/templates/channel/_combined_chat.html", encoding="utf-8").read()
     script = open("web/static/js/live-chat-feed.js", encoding="utf-8").read()
     assert 'data-chat-command-toggle' not in dashboard
-    assert 'label class="chat-filter-row chat-filter-suboption"' in dashboard
-    assert 'role="group" aria-label="{{ group }}"' in dashboard
-    assert 'data-chat-filter-group-toggle' not in dashboard
+    assert 'label class="chat-filter-row chat-filter-suboption"' in combined_chat
+    assert 'role="group" aria-label="{{ group }}"' in combined_chat
+    assert 'data-chat-filter-group-toggle' not in combined_chat
     filters = open("web/static/js/dashboard-chat-filters.js", encoding="utf-8").read()
     assert "addEventListener('focusout'" not in filters
     assert "dashboard-chat-filters.js" in dashboard
-    assert dashboard.index('data-chat-filter-toggle') < dashboard.index('data-chat-lock')
+    assert combined_chat.index('data-chat-filter-toggle') < combined_chat.index('data-chat-lock')
     assert 'row.hidden = !message.local_preview && feed.filters ? !feed.filters.allows(category) : false;' in script
     assert 'const rows = [...element.querySelectorAll(".live-chat-message")];' in script
     assert 'rows.forEach(row => {' in script
@@ -560,7 +561,7 @@ def test_clear_chat_removes_twitch_history_and_notifies_subscribers():
 def test_platform_filter_connection_links(platform, connected, url):
     from pathlib import Path
     from jinja2 import Template
-    source = Path("web/templates/channel/dashboard.html").read_text(encoding="utf-8")
+    source = Path("web/templates/channel/_combined_chat.html").read_text(encoding="utf-8")
     heading = source.split('<div class="chat-filter-platform-heading">', 1)[1].split('</div>', 1)[0]
     html = Template(heading).render(platform_key=platform, platform_label=platform.title(), connected=connected,
                                    twitch_connected=connected, youtube_chat=SimpleNamespace(connected=connected))
@@ -1982,6 +1983,11 @@ def test_dashboard_mobile_activity_panels_keep_tabs_above_scrollable_events():
 
 def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     dashboard = open("web/templates/channel/dashboard.html", encoding="utf-8").read()
+    dashboard = dashboard.replace(
+        '{% include "channel/_dashboard_header_stats.html" %}',
+        open("web/templates/channel/_dashboard_header_stats.html", encoding="utf-8").read(),
+    )
+    dashboard += open("web/templates/channel/_combined_chat.html", encoding="utf-8").read()
     features = open("web/templates/channel/settings.html", encoding="utf-8").read()
     channel_layout = open("web/templates/channel/layout.html", encoding="utf-8").read()
     customization = open("web/templates/shared/profile_inputs.html", encoding="utf-8").read()
@@ -2082,7 +2088,8 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '...["ad-ring-intro", "ad-ring-countdown"].filter(name => container.classList.contains(name))' in ad_status_script
     assert 'stickyMedia.matches && window.scrollY > 32' in ad_status_script
     assert '.dashboard-header-stats > .dashboard-ad-sticky.is-visible' in dashboard_styles
-    assert '.channel-dashboard-layout .panel { margin-bottom: 0; padding: 16px; }' in dashboard_styles
+    assert '.channel-dashboard-layout .panel { --panel-padding: 16px; margin-bottom: 0; }' in dashboard_styles
+    assert '.panel { --panel-padding: 24px; margin-bottom: 24px; padding: var(--panel-padding); }' in dashboard_styles
     assert '.channel-page-overview .streamer-main-content { padding: 16px; }' in dashboard_styles
     assert 'align-items: stretch; gap: 12px; margin-bottom: 16px;' in dashboard_styles
     assert 'padding: 5px 9px; border: 0;' in dashboard_styles
@@ -2214,7 +2221,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert 'window.dashboardQueueTest = {' in queue_script
     assert 'simulationActive = true;' in queue_script
     assert 'simulationActive = false;' in queue_script
-    assert 'if (!simulationActive) renderQueue(actualState);' in queue_script
+    assert 'if (!simulationActive && !dashboard?.hidden) renderQueue(actualState);' in queue_script
     assert 'if (simulationActive) {' in queue_script
     assert 'moveIcon("top")' in queue_script
     assert 'moveIcon("bottom")' in queue_script
@@ -2376,7 +2383,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.twitch-game-field:focus-within .channel-metadata-status { opacity: 0; }' in dashboard_styles
     assert 'setStatusSpace(Math.ceil(status.getBoundingClientRect().width))' in metadata_script
     assert 'statusSpaceTimer = window.setTimeout(() => setStatusSpace(0), 450)' in metadata_script
-    assert '.dashboard-video-header { --metadata-label-width: 64px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr);' in dashboard_styles
+    assert '.dashboard-video-header { --metadata-label-width: 64px; --category-art-width: 52px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr);' in dashboard_styles
     assert '.dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: var(--metadata-label-width) minmax(0,1fr);' in dashboard_styles
     assert '.dashboard-video-header .twitch-channel-field > h3 { margin: 0; font-size: 14px; line-height: 1.2; text-align: left;' in dashboard_styles
     assert '.dashboard-video-header .twitch-channel-field strong { box-sizing: border-box; width: 100%;' in dashboard_styles
@@ -2412,7 +2419,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert '.dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9;' in dashboard_styles
     assert 'aspect-ratio: 16 / 9;' in dashboard_styles
     assert 'grid-template-columns: minmax(0,1.3fr) minmax(0,1fr)' in dashboard_styles
-    assert dashboard.index('<div class="channel-dashboard-layout" data-dashboard-carousel>') < dashboard.index('<header class="page-header dashboard-channel-profile" hidden>')
+    assert dashboard.index('<div class="channel-dashboard-layout" data-dashboard-carousel') < dashboard.index('<header class="page-header dashboard-channel-profile" hidden>')
     assert 'class="dashboard-page channel-page channel-page-{{ active_page }}' in channel_layout
     assert 'data-channel-root="{{ channel_root }}"' in channel_layout
     assert "data-sidebar-toggle" in channel_layout
@@ -2483,7 +2490,7 @@ def test_dashboard_templates_include_reply_composer_and_spanning_chat_layout():
     assert ".dashboard-channel-heading { flex-direction: column; align-items: flex-start; gap: 10px; }" in dashboard_styles
     assert ".dashboard-channel-heading > .eyebrow { margin-bottom: 0; padding-left: 12px; }" in dashboard_styles
     assert ".dashboard-channel-identity:hover, .dashboard-channel-identity:focus-visible" in dashboard_styles
-    assert ".channel-dashboard-layout .panel-header h3 { color: #c7b7ff; }" in dashboard_styles
+    assert ":is(.channel-dashboard-layout, .stream-together-page) .panel-header h3 { color: #c7b7ff; }" in dashboard_styles
     assert "width: 50px; height: 50px; flex-basis: 50px;" in dashboard_styles
     assert ".dashboard-channel-copy .page-description { margin-top: 1px; line-height: 1.15; }" in dashboard_styles
     assert ".channel-page-overview { height: 100dvh; overflow: hidden; }" in dashboard_styles

@@ -1,0 +1,8 @@
+<form class="protected-user-search" data-protected-user-search data-search-url="{{ picker_search_url }}"{% if picker_add_label | default('') %} data-add-label="{{ picker_add_label }}"{% endif %}>
+    <label for="{{ picker_input_id }}">Twitch username</label>
+    <div class="protected-user-search-controls">
+        <input id="{{ picker_input_id }}" class="profile-setting-input" type="text" name="query" placeholder="Enter username" maxlength="25" autocomplete="off" required>
+        <button class="button secondary" type="submit">Search</button>
+    </div>
+    <p class="protected-user-search-message" data-protected-search-message aria-live="polite"></p>
+</form>

@@ -76,6 +76,11 @@
         }
     }
     toggle.addEventListener("click", toggleNavigation);
+    document.addEventListener("dashboard-view-changed", () => {
+        if (!mobileMedia.matches || !mobileExpanded) return;
+        mobileExpanded = false;
+        applyResponsiveState();
+    });
     mobileToggle?.addEventListener("click", () => {
         if (mobileMedia.matches) toggleNavigation();
     });

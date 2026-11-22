@@ -40,19 +40,22 @@ async def stream_chat_events(request, service, broadcaster_id: str, view: str, *
             youtube_state = current
             return f"event: youtube-status\ndata: {json.dumps(current)}\n\n"
 
-        roster = None
+        participants_snapshot = None
         roster_checked = 0
         async def participant_event():
-            nonlocal roster, roster_checked
+            nonlocal participants_snapshot, roster_checked
             fetch = getattr(service, "shared_chat_participants", None)
             if mirror_preferences or view == "commands" or not fetch or time.monotonic() - roster_checked < 30:
                 return None
             roster_checked = time.monotonic()
             current = await fetch(broadcaster_id)
-            if current == roster:
+            active = getattr(service, "shared_chat_active", {}).get(broadcaster_id, bool(current))
+            host = getattr(service, "shared_chat_hosts", {}).get(broadcaster_id)
+            snapshot = current, active, host
+            if snapshot == participants_snapshot:
                 return None
-            roster = current
-            return f"event: chat-participants\ndata: {json.dumps(roster)}\n\n"
+            participants_snapshot = snapshot
+            return f"event: chat-participants\ndata: {json.dumps(current)}\n\n"
 
         event = await participant_event()
         if event:

@@ -84,10 +84,11 @@ button, input { font: inherit; }
     font-size: 14px;
 }
 .nav-link-icon { display: grid; width: 20px; flex: 0 0 20px; place-items: center; font-size: 15px; }
+.nav-link-icon svg { display: block; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .brand-copy, .nav-link-label, .sidebar-button-label { opacity: 1; transition: opacity .14s ease, transform .18s ease; }
 .dashboard-page .sidebar-logout .button { justify-content: center; gap: 10px; overflow: hidden; padding-right: 11px; padding-left: 11px; white-space: nowrap; }
 .dashboard-page .app-shell.sidebar-collapsed { grid-template-columns: 72px minmax(0,1fr); }
-.dashboard-page:not(.channel-page-overview) .app-shell.sidebar-collapsed .main-content { position: relative; left: -36px; width: min(1250px,calc(100vw - 144px)); max-width: none; }
+.dashboard-page:not(.channel-page-overview, .channel-page-stream-together) .app-shell.sidebar-collapsed .main-content { position: relative; left: -36px; width: min(1250px,calc(100vw - 144px)); max-width: none; }
 .dashboard-page .app-shell.sidebar-collapsed .sidebar { width: 72px; padding-right: 14px; padding-left: 14px; }
 @media (min-width: 769px) {
     .dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded .sidebar { width: var(--sidebar-width); padding-right: 14px; padding-left: 14px; box-shadow: 18px 0 38px rgba(0,0,0,.38); }
@@ -99,7 +100,7 @@ button, input { font: inherit; }
     .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .nav-link { gap: 0; justify-content: flex-start; }
     .dashboard-page .app-shell.sidebar-collapsed .sidebar:not(.sidebar-hover-expanded) .sidebar-logout .button { gap: 0; justify-content: center; }
     .dashboard-page .app-shell.sidebar-collapsed.sidebar-hover-expanded { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
-    .dashboard-page:not(.channel-page-overview):not(.admin-channel-overview) .app-shell.sidebar-collapsed.sidebar-hover-expanded .main-content { position: static; left: auto; width: 100%; max-width: 1250px; }
+    .dashboard-page:not(.channel-page-overview, .channel-page-stream-together):not(.admin-channel-overview) .app-shell.sidebar-collapsed.sidebar-hover-expanded .main-content { position: static; left: auto; width: 100%; max-width: 1250px; }
 }
 .nav-link:hover, .nav-link.active { background: var(--surface-raised); color: var(--text); }
 .nav-link.disabled { opacity: .45; pointer-events: none; }
@@ -142,9 +143,9 @@ button, input { font: inherit; }
 .text-link { color: var(--accent); font-size: 14px; font-weight: 700; }
 
 .status-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; margin-bottom: 24px; }
-.status-card, .panel, .message-card { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.status-card, .panel, .message-card { border: var(--panel-border-width, 1px) solid var(--border); border-radius: var(--panel-radius, 14px); background: var(--surface); }
 .status-card { padding: 22px; }
-.panel { margin-bottom: 24px; padding: 24px; }
+.panel { --panel-padding: 24px; margin-bottom: 24px; padding: var(--panel-padding); }
 .card-label { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
 .status-row { display: flex; align-items: center; gap: 9px; font-size: 19px; }
 .status-indicator { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; }
@@ -249,8 +250,8 @@ button, input { font: inherit; }
 .dashboard-ad-stat.state-running strong { color: #c7b7ff; }
 .dashboard-ad-stat.state-scheduled strong { color: #c7b7ff; }
 .dashboard-ad-stat.state-unavailable strong { color: var(--danger); }
-.channel-dashboard-layout .panel-header h3 { color: #c7b7ff; }
-.dashboard-video-header { --metadata-label-width: 64px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr); align-items: center; gap: 4px; }
+:is(.channel-dashboard-layout, .stream-together-page) .panel-header h3 { color: #c7b7ff; }
+.dashboard-video-header { --metadata-label-width: 64px; --category-art-width: 52px; display: grid; min-width: 0; grid-template-columns: minmax(0,1fr); align-items: center; gap: 4px; }
 .dashboard-video-header .twitch-channel-field { min-width: 0; grid-template-columns: var(--metadata-label-width) minmax(0,1fr); column-gap: 7px; }
 .dashboard-video-header .twitch-channel-field > h3 { margin: 0; font-size: 14px; line-height: 1.2; text-align: left; white-space: nowrap; }
 .dashboard-video-header .twitch-channel-field strong { box-sizing: border-box; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -270,7 +271,7 @@ button, input { font: inherit; }
 .dashboard-video-header .twitch-game-field [data-channel-field="game"]:not(:focus):not(.editing) { padding-right: var(--metadata-status-padding, 8px); }
 .dashboard-video-header .twitch-game-field [data-channel-field="game"].metadata-truncated:not(:focus):not(.editing) { padding-right: max(26px, var(--metadata-status-padding, 8px)); }
 .dashboard-video-header .twitch-game-field [data-channel-field="game"].metadata-truncated:not(:focus):not(.editing)::after { right: var(--metadata-status-pencil-right, 8px); }
-.dashboard-video-header:has([data-current-category-art]:not([hidden])) { grid-template-columns: minmax(0,1fr) 52px; column-gap: 8px; }
+.dashboard-video-header:has([data-current-category-art]:not([hidden])) { grid-template-columns: minmax(0,1fr) var(--category-art-width); column-gap: 8px; }
 .dashboard-video-header > .twitch-channel-field { grid-column: 1; }
 .twitch-current-category-art { position: relative; grid-column: 2; grid-row: 1 / span 2; align-self: stretch; min-width: 0; padding: 0; border: 0; border-radius: 5px; background: transparent; cursor: pointer; }
 .twitch-current-category-art:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -817,7 +818,7 @@ html.raid-browser-open { overflow: hidden; }
     .raid-browser-dialog.is-list-view .raid-browser-channel, .raid-browser-dialog[data-result-size].is-list-view .raid-browser-channel { gap: 4px 8px; }
     .raid-browser-dialog.is-list-view .raid-browser-thumbnail { grid-row: 1 / span 4; }
 }
-.dashboard-video-card { position: relative; display: flex; grid-area: player; min-width: 0; align-self: start; flex-direction: column; }
+.dashboard-video-card { --panel-radius: 14px; --panel-border-width: 1px; position: relative; display: flex; grid-area: player; min-width: 0; align-self: start; flex-direction: column; }
 .dashboard-video-card > .panel-header { margin-bottom: 10px; }
 .dashboard-video-frame { width: 100%; min-width: 0; overflow: hidden; }
 .dashboard-video-player { display: block; width: 100%; min-width: 0; max-width: 900px; height: auto; margin-inline: auto; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; background: #0f1115; }
@@ -890,7 +891,7 @@ html.raid-browser-open { overflow: hidden; }
 .admin-channel-dashboard-layout .admin-readonly-chat-panel { grid-area: chat; }
 .viewer-queue-column { grid-area: queue; }
 .channel-dashboard-layout .viewer-queue-column { gap: 12px; }
-.channel-dashboard-layout .panel { margin-bottom: 0; padding: 16px; }
+.channel-dashboard-layout .panel { --panel-padding: 16px; margin-bottom: 0; }
 .channel-dashboard-layout .live-chat-panel:has([data-chat-composer]) { padding-bottom: 8px; }
 .dashboard-activity-panel, .viewer-queue-column > [data-viewer-queue-panel] { min-height: 420px; }
 .live-chat-panel, .dashboard-activity-panel, .viewer-queue-column > [data-viewer-queue-panel] { display: flex; min-width: 0; flex-direction: column; }
@@ -1580,7 +1581,7 @@ body.landing-page {
     .channel-page .sidebar-logo-toggle:hover,
     .channel-page .sidebar-logo-toggle:focus-visible { outline-color: #fff; }
     .app-shell { display: block; padding-top: var(--mobile-nav-height); }
-    .channel-page-overview .sidebar-brand-subtitle { display: none; }
+    :is(.channel-page-overview, .channel-page-stream-together) .sidebar-brand-subtitle { display: none; }
     .sidebar,
     .channel-page-overview .sidebar { position: fixed; z-index: 50; top: 0; right: 0; left: 0; width: 100%; height: 100dvh; max-height: 100dvh; min-height: 0; padding: 10px 20px; overflow: hidden; border-right: 0; border-bottom: 1px solid var(--border); box-shadow: 0 18px 38px rgba(0,0,0,.4); }
     .dashboard-page .app-shell.sidebar-collapsed .sidebar,
@@ -1660,14 +1661,14 @@ body.landing-page {
     /* Lock the root scroller too; feed-level overflow remains scrollable. */
     html:has(> body.channel-page-overview) { height: 100dvh; min-height: 0; overflow: hidden; scrollbar-gutter: auto; }
     .channel-page-overview .dashboard-carousel-navbar-label { position: absolute; top: 46px; right: auto; left: 20px; display: flex; width: 32px; min-width: 0; justify-content: center; overflow: hidden; color: var(--text); font-size: 10px; line-height: 13px; white-space: nowrap; transform: none; }
-    .channel-page-overview .app-shell.sidebar-collapsed .sidebar .brand-copy { display: none; }
+    :is(.channel-page-overview, .channel-page-stream-together) .app-shell.sidebar-collapsed .sidebar .brand-copy { display: none; }
     /* Mobile stats and the brand share the sidebar's stacking context. */
     .channel-page-overview .sidebar .brand { z-index: 52; }
     /* Keep the logo above the stats without its full-width wrapper blocking them. */
     .channel-page-overview .sidebar .brand { pointer-events: none; }
     .channel-page-overview .sidebar .brand .sidebar-logo-toggle { pointer-events: auto; }
-    .channel-page-overview .app-shell.sidebar-collapsed .sidebar .brand { align-items: flex-start; }
-    .channel-page-overview .app-shell.sidebar-collapsed .sidebar .brand-mark { width: 32px; height: 32px; flex-basis: 32px; }
+    :is(.channel-page-overview, .channel-page-stream-together) .app-shell.sidebar-collapsed .sidebar .brand { align-items: flex-start; }
+    :is(.channel-page-overview, .channel-page-stream-together) .app-shell.sidebar-collapsed .sidebar .brand-mark { width: 32px; height: 32px; flex-basis: 32px; }
     .channel-page-overview .app-shell:not(.sidebar-collapsed) .dashboard-carousel-navbar-label { display: none; }
     .channel-page-overview .dashboard-carousel-navbar-count { flex: 0 0 auto; }
     .channel-page-overview .dashboard-carousel-navbar-name { display: none; }
@@ -1773,7 +1774,7 @@ body.landing-page {
 
 @media (max-width: 600px) {
     .channel-page-overview .dashboard-header-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-    .channel-page-overview { --mobile-nav-height: 76px; }
+    :is(.channel-page-overview, .channel-page-stream-together) { --mobile-nav-height: 76px; }
     .channel-page-overview .dashboard-header-stats > :nth-child(-n+3) { grid-column: span 2; }
     .channel-page-overview .dashboard-header-stats > :nth-child(n+4) { grid-column: span 3; }
 }

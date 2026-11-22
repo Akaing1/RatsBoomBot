@@ -109,12 +109,14 @@ async def test_roster_includes_quiet_participants_caches_names_and_clears_on_ses
     monkeypatch.setattr(module.time, 'monotonic', lambda: clock[0])
     live = LiveChatService(None, bot=SimpleNamespace(tokens={'1': {'token': 'test'}}))
     live.client = Mock()
-    live._fetch_twitch_emote_page = AsyncMock(return_value={'data': [{'participants': [
+    live._fetch_twitch_emote_page = AsyncMock(return_value={'data': [{'host_broadcaster_id': '2', 'participants': [
         {'broadcaster_id': '1'}, {'broadcaster_id': '2'}, {'broadcaster_id': '3'}]}]})
     live._fetch_twitch_owner_names = AsyncMock(return_value={'2': 'Rat', '3': 'Friend'})
     expected = [{'id': '2', 'name': 'Rat'}, {'id': '3', 'name': 'Friend'}]
     results = await asyncio.gather(live.shared_chat_participants('1'), live.shared_chat_participants('1'))
     assert results == [expected, expected]
+    assert live.shared_chat_active['1'] is True
+    assert live.shared_chat_hosts['1'] == '2'
     assert live._fetch_twitch_emote_page.await_count == 1
     clock[0] += 31
     assert await live.shared_chat_participants('1') == expected
@@ -123,9 +125,21 @@ async def test_roster_includes_quiet_participants_caches_names_and_clears_on_ses
     live._fetch_twitch_emote_page.side_effect = httpx.ConnectError('offline')
     assert await live.shared_chat_participants('1') == expected
     clock[0] += 31
+    assert live.shared_chat_hosts['1'] == '2'
     live._fetch_twitch_emote_page.side_effect = None
     live._fetch_twitch_emote_page.return_value = {'data': []}
     assert await live.shared_chat_participants('1') == []
+    assert live.shared_chat_active['1'] is False
+    assert '1' not in live.shared_chat_hosts
+
+
+@pytest.mark.asyncio
+async def test_shared_session_is_active_with_only_the_owner_present():
+    live = LiveChatService(None, bot=SimpleNamespace(tokens={'1': {'token': 'test'}}))
+    live.client = Mock()
+    live._fetch_twitch_emote_page = AsyncMock(return_value={'data': [{'participants': [{'broadcaster_id': '1'}]}]})
+    assert await live.shared_chat_participants('1') == []
+    assert live.shared_chat_active['1'] is True
 
 
 @pytest.mark.asyncio
@@ -141,6 +155,18 @@ async def test_roster_is_sent_before_chat_history_and_changes_on_open_stream(mon
     assert '"name": "Rat"' in await anext(events)
     assert 'history-complete' in await anext(events)
     clock[0] += 31
+    assert 'chat-participants\ndata: []' in await anext(events)
+    live.shared_chat_participants = AsyncMock(return_value=[])
+    queue = next(iter(live.subscribers['1']))
+    live.shared_chat_active['1'] = True
+    live.shared_chat_hosts['1'] = '1'
+    clock[0] += 31
+    queue.put_nowait({'event': 'chat-preferences'})
+    assert 'chat-participants\ndata: []' in await anext(events)
+    live.shared_chat_active['1'] = False
+    live.shared_chat_hosts.clear()
+    clock[0] += 31
+    queue.put_nowait({'event': 'chat-preferences'})
     assert 'chat-participants\ndata: []' in await anext(events)
     await events.aclose()
     assert '1' not in live.subscribers

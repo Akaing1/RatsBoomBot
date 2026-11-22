@@ -1,0 +1,4 @@
+{% extends "channel/dashboard.html" %}
+{% set twitch_channel_metadata = twitch_channel_metadata | default({}) %}
+{% set redemption_activity = redemption_activity | default({'feed': []}) %}
+{% set queue_size = queue_size | default(0) %}

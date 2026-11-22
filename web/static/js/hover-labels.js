@@ -31,7 +31,8 @@
     }
     function positionTooltip() {
         if (!activeElement) return;
-        const rect = activeElement.getBoundingClientRect();
+        const buttonTrack = activeElement.closest('.stream-hangup-track');
+        const rect = (buttonTrack || activeElement).getBoundingClientRect();
         const section = activeElement.closest('.engagement-sidebar section');
         const horizontalAnchor = section ? section.getBoundingClientRect() : rect;
         const size = tooltip.getBoundingClientRect();
@@ -42,7 +43,7 @@
         const height = viewport?.height || window.innerHeight;
         let textLeft = horizontalAnchor.left;
         let textRight = horizontalAnchor.right;
-        if (!section && document.createRange && document.createTreeWalker) {
+        if (!buttonTrack && !section && document.createRange && document.createTreeWalker) {
             const anchor = activeElement.querySelector('.nav-link-label, .sidebar-button-label, .chat-filter-button-label') || activeElement;
             const walker = document.createTreeWalker(anchor, NodeFilter.SHOW_TEXT);
             const bounds = [];

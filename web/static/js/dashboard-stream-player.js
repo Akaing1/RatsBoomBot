@@ -4,8 +4,10 @@
     if (!channel) return;
 
     const status = document.querySelector("[data-stream-playback-status]");
+    let simulatedParticipant = false;
     function showStatus(message = "") {
         if (!status) return;
+        if (simulatedParticipant) message = "";
         status.textContent = message;
         status.hidden = !message;
     }
@@ -29,6 +31,7 @@
     let testMode = false;
     let playing = false;
     let selectedChannel = channel;
+    let previewChannel = channel;
     let loadedChannel = channel;
 
     function updatePlaybackPrompt() {
@@ -90,7 +93,21 @@
     window.addEventListener("dashboard-stream-live-changed", event => {
         if (typeof event.detail?.isLive !== "boolean") return;
         actualLive = event.detail.isLive;
-        if (!testMode) setLive(actualLive);
+        if (!testMode && selectedChannel === channel) setLive(actualLive);
+    });
+    window.addEventListener("dashboard-stream-preview-select", event => {
+        const next = event.detail?.channel;
+        if (typeof next !== 'string' || !/^[a-zA-Z0-9_]{1,25}$/.test(next)) return;
+        simulatedParticipant = event.detail.simulated === true;
+        if (simulatedParticipant) {
+            if (ready && playing) twitchPlayer.pause();
+            playing = false;
+            showStatus();
+            return;
+        }
+        previewChannel = next; testMode = false;
+        selectChannel(next);
+        setLive(next === channel ? actualLive : true);
     });
     window.addEventListener("dashboard-stream-test-start", event => {
         const testChannel = event.detail?.channel;
@@ -103,7 +120,7 @@
         if (!testMode) return;
         testMode = false;
         actualLive = typeof event.detail?.isLive === "boolean" ? event.detail.isLive : actualLive;
-        selectChannel(channel);
-        setLive(actualLive);
+        selectChannel(previewChannel);
+        setLive(previewChannel === channel ? actualLive : true);
     });
 })();

@@ -1,15 +1,17 @@
 (() => {
     const panel = document.querySelector("[data-viewer-queue-panel]");
     if (!panel) return;
+    const dashboard = panel.closest("[data-dashboard-carousel]");
     if (panel.dataset.readOnly === 'true') {
         let refreshing = false;
         async function refreshReadOnly() {
-            if (refreshing || document.hidden) return;
+            if (refreshing || document.hidden || dashboard?.hidden) return;
             refreshing = true;
             try {
                 const response = await fetch(panel.dataset.stateUrl, {cache: 'no-store'});
                 if (!response.ok) return;
                 const data = await response.json();
+                if (dashboard?.hidden) return;
                 panel.querySelector('[data-queue-count]').textContent = `${data.users.length} queued`;
                 panel.querySelector('.queue-state-current').textContent = data.open ? 'Open' : 'Closed';
                 const list = document.createElement('ol'); list.className = 'queue-list';
@@ -26,6 +28,7 @@
         }
         refreshReadOnly();
         window.setInterval(refreshReadOnly, 2000);
+        document.addEventListener("dashboard-view-changed", refreshReadOnly);
         return;
     }
     const stateUrl = panel.dataset.stateUrl;
@@ -355,14 +358,14 @@
     }
 
     async function refreshQueue() {
-        if (requestInProgress || queueAnimating || draggingPosition || touchDrag || mouseDrag || document.hidden) return;
+        if (requestInProgress || queueAnimating || draggingPosition || touchDrag || mouseDrag || document.hidden || dashboard?.hidden) return;
         requestInProgress = true;
         try {
             const response = await fetch(stateUrl, {headers: {Accept: "application/json"}, cache: "no-store"});
             if (response.status === 401) return window.location.assign(globalThis.document?.body?.dataset?.channelRoot?.startsWith("/me/mod/") ? "/me" : "/connect");
             if (response.ok) {
                 actualState = await response.json();
-                if (!simulationActive) renderQueue(actualState);
+                if (!simulationActive && !dashboard?.hidden) renderQueue(actualState);
             }
         } finally {
             requestInProgress = false;
@@ -649,5 +652,6 @@
     });
     refreshQueue();
     window.setInterval(refreshQueue, 2000);
+    document.addEventListener("dashboard-view-changed", refreshQueue);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshQueue(); });
 })();

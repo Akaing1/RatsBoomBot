@@ -15,14 +15,7 @@
                         </div>
                     </div>
 
-                    <form class="protected-user-search" data-protected-user-search data-search-url="{{ protected_search_url | default('/channel/protected-users/search') }}">
-                        <label for="protected-user-query">Twitch username</label>
-                        <div class="protected-user-search-controls">
-                            <input id="protected-user-query" class="profile-setting-input" type="text" name="query" placeholder="Enter username" maxlength="25" autocomplete="off" required>
-                            <button class="button secondary" type="submit">Search</button>
-                        </div>
-                        <p class="protected-user-search-message" data-protected-search-message aria-live="polite"></p>
-                    </form>
+                    {% with picker_search_url=protected_search_url | default('/channel/protected-users/search'), picker_input_id='protected-user-query' %}{% include 'shared/user_search_form.html' %}{% endwith %}
 
                     {% with user_search_add_url=protected_add_url | default('/channel/protected-users/add'), user_search_kind='protected-users', user_search_blacklist=false %}{% include 'shared/user_search_result.html' %}{% endwith %}
                 </article>
