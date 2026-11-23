@@ -304,11 +304,11 @@
             const id = form.querySelector('[data-protected-result-user-id]');
             if (id) id.textContent = user.id;
             const button = form.querySelector('[data-protected-add]');
-            const existing = local ? (searchForm.closest('[data-shoutout-user-list]').querySelector('[data-shoutout-list-value]').value.split(/\s+/).includes(login.toLowerCase()))
+            const existing = local ? (searchForm.closest('[data-shoutout-user-list]')?.querySelector('[data-shoutout-list-value]')?.value.split(/\s+/).includes(login.toLowerCase()) || false)
                 : blacklist ? blacklistedNames.has(login.toLocaleLowerCase()) : user.already_protected;
             button.disabled = existing;
             form.setAttribute('aria-disabled', String(Boolean(existing)));
-            button.textContent = local ? existing ? 'Already added' : 'Add User'
+            button.textContent = local ? existing ? 'Already added' : searchForm.dataset.addLabel || 'Add User'
                 : blacklist ? existing ? 'Already blacklisted' : 'Blacklist' : existing ? 'Already Protected' : 'Add User';
             if (local) form.addEventListener('submit', event => {
                 event.preventDefault(); event.stopPropagation();
@@ -460,7 +460,16 @@
         });
         queryInput.addEventListener('input', event => { if (!event.isComposing) schedule(); });
         queryInput.addEventListener('compositionend', schedule);
-        searchForm.addEventListener('submit', event => { event.preventDefault(); lookup(); });
+        searchForm.addEventListener('submit', event => {
+            if (event.defaultPrevented) {
+                interrupt();
+                stopCached();
+                clearResults();
+                return;
+            }
+            event.preventDefault();
+            lookup();
+        });
         window.addEventListener('pagehide', () => { interrupt(); stopCached(); }, {once: true});
         loadCached();
     }

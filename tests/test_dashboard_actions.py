@@ -10,7 +10,7 @@ class PlaceholderParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if tag == "button" and attrs.get("class") == "dashboard-action-placeholder":
+        if tag in {"button", "a"} and attrs.get("class") == "dashboard-action-placeholder":
             self.current = {"attrs": attrs, "text": ""}
 
     def handle_data(self, text):
@@ -18,7 +18,7 @@ class PlaceholderParser(HTMLParser):
             self.current["text"] += text
 
     def handle_endtag(self, tag):
-        if tag == "button" and self.current is not None:
+        if tag in {"button", "a"} and self.current is not None:
             self.buttons.append(self.current)
             self.current = None
 
@@ -31,6 +31,9 @@ def test_seven_dashboard_actions_are_ordered_and_available_overlays_are_enabled(
     assert [button["text"] for button in parser.buttons] == [
         "Polls", "Predictions", "Raid browser", "Stream Together", "Shouts", "Whispers", "Points redeems"]
     for button in parser.buttons:
+        if button["text"] == "Stream Together":
+            assert button["attrs"]["href"] == "/channel/stream-together"
+            continue
         assert button["attrs"]["type"] == "button"
         if button["text"] == "Raid browser":
             assert "disabled" not in button["attrs"]

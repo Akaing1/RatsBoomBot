@@ -52,6 +52,7 @@ from .v077_chat_preferences import migrate as migrate_077
 from .v078_eight_ball_history import migrate as migrate_078
 from .v079_dashboard_activity import migrate as migrate_079
 from .v082_custom_counters import migrate as migrate_082
+from .v085_last_streamed_together import migrate as migrate_085
 from .v081_custom_commands import migrate as migrate_081
 
 MIGRATIONS = (
@@ -99,4 +100,5 @@ MIGRATIONS = (
     Migration(82, "custom_counters", migrate_082),
     Migration(83, "moderation_shadow", migrate_083),
     Migration(84, "streamer_setup", migrate_084),
+    Migration(85, "last_streamed_together", migrate_085),
 )

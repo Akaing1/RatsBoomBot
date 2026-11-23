@@ -1,0 +1,55 @@
+    {% set header_stats = dashboard_header_stats | default([]) %}
+    {% set stats_pending = stream_together_page and not header_stats %}
+    {% if stats_pending %}
+        {% set header_stats = [
+            {'key': 'viewers', 'label': 'Viewers', 'display_value': '—'},
+            {'key': 'followers', 'label': 'Followers', 'display_value': '—'},
+            {'key': 'subscribers', 'label': 'Subs', 'display_value': '—'}
+        ] %}
+    {% endif %}
+    <div class="dashboard-header-side">
+        <div
+            class="dashboard-header-stats"
+            data-dashboard-header-stats
+            data-channel-id="{{ broadcaster.id }}"
+            data-refresh-url="{{ channel_root }}/api/dashboard-stats"
+            {% if stats_pending %}data-load-stats-on-open{% endif %}
+            aria-label="Channel statistics; activate a statistic to show or hide its number"
+        >
+            {% if not moderator_mode %}<button
+                class="dashboard-header-stat dashboard-stream-stat {% if broadcaster.is_live %}state-live{% else %}state-offline{% endif %}"
+                type="button"
+                data-stream-status
+                data-started-at="{{ broadcaster.stream_started_at.isoformat() if broadcaster.stream_started_at else '' }}"
+                aria-pressed="true"
+                aria-label="Hide online timer"
+            >
+                <span class="status-indicator {% if broadcaster.is_live %}online{% else %}offline{% endif %}"></span>
+                <strong data-stream-status-text>{% if broadcaster.is_live %}Online{% else %}Offline{% endif %}</strong>
+            </button>
+            {% endif %}
+            {% for stat in header_stats %}
+                {% if stat.key != "points_lost" %}
+                <button
+                    class="dashboard-header-stat"
+                    type="button"
+                    data-dashboard-stat="{{ stat.key }}"
+                    aria-pressed="false"
+                    title="Hide {{ stat.label }} count"
+                >
+                    <span>{{ stat.label }}</span>
+                    <strong data-dashboard-stat-value>{{ stat.display_value }}</strong>
+                </button>
+                {% endif %}
+            {% endfor %}
+            {% if can_customize %}<div class="dashboard-ad-stat dashboard-ad-sticky" data-ad-status-mirror aria-hidden="true">
+                <span class="stream-together-ad-label">Ads</span>
+                <svg class="dashboard-ad-progress" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle class="dashboard-ad-progress-track" cx="12" cy="12" r="9"></circle>
+                    <circle class="dashboard-ad-progress-ring" cx="12" cy="12" r="9" data-ad-progress-mirror-ring></circle>
+                    <path class="dashboard-ad-progress-check" d="M6.5 12.5 10.5 16.5 18 8.5"></path>
+                </svg>
+                <strong data-ad-status-mirror-text>{{ ad_status.label }}</strong>
+            </div>{% endif %}
+        </div>
+    </div>

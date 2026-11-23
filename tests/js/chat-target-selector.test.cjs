@@ -167,7 +167,7 @@ test('first-line indentation follows the prefix width and scrolled text cannot o
 });
 
 test('dashboard composer has one row with destination first and square Send last, with no bottom buttons', () => {
-    const template = fs.readFileSync('web/templates/channel/dashboard.html', 'utf8');
+    const template = fs.readFileSync('web/templates/channel/_combined_chat.html', 'utf8');
     const row = template.split('<div class="dashboard-chat-compose-row">')[1].split('<div class="chat-emote-picker"')[0];
     assert.ok(row.indexOf('data-chat-target-cycle') < row.indexOf('name="message"'));
     assert.match(row, /<div class="chat-message-entry">\s*<button[^>]*data-chat-target-cycle/);

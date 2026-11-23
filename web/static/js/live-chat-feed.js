@@ -702,7 +702,10 @@
             window.addEventListener('beforeunload', () => document.removeEventListener('dashboard-chat-notice', onNotice), {once: true});
         }
         source.addEventListener("chat-participants", event => {
-            try { feed.filters?.participants?.(JSON.parse(event.data)); } catch (_) {}
+            try {
+                feed.filters?.participants?.(JSON.parse(event.data));
+                window.dispatchEvent(new CustomEvent('dashboard-stream-participants-changed'));
+            } catch (_) {}
         });
         source.addEventListener("chat-preferences", event => {
             if (element.dataset.mirrorChatPreferences !== undefined) {

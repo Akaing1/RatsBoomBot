@@ -42,7 +42,9 @@ async def directory(tmp_path, monkeypatch):
             await connection.execute("INSERT INTO viewers VALUES ('1','2','user002',500,0)")
             await connection.execute("INSERT INTO viewers VALUES ('other','2','user002',99999,0)")
             await connection.execute("INSERT INTO viewers VALUES ('1','999','not-a-follower',999999,0)")
-            await connection.execute("INSERT INTO chatter_channel_stats VALUES ('1','2',42,800,CURRENT_TIMESTAMP)")
+            await connection.execute("""INSERT INTO chatter_channel_stats
+                (broadcaster_id, user_id, messages_sent, lifetime_points_earned, updated_at)
+                VALUES ('1','2',42,800,CURRENT_TIMESTAMP)""")
         app = FastAPI()
         app.mount('/static', StaticFiles(directory='web/static'), name='static')
         app.mount('/assets', StaticFiles(directory='assets'), name='assets')

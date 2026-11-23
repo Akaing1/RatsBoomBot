@@ -20,6 +20,7 @@ from bot.command_registry import build_command_help_groups
 from bot.shared.pending_raids import raid_lock, raid_state, raid_viewer_count, remember_raid
 from bot.profiles import FeatureName, GlobalCommandGroup, GlobalCommandName, ProfileFeatureName, get_active_profile
 from bot.services.channels.profile_settings import LOYALTY_GROUP
+from bot.services.channels.stream_together import StreamTogetherError
 from bot.services.channels.broadcaster_settings import SOCIAL_SETTING_PLATFORMS
 from bot.services.channels.stream_metadata import (
     StreamCategoryNotFoundError, clear_stream_category, update_stream_game, update_stream_title
@@ -49,6 +50,7 @@ from storage.streamer_setup import get_setup
 from web.channel.routers.streamer_setup import tour_context
 from web.state import get_bot, get_db
 from storage.incoming_raids import recent_incoming_raids
+from storage.stream_together_recency import STREAM_TOGETHER_INITIAL_BOOST, recent_stream_together_participants
 
 router = APIRouter()
 
@@ -127,7 +129,7 @@ def raid_size_bonus(own, candidate, maximum):
 
 def raid_relevance_breakdown(*, same_category=False, shared_tags=(), same_team=False,
                          both_vtubers=False, followed=False, mutual=False, suggested=False, same_language=False, recent_raid=0,
-                         own_viewers=None, viewers=None, own_followers=None, followers=None):
+                         recent_stream_together=0, own_viewers=None, viewers=None, own_followers=None, followers=None):
     # Compatibility outweighs simply being followed/suggested. Treat VTuber
     # separately so it isn't counted again among generic shared tags.
     other_tags = {str(tag).strip().casefold() for tag in shared_tags} - {"vtuber", ""}
@@ -142,6 +144,7 @@ def raid_relevance_breakdown(*, same_category=False, shared_tags=(), same_team=F
         "Suggested": 120 * suggested,
         "Same language": 20 * same_language,
         "Recent raid": round(300 * max(0, min(1, recent_raid))),
+        "Recent Stream Together": round(STREAM_TOGETHER_INITIAL_BOOST * max(0, min(1, recent_stream_together))),
         "Similar viewer count": raid_size_bonus(own_viewers, viewers, 180),
         "Similar channel size": raid_size_bonus(own_followers, followers, 120),
     }
@@ -905,16 +908,23 @@ async def channel_raid_browser(
         (suggested_streams, suggested_ids, suggested_status), (team_streams, team_members), followed_streams = sources
         favorite_availability = None
         recent_raiders = {}
+        recent_participants = {}
         if recommended:
             try:
                 recent_raiders = await recent_incoming_raids(getattr(runtime_bot.services, "db", None), broadcaster_id)
             except Exception:
                 LOGGER.warning("[Dashboard] Recent incoming raids unavailable for %s.", broadcaster_id)
-        recent_raid_streams = []
-        if recent_raiders and not after and not (following or mutual or same_team or suggested or favorites_only):
-            recent_page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {
-                "user_id": list(recent_raiders), "first": 100})
-            recent_raid_streams = recent_page.get("data", [])
+            try:
+                recent_participants = await recent_stream_together_participants(getattr(runtime_bot.services, "db", None), broadcaster_id)
+            except Exception:
+                LOGGER.warning("[Dashboard] Recent Stream Together participants unavailable for %s.", broadcaster_id)
+        recent_streams = []
+        recent_ids = list(dict.fromkeys([*recent_raiders, *recent_participants]))
+        if recent_ids and not after and not (following or mutual or same_team or suggested or favorites_only):
+            for offset in range(0, len(recent_ids), 100):
+                recent_page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {
+                    "user_id": recent_ids[offset:offset + 100], "first": 100})
+                recent_streams.extend(recent_page.get("data", []))
         discovery_prefix = "fy-discovery:"
         dev_streams = await raid_browser_dev_streams(runtime_bot, broadcaster_id) if not after else []
         broad_for_you = (sort == "for_you" and not (developer_only or favorites_only or following or mutual or same_team or suggested or query or category_id or same_category)
@@ -1041,7 +1051,7 @@ async def channel_raid_browser(
             favorite_page = await raid_browser_cached_request(runtime_bot, broadcaster_id, "streams", {"user_id": favorite_ids, "first": 100})
             favorite_streams = favorite_page.get("data", [])
             favorite_availability = favorite_streams
-        candidates = [*dev_streams, *favorite_streams, *recent_raid_streams, *(followed_streams if not after else []),
+        candidates = [*dev_streams, *favorite_streams, *recent_streams, *(followed_streams if not after else []),
                       *(suggested_streams if recommended and not after else []),
                       *(team_streams if recommended and not after and not (following or mutual) else []), *streams.get("data", [])]
         if favorites_only:
@@ -1098,7 +1108,8 @@ async def channel_raid_browser(
             match_breakdown = raid_relevance_breakdown(same_category=category_match, shared_tags=shared_tags,
                 same_team=bool(teams), both_vtubers=both_vtubers, followed=is_followed,
                 suggested=user_id in suggested_ids, same_language=language_match,
-                recent_raid=recent_raiders.get(user_id, 0)) if recommended else {}
+                recent_raid=recent_raiders.get(user_id, 0),
+                recent_stream_together=recent_participants.get(user_id, 0)) if recommended else {}
             channels.append({
                 "id": str(stream.get("user_id", "")), "login": login,
                 "display_name": str(stream.get("user_name") or login),
@@ -1119,7 +1130,8 @@ async def channel_raid_browser(
                 "reasons": [label for active, label in ((category_match, "Same category"), (both_vtubers, "Both VTubers"),
                            (bool(teams), "Same stream team"), (bool(shared_tags), "Shared tags"),
                            (is_followed, "Following"), (user_id in suggested_ids, "Suggested streamer"),
-                           (user_id in recent_raiders, "Raided you recently"), (language_match, "Same language")) if active],
+                           (user_id in recent_raiders, "Raided you recently"),
+                           (user_id in recent_participants, "Recent Stream Together"), (language_match, "Same language")) if active],
                 "language": str(stream.get("language") or ""),
                 "tags": sorted((str(tag) for tag in (stream.get("tags") or [])),
                                key=lambda tag: (tag.casefold() != "vtuber", tag.casefold())),
@@ -1982,6 +1994,181 @@ async def channel_chat_users(request: Request):
     })
 
 
+def stream_together_error(error):
+    status = getattr(error, "status", 502)
+    if status in {401, 403}:
+        return JSONResponse({"detail": "Reconnect Twitch to allow Stream Together controls. Your account must also be eligible for Stream Together.",
+                             "reconnect": True}, status_code=403)
+    if isinstance(error, StreamTogetherError):
+        return JSONResponse({"detail": str(error)}, status_code=409)
+    return JSONResponse({"detail": "Twitch could not complete this request. Refresh the session before trying again."}, status_code=status if status in {400, 404, 409, 429} else 502)
+
+
+@router.get("/channel/api/stream-together/participants", response_class=JSONResponse)
+async def channel_stream_together_participants(request: Request):
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    live_chat = context.services.live_chat
+    try:
+        async with asyncio.timeout(8):
+            call, shared = await asyncio.gather(
+                asyncio.wait_for(live_chat.stream_together.state(context.broadcaster_id), timeout=3),
+                live_chat.shared_chat_participants(context.broadcaster_id), return_exceptions=True)
+            if isinstance(shared, Exception):
+                shared = []
+            shared_active = bool(shared or getattr(live_chat, "shared_chat_active", {}).get(context.broadcaster_id))
+            if isinstance(call, Exception):
+                if not shared_active and getattr(call, "status", None) not in {401, 403}:
+                    raise call
+                call = {}
+            session = call.get("session")
+            is_host = bool(session)
+            ids = {str(guest.get("user_id", "")) for guest in (session or {}).get("guests", [])}
+            ids.update(str(guest.get("id", "")) for guest in shared)
+            ids = {value for value in ids if re.fullmatch(r"[0-9]{1,25}", value)}
+            own = context.broadcaster_id
+            ids.discard(own)
+            participants = []
+            active = bool(session) or shared_active
+            if active:
+                participant_ids = [own, *sorted(ids)]
+                profiles, streams = await asyncio.gather(
+                    raid_browser_profiles(context.runtime_bot, own, [{"id": value} for value in participant_ids]),
+                    raid_browser_cached_request(context.runtime_bot, own, "streams", {"user_id": participant_ids, "first": 100}),
+                    return_exceptions=True,
+                )
+                if isinstance(profiles, Exception):
+                    raise profiles
+                live_ids = None if isinstance(streams, Exception) else {str(stream["user_id"]) for stream in streams.get("data", [])}
+                for value in participant_ids:
+                    profile = profiles.get(value, {})
+                    login = profile.get("login") or (context.broadcaster.login if value == own else "")
+                    if login:
+                        participants.append({"id": value, "login": login,
+                            "display_name": profile.get("display_name") or login,
+                            "profile_image_url": profile.get("profile_image_url") or "",
+                            "is_streaming": value in live_ids if live_ids is not None else None})
+        return JSONResponse(
+            {"participants": participants, "active": active, "is_host": is_host, "shared_chat_active": shared_active},
+            headers={"Cache-Control": "no-store"},
+        )
+    except (HTTPException, TimeoutError) as error:
+        return stream_together_error(error)
+
+
+@router.get("/channel/api/stream-together/guests", response_class=JSONResponse)
+async def channel_stream_together_guests(request: Request, refresh: bool = False, guest_host: str = ""):
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    if getattr(request.state, "channel_access", None):
+        return JSONResponse({"detail": "Only the channel owner can manage Stream Together."}, status_code=403)
+    try:
+        async with asyncio.timeout(8):
+            live_chat = context.services.live_chat
+            own = context.broadcaster_id
+            own_lookup = asyncio.wait_for(live_chat.stream_together.state(own), timeout=3)
+            shared_lookup = getattr(live_chat, "shared_chat_participants", None)
+            shared_options = {"refresh": True} if refresh else {}
+            shared_request = asyncio.wait_for(shared_lookup(own, **shared_options), timeout=3) if shared_lookup else asyncio.sleep(0, result=[])
+            state, shared = await asyncio.gather(own_lookup, shared_request, return_exceptions=True)
+            lookup_error = None
+            if isinstance(state, (HTTPException, TimeoutError)):
+                lookup_error = state
+                state = {"session": None, "invites": [], "slot_count": 0}
+            elif isinstance(state, Exception):
+                raise state
+            if isinstance(shared, Exception):
+                shared = []
+            shared_active = bool(shared or getattr(live_chat, "shared_chat_active", {}).get(own))
+            if not state.get("session") and guest_host:
+                login = guest_host.strip().lower()
+                if not re.fullmatch(r"[a-z0-9_]{1,25}", login):
+                    raise StreamTogetherError("Enter a valid Twitch host username.")
+                users = await raid_browser_cached_request(context.runtime_bot, own, "users", {"login": [login]})
+                host_id = next((str(user["id"]) for user in users.get("data", []) if user.get("login") == login), None)
+                if not host_id or host_id == own:
+                    raise StreamTogetherError("Choose another Twitch channel as the host.")
+                connected = await live_chat.stream_together.connected_state(own, host_id)
+                if connected:
+                    state = {**connected, "host_id": host_id, "host_login": login}
+                    lookup_error = None
+            if not state.get("session") and shared_active:
+                host_id = getattr(live_chat, "shared_chat_hosts", {}).get(own)
+                connected = None
+                if host_id and host_id != own:
+                    try:
+                        connected = await asyncio.wait_for(live_chat.stream_together.connected_state(own, host_id), timeout=2)
+                    except (HTTPException, TimeoutError):
+                        pass  # Use the Shared Chat roster if Twitch cannot return the full call.
+                if connected:
+                    state = {**connected, "host_id": host_id}
+                else:
+                    own_login = getattr(context.broadcaster, "login", "")
+                    members = {guest["id"]: guest.get("name", "") for guest in shared}
+                    members[own] = getattr(context.broadcaster, "name", "") or own_login
+                    if host_id:
+                        members.setdefault(host_id, "")
+                    state = {
+                        "state": "active", "session": {"guests": [
+                            {"user_id": user_id, "user_display_name": name} for user_id, name in members.items()
+                        ]},
+                        "invites": [], "slot_count": 0, "is_host": False,
+                        "host_id": host_id, "host_login": own_login if host_id == own else "", "shared_chat_only": True,
+                    }
+                lookup_error = None
+            if lookup_error:
+                raise lookup_error
+            state = {"is_host": True, **state, "shared_chat_active": shared_active}
+            if state.get("session"):
+                guests = state["session"].get("guests", [])
+                ids = sorted({str(guest.get("user_id", "")) for guest in guests if re.fullmatch(r"[0-9]{1,25}", str(guest.get("user_id", "")))})
+                if ids:
+                    profiles, streams = await asyncio.gather(
+                        raid_browser_profiles(context.runtime_bot, context.broadcaster_id, [{"id": value} for value in ids]),
+                        raid_browser_cached_request(context.runtime_bot, context.broadcaster_id, "streams", {"user_id": ids, "first": 100}),
+                        return_exceptions=True)
+                    profiles = {} if isinstance(profiles, Exception) else profiles
+                    live = None if isinstance(streams, Exception) else {str(stream["user_id"]): stream for stream in streams.get("data", [])}
+                    entries = []
+                    for guest in guests:
+                        user_id = str(guest.get("user_id", ""))
+                        profile = profiles.get(user_id, {})
+                        stream = (live or {}).get(user_id)
+                        thumbnail = str((stream or {}).get("thumbnail_url") or "").replace("{width}", "640").replace("{height}", "360")
+                        entries.append({**guest, "user_login": guest.get("user_login") or profile.get("login") or "",
+                            "user_display_name": guest.get("user_display_name") or profile.get("display_name") or "",
+                            "profile_image_url": profile.get("profile_image_url") or "",
+                            "is_streaming": user_id in live if live is not None else None,
+                            "thumbnail_url": f"{thumbnail}?t={int(time.time() // 60)}" if thumbnail else ""})
+                    state = {**state, "session": {**state["session"], "guests": entries}}
+            host = next((guest for guest in (state.get("session") or {}).get("guests", [])
+                         if str(guest.get("user_id")) == state.get("host_id")), {})
+            login = (state.get("host_login") or host.get("user_login")) if state["is_host"] is False else getattr(context.broadcaster, "login", "")
+            state = {**state, "call_url": f"https://www.twitch.tv/popout/{login}/guest-star" if re.fullmatch(r"[A-Za-z0-9_]{1,25}", login or "") else ""}
+        return JSONResponse(state, headers={"Cache-Control": "no-store"})
+    except (HTTPException, TimeoutError, StreamTogetherError) as error:
+        return stream_together_error(error)
+
+
+@router.post("/channel/api/stream-together/control", response_class=JSONResponse)
+async def channel_stream_together_control(request: Request, action: str = Form(...), csrf_token: str = Form(...)):
+    context = resolve_channel_api_context(request, get_bot)
+    if isinstance(context, JSONResponse):
+        return context
+    if getattr(request.state, "channel_access", None):
+        return JSONResponse({"detail": "Only the channel owner can manage Stream Together."}, status_code=403)
+    validate_csrf_token(request, csrf_token)
+    values = dict(await request.form())
+    try:
+        async with asyncio.timeout(8):
+            await context.services.live_chat.stream_together.action(context.broadcaster_id, action, values)
+        return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store"})
+    except (HTTPException, TimeoutError, StreamTogetherError) as error:
+        return stream_together_error(error)
+
+
 @router.get("/channel/api/ad-status", response_class=JSONResponse)
 async def channel_ad_status(request: Request):
     context = resolve_channel_api_context(request, get_bot)
@@ -2192,8 +2379,19 @@ async def channel_send_chat_message(
     return JSONResponse(payload, status_code=status_code)
 
 
+@router.get("/channel/stream-together", response_class=HTMLResponse)
+async def channel_stream_together_page(request: Request):
+    if getattr(request.state, "channel_access", None):
+        return RedirectResponse(url="/channel", status_code=303)
+    return await render_channel_dashboard(request, stream_together_page=True)
+
+
 @router.get("/channel", response_class=HTMLResponse)
 async def channel_dashboard(request: Request):
+    return await render_channel_dashboard(request)
+
+
+async def render_channel_dashboard(request: Request, *, stream_together_page: bool = False):
     broadcaster_id = current_channel_id(request)
 
     if not broadcaster_id:
@@ -2244,11 +2442,12 @@ async def channel_dashboard(request: Request):
 
     return templates.TemplateResponse(
         request=request,
-        name="channel/dashboard.html",
+        name="channel/stream_together.html" if stream_together_page else "channel/dashboard.html",
         context={
+            "active_page": "stream-together" if stream_together_page else "overview",
+            "stream_together_page": stream_together_page,
             "streamer_setup": setup_progress,
             "setup_tour": setup_tour,
-            "active_page": "overview",
             "broadcaster": broadcaster,
             "runtime_unavailable": False,
             "channel_settings": channel_settings,

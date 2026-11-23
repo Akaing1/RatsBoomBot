@@ -63,7 +63,7 @@ test('settings save without navigation, preserve drafts, refresh dependent switc
         await page.goto(`http://127.0.0.1:${server.address().port}/channel/settings?section=events`);
         await page.addStyleTag({path: 'web/static/css/channel-settings.css'});
         await page.addStyleTag({content: '.settings-menu{position:fixed;left:0;top:0;width:180px}.settings-main{margin-left:200px}'});
-        for (const file of ['channel-settings.js', 'settings-save.js', 'protected-users.js']) await page.addScriptTag({path: `web/static/js/${file}`});
+        for (const file of ['state-toggle.js', 'channel-settings.js', 'settings-save.js', 'protected-users.js']) await page.addScriptTag({path: `web/static/js/${file}`});
         await page.evaluate(() => { window.samePage = true; window.originalNotice = document.querySelector('.settings-blocked-notice'); window.originalMaster = document.querySelector('#master'); window.originalChild = document.querySelector('#child'); });
         assert.equal(await page.locator('.toggle-feedback').count(), 0);
         assert.equal(await page.locator('#save-follow [data-settings-save]').isVisible(), false);

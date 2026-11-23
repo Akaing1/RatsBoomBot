@@ -17,6 +17,7 @@ function setup(enabled = false) {
     let reloads = 0;
     const window = {sessionStorage: {getItem: name => storage.get(name), setItem: (name, value) => storage.set(name, value)},
         location: {reload() {reloads++;}}};
+    vm.runInNewContext(fs.readFileSync('web/static/js/dashboard-test-names.js', 'utf8'), {window});
     vm.runInNewContext(fs.readFileSync('web/static/js/dashboard-chat-test-mode.js', 'utf8'), {
         window, document, console: {warn: text => logs.push(text), info: text => logs.push(text)}, CustomEvent: class {constructor(type, options) {this.type = type; this.detail = options.detail;}}
     });

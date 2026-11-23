@@ -9,6 +9,7 @@
     if (!layout || !deck || !previous || !next || !positionCount || !positionName) return;
 
     const media = window.matchMedia("(max-width: 768px)");
+    const inCallView = () => document.body.classList.contains("channel-page-stream-together");
     const sidebar = document.querySelector("[data-channel-sidebar]");
     const statsRow = layout.querySelector(".dashboard-header-side");
     const statsMarker = document.createComment("dashboard desktop stats position");
@@ -93,7 +94,7 @@
     }
 
     function updateChatOffset() {
-        if (!media.matches || !slides.length) return;
+        if (inCallView() || !media.matches || !slides.length) return;
         const gap = parseFloat(window.getComputedStyle(playerSlide).rowGap) || 0;
         const offset = `${player.offsetHeight + gap}px`;
         if (playerSlide.style.getPropertyValue("--dashboard-chat-top") !== offset) {
@@ -111,12 +112,12 @@
     }
 
     chatInput?.addEventListener("focus", () => {
-        if (!media.matches) return;
+        if (inCallView() || !media.matches) return;
         showCard(0);
         setChatExpanded(true);
     });
     chat.addEventListener("focusout", event => {
-        if (!media.matches || (event.relatedTarget && chat.contains(event.relatedTarget))) return;
+        if (inCallView() || !media.matches || (event.relatedTarget && chat.contains(event.relatedTarget))) return;
         setChatExpanded(false);
     });
     chatLock?.addEventListener("click", () => {
@@ -133,7 +134,7 @@
         updateChatControls();
     });
     document.addEventListener("dashboard-chat-sent", () => {
-        if (!media.matches || chatLocked) return;
+        if (inCallView() || !media.matches || chatLocked) return;
         chatInput?.blur();
         setChatExpanded(false);
     });
@@ -146,6 +147,7 @@
     } else window.addEventListener("resize", updateChatOffset);
 
     function showCard(index, focusCard = false) {
+        if (inCallView()) return;
         const previousIndex = activeIndex;
         activeIndex = Math.min(Math.max(index, 0), slides.length - 1);
         if (activeIndex !== previousIndex) {
@@ -238,6 +240,7 @@
     }
 
     function updateLayout() {
+        if (inCallView()) return;
         if (media.matches) enableCarousel();
         else disableCarousel();
         updateVisibleHeight();
@@ -246,6 +249,7 @@
     previous.addEventListener("click", () => showCard(activeIndex - 1, true));
     document.addEventListener("dashboard-raid-started", () => { if (media.matches) showCard(0); });
     document.addEventListener("dashboard-engagement-started", () => { if (media.matches) showCard(0); });
+    document.addEventListener("dashboard-stream-together-opened", () => { if (media.matches) showCard(0); });
     next.addEventListener("click", () => showCard(activeIndex + 1, true));
     deck.addEventListener("keydown", event => {
         if (!media.matches || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -305,5 +309,6 @@
         event.stopImmediatePropagation();
     }, true);
     media.addEventListener("change", updateLayout);
+    document.addEventListener("dashboard-view-changed", updateLayout);
     updateLayout();
 })();

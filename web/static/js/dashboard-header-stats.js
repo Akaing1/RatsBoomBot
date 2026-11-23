@@ -1,7 +1,7 @@
 (() => {
     const container = document.querySelector("[data-dashboard-header-stats]");
     if (!container) return;
-    const dashboard = container.closest(".channel-dashboard-layout") || document.querySelector("[data-dashboard-carousel]");
+    const dashboard = container.closest(".channel-dashboard-layout, [data-stream-together-layout]") || document.querySelector("[data-dashboard-carousel]");
     if (!dashboard) return;
     const statsRow = container.closest(".dashboard-header-side");
 
@@ -27,7 +27,8 @@
     let previewActive = false;
     let hiddenStats = new Set();
     let refreshInProgress = false;
-    let lastRefreshAt = Date.now();
+    const loadStatsOnOpen = container.dataset.loadStatsOnOpen !== undefined;
+    let lastRefreshAt = loadStatsOnOpen ? 0 : Date.now();
 
     try {
         const stored = JSON.parse(window.localStorage.getItem(storageKey) || "[]");
@@ -166,6 +167,7 @@
     }
 
     window.setInterval(refreshStats, refreshInterval);
+    if (loadStatsOnOpen) void refreshStats();
     renderStreamStatus();
     window.setInterval(renderStreamStatus, 1000);
     document.addEventListener("visibilitychange", () => {

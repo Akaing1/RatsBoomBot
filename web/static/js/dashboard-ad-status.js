@@ -66,7 +66,8 @@
 
     function updateStickyVisibility() {
         if (!stickyMirror) return;
-        const visible = mobileMedia.matches || (stickyMedia.matches && window.scrollY > 32);
+        const visible = Boolean(stickyMirror.closest("[data-stream-together-layout]")) ||
+            mobileMedia.matches || (stickyMedia.matches && window.scrollY > 32);
         stickyMirror.classList.toggle("is-visible", visible);
         stickyMirror.setAttribute("aria-hidden", String(!visible));
     }
@@ -332,10 +333,12 @@
     if (container.dataset.state === "running") beginRingIntro();
     updateStickyVisibility();
     window.addEventListener("scroll", updateStickyVisibility, {passive: true});
+    document.addEventListener("dashboard-view-changed", updateStickyVisibility);
     stickyMedia.addEventListener("change", updateStickyVisibility);
     mobileMedia.addEventListener("change", updateStickyVisibility);
     actionButtons.forEach(button => button.addEventListener("click", () => runAction(button.dataset.adAction)));
     window.setInterval(render, 1000);
     window.setInterval(refresh, 30000);
+    if (container.dataset.state === "loading") void refresh();
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 })();

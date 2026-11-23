@@ -11,7 +11,8 @@ from web.channel.api_context import resolve_channel_api_context
 
 ENDPOINTS = [dashboard.channel_raid_contributors, dashboard.channel_dashboard_stats,
              dashboard.channel_redemption_activity, dashboard.channel_viewer_queue_state,
-             dashboard.channel_chat_emotes, dashboard.channel_chat_users, dashboard.channel_ad_status]
+             dashboard.channel_chat_emotes, dashboard.channel_chat_users, dashboard.channel_ad_status,
+             dashboard.channel_stream_together_guests, dashboard.channel_stream_together_participants]
 
 
 def request(session):

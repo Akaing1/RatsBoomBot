@@ -1,13 +1,15 @@
 (() => {
     const key = 'ratsboombot:youtube-chat-test';
+    const [viewer, youtubeViewer, recipient, raider] = window.dashboardTestNames;
     let active = false, sequence = 0, nextFailure = null;
     try { active = window.sessionStorage.getItem(key) === 'true'; } catch (_) {}
     function emitMessage(text, platform = 'youtube', badges = []) {
         if (!['youtube', 'twitch'].includes(platform)) return;
         const id = `${platform}:test-${Date.now()}-${++sequence}`;
+        const username = platform === 'youtube' ? youtubeViewer : viewer;
         document.dispatchEvent(new CustomEvent('dashboard-chat-test-message', {detail: {
             id, platform, kind: 'message', test_mode: true,
-            username: 'test_viewer', display_name: `Test ${platform === 'youtube' ? 'YouTube' : 'Twitch'}`,
+            username, display_name: username,
             timestamp: new Date().toISOString(), message: String(text), badges, is_bot: badges.includes('bot')
         }}));
         return id;
@@ -24,26 +26,27 @@
         message,
         notice(type = 'all') {
             const samples = {
-                sub: ['sub', 'Subscription', 'Test viewer subscribed at Tier 1.'],
-                prime: ['sub', 'Prime subscription', 'Test viewer subscribed with Prime.'],
-                resub: ['resub', 'Resubscription', 'Test viewer subscribed for 12 months!', 'Happy to be here!'],
-                primeresub: ['resub', 'Prime resubscription', 'Test viewer subscribed with Prime for 12 months!'],
-                giftsub: ['sub_gift', 'Gift sub', 'Test viewer gifted a Tier 1 sub to Test recipient!'],
-                giftsubs: ['community_sub_gift', 'Gift subs', 'Test viewer gifted 5 Tier 1 subs to the community!'],
-                watchstreak: ['watch_streak', 'Watch streak', 'Test viewer watched 10 consecutive streams!'],
+                sub: ['sub', 'Subscription', `${viewer} subscribed at Tier 1.`],
+                prime: ['sub', 'Prime subscription', `${viewer} subscribed with Prime.`],
+                resub: ['resub', 'Resubscription', `${viewer} subscribed for 12 months!`, 'Happy to be here!'],
+                primeresub: ['resub', 'Prime resubscription', `${viewer} subscribed with Prime for 12 months!`],
+                giftsub: ['sub_gift', 'Gift sub', `${viewer} gifted a Tier 1 sub to ${recipient}!`],
+                giftsubs: ['community_sub_gift', 'Gift subs', `${viewer} gifted 5 Tier 1 subs to the community!`],
+                watchstreak: ['watch_streak', 'Watch streak', `${viewer} watched 10 consecutive streams!`],
                 bits: ['', '', '', 'Cheer100 This is a test Bits message!'],
                 spacedbits: ['', '', '', 'Cheer100 hello Cheer50 world'],
-                substreak: ['resub', 'Resubscription', 'Test viewer subscribed for 12 months! · 6 consecutive months'],
+                substreak: ['resub', 'Resubscription', `${viewer} subscribed for 12 months! · 6 consecutive months`],
                 redeem: ['redemption', 'Redeem', 'Redeemed Hydrate · 1,000 points', 'Time for water!'],
-                raid: ['raid', 'Incoming raid', 'Test raider is raiding with 25 viewers!']
+                raid: ['raid', 'Incoming raid', `${raider} is raiding with 25 viewers!`]
             };
             if (type !== 'all' && !Object.hasOwn(samples, type)) throw new Error(`Use all or: ${Object.keys(samples).join(', ')}.`);
             return (type === 'all' ? Object.keys(samples) : [type]).map(key => {
                 const [notice_type, notice_label, notice, text = ''] = samples[key];
                 const id = `twitch:test-notice-${Date.now()}-${++sequence}`;
+                const username = key === 'raid' ? raider : viewer;
                 document.dispatchEvent(new CustomEvent('dashboard-chat-test-notice', {detail: {
-                    id, platform: 'twitch', kind: 'chat', test_mode: true, local_preview: true, username: 'test_viewer',
-                    display_name: key === 'raid' ? 'Test raider' : 'Test viewer',
+                    id, platform: 'twitch', kind: 'chat', test_mode: true, local_preview: true, username,
+                    display_name: username,
                     timestamp: new Date().toISOString(), message: text, notice_type, notice_label, notice,
                     watch_streak: key === 'watchstreak' ? 10 : 0,
                     bits: key === 'bits' ? 100 : key === 'spacedbits' ? 150 : 0,
