@@ -17,7 +17,7 @@ def profiles():
 
 
 def setup_command():
-    pet = SimpleNamespace(display_name='Little Rat', rarity='common', passive_percent_label='10', passive_description='bonus loyalty points earned')
+    pet = SimpleNamespace(display_name='Little Rat', rarity='common', progress_label='Level 1 · 10/100 XP', passive_percent_label='10', passive_description='bonus loyalty points earned')
     service = SimpleNamespace(
         buy_ticket=AsyncMock(return_value=50_000),
         get_equipped_pet=AsyncMock(return_value=pet),
@@ -60,6 +60,7 @@ async def test_summon_error_and_cross_channel_refund_currency():
 async def test_status_and_equip_passive_use_channel_currency():
     command, ctx, _ = setup_command()
     await command.pets.callback(command, ctx)
+    assert 'Level 1 · 10/100 XP' in ctx.reply.call_args.args[0]
     assert '10% bonus Shards earned' in ctx.reply.call_args.args[0]
     await command.equip.callback(command, ctx, name='Little Rat')
     assert '10% bonus Shards earned' in ctx.reply.call_args.args[0]

@@ -14,7 +14,11 @@ Pet rarity and passive rarity are separate. Both use Common, Rare, and Ultra Rar
 | Kamikaze Luck | Rare | 5 → 10 percentage points | Added to the targeted `!kamikaze` hit chance |
 | Second Chance | Ultra Rare | 10% fixed | Returns 10% of a lost currency-command `gamble` bet; the result still counts as a loss |
 
-Passive strength scales linearly from the listed starting value to its maximum at level 50, in whole basis points; fixed-value passives stay constant. Level progression remains future work. Self-service acquisition is described below. The administrator grant tool can issue and equip a pet for a known Twitch identity. For example, grant Little Rat with its normal Loyalty Gain passive:
+Passive strength scales linearly from the listed starting value to its maximum at level 50, in whole basis points; fixed-value passives stay constant.
+
+An equipped pet earns 10 XP per two-minute live watch payout in a points-enabled channel. Each interval counts once globally, including when switching pets. Level 2 takes 100 XP (20 minutes), and each subsequent level costs 20 more XP than the last. Excess XP carries into the next level until the pet reaches its cap. Switching pets preserves each pet’s progress.
+
+Self-service acquisition is described below. The administrator grant tool can issue and equip a pet for a known Twitch identity. For example, grant Little Rat with its normal Loyalty Gain passive:
 
 ```bash
 python -m scripts.grant_pet chatter_name --pet rat
@@ -41,7 +45,7 @@ Sleepy Fox is Common. Administrator grants use the fixed mappings below by defau
 
 ## Summoning
 
-- `!pets`: equipped pet, active passive, ticket count, and full collection link on the global profile / me page.
+- `!pets`: equipped pet, level, XP progress, active passive, and full collection link on the global profile / me page.
 - `!pets buy ticket`, `!pets buy summon`, or `!pets buy summon ticket`: buy one global ticket for **50,000 loyalty points from the current channel**. Points must be enabled in that channel.
 - `!pets summon` or `!pets summon ticket`: consume the oldest ticket. Tickets and ownership are global.
 - `!pets equip <full pet name>`: equip an owned pet across all channels. The first summon auto-equips; later new pets leave the existing loadout alone.
@@ -59,7 +63,7 @@ Sleepy Fox is Common. Administrator grants use the fixed mappings below by defau
 
 Summons first roll rarity with 70% Common / 20% Rare / 10% UR weights, excluding empty tiers and normalizing the remaining weights. They then choose uniformly within that rarity. All eight pets are Common, so currently Common is 100% and each pet has a 12.5% chance. The Pets tab has an expandable Rates popup anchored to the Rates control, showing the standard rarity rates and the available pets in each tier. The rat keeps its stable internal ID and sprite URL after being renamed Little Rat. Migration 58 aligns previously owned UAT pets with these fixed mappings without changing equipment, level, or XP.
 
-Duplicates return points to the ticket's original purchase channel, without loyalty bonuses or earned-point XP. Purchases and summons are atomic to prevent double spending. Existing pets are aligned with the selected mappings on migration. No leveling, feeding, essence purchases, or passive rerolls are added here.
+Duplicates return points to the ticket's original purchase channel, without loyalty bonuses or earned-point XP. Purchases and summons are atomic to prevent double spending. Existing pets are aligned with the selected mappings on migration.
 
 ### UAT check
 

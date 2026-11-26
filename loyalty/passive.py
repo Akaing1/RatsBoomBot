@@ -6,6 +6,7 @@ from twitchio.exceptions import HTTPException
 
 from bot.profiles import FeatureName, get_active_profile
 from config.settings import settings
+from storage.transactions import immediate_transaction
 
 LOGGER = logging.getLogger("RatBoomBot")
 
@@ -150,46 +151,50 @@ class PassivePointsService:
 
         async with self.db.acquire() as connection:
             for user_id, username in eligible:
-                apply_earned_bonus = getattr(self.points, "apply_earned_bonus", None)
-                awarded_points = (
-                    await apply_earned_bonus(user_id, self.POINTS_PER_INTERVAL, connection)
-                    if callable(apply_earned_bonus)
-                    else self.POINTS_PER_INTERVAL
-                )
-                await connection.execute(
-                    """
-                    INSERT OR IGNORE INTO passive_point_payouts (
-                        broadcaster_id, stream_id, interval_started_at, user_id, points
+                async with immediate_transaction(connection):
+                    apply_earned_bonus = getattr(self.points, "apply_earned_bonus", None)
+                    awarded_points = (
+                        await apply_earned_bonus(user_id, self.POINTS_PER_INTERVAL, connection)
+                        if callable(apply_earned_bonus)
+                        else self.POINTS_PER_INTERVAL
                     )
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (broadcaster_id, str(stream_id), int(window), user_id, awarded_points)
-                )
-                inserted = await connection.fetchone("SELECT changes() AS count")
+                    await connection.execute(
+                        """
+                        INSERT OR IGNORE INTO passive_point_payouts (
+                            broadcaster_id, stream_id, interval_started_at, user_id, points
+                        )
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (broadcaster_id, str(stream_id), int(window), user_id, awarded_points)
+                    )
+                    inserted = await connection.fetchone("SELECT changes() AS count")
 
-                if not inserted or int(inserted["count"]) == 0:
-                    continue
+                    if not inserted or int(inserted["count"]) == 0:
+                        continue
 
-                await connection.execute(
-                    """
-                    INSERT INTO viewers (broadcaster_id, user_id, username, points, messages)
-                    VALUES (?, ?, ?, ?, 0)
-                    ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
-                        username = excluded.username,
-                        points = points + excluded.points
-                    """,
-                    (broadcaster_id, user_id, username, awarded_points)
-                )
-
-                if self.points.chatter_stats is not None:
-                    await self.points.chatter_stats.record_points_earned(
-                        broadcaster_id,
-                        user_id,
-                        awarded_points,
-                        connection
+                    await connection.execute(
+                        """
+                        INSERT INTO viewers (broadcaster_id, user_id, username, points, messages)
+                        VALUES (?, ?, ?, ?, 0)
+                        ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
+                            username = excluded.username,
+                            points = points + excluded.points
+                        """,
+                        (broadcaster_id, user_id, username, awarded_points)
                     )
 
-                awarded += 1
+                    if self.points.chatter_stats is not None:
+                        await self.points.chatter_stats.record_points_earned(
+                            broadcaster_id,
+                            user_id,
+                            awarded_points,
+                            connection
+                        )
+
+                    if self.points.pets is not None:
+                        await self.points.pets.award_watch_xp(user_id, int(window), connection)
+
+                    awarded += 1
 
         if awarded:
             LOGGER.info(

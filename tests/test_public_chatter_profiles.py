@@ -96,6 +96,7 @@ class FakePets:
             display_name="Silly Bat",
             rarity="common",
             level=1,
+            progress_label="Level 1 · 30/100 XP",
             passive_name="Loyalty Gain",
             passive_rarity="common",
             passive_description="bonus loyalty points earned",
@@ -321,6 +322,7 @@ def test_public_profile_renders_full_pet_collection(monkeypatch):
             return [bat, SimpleNamespace(
                 user_pet_id=2, pet_id="sleepy_fox", display_name="Sleepy Fox",
                 rarity="ultra_rare", sprite_path="/assets/Sleepy%20Fox.png",
+                progress_label="Level 50 · Max level",
                 frame_count=4, passive_percent_label="10", passive_description="gamble loss refunded",
             )]
 
@@ -347,6 +349,8 @@ def test_public_profile_renders_full_pet_collection(monkeypatch):
     assert "70% Silly Bat" not in response.text
     assert 'id="pets"' in response.text
     assert 'class="pet-equipped-label">Equipped' in response.text
+    assert response.text.count("Level 1 · 30/100 XP") == 2
+    assert "Level 50 · Max level" in response.text
     assert "rarity-common is-equipped" in response.text
     assert "UR" in response.text
     assert "!pets equip Sleepy Fox" in response.text

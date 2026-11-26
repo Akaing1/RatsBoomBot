@@ -76,7 +76,7 @@ async def test_passive_points_awards_once_per_stream_interval(monkeypatch, tmp_p
     broadcaster = FakeBroadcaster(chatters)
     bot = SimpleNamespace(bot_id="bot-1", create_partialuser=lambda user_id: broadcaster)
     chatter_stats = SimpleNamespace(record_points_earned=AsyncMock())
-    points = SimpleNamespace(chatter_stats=chatter_stats)
+    points = SimpleNamespace(chatter_stats=chatter_stats, pets=None)
     monkeypatch.setattr(passive_module, "get_active_profile", lambda broadcaster_id: object())
 
     async with asqlite.create_pool(str(tmp_path / "passive.db")) as database:
@@ -121,3 +121,42 @@ async def test_passive_points_awards_once_per_stream_interval(monkeypatch, tmp_p
             {"moderator": "bot-1", "first": 1000, "max_results": None},
             {"moderator": "bot-1", "first": 1000, "max_results": None}
         ]
+
+
+@pytest.mark.asyncio
+async def test_watch_xp_levels_only_equipped_pet_once_globally(monkeypatch, tmp_path):
+    from loyalty.service import PointsService
+    from pets import PetService
+    from storage.migration_runner import run_migrations
+
+    viewer = SimpleNamespace(id="viewer", name="viewer")
+    bot = SimpleNamespace(bot_id="bot", create_partialuser=lambda _: FakeBroadcaster([viewer]))
+    monkeypatch.setattr(passive_module, "get_active_profile", lambda _: object())
+    async with asqlite.create_pool(str(tmp_path / "xp.db")) as database:
+        await run_migrations(database)
+        pets = PetService(database)
+        points = PointsService(bot, database, pets=pets)
+        service = PassivePointsService(bot, database, points, FakeChatIdentity(), FakeFeatures())
+        await pets.grant_rat("viewer")
+        bat = await pets.grant_bat("viewer")
+        for tick in range(1, 11):
+            await service.award_interval("one", "live", interval_started_at=120 * tick)
+        leveled = await pets.get_equipped_pet("viewer")
+        assert leveled.progress_label == "Level 2 · 0/120 XP"
+        assert leveled.effective_passive_bps > bat.effective_passive_bps
+        await pets.equip("viewer", "Little Rat")
+        await service.award_interval("two", "other", interval_started_at=1200)
+        assert (await pets.get_equipped_pet("viewer")).xp == 0
+        await service.award_interval("two", "other", interval_started_at=1320)
+        await service.award_interval("two", "other", interval_started_at=1320)
+        assert (await pets.get_equipped_pet("viewer")).xp == 10
+        await pets.equip("viewer", "Silly Bat")
+        assert (await pets.get_equipped_pet("viewer")).level == 2
+        async with database.acquire() as connection:
+            await connection.execute("UPDATE user_pets SET level = 49, xp = 1055 WHERE id = ?", (bat.user_pet_id,))
+        for tick in (12, 13):
+            await service.award_interval("one", "live", interval_started_at=120 * tick)
+        capped = await pets.get_equipped_pet("viewer")
+        assert capped.progress_label == "Level 50 · Max level"
+        assert capped.xp == 0
+        assert capped.passive_percent == 10

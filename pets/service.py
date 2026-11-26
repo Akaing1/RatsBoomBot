@@ -21,6 +21,13 @@ DUPLICATE_REFUNDS = {"common": 12_500, "rare": 25_000, "ultra_rare": 50_000}
 
 
 
+WATCH_XP = 10
+
+
+def xp_to_next_level(level: int) -> int:
+    return 100 + 20 * (level - 1)
+
+
 @dataclass(frozen=True)
 class SummonResult:
     pet_id: str
@@ -48,6 +55,12 @@ class EquippedPet:
     passive_rarity: str
     passive_name: str
     passive_max_bps: int
+
+    @property
+    def progress_label(self) -> str:
+        if self.level >= self.max_level:
+            return f"Level {self.level} · Max level"
+        return f"Level {self.level} · {self.xp}/{xp_to_next_level(self.level)} XP"
 
     @property
     def effective_passive_bps(self) -> int:
@@ -99,6 +112,33 @@ class PetService:
                 row = await managed_connection.fetchone(query, (str(user_id),))
 
         return self._from_row(row) if row is not None else None
+
+    async def award_watch_xp(self, user_id: str, interval: int, connection) -> None:
+        """Award XP within the caller's live payout transaction."""
+        loadout = await connection.fetchone("""
+            UPDATE user_pet_loadouts SET last_xp_interval = ?
+            WHERE user_id = ? AND (last_xp_interval IS NULL OR last_xp_interval < ?)
+            RETURNING user_pet_id
+        """, (interval, user_id, interval))
+        if loadout is None:
+            return
+
+        row = await connection.fetchone("""
+            SELECT owned.level, owned.xp, definitions.max_level
+            FROM user_pets AS owned JOIN pet_definitions AS definitions ON definitions.id = owned.pet_id
+            WHERE owned.id = ?
+        """, (loadout["user_pet_id"],))
+        level, max_level = row["level"], row["max_level"]
+        if level >= max_level:
+            return
+        xp = row["xp"] + WATCH_XP
+        while level < max_level and xp >= xp_to_next_level(level):
+            xp -= xp_to_next_level(level)
+            level += 1
+        await connection.execute(
+            "UPDATE user_pets SET level = ?, xp = ? WHERE id = ?",
+            (level, 0 if level == max_level else xp, loadout["user_pet_id"]),
+        )
 
     async def get_collection(self, user_id: str) -> list[EquippedPet]:
         async with self.db.acquire() as connection:
