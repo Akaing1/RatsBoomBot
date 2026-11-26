@@ -28,8 +28,8 @@ async def test_rat_and_passive_tiers_are_seeded_and_level_scaled(tmp_path):
         assert {row['id'] for row in rows} == set(PASSIVES)
         assert {row['rarity'] for row in rows} == {'common', 'rare', 'ultra_rare'}
         assert (await pets.get_equipped_pet('viewer')).passive_percent == 20
-        assert scaled_bps(500, 1000, 1, 50) == 500
-        assert scaled_bps(500, 1000, 50, 50) == 1000
+        assert scaled_bps(500, 750, 1, 50) == 500
+        assert scaled_bps(500, 750, 50, 50) == 750
         assert scaled_bps(100, 500, 50, 50) == 500
 
 
@@ -108,7 +108,8 @@ async def test_rare_passive_adds_only_to_mythical_weapon_roll(tmp_path, monkeypa
 
 def test_passive_upgrades_at_each_tenth_level():
     for level in range(1, 51):
-        assert scaled_bps(500, 1000, level, 50) == 500 + 100 * (level // 10)
+        gamble = PASSIVES[GAMBLE_ODDS]
+        assert scaled_bps(gamble.min_bps, gamble.max_bps, level, 50) == 500 + 50 * (level // 10)
 
 
 @pytest.mark.asyncio

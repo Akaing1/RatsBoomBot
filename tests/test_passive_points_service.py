@@ -159,4 +159,4 @@ async def test_watch_xp_levels_only_equipped_pet_once_globally(monkeypatch, tmp_
         capped = await pets.get_equipped_pet("viewer")
         assert capped.progress_label == "Level 50 · Max level"
         assert capped.xp == 0
-        assert capped.passive_percent == 10
+        assert capped.passive_percent == 7.5

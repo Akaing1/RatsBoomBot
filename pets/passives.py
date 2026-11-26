@@ -28,7 +28,7 @@ class PassiveDefinition:
 PASSIVES = {
     LOYALTY_GAIN: PassiveDefinition("Loyalty Gain", COMMON, 1000, 1500, "bonus loyalty points earned"),
     RAID_DAMAGE: PassiveDefinition("Boss Hunt Damage", COMMON, 1000, 2000, "bonus Boss Hunt damage"),
-    GAMBLE_ODDS: PassiveDefinition("Gamble Luck", COMMON, 500, 1000, "added gamble win chance"),
+    GAMBLE_ODDS: PassiveDefinition("Gamble Luck", COMMON, 500, 750, "added gamble win chance"),
     RAID_PROFIT: PassiveDefinition("Boss Hunt Profit", COMMON, 1000, 2000, "bonus Boss Hunt point rewards"),
     RARE_DROP_CHANCE: PassiveDefinition("Rare Drop Luck", RARE, 100, 500, "added mythical weapon drop chance"),
     KAMIKAZE_ODDS: PassiveDefinition("Kamikaze Luck", RARE, 500, 1000, "added kamikaze hit chance"),

@@ -8,13 +8,13 @@ Pet rarity and passive rarity are separate. Both use Common, Rare, and Ultra Rar
 | --- | --- | --- | --- |
 | Loyalty Gain | Common | 10% → 15% | Extra earned loyalty points; excludes transfers, purchases, refunds, and gambling payouts |
 | Boss Hunt Damage | Common | 10% → 20% | Extra damage on each Boss Hunt attack |
-| Gamble Luck | Common | 5 → 10 percentage points | Added to the channel's gamble win chance, capped at 100% |
+| Gamble Luck | Common | 5 → 7.5 percentage points | Added to the channel's gamble win chance, capped at 100% |
 | Boss Hunt Profit | Common | 10% → 20% | Extra contribution and final hit point rewards |
 | Rare Drop Luck | Rare | 1 → 5 percentage points | Added to the top contributor's mythical weapon roll |
 | Kamikaze Luck | Rare | 5 → 10 percentage points | Added to the targeted `!kamikaze` hit chance |
 | Second Chance | Ultra Rare | 10% fixed | Returns 10% of a lost currency-command `gamble` bet; the result still counts as a loss |
 
-Scaling passives upgrade at levels 10, 20, 30, 40 and 50 in equal steps. Gamble Luck starts at +5 percentage points and adds one point per milestone. Loyalty Gain starts at +10% and adds 1 percentage point per milestone. Fractional loyalty bonuses accumulate per viewer in each channel and pay out as whole points.
+Scaling passives upgrade at levels 10, 20, 30, 40 and 50 in equal steps. Gamble Luck starts at +5 percentage points and adds 0.5 percentage points per milestone. Loyalty Gain starts at +10% and adds 1 percentage point per milestone. Fractional loyalty bonuses accumulate per viewer in each channel and pay out as whole points.
 
 An equipped pet earns 10 XP per two-minute live watch payout in a points-enabled channel. Each interval counts once globally, including when switching pets. Level 2 takes 100 XP (20 minutes), and each subsequent level costs 20 more XP than the last. Excess XP carries into the next level until the pet reaches its cap. Switching pets preserves each pet’s progress.
 
@@ -89,7 +89,7 @@ Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_pet
 
 ### Witch's Cat
 
-Migration 62 adds Common Witch's Cat with Gamble Luck: +5 percentage points to gamble win chance at level 1, scaling to +10 at level 50. The approved upright black cat and wide-brimmed white witch hat use four equal 112 × 149 frames in `assets/Witch's Cat.png`. The 1.2-second breathing, blink, and tail-wave loop is anchored to the front paws to avoid horizontal drift. Reduced-motion preferences disable animation.
+Migration 62 adds Common Witch's Cat with Gamble Luck: +5 percentage points to gamble win chance at level 1, scaling to +7.5 at level 50. The approved upright black cat and wide-brimmed white witch hat use four equal 112 × 149 frames in `assets/Witch's Cat.png`. The 1.2-second breathing, blink, and tail-wave loop is anchored to the front paws to avoid horizontal drift. Reduced-motion preferences disable animation.
 
 Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_pet Ninjakaing --pet cat`. Owners can use `!pets equip Witch's Cat`.
 
