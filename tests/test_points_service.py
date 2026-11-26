@@ -174,7 +174,15 @@ async def test_concurrent_message_tracking_waits_for_in_progress_award(monkeypat
     release = asyncio.Event()
 
     class Connection:
-        async def execute(self, query, values) -> None:
+        async def commit(self) -> None:
+            pass
+
+        async def rollback(self) -> None:
+            pass
+
+        async def execute(self, query, values=()) -> None:
+            if query == "BEGIN IMMEDIATE":
+                return
             started.set()
             await release.wait()
 
