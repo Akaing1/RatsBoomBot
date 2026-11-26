@@ -6,7 +6,7 @@ Pet rarity and passive rarity are separate. Both use Common, Rare, and Ultra Rar
 
 | Passive | Tier | Level 1 → level 50 | Effect |
 | --- | --- | --- | --- |
-| Loyalty Gain | Common | 10% fixed | Extra earned loyalty points; excludes transfers, purchases, refunds, and gambling payouts |
+| Loyalty Gain | Common | 10% → 15% | Extra earned loyalty points; excludes transfers, purchases, refunds, and gambling payouts |
 | Boss Hunt Damage | Common | 10% → 20% | Extra damage on each Boss Hunt attack |
 | Gamble Luck | Common | 5 → 10 percentage points | Added to the channel's gamble win chance, capped at 100% |
 | Boss Hunt Profit | Common | 10% → 20% | Extra contribution and final hit point rewards |
@@ -14,7 +14,7 @@ Pet rarity and passive rarity are separate. Both use Common, Rare, and Ultra Rar
 | Kamikaze Luck | Rare | 5 → 10 percentage points | Added to the targeted `!kamikaze` hit chance |
 | Second Chance | Ultra Rare | 10% fixed | Returns 10% of a lost currency-command `gamble` bet; the result still counts as a loss |
 
-Passive strength scales linearly from the listed starting value to its maximum at level 50, in whole basis points; fixed-value passives stay constant.
+Scaling passives upgrade at levels 10, 20, 30, 40 and 50 in equal steps. Gamble Luck starts at +5 percentage points and adds one point per milestone. Loyalty Gain starts at +10% and adds 1 percentage point per milestone. Fractional loyalty bonuses accumulate per viewer in each channel and pay out as whole points.
 
 An equipped pet earns 10 XP per two-minute live watch payout in a points-enabled channel. Each interval counts once globally, including when switching pets. Level 2 takes 100 XP (20 minutes), and each subsequent level costs 20 more XP than the last. Excess XP carries into the next level until the pet reaches its cap. Switching pets preserves each pet’s progress.
 
@@ -103,6 +103,6 @@ Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_pet
 
 ### Honey Hen
 
-Migration 64 adds Common Honey Hen with fixed Loyalty Gain: +10% earned loyalty points. This completes two Common pets for each of the four Common passives. The approved honey-and-cream chicken, heart-shaped comb, cheek freckles, and open honey jar with an amber spill use `assets/Honey Hen.png`, a 448 × 149 strip of four 112 × 149 frames. Both profile and collection play at 300 ms per frame (1.2-second loop), with reduced-motion support.
+Migration 64 adds Common Honey Hen with Loyalty Gain: +10% earned loyalty points at level 1. This completes two Common pets for each of the four Common passives. The approved honey-and-cream chicken, heart-shaped comb, cheek freckles, and open honey jar with an amber spill use `assets/Honey Hen.png`, a 448 × 149 strip of four 112 × 149 frames. Both profile and collection play at 300 ms per frame (1.2-second loop), with reduced-motion support.
 
 Grant and equip for UAT: `sudo -u rats-bot .venv/bin/python -m scripts.grant_pet Ninjakaing --pet hen`. Owners can use `!pets equip Honey Hen`.

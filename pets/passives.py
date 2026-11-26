@@ -26,7 +26,7 @@ class PassiveDefinition:
 
 
 PASSIVES = {
-    LOYALTY_GAIN: PassiveDefinition("Loyalty Gain", COMMON, 1000, 1000, "bonus loyalty points earned"),
+    LOYALTY_GAIN: PassiveDefinition("Loyalty Gain", COMMON, 1000, 1500, "bonus loyalty points earned"),
     RAID_DAMAGE: PassiveDefinition("Boss Hunt Damage", COMMON, 1000, 2000, "bonus Boss Hunt damage"),
     GAMBLE_ODDS: PassiveDefinition("Gamble Luck", COMMON, 500, 1000, "added gamble win chance"),
     RAID_PROFIT: PassiveDefinition("Boss Hunt Profit", COMMON, 1000, 2000, "bonus Boss Hunt point rewards"),
@@ -37,8 +37,8 @@ PASSIVES = {
 
 
 def scaled_bps(base_bps: int, max_bps: int, level: int, max_level: int) -> int:
-    """Scale from a pet's rolled starting value to the passive cap at max level."""
-    progress = min(max(level - 1, 0), max(max_level - 1, 0))
-    if max_level <= 1:
+    """Apply one upgrade per ten levels, with the final upgrade at the cap."""
+    if level >= max_level:
         return max_bps
-    return base_bps + (max(max_bps - base_bps, 0) * progress) // (max_level - 1)
+    steps = max(1, (max_level + 9) // 10)
+    return base_bps + max(0, max_bps - base_bps) * (max(0, level) // 10) // steps

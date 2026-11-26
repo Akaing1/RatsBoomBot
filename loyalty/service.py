@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 
 from config.settings import settings
+from storage.transactions import immediate_transaction
 
 from bot.profiles import FeatureName, get_active_profile
 
@@ -225,9 +226,9 @@ class PointsService:
             """
 
             try:
-                async with self.db.acquire() as connection:
+                async with self.db.acquire() as connection, immediate_transaction(connection):
                     awarded_points = await self.apply_earned_bonus(
-                        user_id,
+                        broadcaster_id, user_id,
                         points_config.points_per_message,
                         connection
                     )
@@ -253,13 +254,13 @@ class PointsService:
             broadcaster_id
         )
 
-    async def apply_earned_bonus(self, user_id: str, base_amount: int, connection=None) -> int:
+    async def apply_earned_bonus(self, broadcaster_id: str, user_id: str, base_amount: int, connection) -> int:
         base_amount = int(base_amount)
 
         if base_amount <= 0 or self.pets is None:
             return base_amount
 
-        bonus = await self.pets.loyalty_bonus(str(user_id), base_amount, connection)
+        bonus = await self.pets.loyalty_bonus(broadcaster_id, str(user_id), base_amount, connection)
         return base_amount + bonus
 
     async def get_points(self, broadcaster_id: str, user_id: str) -> int:
@@ -314,8 +315,8 @@ class PointsService:
         """
 
         try:
-            async with self.db.acquire() as connection:
-                awarded_amount = await self.apply_earned_bonus(user_id, amount, connection) if earned else amount
+            async with self.db.acquire() as connection, immediate_transaction(connection):
+                awarded_amount = await self.apply_earned_bonus(broadcaster_id, user_id, amount, connection) if earned else amount
                 values = (broadcaster_id, user_id, username, awarded_amount)
                 await connection.execute(query, values)
 
@@ -347,10 +348,10 @@ class PointsService:
 
         try:
             async with self.db.acquire() as connection:
-                await connection.execute("BEGIN")
+                await connection.execute("BEGIN IMMEDIATE")
 
                 try:
-                    awarded_amount = await self.apply_earned_bonus(user_id, amount, connection) if earned else amount
+                    awarded_amount = await self.apply_earned_bonus(broadcaster_id, user_id, amount, connection) if earned else amount
                     await connection.execute(
                         """
                         INSERT OR IGNORE INTO point_reward_events (

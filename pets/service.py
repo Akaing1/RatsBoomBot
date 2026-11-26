@@ -296,11 +296,21 @@ class PetService:
                 )
         return pet
 
-    async def loyalty_bonus(self, user_id: str, base_amount: int, connection=None) -> int:
-        if base_amount <= 0:
-            return 0
-
-        return (int(base_amount) * await self.bonus_bps(user_id, LOYALTY_GAIN_PASSIVE, connection)) // 10_000
+    async def loyalty_bonus(self, broadcaster_id: str, user_id: str, base_amount: int, connection) -> int:
+        """Accrue the bonus in the same write transaction as its channel payout."""
+        bps = await self.bonus_bps(user_id, LOYALTY_GAIN_PASSIVE, connection)
+        whole, fraction = divmod(base_amount * bps, 10_000)
+        if not fraction:
+            return whole
+        row = await connection.fetchone("""
+            INSERT INTO pet_loyalty_remainders (broadcaster_id, user_id, remainder)
+            VALUES (?, ?, ?)
+            ON CONFLICT(broadcaster_id, user_id) DO UPDATE SET
+                remainder = (remainder + excluded.remainder) % 10000
+            RETURNING remainder
+        """, (broadcaster_id, user_id, fraction))
+        # A smaller remainder means this award crossed a whole-point boundary.
+        return whole + int(row["remainder"] < fraction)
 
     async def bonus_bps(self, user_id: str, passive_type: str, connection=None) -> int:
         pet = await self.get_equipped_pet(user_id, connection)

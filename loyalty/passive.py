@@ -152,25 +152,27 @@ class PassivePointsService:
         async with self.db.acquire() as connection:
             for user_id, username in eligible:
                 async with immediate_transaction(connection):
+                    payout_key = (broadcaster_id, str(stream_id), int(window), user_id)
+                    if await connection.fetchone("""
+                        SELECT 1 FROM passive_point_payouts WHERE broadcaster_id = ?
+                        AND stream_id = ? AND interval_started_at = ? AND user_id = ?
+                    """, payout_key):
+                        continue
                     apply_earned_bonus = getattr(self.points, "apply_earned_bonus", None)
                     awarded_points = (
-                        await apply_earned_bonus(user_id, self.POINTS_PER_INTERVAL, connection)
+                        await apply_earned_bonus(broadcaster_id, user_id, self.POINTS_PER_INTERVAL, connection)
                         if callable(apply_earned_bonus)
                         else self.POINTS_PER_INTERVAL
                     )
                     await connection.execute(
                         """
-                        INSERT OR IGNORE INTO passive_point_payouts (
+                        INSERT INTO passive_point_payouts (
                             broadcaster_id, stream_id, interval_started_at, user_id, points
                         )
                         VALUES (?, ?, ?, ?, ?)
                         """,
-                        (broadcaster_id, str(stream_id), int(window), user_id, awarded_points)
+                        (*payout_key, awarded_points)
                     )
-                    inserted = await connection.fetchone("SELECT changes() AS count")
-
-                    if not inserted or int(inserted["count"]) == 0:
-                        continue
 
                     await connection.execute(
                         """

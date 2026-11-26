@@ -143,7 +143,7 @@ async def test_watch_xp_levels_only_equipped_pet_once_globally(monkeypatch, tmp_
             await service.award_interval("one", "live", interval_started_at=120 * tick)
         leveled = await pets.get_equipped_pet("viewer")
         assert leveled.progress_label == "Level 2 · 0/120 XP"
-        assert leveled.effective_passive_bps > bat.effective_passive_bps
+        assert leveled.effective_passive_bps == bat.effective_passive_bps
         await pets.equip("viewer", "Little Rat")
         await service.award_interval("two", "other", interval_started_at=1200)
         assert (await pets.get_equipped_pet("viewer")).xp == 0

@@ -18,6 +18,7 @@ from .v063_dog_of_the_sun import migrate as migrate_063
 from .v064_honey_hen import migrate as migrate_064
 from .v066_repair_honey_hen_collision import migrate as migrate_066
 from .v086_pet_watch_xp import migrate as migrate_086
+from .v087_loyalty_gain_progression import migrate as migrate_087
 
 
 MIGRATIONS = (
@@ -37,4 +38,5 @@ MIGRATIONS = (
     Migration(64, "honey_hen", migrate_064),
     Migration(66, "repair_honey_hen_collision", migrate_066),
     Migration(86, "pet_watch_xp", migrate_086),
+    Migration(87, "loyalty_gain_progression", migrate_087),
 )
