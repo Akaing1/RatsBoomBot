@@ -38,6 +38,7 @@
                 <div class="chatter-pet" title="{{ profile.pet.display_name }} ({{ profile.pet.rarity | replace('_', ' ') | title }}) · Level {{ profile.pet.level }} · {{ profile.pet.passive_name }} ({{ profile.pet.passive_rarity | replace('_', ' ') | title }})">
                     <div class="chatter-pet-sprite{% if profile.pet.pet_id == 'honey_hen' %} chatter-pet-sprite--hen{% elif profile.pet.pet_id == 'dog_of_the_sun' %} chatter-pet-sprite--sun-dog{% elif profile.pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif profile.pet.pet_id == 'witch_cat' %} chatter-pet-sprite--cat{% elif profile.pet.pet_id == 'royal_raven' %} chatter-pet-sprite--raven{% elif profile.pet.pet_id == 'horned_wolf' %} chatter-pet-sprite--wolf{% elif profile.pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ profile.pet.sprite_path | replace("'", '%27') }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ profile.pet.frame_count }}" role="img" aria-label="{{ profile.pet.display_name }}"></div>
                     <span>{{ profile.pet.display_name }} · {{ profile.pet.rarity | replace('_', ' ') | title }}</span>
+                    <small>{{ profile.pet.progress_label }}</small>
                     <small>{{ profile.pet.passive_name }} · {{ profile.pet.passive_rarity | replace('_', ' ') | title }}</small>
                     <small>{{ profile.pet.passive_percent_label }}% {{ profile.pet.passive_description }}</small>
                 </div>
@@ -78,6 +79,7 @@
                     </div>
                 </details>
             </div>
+            <p>Your equipped pet earns 10 XP every two minutes while you earn live watch points. Scaling passives improve every 10 levels.</p>
             <div class="pet-collection-grid">
                 {% for pet in profile.pets %}
                 {% set equipped = profile.pet and profile.pet.user_pet_id == pet.user_pet_id %}
@@ -87,6 +89,7 @@
                     <div class="chatter-pet-sprite{% if pet.pet_id == 'honey_hen' %} chatter-pet-sprite--hen{% elif pet.pet_id == 'dog_of_the_sun' %} chatter-pet-sprite--sun-dog{% elif pet.pet_id == 'explosive_rat' %} chatter-pet-sprite--rat{% elif pet.pet_id == 'witch_cat' %} chatter-pet-sprite--cat{% elif pet.pet_id == 'royal_raven' %} chatter-pet-sprite--raven{% elif pet.pet_id == 'horned_wolf' %} chatter-pet-sprite--wolf{% elif pet.pet_id == 'sleepy_fox' %} chatter-pet-sprite--fox{% endif %}" style="--pet-sprite: url('{{ pet.sprite_path | replace("'", '%27') }}?v={{ deployment_stamp() | urlencode }}'); --pet-frames: {{ pet.frame_count }}" role="img" aria-label="{{ pet.display_name }}"></div>
                     </div>
                     <h3>{{ pet.display_name }}</h3>
+                    <small>{{ pet.progress_label }}</small>
                     <p class="pet-passive"><strong>{{ pet.passive_percent_label }}%</strong> {{ pet.passive_description }}</p>
                     {% if not equipped %}<details class="pet-equip-help"><summary>Equip in chat</summary><code>!pets equip {{ pet.display_name }}</code></details>{% endif %}
                 </article>

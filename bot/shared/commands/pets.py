@@ -34,11 +34,10 @@ class PetsCommands(commands.Component):
             return
         service = self.bot.services.pets
         pet = await service.get_equipped_pet(str(ctx.chatter.id))
-        tickets = await service.ticket_count(str(ctx.chatter.id))
         identity = await self.bot.services.chatter_stats.resolve_identity(str(ctx.chatter.id))
         login = str(identity["login"]) if identity else str(ctx.chatter.name)
         url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/chatters/{quote(login, safe='')}#pets"
-        status = f"{pet.display_name} ({rarity_label(pet.rarity)}) equipped: {pet.passive_percent_label}% {pet.passive_description}." if pet else "No pet equipped."
+        status = f"{pet.display_name} ({rarity_label(pet.rarity)}, {pet.progress_label}) equipped: {pet.passive_percent_label}% {pet.passive_description}." if pet else "No pet equipped."
         status = self.currency_text(status, get_context_broadcaster_id(ctx))
         await ctx.reply(f"{status} View Collection: {url}")
 

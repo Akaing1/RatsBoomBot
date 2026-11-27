@@ -28,8 +28,8 @@ async def test_rat_and_passive_tiers_are_seeded_and_level_scaled(tmp_path):
         assert {row['id'] for row in rows} == set(PASSIVES)
         assert {row['rarity'] for row in rows} == {'common', 'rare', 'ultra_rare'}
         assert (await pets.get_equipped_pet('viewer')).passive_percent == 20
-        assert scaled_bps(500, 1000, 1, 50) == 500
-        assert scaled_bps(500, 1000, 50, 50) == 1000
+        assert scaled_bps(500, 750, 1, 50) == 500
+        assert scaled_bps(500, 750, 50, 50) == 750
         assert scaled_bps(100, 500, 50, 50) == 500
 
 
@@ -104,3 +104,31 @@ async def test_rare_passive_adds_only_to_mythical_weapon_roll(tmp_path, monkeypa
         result = await service.attack('channel', 'stream', 'viewer', 'viewer', config)
         assert ('viewer', 'mythical_blade') in result.drops
         assert len(result.drops) == 1
+
+
+def test_passive_upgrades_at_each_tenth_level():
+    for level in range(1, 51):
+        gamble = PASSIVES[GAMBLE_ODDS]
+        assert scaled_bps(gamble.min_bps, gamble.max_bps, level, 50) == 500 + 50 * (level // 10)
+
+
+@pytest.mark.asyncio
+async def test_loyalty_fractions_are_channel_scoped_and_duplicate_safe(tmp_path):
+    async with asqlite.create_pool(str(tmp_path / 'fraction.db')) as db:
+        await run_migrations(db)
+        pets = PetService(db)
+        pet = await pets.grant_rat('viewer')
+        async with db.acquire() as conn:
+            await conn.execute('UPDATE user_pets SET level=50 WHERE id=?', (pet.user_pet_id,))
+        assert (await pets.get_equipped_pet('viewer')).passive_percent == 15
+        points = PointsService(None, db, pets=pets)
+        for channel in ('a', 'b'):
+            for _ in range(2):
+                await points.add_points_once(channel, 'viewer', 'viewer', 5, source='test', event_id='one')
+            assert await points.get_points(channel, 'viewer') == 5
+        await points.add_points('a', 'viewer', 'viewer', 5)
+        assert await points.get_points('a', 'viewer') == 11
+        assert await points.get_points('b', 'viewer') == 5
+        async with db.acquire() as conn:
+            rows = await conn.fetchall('SELECT broadcaster_id, remainder FROM pet_loyalty_remainders')
+        assert {row['broadcaster_id']: row['remainder'] for row in rows} == {'a': 5000, 'b': 7500}
