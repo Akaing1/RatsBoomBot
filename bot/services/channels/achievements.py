@@ -18,6 +18,7 @@ SECRET_CHANNEL_ACHIEVEMENTS = {
     "win_streak": ("Quit While You're Ahead", "Win 10 consecutive settled !gamble bets in this channel.", "dice", "chat", "wins in a row"),
 }
 ACHIEVEMENTS = {
+    "gift_inspector_2026": ("Gift Inspector 2026", "Land a hit on the Mistletoe Mimic during the 2026 Christmas Boss Hunt.", "trophy"),
     "explorer": ("Community Explorer", "Check into unique channels.", "compass"),
     "regular": ("Daily Regular", "Complete daily check-ins across all channels.", "calendar"),
     "familiar": ("Familiar Face", "Complete daily check-ins in a single channel.", "home"),
@@ -133,7 +134,7 @@ class AchievementService:
                 earned[("familiar", "", tier)] = min(matches, key=lambda row: row["unlocked_at"] or "")
         cards = []
         for name, channel in [(name, "") for name in ACHIEVEMENTS]:
-            if name in {"house", "stones", "exterminator", "loss_streak_global", "win_streak_global"} and (name, channel, 4) not in earned:
+            if name in {"gift_inspector_2026", "house", "stones", "exterminator", "loss_streak_global", "win_streak_global"} and (name, channel, 4) not in earned:
                 continue
             title, description, icon = ACHIEVEMENTS[name]
             if name in streak_origins:
@@ -147,13 +148,13 @@ class AchievementService:
                 steps.append({"name": TIER_NAMES[tier - 1], "threshold": int(row["threshold"]), "earned": unlock is not None, "date": unlock["unlocked_at"] if unlock else None, "reward": None, "xp": ACHIEVEMENT_TIER_XP[tier]})
             highest = next((step for step in reversed(steps) if step["earned"]), None)
             next_tier = next((step for step in steps if not step["earned"]), None)
-            count = counts.get((name, channel), 0)
+            count = int(highest is not None) if name == "gift_inspector_2026" else counts.get((name, channel), 0)
             target = next_tier["threshold"] if next_tier else steps[-1]["threshold"]
             cards.append({
                 "title": title, "description": description, "icon": icon,
-                "category": "raids" if name in {"damage", "weapons", "buffs", "consumables", "stones"} else "chat" if name in {"collector", "winner", "house", "exterminator", "nice_try_global", "loss_streak_global", "win_streak_global"} else "check_ins",
-                "unit": {"stones": "unique blessed weapons", "exterminator": "successful kamikazes", "nice_try_global": "missed kamikazes", "loss_streak_global": "losses in a row", "win_streak_global": "wins in a row", "damage": "damage", "weapons": "weapons purchased", "buffs": "buffs purchased", "consumables": "consumables purchased", "explorer": "unique channels", "collector": "loyalty points", "winner": "loyalty points", "house": "loyalty points"}.get(name, "check-ins"),
-                "standalone": name in {"house", "stones", "exterminator", "loss_streak_global", "win_streak_global"},
+                "category": "raids" if name in {"damage", "weapons", "buffs", "consumables", "stones", "gift_inspector_2026"} else "chat" if name in {"collector", "winner", "house", "exterminator", "nice_try_global", "loss_streak_global", "win_streak_global"} else "check_ins",
+                "unit": {"gift_inspector_2026": "events joined", "stones": "unique blessed weapons", "exterminator": "successful kamikazes", "nice_try_global": "missed kamikazes", "loss_streak_global": "losses in a row", "win_streak_global": "wins in a row", "damage": "damage", "weapons": "weapons purchased", "buffs": "buffs purchased", "consumables": "consumables purchased", "explorer": "unique channels", "collector": "loyalty points", "winner": "loyalty points", "house": "loyalty points"}.get(name, "check-ins"),
+                "standalone": name in {"gift_inspector_2026", "house", "stones", "exterminator", "loss_streak_global", "win_streak_global"},
                 "scope": "channel" if channel else "global",
                 "channel": channel_metadata(channel) if channel else None,
                 "tier": highest["name"] if highest else "Locked", "steps": steps,

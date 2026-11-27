@@ -9,6 +9,7 @@ from .v032_global_blessed_achievements import migrate as migrate_032
 from .v033_channel_achievements import migrate as migrate_033
 from .v034_secret_command_achievements import migrate as migrate_034
 from .v035_community_achievements import migrate as migrate_035
+from .v089_mimic_participation import migrate as migrate_089
 
 
 MIGRATIONS = (
@@ -19,4 +20,5 @@ MIGRATIONS = (
     Migration(33, "channel_achievements", migrate_033),
     Migration(34, "secret_command_achievements", migrate_034),
     Migration(35, "community_achievements", migrate_035),
+    Migration(89, "mimic_participation", migrate_089),
 )
