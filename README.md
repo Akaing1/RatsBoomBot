@@ -118,6 +118,12 @@ Points can remain disabled without disabling unrelated redeem tracking. Meinya s
 
 Historical message totals are seeded from the previous point-eligible message count. After migration 13, every non-bot message is counted independently of the loyalty cooldown. Historical lifetime earnings begin with the balance present at migration; future totals include chat, redeem, raid, gamble, and other bot rewards while excluding moderator grants and viewer transfers.
 
+### Rat’s Recap
+
+Rat’s Recap will cover the 2027 calendar year. Once migration 90 is applied, the bot silently records daily totals for messages sent, loyalty points earned, and gambling wins and losses. Each row in `recap_daily` belongs to one viewer in one channel on one UTC day. Collection starts with new activity after migration.
+
+Viewers will first see their recap at the end of 2027. The planned stat card features their home community by active days and four personal highlights drawn from communities, attendance, chat, points and generosity, gambling, Boss Hunt, pets, and achievements.
+
 ### Pets
 
 The `pets/` package owns global pet collections, summon tickets, equipment, and passive bonuses. One pet is equipped across all channels. `!pets buy ticket` costs 50,000 loyalty points in the current channel; `!pets summon` consumes a ticket, and `!pets equip <full pet name>` changes the equipped pet. Duplicate refunds return to the ticket's purchase channel.
