@@ -4,7 +4,7 @@ RatsBoomBot is a multi-channel Twitch chatbot and streamer dashboard built with 
 
 The project is privately operated for Ninjakaing and a growing group of stream communities. Core broadcaster onboarding is self-service on the hosted website; specialized integrations and premium features may require maintainer assistance.
 
-Current application version: **17.1.5** (see [`config/version.py`](config/version.py)). Active development targets `release/17.0.0`; the branch name denotes the next release milestone.
+Current application version: **18.0.3** (see [`config/version.py`](config/version.py)). Active development targets `release/18.0.0`; the branch name denotes the next release milestone.
 
 [Website](https://ratsboombot.com) · [My account](https://ratsboombot.com/me) · [Patch notes](https://ratsboombot.com/patch-notes) · [Local development](docs/development.md)
 
@@ -38,6 +38,8 @@ Current application version: **17.1.5** (see [`config/version.py`](config/versio
 - Public patch-note archive and release articles
 - Administrator and Twitch-authenticated channel dashboards
 - SQLite migrations, deployment backups, health checks, and automated tests
+
+For a first visit, start with [local development](docs/development.md), [moderator access](docs/moderator-access.md), or the [Linux deployment guide](deploy/linux/README.md). Maintainers can also consult [timer rotation](docs/timer_rotation.md), [command slow mode](docs/command-slowmode.md), and [syncing channel user lists](docs/user-list-sync.md).
 
 ## Tech Stack
 
@@ -118,11 +120,19 @@ Points can remain disabled without disabling unrelated redeem tracking. Meinya s
 
 Historical message totals are seeded from the previous point-eligible message count. After migration 13, every non-bot message is counted independently of the loyalty cooldown. Historical lifetime earnings begin with the balance present at migration; future totals include chat, redeem, raid, gamble, and other bot rewards while excluding moderator grants and viewer transfers.
 
+Chatter level combines XP from permanent achievement unlocks and contributed boss clears across communities. See [global chatter levels](docs/chatter-levels.md) for the curve and XP values.
+
+### Rat’s Recap
+
+Rat’s Recap will cover the 2027 calendar year. Once migration 90 is applied, the bot silently records daily totals for messages sent, loyalty points earned, and gambling wins and losses. Each row in `recap_daily` belongs to one viewer in one channel on one UTC day. Collection starts with new activity after migration.
+
+Viewers will first see their recap at the end of 2027. The planned stat card features their home community by active days and four personal highlights drawn from communities, attendance, chat, points and generosity, gambling, Boss Hunt, pets, and achievements.
+
 ### Pets
 
 The `pets/` package owns global pet collections, summon tickets, equipment, and passive bonuses. One pet is equipped across all channels. `!pets buy ticket` costs 50,000 loyalty points in the current channel; `!pets summon` consumes a ticket, and `!pets equip <full pet name>` changes the equipped pet. Duplicate refunds return to the ticket's purchase channel.
 
-The eight current Common pets each have a 12.5% summon chance. Their fixed passives cover Loyalty Gain, Gamble Luck, Boss Hunt Damage, and Boss Hunt Profit. Leveling and feeding are not implemented yet. See [`docs/pets.md`](docs/pets.md) for rates, passives, and the asset workflow.
+The eight current Common pets each have a 12.5% summon chance. Their fixed passives cover Loyalty Gain, Gamble Luck, Boss Hunt Damage, and Boss Hunt Profit. The equipped pet earns 10 XP per two-minute live watch payout, once per viewer per interval across channels. Level 2 costs 100 XP and each later level costs 20 more than the last. Progress stays with the pet when switching equipment. Passives upgrade at levels 10, 20, 30, 40, and 50. Loyalty Gain rises from 10% to 15%, with fractional points carried forward in each channel. Gamble Luck adds 5 to 7.5 percentage points to win chance. Boss Hunt Damage and Profit rise from 10% to 20%. Use `!pets` or the profile’s Pets tab to check progress. See [`docs/pets.md`](docs/pets.md) for rates, passives, and the asset workflow.
 
 Administrators can grant a pet to an existing chatter identity using the selected environment's database:
 
@@ -164,13 +174,17 @@ Some directory sorting and suggested-streamer lookups use Twitch's unsupported p
 
 Boss Hunt is the separate RPG minigame with scheduled bosses, attacks, weapons, and loyalty point rewards. Streamers can monitor and manage encounters from the Boss Hunt sidebar page. Viewers use the existing `!raid` commands and `/raid/{channel}` guide; those names remain valid so saved commands and links continue to work. This feature is distinct from Twitch raids.
 
+Automatic mini-boss difficulty adjusts with prior encounters. Contribution and final-hit rewards use the channel currency. The viewer guide covers attacks, equipment, consumables, crafting, repairs, and loot. See [adaptive mini-boss difficulty](docs/dynamic-mini-bosses.md) and [Boss Hunt payouts](docs/raid-progress-payouts.md).
+
+**Mistletoe Mimic (2026)** is in development for December 11–31 UTC. Release 18 includes the rules for a shared 1,000,000 HP boss, 200,000-damage milestones, finale rewards, and the global *Gift Inspector 2026* achievement for a viewer’s first recorded contribution. Live takeover, attack routing and reward delivery are still pending.
+
 ### Clips
 
 `!clip` or `!clips` creates a 60-second clip. Adding `short` requests a 30-second clip. Clip creation includes per-channel cooldowns, in-progress protection, live validation, and profile-specific responses.
 
 The bot checks for the accepted clip for up to 60 seconds, backing off between lookups and retrying temporary failures. It announces success only when Twitch confirms the clip exists. An unconfirmed request produces a Clip Manager check message instead of a guessed link; the bot does not automatically create a duplicate clip.
 
-The **Clips** tab in For You browses channel clips with last-24-hours, 7-day, 1-month, and all-time ranges (all time by default), search, sorting, playback, and downloads. Search and sorting apply to loaded clips; load more to expand the results. Filters apply immediately.
+The **Clips** tab in For You browses channel clips with last-24-hours, 7-day, 1-month, and all-time ranges (all time by default), search, sorting, playback, and downloads. Search and sort across the selected date range, then browse the results in pages of 50. Filters apply immediately.
 
 ### Moderation
 
@@ -179,6 +193,8 @@ Moderation support includes protected users, timeout actions, and configurable b
 - `learning` records observations without action.
 - `shadow` records what would have happened.
 - `active` applies moderation actions.
+
+Administrators can review SeryBot observations at `/admin/bot-detection`. The bot records a ban even when it saw no chat from the account. It compares detector flags with the ban and allows ten seconds for delayed chat events. The review distinguishes missing observations, multiple candidate messages, and flags with no observed ban. A nearby message alone does not establish what triggered a ban.
 
 ### Game Integrations
 
@@ -195,6 +211,22 @@ Third-party game APIs may require public player profiles and do not expose every
 The root URL is the public landing page with chatter sign-in. Connected broadcasters use `/channel` for stream status, combined Twitch/YouTube chat, viewer queues, check-ins, redeems, raid discovery, and feature/customization controls. Twitch and YouTube authorization warnings appear above dashboard content with their own reauthorize actions. Linked YouTube accounts are checked on page load even while offline; temporary check failures offer Retry rather than claiming reauthorization is required. Successful YouTube reconnects clear its warning.
 
 Channel sessions are isolated by Twitch user ID and persist for the configured session lifetime. The Overview also provides polls and predictions with live summaries and history, subject to Twitch eligibility and authorization. The Followers page adds sortable statistics and raid favorites.
+
+#### Combined chat and the OBS dock
+
+Combined Chat and its OBS dock label messages relayed from other Twitch channels with their source channel. The Shared Chat filter section has an Enable shared chat toggle for all shared messages and individual toggles for each participating streamer’s chat, plus Clear and right-click-to-solo controls. Twitch’s session roster refreshes about every 30 seconds while the dashboard is open, including quiet channels; departed participants disappear from the list. Per-channel selections sync to an open OBS dock and existing per-streamer choices are preserved. Your own Twitch and YouTube messages are always included by the Shared Chat section; user and message-type filters still apply.
+
+Relayed messages and notifications are display-only for the receiving channel: they do not earn loyalty points, increment chatter statistics, advance timers/Boss Hunt activity, trigger automatic shoutouts or run bot moderation there. TwitchIO skips commands on relayed messages; commands still run in their original channel. Message IDs remain scoped to the receiving channel for replies and moderation. Shared messages use source-channel badges and role highlights.
+
+OBS chat docks include a top Twitch/YouTube/Both selector, fading connection status inside the compact message composer, and the dashboard’s searchable Twitch/7TV emote picker with inline emote previews. Sign in as the channel owner inside the OBS browser; you return automatically to the dock to send. Enter sends and Shift+Enter adds a newline. Dock URLs remain read-only without owner authentication; rotating the URL also revokes its send endpoint.
+
+#### Guided setup
+
+First-time streamers can launch an interactive tour from Overview. It highlights the actual dashboard controls, walks through moderator access and a command check, and saves progress per channel. Return to **Settings → Guided setup** to replay it.
+
+#### Stream Together
+
+Open **Stream Together** from the sidebar to host a call or view participants alongside chat. Starting a session opens Twitch’s call page, which must stay open. Guests accept their invitation on Twitch. Shared Chat enables automatic call discovery; guests can also find the host or paste a call link for multiview. Recent Stream Together partners inform raid recommendations.
 
 ### Moderator Dashboard
 
@@ -229,9 +261,13 @@ Tabs retain form drafts and mark unsaved changes. Each form saves independently,
 
 ### For You and Personal Tools
 
-The For You sidebar workspace contains **Notes, Quotes, and Clips**. Notes can be created, titled, edited, reordered, and deleted; untitled notes receive sequential names. The Overview note editor shares this storage, and delegated moderator notes are available to the streamer. Quote management uses the same channel collection as `!quote`.
+The For You sidebar workspace contains **Notes, Quotes, Clips, and Custom Commands**. Notes can be created, titled, edited, reordered, and deleted; untitled notes receive sequential names. The Overview note editor shares this storage, and delegated moderator notes are available to the streamer. Quote management uses the same channel collection as `!quote`.
 
 The Overview's personal reminder timer uses Minutes : Seconds, survives refreshes, and supports reminders from one second to seven days. Keep the dashboard open for the completion popup; overdue timers appear when you return. These reminders do not post chat messages and are separate from automated chat timers in Settings.
+
+#### Custom commands and counters
+
+In **For You → Custom Commands**, choose **Add command**, name it, and build a response on the block canvas. Commands start disabled with a zero-second cooldown. Use **Run test** to preview a flow before enabling it. Blocks can send messages, branch on arguments or roles, pick a random reply, roll a named random number, and update a channel counter. For example, increment `deaths` and send `Deaths: {counter.deaths}`. Open **Counters** in the editor to see which commands use each saved value, edit it, or reset it between streams. See the [editor guide](docs/custom_commands.md).
 
 ### Patch Notes
 
@@ -283,7 +319,7 @@ League statistics are stored separately in `.data/league.db`. This database cont
 
 Migrations run automatically during startup. The authoritative ordered registry is [`storage/migrations/__init__.py`](storage/migrations/__init__.py). It includes the original engagement schema, Boss Hunt progression, achievements, YouTube chat, viewer sessions, quotes, global pets, and raid-browser settings.
 
-Recent migrations cover For You note management, delegated channel access and authorization, retirement of the View role, follower indexing, and the unpublished combined release-note draft. Applied migration versions and names are recorded in `schema_migrations`.
+Migrations 81–85 add custom commands and counters, moderation observations, guided setup, and recent Stream Together partners. Migrations 86–90 add pet XP tracking, Loyalty Gain progression, the Gamble Luck cap, Mimic participation, and daily recap counters. Applied migration versions and names are recorded in `schema_migrations`.
 
 Migrations are grouped into core, loyalty, achievements, Boss Hunts, and pets while retaining one global version sequence. See the [migration contributor guide](docs/migrations.md) for numbering, registration, upgrade tests, and recovery. Use a new migration for schema changes instead of rebuilding the production database.
 
@@ -314,6 +350,7 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 | Clips | `!clip`, `!clip short` |
 | Raids | `!startraid <channel>` |
 | Points | `!points` or the profile currency command with `leaderboard`, `give`, `gamble`, `roulette` / `spin`, `duel`, `add`, and `reset` subcommands |
+| Boss Hunt | `!raid attack`, `!raid leaderboard`, `!raid shop`, `!raid buy`, `!raid inventory`, `!raid craft`, `!raid equip`, `!raid unequip`, `!raid repair`, `!raid sell`, `!raid loot`, `!raid help` |
 | Pets | `!pets`, `!pets buy ticket`, `!pets summon`, `!pets equip <full pet name>` |
 | Quotes | `!quote`, `!quote <number>`, `!quote add <message>`, `!quote remove <number>` |
 | Overwatch | `!ow`, `!owrank`, `!owrecord`, `!owreset` |
@@ -321,11 +358,13 @@ The default prefix is `!`. Availability depends on the profile and dashboard ove
 
 `!dailies [username]` (alias `!rollall`) rolls all enabled achievement measurements (`stinky`, `lucky`, `smart`, and `height`) in one reply. It shares each measurement's existing limit: only the first attempt per measured user per live stream counts for achievements, whether invoked individually or together. Offline rolls still respond without achievement credit.
 
-While a channel is live, connected logged-in chatters earn 15 passive points every two minutes. Twitch's connected-chatter list is used as an approximation of watch activity; the broadcaster and configured bot identities are excluded. The bot identity used by the channel must authorize `moderator:read:chatters` and be a moderator in that channel. Payout intervals are persisted so a bot restart cannot award the same interval twice.
+While a channel is live, connected logged-in chatters earn 15 passive points every two minutes. Twitch's connected-chatter list is used as an approximation of watch activity; configured bot identities and ignored users are excluded. The bot identity used by the channel must authorize `moderator:read:chatters` and be a moderator in that channel. Payout intervals are persisted so a bot restart cannot award the same interval twice.
 
 Bits spent through native Cheers earn the configured channel reward directly. Sound Alerts Bits purchases use the same reward ratio when the official `soundalerts` chatbot posts its purchase confirmation; anonymous or unresolvable purchasers are skipped, and processed chat-message IDs are persisted to prevent duplicate payouts.
 
 Roulette uses a standard single-zero wheel: 18 red, 18 black, and one green. Red and black return 2× the wager, green returns 5×, and the default cap is 1,000 units of the channel's loyalty currency. Green is intentionally a high-risk novelty bet rather than an equal-odds choice. Wagers and payouts settle atomically to prevent concurrent commands from overspending a balance.
+
+The gamble subcommand accepts a percentage of the current balance, for example `!points gamble 20%` in a channel using the default currency command.
 
 Point commands use the profile's currency command and provide `leaderboard`, `reset`, `add`, `give`, `gamble`, `roulette` / `spin`, and `duel` subcommands. Permission-sensitive actions are restricted to moderators or the broadcaster where appropriate.
 
@@ -364,7 +403,7 @@ UAT uses `https://uat.ratsboombot.com`, an independent Twitch application, and t
 
 Pull requests targeting `uat` or `release/**`, and pushes to those branches, run Python compilation and pytest. When `UAT_DEPLOY_ENABLED` is `true`, eligible pushes and same-repository, non-draft PRs targeting `release/**` deploy UAT after validation. The workflow also supports manual dispatch. UAT deployments do not publish GitHub releases or restart the production service.
 
-Complete the one-time Raspberry Pi, Twitch, Cloudflare, and GitHub setup in [`deploy/linux/UAT.md`](deploy/linux/UAT.md). Open feature and fix PRs against the active release branch (`release/16.0.0`), verify them in UAT, and merge the release branch into `master` when ready to ship.
+Complete the one-time Raspberry Pi, Twitch, Cloudflare, and GitHub setup in [`deploy/linux/UAT.md`](deploy/linux/UAT.md). Open feature and fix PRs against the active release branch (`release/18.0.0`), verify them in UAT, and merge the release branch into `master` when ready to ship.
 
 ## Testing
 
@@ -389,7 +428,7 @@ RatsBoomBot uses a practical three-part version number:
 - Minor (`X.Y.0`) — additive, non-breaking work such as a profile or contained enhancement.
 - Major (`X.0.0`) — a new system, major capability, architectural checkpoint, or release milestone.
 
-The active release branch is `release/16.0.0`. Branch names denote planned milestones; only published GitHub releases belong in the dated changelog. The homepage’s **What’s New** panel highlights major updates; the public Patch notes archive holds curated published articles. Keep it distinct from the GitHub release/changelog history and unpublished admin drafts.
+The active release branch is `release/18.0.0`. Branch names denote planned milestones; only published GitHub releases belong in the dated changelog. The homepage’s **What’s New** panel highlights major updates; the public Patch notes archive holds curated published articles. Keep it distinct from the GitHub release/changelog history and unpublished admin drafts.
 
 ## Current Limitations
 
@@ -420,11 +459,3 @@ Samples contain a Unix timestamp, PID, application version, process resident mem
 To inspect history, run `tail -n 10 /path/to/database-directory/performance.jsonl`. Copy the current file and rotated backups when investigating an incident. Samples flush after each write; a stalled process may leave a gap, and this logger cannot diagnose an outage before it was deployed. File/firmware reads run off the chat event loop, with a two-second firmware command timeout.
 
 Connection recovery and monitoring: [operations guide](docs/connection-recovery.md).
-
-### Shared Chat handling
-
-Combined Chat and its OBS dock label messages relayed from other Twitch channels with their source channel. The Shared Chat filter section has an Enable shared chat toggle for all shared messages and individual toggles for each participating streamer’s chat, plus Clear and right-click-to-solo controls. Twitch’s session roster refreshes about every 30 seconds while the dashboard is open, including quiet channels; departed participants disappear from the list. Per-channel selections sync to an open OBS dock and existing per-streamer choices are preserved. Your own Twitch and YouTube messages are always included by the Shared Chat section; user and message-type filters still apply.
-
-Relayed messages and notifications are display-only for the receiving channel: they do not earn loyalty points, increment chatter statistics, advance timers/Boss Hunt activity, trigger automatic shoutouts or run bot moderation there. TwitchIO skips commands on relayed messages; commands still run in their original channel. Message IDs remain scoped to the receiving channel for replies and moderation. Shared messages use source-channel badges and role highlights. This does not start or manage Stream Together sessions.
-
-OBS chat docks include a top Twitch/YouTube/Both selector, fading connection status inside the compact message composer, and the dashboard’s searchable Twitch/7TV emote picker with inline emote previews. Sign in as the channel owner inside the OBS browser; you return automatically to the dock to send. Enter sends and Shift+Enter adds a newline. Dock URLs remain read-only without owner authentication; rotating the URL also revokes its send endpoint.
